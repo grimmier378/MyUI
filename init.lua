@@ -79,6 +79,28 @@ local function LoadSettings()
 	LoadTheme()
 end
 
+local function InitModules()
+	if MyUI_Modules.MyChat ~= nil then
+		MyUI_MyChatLoaded = true
+		MyUI_MyChatPrehandle = MyUI_Modules.MyChat.PreHandle
+	end
+
+	for idx, data in ipairs(MyUI_Settings.mods_enabled) do
+		if data.enabled and MyUI_Modules[data.name] ~= nil then
+			local message = {
+				Subject = 'Hello',
+				Message = 'Hello',
+				Name = MyUI_CharLoaded,
+				Guild = mq.TLO.Me.Guild(),
+				Tell = '',
+				Check = os.time,
+			}
+			MyActor:send({ mailbox = MyUI_Modules[data.name].ActorMailBox, script = data.name:lower(), }, message)
+			MyActor:send({ mailbox = MyUI_Modules[data.name].ActorMailBox, script = 'grimgui', }, message)
+		end
+	end
+end
+
 local function RenderModules()
 	for _, data in ipairs(MyUI_Settings.mods_enabled) do
 		if data.enabled and MyUI_Modules[data.name] ~= nil then
@@ -105,13 +127,22 @@ local function MyUI_Render()
 					ImGui.TableNextColumn()
 					data.enabled, pressed = ImGui.Checkbox(data.name, data.enabled)
 					if pressed then
-						if MyUI_Settings.mods_enabled[idx][data.name] == false then
-							if data.enabled then
-								table.insert(mods, data.name)
-								MyUI_Modules = MyUI_LoadModules.load(mods)
+						-- if MyUI_Settings.mods_enabled[idx].enabled == false then
+						if data.enabled then
+							table.insert(mods, data.name)
+							MyUI_Modules[data.name] = MyUI_LoadModules.load(data.name)
+							InitModules()
+						else
+							MyUI_Modules[data.name] = nil
+							for i, v in ipairs(mods) do
+								if v == data.name then
+									table.remove(mods, i)
+								end
 							end
+							InitModules()
 						end
-						MyUI_Settings.mods_enabled[idx][data.name] = not MyUI_Settings.mods_enabled[idx][data.name]
+						-- end
+						MyUI_Settings.mods_enabled[idx].enabled = data.enabled
 						mq.pickle(MyUI_SettingsFile, MyUI_Settings)
 					end
 				end
@@ -149,15 +180,19 @@ end
 local args = { ..., }
 
 local function CheckMode(value)
+	if value == nil then
+		MyUI_Mode = 'driver'
+		return
+	end
 	if value[1] == 'client' then
 		MyUI_Mode = 'client'
-	else
+	elseif value[1] == 'driver' then
 		MyUI_Mode = 'driver'
 	end
 end
 
 local function CommandHandler(...)
-	local args = { ..., }
+	args = { ..., }
 	if args[1] == 'show' then
 		MyUI_Settings.ShowMain = not MyUI_Settings.ShowMain
 		mq.pickle(MyUI_SettingsFile, MyUI_Settings)
@@ -178,26 +213,9 @@ local function StartUp()
 		end
 	end
 
-	MyUI_Modules = MyUI_LoadModules.load(mods)
-	if MyUI_Modules.MyChat ~= nil then
-		MyUI_MyChatLoaded = true
-		MyUI_MyChatPrehandle = MyUI_Modules.MyChat.PreHandle
-	end
+	MyUI_Modules = MyUI_LoadModules.loadAll(mods)
 
-	for idx, data in ipairs(MyUI_Settings.mods_enabled) do
-		if data.enabled and MyUI_Modules[data.name] ~= nil then
-			local message = {
-				Subject = 'Hello',
-				Message = 'Hello',
-				Name = MyUI_CharLoaded,
-				Guild = mq.TLO.Me.Guild(),
-				Tell = '',
-				Check = os.time,
-			}
-			MyActor:send({ mailbox = MyUI_Modules[data.name].ActorMailBox, script = data.name:lower(), }, message)
-			MyActor:send({ mailbox = MyUI_Modules[data.name].ActorMailBox, script = 'grimgui', }, message)
-		end
-	end
+	InitModules()
 
 	MyUI_IsRunning = true
 	mq.imgui.init(MyUI_ScriptName .. "##" .. MyUI_CharLoaded, MyUI_Render)

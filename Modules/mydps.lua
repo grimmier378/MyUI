@@ -81,7 +81,6 @@ local function printOutput(msg, ...)
 	if not useMyChat then
 		printf(msg)
 	else
-		---@diagnostic disable-next-line: undefined-field
 		MyUI_Modules.MyChat.PreHandle(script, msg)
 	end
 end

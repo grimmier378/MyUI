@@ -34,9 +34,6 @@ function LoadTheme.EvaluateLua(str)
 	return LoadTheme.PCallString(string.format(runEnv, str))
 end
 
----@param tName string
----@param tTable table
----@return integer, integer
 function LoadTheme.StartTheme(tName, tTable)
 	local StyleCounter = 0
 	local ColorCounter = 0

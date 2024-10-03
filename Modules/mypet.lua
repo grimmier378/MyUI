@@ -188,6 +188,33 @@ local function loadSettings()
 	if newSetting then mq.pickle(configFile, settings) end
 end
 
+local function DrawTheme(tName)
+	local StyleCounter = 0
+	local ColorCounter = 0
+	for tID, tData in pairs(theme.Theme) do
+		if tData.Name == tName then
+			for pID, cData in pairs(theme.Theme[tID].Color) do
+				ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
+				ColorCounter = ColorCounter + 1
+			end
+			if tData['Style'] ~= nil then
+				if next(tData['Style']) ~= nil then
+					for sID, sData in pairs(theme.Theme[tID].Style) do
+						if sData.Size ~= nil then
+							ImGui.PushStyleVar(sID, sData.Size)
+							StyleCounter = StyleCounter + 1
+						elseif sData.X ~= nil then
+							ImGui.PushStyleVar(sID, sData.X, sData.Y)
+							StyleCounter = StyleCounter + 1
+						end
+					end
+				end
+			end
+		end
+	end
+	return ColorCounter, StyleCounter
+end
+
 local function GetButtonStates()
 	local stance = mq.TLO.Pet.Stance()
 	btnInfo.follow = stance == 'FOLLOW' and true or false
@@ -261,7 +288,7 @@ function MyPet.RenderGUI()
 			-- Set Window Name
 			local winName = string.format('%s##Main_%s', script, meName)
 			-- Load Theme
-			local ColorCount, StyleCount = LoadTheme.StartTheme(theme.Theme[themeID])
+			local ColorCount, StyleCount = DrawTheme(themeName)
 			-- Create Main Window
 			local openMain, showMain = ImGui.Begin(winName, true, winFlags)
 			-- Check if the window is open
@@ -431,7 +458,7 @@ function MyPet.RenderGUI()
 
 	if showConfigGUI then
 		local winName = string.format('%s Config##Config_%s', script, meName)
-		local ColCntConf, StyCntConf = LoadTheme.StartTheme(theme.Theme[themeID])
+		local ColCntConf, StyCntConf = DrawTheme(themeName)
 		local openConfig, showConfig = ImGui.Begin(winName, true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
 		if not openConfig then
 			showConfigGUI = false

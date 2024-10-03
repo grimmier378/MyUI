@@ -128,6 +128,33 @@ local function loadTheme()
 	end
 end
 
+local function DrawTheme(tName, tTable)
+	local StyleCounter = 0
+	local ColorCounter = 0
+	for tID, tData in pairs(tTable) do
+		if tData.Name == tName then
+			for pID, cData in pairs(tTable[tID].Color) do
+				ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
+				ColorCounter = ColorCounter + 1
+			end
+			if tData['Style'] ~= nil then
+				if next(tData['Style']) ~= nil then
+					for sID, sData in pairs(tTable[tID].Style) do
+						if sData.Size ~= nil then
+							ImGui.PushStyleVar(sID, sData.Size)
+							StyleCounter = StyleCounter + 1
+						elseif sData.X ~= nil then
+							ImGui.PushStyleVar(sID, sData.X, sData.Y)
+							StyleCounter = StyleCounter + 1
+						end
+					end
+				end
+			end
+		end
+	end
+	return ColorCounter, StyleCounter
+end
+
 local function loadSettings()
 	-- Check if the dialog data file exists
 	local newSetting = false
@@ -482,7 +509,7 @@ end
 
 local function DrawConfigWin()
 	if not configWindowShow then return end
-	local ColorCountTheme, StyleCountTheme = LoadTheme.StartTheme(theme.Theme[themeID])
+	local ColorCountTheme, StyleCountTheme = DrawTheme(themeName, theme.Theme)
 	local openTheme, showTheme = ImGui.Begin('Config##MySpells_', true,
 		bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoFocusOnAppearing))
 	if not openTheme then
@@ -560,7 +587,7 @@ function MySpells.RenderGUI()
 	if not aSize then winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse) end
 	if locked then winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoMove) end
 	if not showTitle then winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoTitleBar) end
-	local ColorCount, StyleCount = LoadTheme.StartTheme(theme.Theme[themeID])
+	local ColorCount, StyleCount = DrawTheme(themeName, theme.Theme)
 	local open, show = ImGui.Begin(bIcon .. '##MySpells_' .. mq.TLO.Me.Name(), true, winFlags)
 	if not open then
 		RUNNING = false
@@ -827,7 +854,7 @@ function MySpells.RenderGUI()
 		if castLocked then castFlags = bit32.bor(castFlags, ImGuiWindowFlags.NoMove) end
 		if not showTitleCasting then castFlags = bit32.bor(castFlags, ImGuiWindowFlags.NoTitleBar) end
 		castTheme.Theme[themeID].Color[2].Color[4] = castTransparency or 1
-		local ColorCountCast, StyleCountCast = LoadTheme.StartTheme(castTheme.Theme[themeID])
+		local ColorCountCast, StyleCountCast = DrawTheme(themeName, castTheme.Theme)
 		ImGui.SetNextWindowSize(ImVec2(150, 55), ImGuiCond.FirstUseEver)
 		ImGui.SetNextWindowPos(ImGui.GetMousePosVec(), ImGuiCond.FirstUseEver)
 

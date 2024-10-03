@@ -2233,15 +2233,15 @@ local function MyChatTloHandler(consoleName, message)
     return 'nil', true
 end
 
---Register the TLO
-mq.AddTopLevelObject('MyChatTlo', function(param)
-    if not param or param:len() == 0 then return "My Chat", "My Chat" end
-    local consoleName, message = param:match("([^,]+)%s*,%s*(.+)")
+-- --Register the TLO
+-- mq.AddTopLevelObject('MyChatTlo', function(param)
+--     if not param or param:len() == 0 then return "My Chat", "My Chat" end
+--     local consoleName, message = param:match("([^,]+)%s*,%s*(.+)")
 
-    consoleName = consoleName:match("^%s*(.-)%s*$")
-    message = message:match("^%s*(.-)%s*$")
-    return MyChatTloHandler(consoleName, message), true
-end)
+--     consoleName = consoleName:match("^%s*(.-)%s*$")
+--     message = message:match("^%s*(.-)%s*$")
+--     return MyChatTloHandler(consoleName, message), true
+-- end)
 
 function MyChat.SortChannels()
     sortedChannels = {}

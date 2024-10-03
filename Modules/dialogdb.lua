@@ -80,6 +80,33 @@ local function loadTheme()
 	end
 end
 
+local function DrawTheme(tName)
+	local StyleCounter = 0
+	local ColorCounter = 0
+	for tID, tData in pairs(DialogDB.theme.Theme) do
+		if tData.Name == tName then
+			for pID, cData in pairs(DialogDB.theme.Theme[tID].Color) do
+				ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
+				ColorCounter = ColorCounter + 1
+			end
+			if tData['Style'] ~= nil then
+				if next(tData['Style']) ~= nil then
+					for sID, sData in pairs(DialogDB.theme.Theme[tID].Style) do
+						if sData.Size ~= nil then
+							ImGui.PushStyleVar(sID, sData.Size)
+							StyleCounter = StyleCounter + 1
+						elseif sData.X ~= nil then
+							ImGui.PushStyleVar(sID, sData.X, sData.Y)
+							StyleCounter = StyleCounter + 1
+						end
+					end
+				end
+			end
+		end
+	end
+	return ColorCounter, StyleCounter
+end
+
 local function loadSettings()
 	-- Check if the dialog data file exists
 	if not MyUI_Utils.File.Exists(dialogData) then
@@ -344,7 +371,7 @@ local function handleCombinedDialog()
 end
 
 local function DrawEditWin(server, target, zone, desc, cmd)
-	local ColorCountEdit, StyleCountEdit = LoadTheme.StartTheme(DialogDB.theme.Theme[themeID])
+	local ColorCountEdit, StyleCountEdit = DrawTheme(DialogDB.themeName)
 	local openE, showE = ImGui.Begin("Edit Dialog##Dialog_Edit_" .. MyUI_CharLoaded, true, ImGuiWindowFlags.NoCollapse)
 	if not openE then
 		DialogDB.editGUI = false
@@ -423,7 +450,7 @@ local function DrawConfigWin()
 		tmpTarget = CurrTarget
 	end
 	ImGui.SetNextWindowSize(580, 350, ImGuiCond.Appearing)
-	local ColorCountConf, StyleCountConf = LoadTheme.StartTheme(DialogDB.theme.Theme[themeID])
+	local ColorCountConf, StyleCountConf = DrawTheme(DialogDB.themeName)
 	local openC, showC = ImGui.Begin("NPC Dialog Config##Dialog_Config_" .. MyUI_CharLoaded, true, ImGuiWindowFlags.NoCollapse)
 	if not openC then
 		if newTarget then
@@ -587,7 +614,7 @@ local function DrawConfigWin()
 end
 
 local function DrawThemeWin()
-	local ColorCountTheme, StyleCountTheme = LoadTheme.StartTheme(DialogDB.theme.Theme[themeID])
+	local ColorCountTheme, StyleCountTheme = DrawTheme(DialogDB.themeName)
 	local openTheme, showTheme = ImGui.Begin('Theme Selector##DialogDB_' .. MyUI_CharLoaded, true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
 	if not openTheme then
 		DialogDB.themeGUI = false
@@ -680,7 +707,7 @@ local function DrawHelpWin()
 end
 
 local function DrawMainWin()
-	local ColorCount, StyleCount = LoadTheme.StartTheme(DialogDB.theme.Theme[themeID])
+	local ColorCount, StyleCount = DrawTheme(DialogDB.themeName)
 	local openMain, showMain = ImGui.Begin("NPC Dialog##DialogDB_Main_" .. MyUI_CharLoaded, true, winFlags)
 	if not openMain then
 		DialogDB.ShowDialog = false

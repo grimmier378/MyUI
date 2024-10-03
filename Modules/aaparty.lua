@@ -171,6 +171,33 @@ local function GenerateContent(who, sub, what)
     }
 end
 
+local function DrawTheme(tName)
+    local StyleCounter = 0
+    local ColorCounter = 0
+    for tID, tData in pairs(theme.Theme) do
+        if tData.Name == tName then
+            for pID, cData in pairs(theme.Theme[tID].Color) do
+                ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
+                ColorCounter = ColorCounter + 1
+            end
+            if tData['Style'] ~= nil then
+                if next(tData['Style']) ~= nil then
+                    for sID, sData in pairs(theme.Theme[tID].Style) do
+                        if sData.Size ~= nil then
+                            ImGui.PushStyleVar(sID, sData.Size)
+                            StyleCounter = StyleCounter + 1
+                        elseif sData.X ~= nil then
+                            ImGui.PushStyleVar(sID, sData.X, sData.Y)
+                            StyleCounter = StyleCounter + 1
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return ColorCounter, StyleCounter
+end
+
 local function sortedBoxes(boxes)
     table.sort(boxes, function(a, b)
         return a.Name < b.Name
@@ -373,7 +400,7 @@ function AAParty.RenderGUI()
         else
             winFlags = bit32.bor(ImGuiWindowFlags.None)
         end
-        local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(theme.Theme[themeID] or {})
+        local ColorCount, StyleCount = DrawTheme(settings[script].LoadTheme or 'Default')
         local openGUI, showGUI = imgui.Begin("AA Party##AA_Party_" .. MyUI_CharLoaded, true, winFlags)
         if not openGUI then
             AAPartyShow = false
@@ -534,7 +561,7 @@ function AAParty.RenderGUI()
     end
 
     if MailBoxShow then
-        local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(theme.Theme[themeID])
+        local ColorCount, StyleCount = DrawTheme(settings[script].LoadTheme or 'Default')
         local openMail, showMail = imgui.Begin("AA Party MailBox##MailBox_" .. MyUI_CharLoaded, true, ImGuiWindowFlags.None)
         if not openMail then
             MailBoxShow = false
@@ -574,7 +601,7 @@ function AAParty.RenderGUI()
     end
 
     if AAPartyConfigShow then
-        local ColorCountTheme, StyleCountTheme = MyUI_ThemeLoader.StartTheme(theme.Theme[themeID])
+        local ColorCountTheme, StyleCountTheme = DrawTheme(settings[script].LoadTheme or 'Default')
         local openTheme, showConfig = ImGui.Begin('Config##MySpells_', true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
         if not openTheme then
             AAPartyConfigShow = false

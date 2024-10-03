@@ -416,10 +416,10 @@ function SillySounds.RenderGUI()
     ImGui.End()
 end
 
+local clockTimer = mq.gettime()
 -- Main loop
 function SillySounds.MainLoop()
     mq.doevents()
-    mq.delay(1)
 
     if mq.TLO.Window('ConfirmationDialogBox').Open() then
         alarmTagged = false
@@ -443,14 +443,17 @@ function SillySounds.MainLoop()
         local curTime = os.time()
         if curTime - timerPlay > soundDuration then
             resetVolume()
+            clockTimer = mq.gettime()
         end
     end
 
     if not playing and timerPlay == 0 then
-        mq.delay(100)
-        local tmpVol = getVolume()
-        if originalVolume ~= tmpVol then
-            originalVolume = tmpVol
+        if mq.gettime() - clockTimer > 100 then
+            local tmpVol = getVolume()
+            if originalVolume ~= tmpVol then
+                originalVolume = tmpVol
+            end
+            clockTimer = mq.gettime()
         end
     end
 end

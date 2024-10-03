@@ -14,7 +14,7 @@ MyUI_LoadModules     = MyUI_Utils.Library.Include('lib.modules')
 
 MyUI_SQLite3         = MyUI_PackageMan.Require('lsqlite3')
 MyUI_Colors          = MyUI_Utils.Library.Include('lib.colors')
-MyUI_ThemeLoader     = MyUI_Utils.Library.Include('lib.theme_loader')
+MyUI_ThemeLoader     = require('lib.theme_loader')
 MyUI_AbilityPicker   = MyUI_Utils.Library.Include('lib.AbilityPicker')
 
 -- build, char, server info
@@ -77,6 +77,7 @@ local function MyUI_Render()
 
 		if not open_gui then
 			MyUI_Settings.ShowMain = false
+			mq.pickle(MyUI_SettingsFile, MyUI_Settings)
 		end
 		if ImGui.BeginTable("Modules", 2, ImGuiWindowFlags.None) then
 			if show_gui then

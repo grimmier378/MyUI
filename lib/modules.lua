@@ -16,16 +16,6 @@ function Module.load(module_list)
 	return newModule
 end
 
-function Module.Render(module_list)
-	local modules = {}
-	for _, module in ipairs(module_list) do
-		local moduleName = require("modules." .. module:lower())
-		if moduleName then
-			modules[module] = moduleName
-		end
-	end
-end
-
 -- function Module.GetModuleList()
 -- 	return Module.modules
 -- end

@@ -9,7 +9,6 @@
 -- Load Libraries
 local mq                                                         = require('mq')
 local ImGui                                                      = require('ImGui')
-local LoadTheme                                                  = require('lib.theme_loader')
 local MyPaths                                                    = {}
 -- Variables
 local script                                                     = 'MyPaths' -- Change this to the name of your script
@@ -145,7 +144,7 @@ local function loadTheme()
         theme = dofile(themeFile)
     else
         -- Create the theme file from the defaults
-        theme = require('themes') -- your local themes file incase the user doesn't have one in config folder
+        theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
         mq.pickle(themeFile, theme)
     end
     -- Load the theme from the settings file
@@ -1203,7 +1202,7 @@ function MyPaths.RenderGUI()
         -- Set Window Name
         local winName = string.format('%s##Main_%s', script, meName)
         -- Load Theme
-        local ColorCount, StyleCount = LoadTheme.StartTheme(theme.Theme[themeID])
+        local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(theme.Theme[themeID])
         -- Create Main Window
         local openMain, showMain = ImGui.Begin(winName, true, winFlags)
         -- Check if the window is open
@@ -2104,7 +2103,7 @@ function MyPaths.RenderGUI()
         -- Reset Font Scale
         ImGui.SetWindowFontScale(1)
         -- Unload Theme
-        LoadTheme.EndTheme(ColorCount, StyleCount)
+        MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
         ImGui.End()
     end
 
@@ -2112,7 +2111,7 @@ function MyPaths.RenderGUI()
     if showConfigGUI then
         if currZone ~= lastZone then return end
         local winName = string.format('%s Config##Config_%s', script, meName)
-        local ColCntConf, StyCntConf = LoadTheme.StartTheme(theme.Theme[themeID])
+        local ColCntConf, StyCntConf = MyUI_ThemeLoader.StartTheme(theme.Theme[themeID])
         local openConfig, showConfig = ImGui.Begin(winName, true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
         if not openConfig then
             showConfigGUI = false
@@ -2326,7 +2325,7 @@ function MyPaths.RenderGUI()
         end
         -- Reset Window Font Scale
         ImGui.SetWindowFontScale(1)
-        LoadTheme.EndTheme(ColCntConf, StyCntConf)
+        MyUI_ThemeLoader.EndTheme(ColCntConf, StyCntConf)
         ImGui.End()
     end
 
@@ -2748,6 +2747,8 @@ function MyPaths.MainLoop()
         justZoned = true
     end
 
+    if justZoned then return end
+
     if NavSet.doNav and NavSet.ChainStart and not NavSet.doChainPause then NavSet.ChainPath = NavSet.SelectedPath end
 
     if NavSet.ChainStart and NavSet.doChainPause then
@@ -2784,7 +2785,7 @@ function MyPaths.MainLoop()
         end
         NavSet.ChainStart = true
         NavSet.CurChain = 1
-        mq.delay(500)
+        -- mq.delay(500)
     end
 
     if not mq.TLO.Me.Sitting() then
@@ -2811,11 +2812,6 @@ function MyPaths.MainLoop()
         NavSet.CurrentStepIndex = 1
         status = 'Idle'
         PathStartClock, PathStartTime = nil, nil
-    end
-    -- Make sure we are still in game or exit the script.
-    if mq.TLO.EverQuest.GameState() ~= "INGAME" then
-        printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
-        mq.exit()
     end
 
     -- check interrupts
@@ -2923,7 +2919,6 @@ function MyPaths.MainLoop()
         NavSet.CurrentStepIndex = 1
 
         PathStartClock, PathStartTime = nil, nil
-        mq.delay(100)
     end
 
     -- Update previousDoNav to the current state
@@ -2956,11 +2951,9 @@ function MyPaths.MainLoop()
                     NavSet.doPingPong = false
                 end
                 NavSet.CurChain = NavSet.CurChain + 1
-                mq.delay(5)
                 NavSet.doNav = true
                 PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
             end
-            mq.delay(5)
         elseif ChainedPaths[NavSet.CurChain].Path == NavSet.ChainPath and NavSet.CurChain == #ChainedPaths then
             if not NavSet.ChainLoop then
                 NavSet.ChainStart = false
@@ -3021,8 +3014,6 @@ function MyPaths.MainLoop()
     -- Process ImGui Window Flag Changes
     winFlags = locked and bit32.bor(ImGuiWindowFlags.NoMove, ImGuiWindowFlags.MenuBar) or bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.MenuBar)
     winFlags = aSize and bit32.bor(winFlags, ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.MenuBar) or winFlags
-
-    mq.delay(1)
 end
 
 Init()

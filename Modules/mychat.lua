@@ -102,7 +102,7 @@ local MyChat                                     = {
     -- Consoles
     Consoles = {},
     -- Flags
-    tabFlags = bit32.bor(ImGuiTabBarFlags.Reorderable),
+    tabFlags = bit32.bor(ImGuiTabBarFlags.Reorderable, ImGuiTabBarFlags.FittingPolicyResizeDown, ImGuiTabBarFlags.TabListPopupButton),
     winFlags = bit32.bor(ImGuiWindowFlags.MenuBar, ImGuiWindowFlags.NoScrollbar),
     PopOutFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar),
 
@@ -921,7 +921,7 @@ local function DrawConsole(channelID)
     local scale = MyChat.Settings.Channels[channelID].Scale
     local PopOut = MyChat.Settings.Channels[channelID].PopOut
     if zoom and MyChat.Consoles[channelID].txtBuffer ~= '' then
-        local footerHeight = 30
+        local footerHeight = 35
         local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
         contentSizeY = contentSizeY - footerHeight
 
@@ -978,10 +978,10 @@ local function DrawConsole(channelID)
         end
         ImGui.EndChild()
     else
-        local footerHeight = 30
+        local footerHeight = 35
         local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
         contentSizeY = contentSizeY - footerHeight
-        MyChat.Consoles[channelID].console:Render(ImVec2(contentSizeX, contentSizeY))
+        MyChat.Consoles[channelID].console:Render(ImVec2(0, 0))
     end
     --Command Line
     ImGui.Separator()
@@ -1216,7 +1216,7 @@ local function DrawChatWindow()
             end
             ActTab = 'Main'
             activeID = 0
-            local footerHeight = 30
+            local footerHeight = 35
             local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
             contentSizeY = contentSizeY - footerHeight
             if ImGui.BeginPopupContextWindow() then
@@ -1233,7 +1233,7 @@ local function DrawChatWindow()
                 ImGui.EndPopup()
             end
             if not zoomMain then
-                MyChat.console:Render(ImVec2(contentSizeX, contentSizeY))
+                MyChat.console:Render(ImVec2(0, contentSizeY))
                 --Command Line
                 ImGui.Separator()
                 local textFlags = bit32.bor(0,
@@ -1243,7 +1243,7 @@ local function DrawChatWindow()
                 -- ImGuiInputTextFlags.CallbackHistory
                 )
             else
-                footerHeight = 30
+                footerHeight = 35
                 contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
                 contentSizeY = contentSizeY - footerHeight
 
@@ -1323,7 +1323,7 @@ local function DrawChatWindow()
                 setFocus = true
             end
             ImGui.SetItemDefaultFocus()
-            if MyChat.KeyFocus and not IsItemFocused and ImGui.IsKeyPressed(ImGuiKey[MyChat.KeyName]) then
+            if MyChat.KeyFocus and not ImGui.IsItemFocused() and ImGui.IsKeyPressed(ImGuiKey[MyChat.KeyName]) then
                 setFocus = true
             end
             if setFocus then
@@ -2311,7 +2311,6 @@ function MyChat.MainLoop()
         lastTime = os.clock()
     end
     mq.doevents()
-    mq.delay(1)
 end
 
 init()

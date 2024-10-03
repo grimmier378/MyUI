@@ -42,7 +42,7 @@ local function loadTheme()
     if MyUI_Utils.File.Exists(themeFile) then
         theme = dofile(themeFile)
     else
-        theme = require('themes') -- your local themes file incase the user doesn't have one in config folder
+        theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
     end
     TempSettings.themeName = settings[script].LoadTheme or 'Default'
     if theme and theme.Theme then
@@ -373,7 +373,7 @@ function AAParty.RenderGUI()
         else
             winFlags = bit32.bor(ImGuiWindowFlags.None)
         end
-        local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(theme.Theme[themeID])
+        local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(theme.Theme[themeID] or {})
         local openGUI, showGUI = imgui.Begin("AA Party##AA_Party_" .. MyUI_CharLoaded, true, winFlags)
         if not openGUI then
             AAPartyShow = false
@@ -532,7 +532,6 @@ function AAParty.RenderGUI()
             imgui.End()
         end
     end
-
 
     if MailBoxShow then
         local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(theme.Theme[themeID])

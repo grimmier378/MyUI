@@ -285,6 +285,8 @@ local function startup()
 	lastZone = currZone
 end
 
+local clockTimer = mq.gettime()
+
 function SAST.MainLoop()
 	if refreshStats then
 		mq.delay(3000, function() return (mq.TLO.Window("AdventureStatsWnd/AdvStats_ThemeList").List(1)() or 0) ~= 0 end)
@@ -297,31 +299,33 @@ function SAST.MainLoop()
 	if mq.TLO.Window('CharacterListWnd').Open() then return false end
 	if currZone ~= lastZone then
 		lastZone = currZone
-		mq.delay('1s')
+		clockTimer = mq.gettime()
 	end
-	local advActive = checkAdv() ~= 'No Adventure Started'
-	local expActive = checkExp() ~= 'No Expedition Started'
-	if advActive or expActive then
-		guiOpen = true
-		-- if ingame window is open and we didn't set the flag close it on all characters. we most likely zoned or just accepted the quest.
-		if not eqWinAdvOpen and AdvWIN.Open() and advActive then
-			if doDelay and delayTime ~= nil then mq.delay(delayTime) end
-			if mode == 'Solo' then
-				AdvWIN.DoClose()
-			else
-				mq.cmdf('/noparse %s/lua parse mq.TLO.Window("AdventureRequestWnd").DoClose()', groupCmd)
+	if mq.gettime() - clockTimer > 1000 then
+		local advActive = checkAdv() ~= 'No Adventure Started'
+		local expActive = checkExp() ~= 'No Expedition Started'
+		if advActive or expActive then
+			guiOpen = true
+			-- if ingame window is open and we didn't set the flag close it on all characters. we most likely zoned or just accepted the quest.
+			if not eqWinAdvOpen and AdvWIN.Open() and advActive then
+				if doDelay and delayTime ~= nil then mq.delay(delayTime) end
+				if mode == 'Solo' then
+					AdvWIN.DoClose()
+				else
+					mq.cmdf('/noparse %s/lua parse mq.TLO.Window("AdventureRequestWnd").DoClose()', groupCmd)
+				end
 			end
-		end
-		if not eqWinExpOpen and ExpWIN.Open() and expActive then
-			if doDelay and delayTime ~= nil then mq.delay(delayTime) end
-			if mode == 'Solo' then
-				ExpWIN.DoClose()
-			else
-				mq.cmdf('/noparse %s/lua parse mq.TLO.Window("DynamicZoneWnd").DoClose()', groupCmd)
+			if not eqWinExpOpen and ExpWIN.Open() and expActive then
+				if doDelay and delayTime ~= nil then mq.delay(delayTime) end
+				if mode == 'Solo' then
+					ExpWIN.DoClose()
+				else
+					mq.cmdf('/noparse %s/lua parse mq.TLO.Window("DynamicZoneWnd").DoClose()', groupCmd)
+				end
 			end
+		else
+			guiOpen = false
 		end
-	else
-		guiOpen = false
 	end
 end
 

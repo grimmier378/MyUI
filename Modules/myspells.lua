@@ -113,8 +113,8 @@ local function loadTheme()
 			theme = dofile(themeFileOld)
 			castTheme = dofile(themeFileOld)
 		else
-			theme = require('themes') -- your local themes file incase the user doesn't have one in config folder
-			castTheme = require('themes')
+			theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
+			castTheme = require('defaults.themes')
 		end
 		mq.pickle(themeFile, theme)
 	end

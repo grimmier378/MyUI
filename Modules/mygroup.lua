@@ -92,7 +92,7 @@ local function loadTheme()
     if File_Exists(themeFile) then
         theme = dofile(themeFile)
     else
-        theme = require('themes')
+        theme = require('defaults.themes')
     end
     themeName = theme.LoadTheme or themeName
 end
@@ -925,17 +925,17 @@ local function init()
     lastZone = currZone
 end
 
+local clockTimer = mq.gettime()
+
 function MyGroup.MainLoop()
     meID = TLO.Me.ID()
     if TLO.Window('CharacterListWnd').Open() then return false end
     currZone = mq.TLO.Zone.ID()
     if not mq.TLO.MacroQuest.GameState() == "INGAME" then mq.exit() end
-    mq.delay(33)
-
+    local timdiff = mq.gettime() - clockTimer
     if currZone ~= lastZone then
         mimicMe = false
         followMe = false
-        mq.delay(100)
         lastZone = currZone
     end
 
@@ -951,10 +951,5 @@ function MyGroup.MainLoop()
     end
 end
 
-if mq.TLO.EverQuest.GameState() ~= "INGAME" then
-    print("\aw[\atMySpells\ax] \arNot in game, \ayTry again later...")
-    mq.exit()
-end
 init()
-printf("\ag %s \aw[\ayMy Group\aw] ::\at Loaded", TLO.Time())
 return MyGroup

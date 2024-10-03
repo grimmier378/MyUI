@@ -67,7 +67,7 @@ local function loadTheme()
 		if MyUI_Utils.File.Exists(themeFileOld) then
 			DialogDB.theme = dofile(themeFileOld)
 		else
-			DialogDB.theme = require('themes') -- your local themes file incase the user doesn't have one in config folder
+			DialogDB.theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
 		end
 		mq.pickle(themeFile, DialogDB.theme)
 	end
@@ -860,26 +860,25 @@ end
 local clockTimer = mq.gettime()
 function DialogDB.MainLoop()
 	local elapsedTime = mq.gettime() - clockTimer
-	-- if elapsedTime >= 50 then
-	currZoneShort = mq.TLO.Zone.ShortName() or 'None'
-	if currZoneShort ~= lastZone then
-		tmpDesc = ''
-		CurrTarget = 'None'
-		hasDialog = false
-		DialogDB.ShowDialog = false
-		DialogDB.ConfUI = false
-		DialogDB.editGUI = false
-		mq.delay(500)
-		lastZone = currZoneShort
-		searchString = ""
+	if elapsedTime >= 50 then
+		currZoneShort = mq.TLO.Zone.ShortName() or 'None'
+		if currZoneShort ~= lastZone then
+			tmpDesc = ''
+			CurrTarget = 'None'
+			hasDialog = false
+			DialogDB.ShowDialog = false
+			DialogDB.ConfUI = false
+			DialogDB.editGUI = false
+			lastZone = currZoneShort
+			searchString = ""
+		end
+		if checkDialog() then
+			DialogDB.ShowDialog = true
+		else
+			DialogDB.ShowDialog = false
+			if CurrTarget ~= mq.TLO.Target.DisplayName() then tmpDesc = '' end
+		end
 	end
-	if checkDialog() then
-		DialogDB.ShowDialog = true
-	else
-		DialogDB.ShowDialog = false
-		if CurrTarget ~= mq.TLO.Target.DisplayName() then tmpDesc = '' end
-	end
-	-- end
 	mq.doevents()
 end
 

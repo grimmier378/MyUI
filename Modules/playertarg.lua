@@ -94,7 +94,7 @@ local function loadTheme()
     if MyUI_Utils.File.Exists(themeFile) then
         theme = dofile(themeFile)
     else
-        theme = require('themes')
+        theme = require('defaults.themes')
     end
     themeName = theme.LoadTheme or 'notheme'
 end
@@ -1083,18 +1083,21 @@ local function init()
     loadSettings()
 end
 
-function PlayerTarg.MainLoop()
-    if mq.TLO.EverQuest.GameState() ~= "INGAME" then mq.exit() end
-    mq.delay(10)
-    pulseIcon(pulseSpeed)
-    pulseCombat(combatPulseSpeed)
+local clockTimer = mq.gettime()
 
-    ---@diagnostic disable-next-line: undefined-field
-    breathPct = mq.TLO.Me.PctAirSupply() or 100
-    if breathPct < 100 then
-        breathBarShow = true
-    else
-        breathBarShow = false
+function PlayerTarg.MainLoop()
+    local timeDiff = mq.gettime() - clockTimer
+    if timeDiff > 10 then
+        pulseIcon(pulseSpeed)
+        pulseCombat(combatPulseSpeed)
+
+        ---@diagnostic disable-next-line: undefined-field
+        breathPct = mq.TLO.Me.PctAirSupply() or 100
+        if breathPct < 100 then
+            breathBarShow = true
+        else
+            breathBarShow = false
+        end
     end
 end
 

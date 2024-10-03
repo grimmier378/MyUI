@@ -37,7 +37,7 @@ end
 ---@param theme table
 ---@return integer, integer
 function LoadTheme.StartTheme(theme)
-	if not theme == type('table') then return 0, 0 end
+	if type(theme) == 'table' then return 0, 0 end
 
 	local themeColorPop = 0
 	local themeStylePop = 0

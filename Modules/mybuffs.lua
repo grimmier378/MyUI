@@ -566,7 +566,7 @@ local function loadTheme()
     if MyUI_Utils.File.Exists(themeFile) then
         MyBuffs.theme = dofile(themeFile)
     else
-        MyBuffs.theme = require('themes')
+        MyBuffs.theme = require('defaults.themes')
         mq.pickle(themeFile, MyBuffs.theme)
     end
     themeName = MyBuffs.theme.LoadTheme or 'notheme'
@@ -1722,7 +1722,6 @@ function MyBuffs.MainLoop()
     local elapsedTime = mq.gettime() - clockTimer
     if (not solo and elapsedTime >= 500) or (solo and elapsedTime >= 33) then -- refresh faster if solo, otherwise every half second to report is reasonable
         if currZone ~= lastZone then
-            mq.delay(100)
             lastZone = currZone
         end
         if not solo then CheckStale() end

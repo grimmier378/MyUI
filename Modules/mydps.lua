@@ -100,7 +100,7 @@ local function loadThemeTable()
 	if File_Exists(themeFile) then
 		theme = dofile(themeFile)
 	else
-		theme = require('themes') -- your local themes file incase the user doesn't have one in config folder
+		theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
 		mq.pickle(themeFile, theme)
 	end
 	themeName = settings.Options.useTheme or 'Default'
@@ -1447,12 +1447,6 @@ function MyDPS.MainLoop()
 			uiTime = 0
 		end
 	end
-end
-
--- Make sure we are in game before running the script
-if mq.TLO.EverQuest.GameState() ~= "INGAME" then
-	printOutput("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
-	mq.exit()
 end
 
 Init()

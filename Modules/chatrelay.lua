@@ -390,7 +390,7 @@ function ChatRelay.RenderGUI()
         ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0.6))
         ImGui.SetNextWindowSize(100, 100, ImGuiCond.FirstUseEver)
         ImGui.SetNextWindowPos(500, 700, ImGuiCond.FirstUseEver)
-        local openMini, showMini = ImGui.Begin("Chat Relay Mini##" .. ME, true, bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar))
+        local openMini, showMini = ImGui.Begin("Chat Relay Mini##" .. MyUI_CharLoaded, true, bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar))
         if not openMini then
             Minimized = false
         end
@@ -534,13 +534,13 @@ local clockTimer = mq.gettime()
 function ChatRelay.MainLoop()
     mq.doevents()
     local elapsedTime = mq.gettime() - clockTimer
-    -- if elapsedTime >= 50 then
-    currZone = mq.TLO.Zone.ID()
-    if currZone ~= lastZone then
-        lastZone = currZone
+    if elapsedTime >= 50 then
+        currZone = mq.TLO.Zone.ID()
+        if currZone ~= lastZone then
+            lastZone = currZone
+        end
+        if not showMain and mode == 'driver' then Minimized = true end
     end
-    if not showMain and mode == 'driver' then Minimized = true end
-    -- end
 end
 
 init()

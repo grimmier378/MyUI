@@ -81,7 +81,7 @@ local function loadTheme()
 		theme = dofile(themeFile)
 	else
 		-- Create the theme file from the defaults
-		theme = require('themes') -- your local themes file incase the user doesn't have one in config folder
+		theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
 		mq.pickle(themeFile, theme)
 	end
 	-- Load the theme from the settings file
@@ -664,35 +664,32 @@ local function Init()
 	GetButtonStates()
 end
 
+local clockTimer = mq.gettime()
 function MyPet.MainLoop()
 	-- Main Loop
-
-	petName = mq.TLO.Pet.DisplayName() or 'No Pet'
-	local curTime = os.time()
-	-- Process ImGui Window Flag Changes
-	winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoFocusOnAppearing)
-	winFlags = locked and bit32.bor(ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoResize, winFlags) or winFlags
-	-- winFlags = aSize and bit32.bor(winFlags, ImGuiWindowFlags.AlwaysAutoResize) or winFlags
-	winFlags = not showTitleBar and bit32.bor(winFlags, ImGuiWindowFlags.NoTitleBar) or winFlags
-	if petName ~= 'No Pet' then
-		GetButtonStates()
-		if curTime - lastCheck > 1 then
-			getPetData()
-			lastCheck = curTime
+	local timeDiff = mq.gettime() - clockTimer
+	if timeDiff > 33 then
+		petName = mq.TLO.Pet.DisplayName() or 'No Pet'
+		local curTime = os.time()
+		-- Process ImGui Window Flag Changes
+		winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoFocusOnAppearing)
+		winFlags = locked and bit32.bor(ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoResize, winFlags) or winFlags
+		-- winFlags = aSize and bit32.bor(winFlags, ImGuiWindowFlags.AlwaysAutoResize) or winFlags
+		winFlags = not showTitleBar and bit32.bor(winFlags, ImGuiWindowFlags.NoTitleBar) or winFlags
+		if petName ~= 'No Pet' then
+			GetButtonStates()
+			if curTime - lastCheck > 1 then
+				getPetData()
+				lastCheck = curTime
+			end
+		else
+			petBuffCount = 0
+			petBuffs = {}
 		end
-	else
-		petBuffCount = 0
-		petBuffs = {}
+		clockTimer = mq.gettime()
 	end
-
-	mq.delay(33)
 end
 
--- Make sure we are in game before running the script
-if mq.TLO.EverQuest.GameState() ~= "INGAME" then
-	printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
-	mq.exit()
-end
 Init()
 
 return MyPet

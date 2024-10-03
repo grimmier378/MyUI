@@ -11,7 +11,6 @@ MyUI_Icons           = MyUI_Utils.Library.Include('mq.ICONS')
 MyUI_Base64          = MyUI_Utils.Library.Include('lib.base64') -- Ensure you have a base64 module available
 MyUI_PackageMan      = MyUI_Utils.Library.Include('mq.PackageMan')
 MyUI_LoadModules     = MyUI_Utils.Library.Include('lib.modules')
-
 MyUI_SQLite3         = MyUI_PackageMan.Require('lsqlite3')
 MyUI_Colors          = MyUI_Utils.Library.Include('lib.colors')
 MyUI_ThemeLoader     = require('lib.theme_loader')
@@ -27,30 +26,42 @@ MyUI_Modules         = {}
 MyUI_Mode            = 'driver'
 local mods           = {}
 MyUI_SettingsFile    = mq.configDir .. '/MyUI/' .. MyUI_Server:gsub(" ", "_") .. '/' .. MyUI_CharLoaded .. '.lua'
+MyUI_MyChatLoaded    = false
+MyUI_MyChatPrehandle = nil
 
 MyUI_DefaultConfig   = {
 	ShowMain = true,
+	ThemeName = 'Default',
 	mods_enabled = {
-		ChatRelay = false,
-		AAParty = false,
-		DialogDB = false,
-		MyBuffs = false,
-		MyChat = false,
-		MyDps = false,
-		MyGroup = false,
-		MyPaths = false,
-		MyPet = false,
-		MySpells = false,
-		PlayerTarg = false,
-		SAST = false,
-		SillySounds = false,
+		[13] = { name = 'AAParty', enabled = false, },
+		[12] = { name = 'ChatRelay', enabled = false, },
+		[2]  = { name = 'DialogDB', enabled = false, },
+		[11] = { name = 'MyBuffs', enabled = false, },
+		[1]  = { name = 'MyChat', enabled = false, },
+		[10] = { name = 'MyDPS', enabled = false, },
+		[3]  = { name = 'MyGroup', enabled = false, },
+		[4]  = { name = 'MyPaths', enabled = false, },
+		[5]  = { name = 'MyPet', enabled = false, },
+		[6]  = { name = 'MySpells', enabled = false, },
+		[7]  = { name = 'PlayerTarg', enabled = false, },
+		[8]  = { name = 'SAST', enabled = false, },
+		[9]  = { name = 'SillySounds', enabled = false, },
 	},
 }
 MyUI_Settings        = {}
 MyUI_Theme           = {}
+MyUI_ThemeFile       = string.format('%s/MyThemeZ.lua', mq.configDir)
 MyUI_ThemeName       = 'Default'
 
 local MyUI_IsRunning = false
+
+local function LoadTheme()
+	if MyUI_Utils.File.Exists(MyUI_ThemeFile) then
+		MyUI_Theme = dofile(MyUI_ThemeFile)
+	else
+		MyUI_Theme = require('defaults.themes')
+	end
+end
 
 local function LoadSettings()
 	if MyUI_Utils.File.Exists(MyUI_SettingsFile) then
@@ -58,12 +69,20 @@ local function LoadSettings()
 	else
 		MyUI_Settings = MyUI_DefaultConfig
 	end
+
+	for k, v in pairs(MyUI_DefaultConfig) do
+		if MyUI_Settings[k] == nil then
+			MyUI_Settings[k] = v
+		end
+	end
+
+	LoadTheme()
 end
 
 local function RenderModules()
-	for modName, enabled in pairs(MyUI_Settings.mods_enabled) do
-		if enabled and MyUI_Modules[modName] ~= nil then
-			MyUI_Modules[modName].RenderGUI()
+	for _, data in ipairs(MyUI_Settings.mods_enabled) do
+		if data.enabled and MyUI_Modules[data.name] ~= nil then
+			MyUI_Modules[data.name].RenderGUI()
 		end
 	end
 end
@@ -71,7 +90,7 @@ end
 local function MyUI_Render()
 	if MyUI_Settings.ShowMain then
 		ImGui.SetNextWindowSize(400, 200, ImGuiCond.FirstUseEver)
-		local color_count, style_count = MyUI_ThemeLoader.StartTheme(MyUI_Theme)
+		local color_count, style_count = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
 
 		local open_gui, show_gui = ImGui.Begin(MyUI_ScriptName .. "##" .. MyUI_CharLoaded, true, ImGuiWindowFlags.None)
 
@@ -81,18 +100,18 @@ local function MyUI_Render()
 		end
 		if ImGui.BeginTable("Modules", 2, ImGuiWindowFlags.None) then
 			if show_gui then
-				for modName, enabled in pairs(MyUI_Settings.mods_enabled) do
+				for idx, data in ipairs(MyUI_Settings.mods_enabled) do
 					local pressed = false
 					ImGui.TableNextColumn()
-					enabled, pressed = ImGui.Checkbox(modName, enabled)
+					data.enabled, pressed = ImGui.Checkbox(data.name, data.enabled)
 					if pressed then
-						if MyUI_Settings.mods_enabled[modName] == false then
-							if enabled then
-								table.insert(mods, modName)
+						if MyUI_Settings.mods_enabled[idx][data.name] == false then
+							if data.enabled then
+								table.insert(mods, data.name)
 								MyUI_Modules = MyUI_LoadModules.load(mods)
 							end
 						end
-						MyUI_Settings.mods_enabled[modName] = not MyUI_Settings.mods_enabled[modName]
+						MyUI_Settings.mods_enabled[idx][data.name] = not MyUI_Settings.mods_enabled[idx][data.name]
 						mq.pickle(MyUI_SettingsFile, MyUI_Settings)
 					end
 				end
@@ -109,9 +128,17 @@ end
 local function MyUI_Main()
 	while MyUI_IsRunning do
 		mq.doevents()
-		for modName, enabled in pairs(MyUI_Settings.mods_enabled) do
-			if enabled and MyUI_Modules[modName] ~= nil then
-				MyUI_Modules[modName].MainLoop()
+		for idx, data in ipairs(MyUI_Settings.mods_enabled) do
+			if data.enabled and MyUI_Modules[data.name] ~= nil then
+				if data.name == 'MyChat' then
+					if not MyUI_MyChatLoaded then
+						MyUI_MyChatLoaded = true
+						if MyUI_MyChatPrehandle == nil then
+							MyUI_MyChatPrehandle = MyUI_Modules.MyChat.PreHandle
+						end
+					end
+				end
+				MyUI_Modules[data.name].MainLoop()
 				mq.delay(10)
 			end
 		end
@@ -144,15 +171,21 @@ local function StartUp()
 	CheckMode(args)
 	LoadSettings()
 
-	for modName, enabled in pairs(MyUI_Settings.mods_enabled) do
-		if enabled then
-			table.insert(mods, modName)
+
+	for _, data in ipairs(MyUI_Settings.mods_enabled) do
+		if data.enabled then
+			table.insert(mods, data.name)
 		end
 	end
-	MyUI_Modules = MyUI_LoadModules.load(mods)
 
-	for modName, enabled in pairs(MyUI_Settings.mods_enabled) do
-		if enabled and MyUI_Modules[modName] ~= nil then
+	MyUI_Modules = MyUI_LoadModules.load(mods)
+	if MyUI_Modules.MyChat ~= nil then
+		MyUI_MyChatLoaded = true
+		MyUI_MyChatPrehandle = MyUI_Modules.MyChat.PreHandle
+	end
+
+	for idx, data in ipairs(MyUI_Settings.mods_enabled) do
+		if data.enabled and MyUI_Modules[data.name] ~= nil then
 			local message = {
 				Subject = 'Hello',
 				Message = 'Hello',
@@ -161,8 +194,8 @@ local function StartUp()
 				Tell = '',
 				Check = os.time,
 			}
-			MyActor:send({ mailbox = MyUI_Modules[modName].ActorMailBox, script = modName:lower(), }, message)
-			MyActor:send({ mailbox = MyUI_Modules[modName].ActorMailBox, script = 'grimgui', }, message)
+			MyActor:send({ mailbox = MyUI_Modules[data.name].ActorMailBox, script = data.name:lower(), }, message)
+			MyActor:send({ mailbox = MyUI_Modules[data.name].ActorMailBox, script = 'grimgui', }, message)
 		end
 	end
 

@@ -981,7 +981,7 @@ local function DrawConsole(channelID)
         local footerHeight = 35
         local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
         contentSizeY = contentSizeY - footerHeight
-        MyChat.Consoles[channelID].console:Render(ImVec2(0, 0))
+        MyChat.Consoles[channelID].console:Render(ImVec2(0, contentSizeY))
     end
     --Command Line
     ImGui.Separator()
@@ -2174,7 +2174,7 @@ function MyChat.ChannelExecCommand(text, channelID)
     end
 end
 
-local function createTLOConsole(name)
+function MyChat.createExternConsole(name)
     for k, v in pairs(MyChat.Settings.Channels) do
         local tmpName = v.Name:gsub("^%d+%s*", "")
         if tmpName == name then
@@ -2212,14 +2212,14 @@ local function createTLOConsole(name)
 end
 
 -- TLO Handler
-local function MyChatTloHandler(consoleName, message)
-    if type(consoleName) ~= "string" or type(message) ~= "string" then
-        print("Error: Both 'console' and 'message' must be strings.")
-        return 'nil', true
-    end
+function MyChat.MyChatHandler(consoleName, message)
+    -- if type(consoleName) ~= "string" or type(message) ~= "string" then
+    --     print("Error: Both 'console' and 'message' must be strings.")
+    --     return 'nil', true
+    -- end
 
     -- Create the console if it does not exist and append the message
-    createTLOConsole(consoleName)
+    MyChat.createExternConsole(consoleName)
     local consoleID = MyChat.TLOConsoles[consoleName]
 
     -- main console if enabled
@@ -2233,15 +2233,17 @@ local function MyChatTloHandler(consoleName, message)
     return 'nil', true
 end
 
--- --Register the TLO
--- mq.AddTopLevelObject('MyChatTlo', function(param)
---     if not param or param:len() == 0 then return "My Chat", "My Chat" end
---     local consoleName, message = param:match("([^,]+)%s*,%s*(.+)")
-
---     consoleName = consoleName:match("^%s*(.-)%s*$")
---     message = message:match("^%s*(.-)%s*$")
---     return MyChatTloHandler(consoleName, message), true
--- end)
+--Register the TLO
+function MyChat.PreHandle(...)
+    local param = { ..., }
+    -- if not param or param:len() == 0 then return "My Chat", "My Chat" end
+    -- local consoleName, message = param:match("([^,]+)%s*,%s*(.+)")
+    local consoleName, message = param[1], param[2]
+    -- consoleName = consoleName:match("^%s*(.-)%s*$")
+    -- message = message:match("^%s*(.-)%s*$")
+    printf("Console: %s, Message: %s", consoleName, message)
+    return MyChat.MyChatHandler(consoleName, message), true
+end
 
 function MyChat.SortChannels()
     sortedChannels = {}

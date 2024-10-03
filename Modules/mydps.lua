@@ -77,12 +77,12 @@ local defaults = {
 local function printOutput(msg, ...)
 	msg = string.format(msg, ...)
 	---@diagnostic disable-next-line: undefined-field
-	local useMyChat = mq.TLO.MyChatTlo ~= nil and true or false
+	local useMyChat = MyUI_MyChatLoaded or false
 	if not useMyChat then
 		printf(msg)
 	else
 		---@diagnostic disable-next-line: undefined-field
-		mq.TLO.MyChatTlo(script, msg)
+		MyUI_Modules.MyChat.PreHandle(script, msg)
 	end
 end
 

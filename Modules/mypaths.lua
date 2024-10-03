@@ -707,8 +707,9 @@ local function CheckInterrupts()
             mq.cmdf("/nav stop")
             interruptInProgress = true
         end
-        mq.delay(30)
+        -- mq.delay(30)
         local curHP, curMP = mq.TLO.Me.PctHPs(), mq.TLO.Me.PctMana() or 0
+        mq.delay(10)
         if curHP - lastHP > 10 or curMP - lastMP > 10 then
             lastHP, lastMP = curHP, curMP
             status = string.format('Paused for Sitting. HP %s MP %s', curHP, curMP)
@@ -716,7 +717,7 @@ local function CheckInterrupts()
 
         flag = true
 
-        if curHP == 100 and curMP == 100 and settings[script].AutoStand then
+        if curHP >= 100 and curMP >= 100 and settings[script].AutoStand then
             interruptInProgress = false
             mq.TLO.Me.Stand()
             status = 'Idle'

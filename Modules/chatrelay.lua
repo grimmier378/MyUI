@@ -456,7 +456,8 @@ end
 
 function ChatRelay.CheckMode()
     if MyUI_Mode == 'driver' then
-        showMain = true
+        Minimized = settings[script].EscapeToMin
+        showMain = not Minimized
         mode = 'driver'
         print('\ayChat Relay:\ao Setting \atDriver\ax Mode. UI will be displayed.')
         print('\ayChat Relay:\ao Type \at/chatrelay show\ax. to Toggle the UI')
@@ -510,9 +511,9 @@ local function init()
     configFile = string.format("%s/MyUI/ChatRelay/%s/%s.lua", mq.configDir, mq.TLO.EverQuest.Server(), MyUI_CharLoaded)
     currZone = mq.TLO.Zone.ID()
     lastZone = currZone
-    ChatRelay.CheckMode()
     mq.bind('/chatrelay', processCommand)
     LoadSettings()
+    ChatRelay.CheckMode()
     RegisterRelayActor()
     -- mq.delay(250)
     mq.event('guild_chat_relay', '#*# tells the guild, #*#', getGuildChat, { keepLinks = true, })

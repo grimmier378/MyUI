@@ -434,7 +434,7 @@ function AAParty.RenderGUI()
                         if compact[groupData[i].Name] then childY = 25 end
                         if compact[groupData[i].Name] and expand[groupData[i].Name] then childY = 51 end
                         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 2, 2)
-                        imgui.BeginChild(groupData[i].Name, 145, childY, bit32.bor(ImGuiChildFlags.Border, ImGuiChildFlags.AutoResizeY))
+                        imgui.BeginChild(groupData[i].Name, 145, childY, bit32.bor(ImGuiChildFlags.Border, ImGuiChildFlags.AutoResizeY), ImGuiWindowFlags.NoScrollbar)
                         -- Start of grouped Whole Elements
                         ImGui.BeginGroup()
                         -- Start of subgrouped Elements for tooltip

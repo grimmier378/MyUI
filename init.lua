@@ -96,7 +96,7 @@ local function InitModules()
 				Check = os.time,
 			}
 			MyActor:send({ mailbox = MyUI_Modules[data.name].ActorMailBox, script = data.name:lower(), }, message)
-			MyActor:send({ mailbox = MyUI_Modules[data.name].ActorMailBox, script = MyUI_ScriptName:lower(), }, message)
+			MyActor:send({ mailbox = MyUI_Modules[data.name].ActorMailBox, script = 'myui', }, message)
 		end
 	end
 end
@@ -202,7 +202,7 @@ local function CommandHandler(...)
 end
 
 local function StartUp()
-	mq.bind('/grimgui', CommandHandler)
+	mq.bind('/myui', CommandHandler)
 	CheckMode(args)
 	LoadSettings()
 

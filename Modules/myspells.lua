@@ -36,14 +36,14 @@ local script = 'MySpells'
 local casting = false
 local spellBar = {}
 local numGems = 8
-local redGem = mq.CreateTexture(mq.luaDir .. '/grimgui/images/red_gem.png')
-local greenGem = mq.CreateTexture(mq.luaDir .. '/grimgui/images/green_gem.png')
-local purpleGem = mq.CreateTexture(mq.luaDir .. '/grimgui/images/purple_gem.png')
-local blueGem = mq.CreateTexture(mq.luaDir .. '/grimgui/images/blue_gem.png')
-local orangeGem = mq.CreateTexture(mq.luaDir .. '/grimgui/images/orange_gem.png')
-local yellowGem = mq.CreateTexture(mq.luaDir .. '/grimgui/images/yellow_gem.png')
-local openBook = mq.CreateTexture(mq.luaDir .. '/grimgui/images/open_book.png')
-local closedBook = mq.CreateTexture(mq.luaDir .. '/grimgui/images/closed_book.png')
+local redGem = mq.CreateTexture(mq.luaDir .. '/myui/images/red_gem.png')
+local greenGem = mq.CreateTexture(mq.luaDir .. '/myui/images/green_gem.png')
+local purpleGem = mq.CreateTexture(mq.luaDir .. '/myui/images/purple_gem.png')
+local blueGem = mq.CreateTexture(mq.luaDir .. '/myui/images/blue_gem.png')
+local orangeGem = mq.CreateTexture(mq.luaDir .. '/myui/images/orange_gem.png')
+local yellowGem = mq.CreateTexture(mq.luaDir .. '/myui/images/yellow_gem.png')
+local openBook = mq.CreateTexture(mq.luaDir .. '/myui/images/open_book.png')
+local closedBook = mq.CreateTexture(mq.luaDir .. '/myui/images/closed_book.png')
 local memSpell = -1
 local currentTime = os.time()
 local maxRow, rowCount, iconSize, scale = 1, 0, 30, 1
@@ -272,6 +272,61 @@ function CalculateColor(minColor, maxColor, value)
 	return r, g, b, a
 end
 
+local function GetSpells(slot)
+	local bonusGems = mq.TLO.Me.AltAbility('Mnemonic Retention').Rank() or 0
+	numGems = 8 + bonusGems
+
+	local function GetInfo(slotNum)
+		local sToolTip = mq.TLO.Window(string.format('CastSpellWnd/CSPW_Spell%s', slotNum - 1)).Tooltip()
+		local sName
+		local sRecast
+		local sClicked
+		local sID, sIcon, sFizzle
+		local sCastTime
+		if spellBar[slotNum] == nil then
+			spellBar[slotNum] = {}
+		end
+		if spellBar[slotNum].sClicked == nil then
+			spellBar[slotNum].sClicked = -1
+		end
+
+		if sToolTip:find("%)%s") then
+			sName = mq.TLO.Me.Gem(slotNum).Name()
+			sID = mq.TLO.Spell(sName).ID() or -1
+			sClicked = spellBar[slotNum].sClicked or -1
+			---@diagnostic disable-next-line: undefined-field
+			sRecast = mq.TLO.Spell(sName).RecastTime.Seconds() or -1
+			sIcon = mq.TLO.Spell(sName).SpellIcon() or -1
+			sCastTime = mq.TLO.Spell(sName).MyCastTime.Seconds() or -1
+			sFizzle = mq.TLO.Spell(sName).FizzleTime() or -1
+		else
+			sName = "Empty"
+			sID = -1
+			sIcon = -1
+			sClicked = -1
+			sRecast = -1
+			sCastTime = -1
+			sFizzle = -1
+		end
+
+		spellBar[slotNum].sCastTime = sCastTime
+		spellBar[slotNum].sName = sName
+		spellBar[slotNum].sID = sID
+		spellBar[slotNum].sIcon = sIcon
+		spellBar[slotNum].sClicked = sClicked
+		spellBar[slotNum].sFizzle = sFizzle
+		spellBar[slotNum].sRecast = sRecast
+	end
+
+	if slot == nil then
+		for i = 1, numGems do
+			GetInfo(i)
+		end
+	else
+		GetInfo(slot)
+	end
+end
+
 --- comments
 ---@param iconID integer
 ---@param spell table
@@ -382,61 +437,6 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 	ImGui.SetCursorPos(cursor_x, cursor_y)
 	ImGui.InvisibleButton(sName, ImVec2(scale * iconSize, scale * iconSize), bit32.bor(ImGuiButtonFlags.MouseButtonRight))
 	ImGui.PopID()
-end
-
-local function GetSpells(slot)
-	local bonusGems = mq.TLO.Me.AltAbility('Mnemonic Retention').Rank() or 0
-	numGems = 8 + bonusGems
-
-	local function GetInfo(slotNum)
-		local sToolTip = mq.TLO.Window(string.format('CastSpellWnd/CSPW_Spell%s', slotNum - 1)).Tooltip()
-		local sName
-		local sRecast
-		local sClicked
-		local sID, sIcon, sFizzle
-		local sCastTime
-		if spellBar[slotNum] == nil then
-			spellBar[slotNum] = {}
-		end
-		if spellBar[slotNum].sClicked == nil then
-			spellBar[slotNum].sClicked = -1
-		end
-
-		if sToolTip:find("%)%s") then
-			sName = mq.TLO.Me.Gem(slotNum).Name()
-			sID = mq.TLO.Spell(sName).ID() or -1
-			sClicked = spellBar[slotNum].sClicked or -1
-			---@diagnostic disable-next-line: undefined-field
-			sRecast = mq.TLO.Spell(sName).RecastTime.Seconds() or -1
-			sIcon = mq.TLO.Spell(sName).SpellIcon() or -1
-			sCastTime = mq.TLO.Spell(sName).MyCastTime.Seconds() or -1
-			sFizzle = mq.TLO.Spell(sName).FizzleTime() or -1
-		else
-			sName = "Empty"
-			sID = -1
-			sIcon = -1
-			sClicked = -1
-			sRecast = -1
-			sCastTime = -1
-			sFizzle = -1
-		end
-
-		spellBar[slotNum].sCastTime = sCastTime
-		spellBar[slotNum].sName = sName
-		spellBar[slotNum].sID = sID
-		spellBar[slotNum].sIcon = sIcon
-		spellBar[slotNum].sClicked = sClicked
-		spellBar[slotNum].sFizzle = sFizzle
-		spellBar[slotNum].sRecast = sRecast
-	end
-
-	if slot == nil then
-		for i = 1, numGems do
-			GetInfo(i)
-		end
-	else
-		GetInfo(slot)
-	end
 end
 
 local function SaveSet(SetName)

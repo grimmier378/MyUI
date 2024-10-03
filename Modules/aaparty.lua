@@ -236,7 +236,7 @@ local function MessageHandler()
         if subject == 'Hello' then
             -- if who ~= mq.TLO.Me.Name() then
             aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(nil, 'Welcome'))
-            aaActor:send({ mailbox = 'aa_party', script = MyUI_ScriptName:lower(), }, GenerateContent(nil, 'Welcome'))
+            aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(nil, 'Welcome'))
 
             -- end
             return
@@ -349,14 +349,14 @@ local function getMyAA()
         changed = true
     end
     if not changed and CheckIn() then
-        aaActor:send({ mailbox = 'aa_party', script = MyUI_ScriptName:lower(), }, GenerateContent(nil, 'CheckIn'))
+        aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(nil, 'CheckIn'))
         aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(nil, 'CheckIn'))
 
         checkIn = os.time()
     end
     if changed then
         aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent())
-        aaActor:send({ mailbox = 'aa_party', script = MyUI_ScriptName:lower(), }, GenerateContent())
+        aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent())
         checkIn = os.time()
         changed = false
     end
@@ -369,7 +369,7 @@ local function SayGoodBye()
         Check = 0,
     }
     aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, message)
-    aaActor:send({ mailbox = 'aa_party', script = MyUI_ScriptName:lower(), }, message)
+    aaActor:send({ mailbox = 'aa_party', script = 'myui', }, message)
 end
 
 ---@param type string
@@ -504,7 +504,7 @@ function AAParty.RenderGUI()
                             imgui.SetCursorPosX(ImGui.GetCursorPosX() + 12)
                             if imgui.Button("<##Decrease" .. groupData[i].Name) then
                                 aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
-                                aaActor:send({ mailbox = 'aa_party', script = MyUI_ScriptName:lower(), }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
+                                aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
                             end
                             imgui.SameLine()
                             local tmp = groupData[i].Setting
@@ -526,7 +526,7 @@ function AAParty.RenderGUI()
                             end
 
                             if imgui.Button(">##Increase" .. groupData[i].Name) then
-                                aaActor:send({ mailbox = 'aa_party', script = MyUI_ScriptName:lower(), }, GenerateContent(groupData[i].Name, 'Action', 'More'))
+                                aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(groupData[i].Name, 'Action', 'More'))
                                 aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(groupData[i].Name, 'Action', 'More'))
                             end
                         end
@@ -718,7 +718,7 @@ local function init()
         hasThemeZ = true
     end
     aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(nil, 'Hello'))
-    aaActor:send({ mailbox = 'aa_party', script = MyUI_ScriptName:lower(), }, GenerateContent(nil, 'Hello'))
+    aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(nil, 'Hello'))
 end
 
 MessageHandler()

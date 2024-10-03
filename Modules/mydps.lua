@@ -247,7 +247,7 @@ local function parseCurrentBattle(dur)
 				CritHeals = critHealsTotal,
 			}
 			ActorDPS:send({ mailbox = 'my_dps', script = 'mydps', }, (msgSend))
-			ActorDPS:send({ mailbox = 'my_dps', script = 'grimgui', }, (msgSend))
+			ActorDPS:send({ mailbox = 'my_dps', script = MyUI_ScriptName:lower(), }, (msgSend))
 			local found = false
 			for k, v in pairs(actorsTable) do
 				if v.name == MyName then
@@ -1057,7 +1057,7 @@ local function pDPS(dur, rType)
 					CritHeals = critHealsTotal,
 				}
 				ActorDPS:send({ mailbox = 'my_dps', script = 'mydps', }, (msgSend))
-				ActorDPS:send({ mailbox = 'my_dps', script = 'grimgui', }, (msgSend))
+				ActorDPS:send({ mailbox = 'my_dps', script = MyUI_ScriptName:lower(), }, (msgSend))
 				for k, v in ipairs(actorsTable) do
 					if v.name == MyName then
 						v.name      = MyName

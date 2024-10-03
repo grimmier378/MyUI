@@ -5,7 +5,7 @@ MyUI_Utils           = require('lib.common')
 MyUI_Actor           = require('actors')
 
 MyUI_Version         = '1.0.0'
-MyUI_ScriptName      = 'GrimGUI'
+MyUI_ScriptName      = 'MyUI'
 
 MyUI_Icons           = MyUI_Utils.Library.Include('mq.ICONS')
 MyUI_Base64          = MyUI_Utils.Library.Include('lib.base64') -- Ensure you have a base64 module available
@@ -96,7 +96,7 @@ local function InitModules()
 				Check = os.time,
 			}
 			MyActor:send({ mailbox = MyUI_Modules[data.name].ActorMailBox, script = data.name:lower(), }, message)
-			MyActor:send({ mailbox = MyUI_Modules[data.name].ActorMailBox, script = 'grimgui', }, message)
+			MyActor:send({ mailbox = MyUI_Modules[data.name].ActorMailBox, script = MyUI_ScriptName:lower(), }, message)
 		end
 	end
 end

@@ -400,7 +400,7 @@ local function GetBuffs()
     if firstRun then subject = 'Hello' end
     if not solo then
         if changed or firstRun then
-            MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'grimgui', }, GenerateContent(subject, MyBuffs.songTable, MyBuffs.buffTable))
+            MyBuffs_Actor:send({ mailbox = 'my_buffs', script = MyUI_ScriptName:lower(), }, GenerateContent(subject, MyBuffs.songTable, MyBuffs.buffTable))
             MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, GenerateContent(subject, MyBuffs.songTable, MyBuffs.buffTable))
             changed = false
         else
@@ -505,7 +505,7 @@ local function MessageHandler()
             check = os.time()
             if who ~= mq.TLO.Me.DisplayName() and who ~= 'Unknown' then
                 MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, GenerateContent('Welcome', MyBuffs.songTable, MyBuffs.buffTable))
-                MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'grimgui', }, GenerateContent('Welcome', MyBuffs.songTable, MyBuffs.buffTable))
+                MyBuffs_Actor:send({ mailbox = 'my_buffs', script = MyUI_ScriptName:lower(), }, GenerateContent('Welcome', MyBuffs.songTable, MyBuffs.buffTable))
             end
         end
 
@@ -559,7 +559,7 @@ local function SayGoodBye()
         Check = 0,
     }
     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, message)
-    MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'grimgui', }, message)
+    MyBuffs_Actor:send({ mailbox = 'my_buffs', script = MyUI_ScriptName:lower(), }, message)
 end
 
 local function loadTheme()
@@ -821,7 +821,7 @@ local function BoxBuffs(id, sorted, view)
             if ImGui.MenuItem("Block##" .. i) then
                 local what = string.format('blockbuff%s', boxBuffs[i].Name)
                 if not solo then
-                    MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'grimgui', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
+                    MyBuffs_Actor:send({ mailbox = 'my_buffs', script = MyUI_ScriptName:lower(), }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                 else
                     mq.cmdf("/blockspell add me '%s'", mq.TLO.Spell(bName).ID())
@@ -832,7 +832,7 @@ local function BoxBuffs(id, sorted, view)
                 local what = string.format('buff%s', boxBuffs[i].Name)
                 if not solo then
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
-                    MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'grimgui', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
+                    MyBuffs_Actor:send({ mailbox = 'my_buffs', script = MyUI_ScriptName:lower(), }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                 else
                     mq.TLO.Me.Buff(bName).Remove()
                 end
@@ -844,7 +844,7 @@ local function BoxBuffs(id, sorted, view)
                 local what = string.format('buff%s', boxBuffs[i].Name)
                 if not solo then
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
-                    MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'grimgui', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
+                    MyBuffs_Actor:send({ mailbox = 'my_buffs', script = MyUI_ScriptName:lower(), }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                 else
                     mq.TLO.Me.Buff(bName).Remove()
                 end
@@ -960,7 +960,7 @@ local function BoxSongs(id, sorted, view)
                 local what = string.format('blocksong%s', boxSongs[i].Name)
                 if not solo then
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
-                    MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'grimgui', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
+                    MyBuffs_Actor:send({ mailbox = 'my_buffs', script = MyUI_ScriptName:lower(), }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                 else
                     mq.cmdf("/blocksong add me '%s'", boxSongs[i].Name)
                 end
@@ -968,7 +968,7 @@ local function BoxSongs(id, sorted, view)
             if ImGui.MenuItem("Remove##" .. i) then
                 local what = string.format('song%s', boxSongs[i].Name)
                 if not solo then
-                    MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'grimgui', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
+                    MyBuffs_Actor:send({ mailbox = 'my_buffs', script = MyUI_ScriptName:lower(), }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                 else
                     mq.TLO.Me.Song(boxSongs[i].Name).Remove()
@@ -981,7 +981,7 @@ local function BoxSongs(id, sorted, view)
                 if not solo then
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', },
                         GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, 'song' .. boxSongs[i].Name))
-                    MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'grimgui', },
+                    MyBuffs_Actor:send({ mailbox = 'my_buffs', script = MyUI_ScriptName:lower(), },
                         GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, 'song' .. boxSongs[i].Name))
                 else
                     mq.TLO.Me.Song(boxSongs[i].Name).Remove()

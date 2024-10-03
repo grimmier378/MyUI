@@ -132,7 +132,7 @@ local function RegisterRelayActor()
                 local announce = os.time()
                 if tellChat[MemberEntry.Name] == nil then
                     tellChat[MemberEntry.Name] = ImGui.ConsoleWidget.new("chat_relay_Console" .. MemberEntry.Name .. "##chat_relayConsole")
-                    RelayActor:send({ mailbox = 'chat_relay', script = 'grimgui', }, GenerateContent('Hello', 'Hello'))
+                    RelayActor:send({ mailbox = 'chat_relay', script = MyUI_ScriptName:lower(), }, GenerateContent('Hello', 'Hello'))
                     RelayActor:send({ mailbox = 'chat_relay', script = 'chatrelay', }, GenerateContent('Hello', 'Hello'))
 
                     charBufferCount[MemberEntry.Name] = { Current = 1, Last = 1, }
@@ -145,7 +145,7 @@ local function RegisterRelayActor()
                     appendColoredTimestamp(guildChat[MemberEntry.Guild], " Guild Added")
                 end
                 if announce - lastAnnounce > 5 then
-                    RelayActor:send({ mailbox = 'chat_relay', script = 'grimgui', }, GenerateContent('Hello', 'Hello'))
+                    RelayActor:send({ mailbox = 'chat_relay', script = MyUI_ScriptName:lower(), }, GenerateContent('Hello', 'Hello'))
                     RelayActor:send({ mailbox = 'chat_relay', script = 'chatrelay', }, GenerateContent('Hello', 'Hello'))
                     lastAnnounce = announce
                 end
@@ -195,7 +195,7 @@ local function ChannelExecCommand(text, channName, channelID)
         if text == 'clear' then
             channelID:Clear()
         elseif who ~= nil and message ~= nil then
-            RelayActor:send({ mailbox = 'chat_relay', script = 'grimgui', }, { Name = channName, Subject = 'Reply', Tell = who, Message = message, })
+            RelayActor:send({ mailbox = 'chat_relay', script = MyUI_ScriptName:lower(), }, { Name = channName, Subject = 'Reply', Tell = who, Message = message, })
             RelayActor:send({ mailbox = 'chat_relay', script = 'chatrelay', }, { Name = channName, Subject = 'Reply', Tell = who, Message = message, })
         end
     end
@@ -217,7 +217,7 @@ local function ChannelExecGuildCommand(text, channName, channelID)
         if text == 'clear' then
             channelID:Clear()
         elseif who ~= nil and message ~= nil then
-            RelayActor:send({ mailbox = 'chat_relay', script = 'grimgui', }, { Name = who, Subject = 'GuildReply', Guild = channName, Message = message, })
+            RelayActor:send({ mailbox = 'chat_relay', script = MyUI_ScriptName:lower(), }, { Name = who, Subject = 'GuildReply', Guild = channName, Message = message, })
             RelayActor:send({ mailbox = 'chat_relay', script = 'chatrelay', }, { Name = who, Subject = 'GuildReply', Guild = channName, Message = message, })
         end
     end
@@ -225,7 +225,7 @@ end
 
 local function getGuildChat(line)
     if not settings[script].RelayGuild then return end
-    RelayActor:send({ mailbox = 'chat_relay', script = 'grimgui', }, GenerateContent('Guild', line))
+    RelayActor:send({ mailbox = 'chat_relay', script = MyUI_ScriptName:lower(), }, GenerateContent('Guild', line))
     RelayActor:send({ mailbox = 'chat_relay', script = 'chatrelay', }, GenerateContent('Guild', line))
 end
 
@@ -246,7 +246,7 @@ local function getTellChat(line, who)
     local pet = mq.TLO.Me.Pet.DisplayName() or 'noPet'
     if (mq.TLO.SpawnCount(checkNPC)() ~= 0 or master == 'PC' or pet == who) then return end
     RelayActor:send({ mailbox = 'chat_relay', script = 'chatrelay', }, GenerateContent('Tell', line))
-    RelayActor:send({ mailbox = 'chat_relay', script = 'grimgui', }, GenerateContent('Tell', line))
+    RelayActor:send({ mailbox = 'chat_relay', script = MyUI_ScriptName:lower(), }, GenerateContent('Tell', line))
 end
 
 function ChatRelay.RenderGUI()

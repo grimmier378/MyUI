@@ -81,7 +81,7 @@ local function printOutput(msg, ...)
 	if not useMyChat then
 		printf(msg)
 	else
-		MyUI_MyChatPrehandle(script, msg)
+		MyUI_MyChatHandler(script, msg)
 	end
 end
 

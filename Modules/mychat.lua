@@ -2233,12 +2233,13 @@ function MyChat.MyChatHandler(consoleName, message)
     return 'nil', true
 end
 
---Register the TLO
-function MyChat.PreHandle(...)
-    local param = { ..., }
-    local consoleName, message = param[1], param[2]
-    -- printf("Console: %s, Message: %s", consoleName, message)
-    return MyChat.MyChatHandler(consoleName, message), true
+---comment
+---@param consoleName string @The name of the Tab to be created or updated
+---@param message string @The message to be displayed
+---@return string
+---@return boolean
+function MyChat.PreHandle(consoleName, message)
+    return MyChat.MyChatHandler(consoleName, message)
 end
 
 function MyChat.SortChannels()
@@ -2319,6 +2320,6 @@ end
 
 init()
 MyUI_MyChatLoaded = true
-MyUI_MyChatPrehandle = MyChat.PreHandle
+MyUI_MyChatHandler = MyChat.MyChatHandler
 
 return MyChat

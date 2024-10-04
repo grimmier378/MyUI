@@ -1,35 +1,35 @@
-local mq             = require('mq')
-local ImGui          = require 'ImGui'
+local mq           = require('mq')
+local ImGui        = require 'ImGui'
 
-MyUI_Utils           = require('lib.common')
-MyUI_Actor           = require('actors')
+MyUI_Utils         = require('lib.common')
+MyUI_Actor         = require('actors')
 
-MyUI_Version         = '1.0.0'
-MyUI_ScriptName      = 'MyUI'
+MyUI_Version       = '1.0.0'
+MyUI_ScriptName    = 'MyUI'
 
-MyUI_Icons           = require('mq.ICONS')
-MyUI_Base64          = require('lib.base64') -- Ensure you have a base64 module available
-MyUI_PackageMan      = require('mq.PackageMan')
-MyUI_LoadModules     = require('lib.modules')
-MyUI_SQLite3         = MyUI_PackageMan.Require('lsqlite3')
-MyUI_Colors          = require('lib.colors')
-MyUI_ThemeLoader     = require('lib.theme_loader')
-MyUI_AbilityPicker   = require('lib.AbilityPicker')
-MyUI_Grimmier_Img    = MyUI_Utils.SetImage(mq.TLO.Lua.Dir() .. "/myui/images/GrimGUI.png")
+MyUI_Icons         = require('mq.ICONS')
+MyUI_Base64        = require('lib.base64')       -- Ensure you have a base64 module available
+MyUI_PackageMan    = require('mq.PackageMan')
+MyUI_LoadModules   = require('lib.modules')
+MyUI_SQLite3       = MyUI_PackageMan.Require('lsqlite3')
+MyUI_Colors        = require('lib.colors')
+MyUI_ThemeLoader   = require('lib.theme_loader')
+MyUI_AbilityPicker = require('lib.AbilityPicker')
+MyUI_Grimmier_Img  = MyUI_Utils.SetImage(mq.TLO.Lua.Dir() .. "/myui/images/GrimGUI.png")
 
 -- build, char, server info
-MyUI_CharLoaded      = mq.TLO.Me.DisplayName()
-MyUI_Server          = mq.TLO.EverQuest.Server()
-MyUI_Build           = mq.TLO.MacroQuest.BuildName()
+MyUI_CharLoaded    = mq.TLO.Me.DisplayName()
+MyUI_Server        = mq.TLO.EverQuest.Server()
+MyUI_Build         = mq.TLO.MacroQuest.BuildName()
 
-local MyActor        = MyUI_Actor.register('myui', function(message) end)
-MyUI_Modules         = {}
-MyUI_Mode            = 'driver'
-local mods           = {}
-local Minimized      = false
-MyUI_SettingsFile    = mq.configDir .. '/MyUI/' .. MyUI_Server:gsub(" ", "_") .. '/' .. MyUI_CharLoaded .. '.lua'
-MyUI_MyChatLoaded    = false
-MyUI_MyChatPrehandle = nil
+local MyActor      = MyUI_Actor.register('myui', function(message) end)
+MyUI_Modules       = {}
+MyUI_Mode          = 'driver'
+local mods         = {}
+local Minimized    = false
+MyUI_SettingsFile  = mq.configDir .. '/MyUI/' .. MyUI_Server:gsub(" ", "_") .. '/' .. MyUI_CharLoaded .. '.lua'
+MyUI_MyChatLoaded  = false
+MyUI_MyChatHandler = nil
 
 
 MyUI_DefaultConfig   = {

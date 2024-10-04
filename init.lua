@@ -7,14 +7,14 @@ MyUI_Actor           = require('actors')
 MyUI_Version         = '1.0.0'
 MyUI_ScriptName      = 'MyUI'
 
-MyUI_Icons           = MyUI_Utils.Library.Include('mq.ICONS')
-MyUI_Base64          = MyUI_Utils.Library.Include('lib.base64') -- Ensure you have a base64 module available
-MyUI_PackageMan      = MyUI_Utils.Library.Include('mq.PackageMan')
-MyUI_LoadModules     = MyUI_Utils.Library.Include('lib.modules')
+MyUI_Icons           = require('mq.ICONS')
+MyUI_Base64          = require('lib.base64') -- Ensure you have a base64 module available
+MyUI_PackageMan      = require('mq.PackageMan')
+MyUI_LoadModules     = require('lib.modules')
 MyUI_SQLite3         = MyUI_PackageMan.Require('lsqlite3')
-MyUI_Colors          = MyUI_Utils.Library.Include('lib.colors')
+MyUI_Colors          = require('lib.colors')
 MyUI_ThemeLoader     = require('lib.theme_loader')
-MyUI_AbilityPicker   = MyUI_Utils.Library.Include('lib.AbilityPicker')
+MyUI_AbilityPicker   = require('lib.AbilityPicker')
 
 -- build, char, server info
 MyUI_CharLoaded      = mq.TLO.Me.DisplayName()

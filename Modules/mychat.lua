@@ -2236,12 +2236,8 @@ end
 --Register the TLO
 function MyChat.PreHandle(...)
     local param = { ..., }
-    -- if not param or param:len() == 0 then return "My Chat", "My Chat" end
-    -- local consoleName, message = param:match("([^,]+)%s*,%s*(.+)")
     local consoleName, message = param[1], param[2]
-    -- consoleName = consoleName:match("^%s*(.-)%s*$")
-    -- message = message:match("^%s*(.-)%s*$")
-    printf("Console: %s, Message: %s", consoleName, message)
+    -- printf("Console: %s, Message: %s", consoleName, message)
     return MyChat.MyChatHandler(consoleName, message), true
 end
 
@@ -2251,7 +2247,7 @@ function MyChat.SortChannels()
         table.insert(sortedChannels, { k, v.Name, })
     end
 
-    -- Custom sort function to first sort by numeric prefixes (if the first word is a number),
+    -- Sort function to first sort by numeric prefixes (if the first word is a number),
     -- then sort alphabetically for non-numeric names
     table.sort(sortedChannels, function(a, b)
         -- Extract the first word from both names

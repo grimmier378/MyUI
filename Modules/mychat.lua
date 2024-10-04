@@ -2271,6 +2271,12 @@ function MyChat.SortChannels()
     end)
 end
 
+function MyChat.Unload()
+    for eventName, _ in pairs(MyChat.eventNames) do
+        mq.unevent(eventName)
+    end
+end
+
 local function init()
     running = true
     loadSettings()

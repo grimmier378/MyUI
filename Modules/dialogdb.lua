@@ -234,6 +234,11 @@ local function setEvents()
 	end
 end
 
+function DialogDB.Unload()
+	mq.unevent("npc_emotes3")
+	mq.unbind("/dialogdb")
+end
+
 local function checkDialog()
 	hasDialog = false
 	if mq.TLO.Target() ~= nil then

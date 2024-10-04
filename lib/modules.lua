@@ -26,4 +26,8 @@ function Module.load(module_name)
 	return nil
 end
 
+function Module.unload(module_name)
+	package.loaded["modules." .. module_name:lower()] = nil
+end
+
 return Module

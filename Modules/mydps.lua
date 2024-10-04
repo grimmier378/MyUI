@@ -1339,6 +1339,22 @@ local function RegisterActor()
 	end)
 end
 
+function MyDPS.Unload()
+	mq.unevent("melee_crit")
+	mq.unevent("melee_crit2")
+	mq.unevent("melee_crit3")
+	mq.unevent("melee_deadly_strike")
+	mq.unevent("melee_non_melee")
+	mq.unevent("melee_damage_shield")
+	mq.unevent("melee_you_hit_non-melee")
+	mq.unevent("melee_do_damage")
+	mq.unevent("melee_miss")
+	mq.unevent("melee_got_hit")
+	mq.unevent("melee_missed_me")
+	mq.unevent("melee_crit_heal")
+	mq.unbind("/mydps")
+end
+
 local args = { ..., }
 local function Init()
 	loadSettings()

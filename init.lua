@@ -134,9 +134,11 @@ local function MyUI_Render()
 								MyUI_Modules[data.name] = MyUI_LoadModules.load(data.name)
 								InitModules()
 							else
-								MyUI_Modules[data.name] = nil
 								for i, v in ipairs(mods) do
 									if v == data.name then
+										MyUI_Modules[data.name].Unload()
+										MyUI_LoadModules.unload(data.name)
+										MyUI_Modules[data.name] = nil
 										table.remove(mods, i)
 									end
 								end

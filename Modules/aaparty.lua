@@ -673,6 +673,10 @@ function AAParty.CheckMode()
     end
 end
 
+function AAParty.Unload()
+    mq.unbind("/aaparty")
+end
+
 local function processCommand(...)
     local args = { ..., }
     if #args > 0 then

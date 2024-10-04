@@ -506,6 +506,14 @@ local function processCommand(...)
     end
 end
 
+function ChatRelay.Unload()
+    mq.unevent("guild_chat_relay")
+    mq.unevent("guild_out_chat_relay")
+    mq.unevent("tell_chat_relay")
+    mq.unevent("out_chat_relay")
+    mq.unbind("/chatrelay")
+end
+
 local function init()
     guildName = mq.TLO.Me.Guild()
     configFile = string.format("%s/MyUI/ChatRelay/%s/%s.lua", mq.configDir, mq.TLO.EverQuest.Server(), MyUI_CharLoaded)

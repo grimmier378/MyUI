@@ -454,6 +454,18 @@ function SillySounds.MainLoop()
     end
 end
 
+function SillySounds.Unload()
+    mq.unevent("gained_level")
+    mq.unevent("hit")
+    mq.unevent("been_hit")
+    mq.unevent("you_died")
+    mq.unevent("you_died2")
+    mq.unevent("gained_aa")
+    mq.unevent("spell_fizzle")
+    mq.unevent("item_added")
+    mq.unbind('/sillysounds')
+end
+
 -- Init
 local function init()
     helpList('help')

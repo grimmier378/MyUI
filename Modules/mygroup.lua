@@ -914,6 +914,9 @@ function MyGroup.RenderGUI()
     end
 end
 
+function MyGroup.Unload()
+end
+
 local function init()
     myName = mq.TLO.Me.Name()
     serverName = TLO.EverQuest.Server()

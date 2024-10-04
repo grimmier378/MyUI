@@ -676,6 +676,10 @@ function MyPet.RenderGUI()
 	end
 end
 
+function MyPet.Unload()
+
+end
+
 local function Init()
 	-- Load Settings
 	loadSettings()

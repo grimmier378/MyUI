@@ -2686,6 +2686,10 @@ local function processArgs()
     end
 end
 
+function MyPaths.Unload()
+    mq.unbind('/mypaths')
+end
+
 local function Init()
     processArgs()
     -- Get Character Name

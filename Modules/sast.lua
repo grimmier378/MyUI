@@ -259,6 +259,10 @@ if #arg > 0 then
 	print('Modes: solo, dannet, eqbc')
 end
 
+function SAST.Unload()
+	mq.unbind("/sast")
+end
+
 local function startup()
 	--check for MQ2EQBC plugin
 	if mode == 'EQBC' then

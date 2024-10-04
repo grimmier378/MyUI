@@ -1077,6 +1077,9 @@ function PlayerTarg.RenderGUI()
 end
 
 --Setup and Loop
+function PlayerTarg.Unload()
+
+end
 
 local function init()
     running = true

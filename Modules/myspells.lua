@@ -911,6 +911,13 @@ function MySpells.RenderGUI()
 	end
 end
 
+function MySpells.Unload()
+	mq.unevent("mem_spell")
+	mq.unevent("int_spell")
+	mq.unevent("fiz_spell")
+	mq.unevent("cast_start")
+end
+
 local function Init()
 	meName = mq.TLO.Me.Name()
 	if mq.TLO.Me.MaxMana() == 0 then

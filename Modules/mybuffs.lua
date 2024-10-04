@@ -1698,6 +1698,10 @@ local function processCommand(...)
     end
 end
 
+function MyBuffs.Unload()
+    mq.unbind('/mybuffs')
+end
+
 local function init()
     configFile = string.format("%s/MyUI/MyBuffs/%s/%s.lua", mq.configDir, MyUI_Server, MyUI_CharLoaded)
 

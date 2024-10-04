@@ -27,6 +27,7 @@ local ModuleName = {} -- Module Name Here Returns the table of functions and any
 	MyUI_MyChatHandler = nil -- function to take in messages and output them to a specific tab in MyChat
 									this will create the tab if it does not exist and output the message to it.
 									Usage: MyUI_MyChatHandler('TabName', 'Message')
+									you can use 'main' for the main tab.
 ]]
 
 -- Exposed Variables

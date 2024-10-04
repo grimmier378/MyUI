@@ -2213,12 +2213,13 @@ end
 
 -- TLO Handler
 function MyChat.MyChatHandler(consoleName, message)
-    -- if type(consoleName) ~= "string" or type(message) ~= "string" then
-    --     print("Error: Both 'console' and 'message' must be strings.")
-    --     return 'nil', true
-    -- end
+    -- if console specified is main then just print to main console
+    if consoleName:lower() == 'main' then
+        appendColoredTimestamp(MyChat.console, mq.TLO.Time.Time24(), message, nil, true)
+        return
+    end
 
-    -- Create the console if it does not exist and append the message
+    -- create console if it doesn't exist
     MyChat.createExternConsole(consoleName)
     local consoleID = MyChat.TLOConsoles[consoleName]
 
@@ -2229,17 +2230,6 @@ function MyChat.MyChatHandler(consoleName, message)
 
     -- our console
     appendColoredTimestamp(MyChat.Consoles[consoleID].console, mq.TLO.Time.Time24(), message, nil, true)
-
-    return 'nil', true
-end
-
----comment
----@param consoleName string @The name of the Tab to be created or updated
----@param message string @The message to be displayed
----@return string
----@return boolean
-function MyChat.PreHandle(consoleName, message)
-    return MyChat.MyChatHandler(consoleName, message)
 end
 
 function MyChat.SortChannels()

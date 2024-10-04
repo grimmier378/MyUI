@@ -220,7 +220,6 @@ local function StartUp()
 	CheckMode(args)
 	LoadSettings()
 
-
 	for _, data in ipairs(MyUI_Settings.mods_enabled) do
 		if data.enabled then
 			table.insert(mods, data.name)
@@ -233,6 +232,9 @@ local function StartUp()
 
 	MyUI_IsRunning = true
 	mq.imgui.init(MyUI_ScriptName .. "##" .. MyUI_CharLoaded, MyUI_Render)
+	table.sort(MyUI_Settings.mods_enabled, function(a, b)
+		return a.name < b.name
+	end)
 end
 
 StartUp()

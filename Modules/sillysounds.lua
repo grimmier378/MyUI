@@ -5,10 +5,6 @@ local SillySounds = {}
 
 local script = "SillySounds"
 local itemWatch = false
-if mq.TLO.EverQuest.GameState() ~= "INGAME" then
-    printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
-    mq.exit()
-end
 
 -- C code definitions for volume control
 ffi.cdef [[
@@ -203,7 +199,7 @@ local function helpList(type)
         printf('\aw%s \ax:: \at /sillysounds help      \t\ag Brings up this list\ax', timeStamp)
         printf('\aw%s \ax:: \at /sillysounds config    \t\ag Opens Config GUI Window\ax', timeStamp)
         printf('\aw%s \ax:: \at /sillysounds show      \t\ag Prints out the current settings\ax', timeStamp)
-        printf('\aw%s \ax:: \at /sillysounds quit      \t\ag Exits the script\ax', timeStamp)
+        -- printf('\aw%s \ax:: \at /sillysounds quit      \t\ag Exits the script\ax', timeStamp)
     elseif type == 'show' then
         printf('\aw%s \ax:: \ay%s Current Settings\ax', timeStamp, script)
         for k, v in pairs(settings) do

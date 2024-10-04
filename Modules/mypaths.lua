@@ -660,7 +660,6 @@ local function groupWatch(type)
     end
     return false
 end
-local sitTime = 0
 local interruptInProgress = false
 local function CheckInterrupts()
     if not InterruptSet.interruptsOn then return false end
@@ -668,7 +667,27 @@ local function CheckInterrupts()
     local xCount = mq.TLO.Me.XTarget() or 0
     local flag = false
     local invis = false
-    if mq.TLO.Window('LootWnd').Open() and InterruptSet.stopForLoot then
+    if mq.TLO.Me.Sitting() and InterruptSet.stopForSitting then
+        local curHP, curMP = mq.TLO.Me.PctHPs(), mq.TLO.Me.PctMana() or 0
+        mq.delay(10)
+        if not interruptInProgress then
+            mq.cmdf("/nav stop log=off")
+            interruptInProgress = true
+            status = string.format('Paused for Sitting. HP %s MP %s', curHP, curMP)
+        end
+        if curHP - lastHP > 5 or curMP - lastMP > 5 then
+            status = string.format('Paused for Sitting. HP %s MP %s', curHP, curMP)
+            lastHP, lastMP = curHP, curMP
+        end
+
+        flag = true
+
+        if curHP >= 99 and curMP >= 99 and settings[script].AutoStand then
+            mq.TLO.Me.Stand()
+            status = 'Idle'
+            flag = false
+        end
+    elseif mq.TLO.Window('LootWnd').Open() and InterruptSet.stopForLoot then
         if not interruptInProgress then
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
@@ -701,33 +720,6 @@ local function CheckInterrupts()
                     flag = true
                 end
             end
-        end
-    elseif mq.TLO.Me.Sitting() == true and InterruptSet.stopForSitting then
-        if sitTime == 0 then
-            sitTime = mq.gettime()
-        end
-        if not interruptInProgress then
-            mq.cmdf("/nav stop log=off")
-            interruptInProgress = true
-        end
-        flag = true
-        -- mq.delay(30)
-        local curHP, curMP = mq.TLO.Me.PctHPs(), mq.TLO.Me.PctMana() or 0
-        if mq.gettime() - sitTime >= 10 then
-            if curHP - lastHP > 10 or curMP - lastMP > 10 then
-                lastHP, lastMP = curHP, curMP
-                status = string.format('Paused for Sitting. HP %s MP %s', curHP, curMP)
-            end
-
-            flag = true
-
-            if curHP >= 100 and curMP >= 100 and settings[script].AutoStand then
-                interruptInProgress = false
-                mq.TLO.Me.Stand()
-                status = 'Idle'
-                flag = false
-            end
-            sitTime = 0
         end
     elseif mq.TLO.Me.Rooted() and InterruptSet.stopForRoot then
         if not interruptInProgress then
@@ -805,7 +797,7 @@ local function CheckInterrupts()
         InterruptSet.PauseStart = os.time()
         intPauseTime = InterruptSet.interruptDelay
         if invis then intPauseTime = settings[script].InvisDelay end
-    elseif interruptInProgress then
+    else
         interruptInProgress = false
         intPauseTime = 0
     end
@@ -1283,15 +1275,14 @@ function MyPaths.RenderGUI()
                 if ImGui.IsItemHovered() then
                     ImGui.SetTooltip("Toggle Lock Window")
                 end
-                if DEBUG then
-                    ImGui.SameLine()
+                ImGui.SameLine()
 
-                    if ImGui.MenuItem(MyUI_Icons.FA_BUG) then
-                        showDebugTab = not showDebugTab
-                    end
-                    if ImGui.IsItemHovered() then
-                        ImGui.SetTooltip("Debug")
-                    end
+                if ImGui.MenuItem(MyUI_Icons.FA_BUG) then
+                    DEBUG = not DEBUG
+                    showDebugTab = DEBUG
+                end
+                if ImGui.IsItemHovered() then
+                    ImGui.SetTooltip("Debug")
                 end
                 ImGui.SameLine()
 
@@ -2857,32 +2848,33 @@ function MyPaths.MainLoop()
     end
 
     -- check interrupts
+    InterruptSet.interruptFound = CheckInterrupts()
     if NavSet.doNav and not NavSet.doPause and not justZoned then
         mq.delay(1)
         cTime = os.time()
-        local checkTime = InterruptSet.interruptCheck or 1
+        local checkTime = InterruptSet.interruptCheck
         -- printf("interrupt Checked: %s", checkTime)
-        if cTime - checkTime >= 1 then
-            InterruptSet.interruptFound = CheckInterrupts()
-            InterruptSet.interruptCheck = os.time()
-            if mq.TLO.SpawnCount('gm')() > 0 and InterruptSet.stopForGM and not NavSet.PausedActiveGN then
-                printf("\ay[\at%s\ax] \arGM Detected, \ayPausing Navigation...", script)
-                NavSet.doNav = false
-                mq.cmdf("/nav stop log=off")
-                NavSet.ChainStart = false
-                mq.cmd("/multiline ; /squelch /beep; /timed  3, /beep ; /timed 2, /beep ; /timed 1, /beep")
-                mq.delay(1)
-                status = 'Paused: GM Detected'
-                NavSet.PausedActiveGN = true
-            end
-            if status == 'Paused for Invis.' or status == 'Paused for Double Invis.' then
-                if settings[script].InvisAction ~= '' then
-                    mq.cmd(settings[script].InvisAction)
-                    -- local iDelay = settings[script].InvisDelay * 1000
-                    -- mq.delay(iDelay)
-                end
+        -- if cTime - checkTime >= 1 then
+        InterruptSet.interruptFound = CheckInterrupts()
+        InterruptSet.interruptCheck = os.time()
+        if mq.TLO.SpawnCount('gm')() > 0 and InterruptSet.stopForGM and not NavSet.PausedActiveGN then
+            printf("\ay[\at%s\ax] \arGM Detected, \ayPausing Navigation...", script)
+            NavSet.doNav = false
+            mq.cmdf("/nav stop log=off")
+            NavSet.ChainStart = false
+            mq.cmd("/multiline ; /squelch /beep; /timed  3, /beep ; /timed 2, /beep ; /timed 1, /beep")
+            mq.delay(1)
+            status = 'Paused: GM Detected'
+            NavSet.PausedActiveGN = true
+        end
+        if status == 'Paused for Invis.' or status == 'Paused for Double Invis.' then
+            if settings[script].InvisAction ~= '' then
+                mq.cmd(settings[script].InvisAction)
+                -- local iDelay = settings[script].InvisDelay * 1000
+                -- mq.delay(iDelay)
             end
         end
+        -- end
     end
 
     if not InterruptSet.interruptFound and not NavSet.doPause and not NavSet.doChainPause then

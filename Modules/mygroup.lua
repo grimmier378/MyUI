@@ -931,8 +931,6 @@ function MyGroup.MainLoop()
     meID = TLO.Me.ID()
     if TLO.Window('CharacterListWnd').Open() then return false end
     currZone = mq.TLO.Zone.ID()
-    if not mq.TLO.MacroQuest.GameState() == "INGAME" then mq.exit() end
-    local timdiff = mq.gettime() - clockTimer
     if currZone ~= lastZone then
         mimicMe = false
         followMe = false

@@ -116,7 +116,7 @@ local function loadSettings()
 		end
 		mq.pickle(dialogData, Dialog)
 	else
-		local tmpDialog = dofile(dialogData)
+		local tmpDialog = dofile(dialogData) or {}
 		for server, sData in pairs(Dialog) do
 			tmpDialog[server] = tmpDialog[server] or {}
 			for target, tData in pairs(sData) do

@@ -80,11 +80,6 @@ local function LoadSettings()
 end
 
 local function InitModules()
-	if MyUI_Modules.MyChat ~= nil then
-		MyUI_MyChatLoaded = true
-		MyUI_MyChatPrehandle = MyUI_Modules.MyChat.PreHandle
-	end
-
 	for idx, data in ipairs(MyUI_Settings.mods_enabled) do
 		if data.enabled and MyUI_Modules[data.name] ~= nil then
 			local message = {
@@ -161,14 +156,6 @@ local function MyUI_Main()
 		mq.doevents()
 		for idx, data in ipairs(MyUI_Settings.mods_enabled) do
 			if data.enabled and MyUI_Modules[data.name] ~= nil then
-				if data.name == 'MyChat' then
-					if not MyUI_MyChatLoaded then
-						MyUI_MyChatLoaded = true
-						if MyUI_MyChatPrehandle == nil then
-							MyUI_MyChatPrehandle = MyUI_Modules.MyChat.PreHandle
-						end
-					end
-				end
 				MyUI_Modules[data.name].MainLoop()
 				mq.delay(10)
 			end

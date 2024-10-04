@@ -81,7 +81,7 @@ local function printOutput(msg, ...)
 	if not useMyChat then
 		printf(msg)
 	else
-		MyUI_Modules.MyChat.PreHandle(script, msg)
+		MyUI_MyChatPrehandle(script, msg)
 	end
 end
 

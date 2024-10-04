@@ -2316,5 +2316,7 @@ function MyChat.MainLoop()
 end
 
 init()
+MyUI_MyChatLoaded = true
+MyUI_MyChatPrehandle = MyChat.PreHandle
 
 return MyChat

@@ -184,7 +184,6 @@ local function MyUI_Main()
 		for idx, data in ipairs(MyUI_Settings.mods_enabled) do
 			if data.enabled and MyUI_Modules[data.name] ~= nil then
 				MyUI_Modules[data.name].MainLoop()
-				-- mq.delay(1)
 			end
 		end
 		mq.delay(1)

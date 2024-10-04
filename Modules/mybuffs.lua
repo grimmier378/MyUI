@@ -1717,7 +1717,6 @@ local function init()
 end
 
 function MyBuffs.MainLoop()
-    if mq.TLO.EverQuest.GameState() ~= "INGAME" then mq.exit() end
     currZone = mq.TLO.Zone.ID()
     local elapsedTime = mq.gettime() - clockTimer
     if (not solo and elapsedTime >= 500) or (solo and elapsedTime >= 33) then -- refresh faster if solo, otherwise every half second to report is reasonable
@@ -1729,6 +1728,5 @@ function MyBuffs.MainLoop()
     end
 end
 
-if mq.TLO.EverQuest.GameState() ~= "INGAME" then mq.exit() end
 init()
 return MyBuffs

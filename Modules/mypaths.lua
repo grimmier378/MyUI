@@ -1278,8 +1278,8 @@ function MyPaths.RenderGUI()
                 ImGui.SameLine()
 
                 if ImGui.MenuItem(MyUI_Icons.FA_BUG) then
-                    DEBUG = not DEBUG
-                    showDebugTab = DEBUG
+                    if not DEBUG then DEBUG = true end
+                    showDebugTab = not showDebugTab
                 end
                 if ImGui.IsItemHovered() then
                     ImGui.SetTooltip("Debug")

@@ -909,10 +909,5 @@ function DialogDB.MainLoop()
 	mq.doevents()
 end
 
-if mq.TLO.EverQuest.GameState() ~= "INGAME" then
-	MyUI_Utils.PrintOutput("\aw[\atDialogDB\ax] \arNot in game, \ayTry again later...")
-	mq.exit()
-end
-
 init()
 return DialogDB

@@ -408,9 +408,9 @@ function ChatRelay.RenderGUI()
             end
 
             if ImGui.BeginPopupContextWindow() then
-                if ImGui.MenuItem("exit") then
-                    mq.exit()
-                end
+                -- if ImGui.MenuItem("exit") then
+                --     mq.exit()
+                -- end
                 if ImGui.MenuItem("config") then
                     showConfig = true
                 end

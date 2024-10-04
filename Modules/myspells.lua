@@ -459,7 +459,7 @@ local function LoadSet(set)
 		end
 	end
 	mq.TLO.Window('SpellBookWnd').DoOpen()
-	mq.delay(5)
+	mq.delay(5, function() return mq.TLO.Window('SpellBookWnd').Open() end)
 	for i = 1, numGems or 8 do
 		GetSpells(i)
 		if setBar[i] ~= nil then

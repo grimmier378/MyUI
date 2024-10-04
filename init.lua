@@ -15,6 +15,7 @@ MyUI_SQLite3         = MyUI_PackageMan.Require('lsqlite3')
 MyUI_Colors          = require('lib.colors')
 MyUI_ThemeLoader     = require('lib.theme_loader')
 MyUI_AbilityPicker   = require('lib.AbilityPicker')
+MyUI_Grimmier_Img    = MyUI_Utils.SetImage(mq.TLO.Lua.Dir() .. "/myui/images/GrimGUI.png")
 
 -- build, char, server info
 MyUI_CharLoaded      = mq.TLO.Me.DisplayName()
@@ -25,9 +26,11 @@ local MyActor        = MyUI_Actor.register('myui', function(message) end)
 MyUI_Modules         = {}
 MyUI_Mode            = 'driver'
 local mods           = {}
+local Minimized      = false
 MyUI_SettingsFile    = mq.configDir .. '/MyUI/' .. MyUI_Server:gsub(" ", "_") .. '/' .. MyUI_CharLoaded .. '.lua'
 MyUI_MyChatLoaded    = false
 MyUI_MyChatPrehandle = nil
+
 
 MyUI_DefaultConfig   = {
 	ShowMain = true,
@@ -75,7 +78,7 @@ local function LoadSettings()
 			MyUI_Settings[k] = v
 		end
 	end
-
+	Minimized = not MyUI_Settings.ShowMain
 	LoadTheme()
 end
 
@@ -106,48 +109,72 @@ end
 
 local function MyUI_Render()
 	if MyUI_Settings.ShowMain then
+		Minimized = false
 		ImGui.SetNextWindowSize(400, 200, ImGuiCond.FirstUseEver)
-		local color_count, style_count = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
+		-- local color_count, style_count = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
 
 		local open_gui, show_gui = ImGui.Begin(MyUI_ScriptName .. "##" .. MyUI_CharLoaded, true, ImGuiWindowFlags.None)
 
 		if not open_gui then
 			MyUI_Settings.ShowMain = false
+			Minimized = true
 			mq.pickle(MyUI_SettingsFile, MyUI_Settings)
 		end
-		if ImGui.BeginTable("Modules", 2, ImGuiWindowFlags.None) then
-			if show_gui then
-				for idx, data in ipairs(MyUI_Settings.mods_enabled) do
-					local pressed = false
-					ImGui.TableNextColumn()
-					data.enabled, pressed = ImGui.Checkbox(data.name, data.enabled)
-					if pressed then
-						-- if MyUI_Settings.mods_enabled[idx].enabled == false then
-						if data.enabled then
-							table.insert(mods, data.name)
-							MyUI_Modules[data.name] = MyUI_LoadModules.load(data.name)
-							InitModules()
-						else
-							MyUI_Modules[data.name] = nil
-							for i, v in ipairs(mods) do
-								if v == data.name then
-									table.remove(mods, i)
+		if show_gui then
+			if ImGui.BeginTable("Modules", 2, ImGuiWindowFlags.None) then
+				if show_gui then
+					for idx, data in ipairs(MyUI_Settings.mods_enabled) do
+						local pressed = false
+						ImGui.TableNextColumn()
+						data.enabled, pressed = ImGui.Checkbox(data.name, data.enabled)
+						if pressed then
+							-- if MyUI_Settings.mods_enabled[idx].enabled == false then
+							if data.enabled then
+								table.insert(mods, data.name)
+								MyUI_Modules[data.name] = MyUI_LoadModules.load(data.name)
+								InitModules()
+							else
+								MyUI_Modules[data.name] = nil
+								for i, v in ipairs(mods) do
+									if v == data.name then
+										table.remove(mods, i)
+									end
 								end
+								InitModules()
 							end
-							InitModules()
+							-- end
+							MyUI_Settings.mods_enabled[idx].enabled = data.enabled
+							mq.pickle(MyUI_SettingsFile, MyUI_Settings)
 						end
-						-- end
-						MyUI_Settings.mods_enabled[idx].enabled = data.enabled
-						mq.pickle(MyUI_SettingsFile, MyUI_Settings)
 					end
 				end
+				ImGui.EndTable()
 			end
-			ImGui.EndTable()
 		end
-
-		MyUI_ThemeLoader.EndTheme(color_count, style_count)
+		-- MyUI_ThemeLoader.EndTheme(color_count, style_count)
 		ImGui.End()
 	end
+
+	if Minimized then
+		-- local color_count, style_count = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
+		local open_gui, show_gui = ImGui.Begin(MyUI_ScriptName .. "##Mini" .. MyUI_CharLoaded, true,
+			bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar))
+
+		if not open_gui then
+			MyUI_Settings.ShowMain = false
+			Minimized = true
+			mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+		end
+		if show_gui then
+			if ImGui.ImageButton("MyUI", MyUI_Grimmier_Img:GetTextureID(), ImVec2(30, 30)) then
+				MyUI_Settings.ShowMain = true
+				Minimized = false
+			end
+		end
+		-- MyUI_ThemeLoader.EndTheme(color_count, style_count)
+		ImGui.End()
+	end
+
 	RenderModules()
 end
 
@@ -157,7 +184,7 @@ local function MyUI_Main()
 		for idx, data in ipairs(MyUI_Settings.mods_enabled) do
 			if data.enabled and MyUI_Modules[data.name] ~= nil then
 				MyUI_Modules[data.name].MainLoop()
-				mq.delay(10)
+				-- mq.delay(1)
 			end
 		end
 		mq.delay(1)

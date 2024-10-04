@@ -286,14 +286,17 @@ local function startup()
 end
 
 local clockTimer = mq.gettime()
-
+local refreshTimer = 0
 function SAST.MainLoop()
-	if refreshStats then
-		mq.delay(3000, function() return (mq.TLO.Window("AdventureStatsWnd/AdvStats_ThemeList").List(1)() or 0) ~= 0 end)
-		mq.delay(200) -- extra pading after window opens so we can pull the data
+	if refreshStats and refreshTimer == 0 then
+		refreshTimer = mq.gettime()
+		-- mq.delay(3000, function() return (mq.TLO.Window("AdventureStatsWnd/AdvStats_ThemeList").List(1)() or 0) ~= 0 end)
+	end
+	if refreshStats and mq.gettime() - refreshTimer >= 200 and ((mq.TLO.Window("AdventureStatsWnd/AdvStats_ThemeList").List(1)() or 0) ~= 0) then
 		mq.TLO.Window('AdventureStatsWnd/AdvStats_DoneButton').LeftMouseUp()
 		-- mq.TLO.Window('AdventureStatsWnd').DoClose()
 		refreshStats = false
+		refreshTimer = 0
 	end
 	currZone = mq.TLO.Zone.ID()
 	if mq.TLO.Window('CharacterListWnd').Open() then return false end
@@ -326,6 +329,7 @@ function SAST.MainLoop()
 		else
 			guiOpen = false
 		end
+		clockTimer = mq.gettime()
 	end
 end
 

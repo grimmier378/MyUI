@@ -733,8 +733,8 @@ function AAParty.MainLoop()
             lastZone = currZone
         end
         getMyAA()
-        mq.delay(50)
         CheckStale()
+        clockTimer = mq.gettime()
     end
 end
 

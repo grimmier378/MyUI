@@ -1382,8 +1382,9 @@ local function Init()
 	end
 end
 
+local clockTimer = mq.gettime()
+
 function MyDPS.MainLoop()
-	local uiTime = 1
 	-- Main Loop
 
 	if tempSettings.doActors ~= settings.Options.announceActors then
@@ -1432,20 +1433,26 @@ function MyDPS.MainLoop()
 	end
 	cleanTable()
 	workingTable = sortTable(damTable, 'combat')
-	if tempSettings.doActors and uiTime == 1 then actorsWorking = sortTable(actorsTable, 'party') end
+	if firstRun then
+		actorsWorking = sortTable(actorsTable, 'party')
+		firstRun = false
+	end
+
 	if tempSettings.sortParty then
+		actorsWorking = sortTable(actorsTable, 'party')
+	else
 		actorsWorking = actorsTable
 	end
 
 	mq.doevents()
-	mq.delay(5)
-	if tempSettings.sortParty then
-		uiTime = uiTime + 5
-		if uiTime >= 34 then
-			if tempSettings.doActors then actorsWorking = sortTable(actorsTable, 'party') end
-			uiTime = 0
-		end
-	end
+	-- mq.delay(5)
+	-- if tempSettings.sortParty then
+	-- 	uiTime = uiTime + 5
+	-- 	if uiTime >= 34 then
+	-- 		if tempSettings.doActors then actorsWorking = sortTable(actorsTable, 'party') end
+	-- 		uiTime = 0
+	-- 	end
+	-- end
 end
 
 Init()

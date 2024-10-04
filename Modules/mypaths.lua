@@ -660,7 +660,7 @@ local function groupWatch(type)
     end
     return false
 end
-
+local sitTime = 0
 local interruptInProgress = false
 local function CheckInterrupts()
     if not InterruptSet.interruptsOn then return false end
@@ -670,21 +670,21 @@ local function CheckInterrupts()
     local invis = false
     if mq.TLO.Window('LootWnd').Open() and InterruptSet.stopForLoot then
         if not interruptInProgress then
-            mq.cmdf("/nav stop")
+            mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
         status = 'Paused for Looting.'
         flag = true
     elseif mq.TLO.Window('AdvancedLootWnd').Open() and InterruptSet.stopForLoot then
         if not interruptInProgress then
-            mq.cmdf("/nav stop")
+            mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
         status = 'Paused for Looting.'
         flag = true
     elseif mq.TLO.Me.Combat() and InterruptSet.stopForCombat then
         if not interruptInProgress then
-            mq.cmdf("/nav stop")
+            mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
         status = 'Paused for Combat.'
@@ -694,7 +694,7 @@ local function CheckInterrupts()
             if mq.TLO.Me.XTarget(i) ~= nil then
                 if (mq.TLO.Me.XTarget(i).ID() ~= 0 and mq.TLO.Me.XTarget(i).Type() ~= 'PC' and mq.TLO.Me.XTarget(i).Master.Type() ~= "PC") then
                     if not interruptInProgress then
-                        mq.cmdf("/nav stop")
+                        mq.cmdf("/nav stop log=off")
                         interruptInProgress = true
                     end
                     status = string.format('Paused for XTarget. XTarg Count %s', mq.TLO.Me.XTarget())
@@ -703,29 +703,35 @@ local function CheckInterrupts()
             end
         end
     elseif mq.TLO.Me.Sitting() == true and InterruptSet.stopForSitting then
+        if sitTime == 0 then
+            sitTime = mq.gettime()
+        end
         if not interruptInProgress then
-            mq.cmdf("/nav stop")
+            mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
+        flag = true
         -- mq.delay(30)
         local curHP, curMP = mq.TLO.Me.PctHPs(), mq.TLO.Me.PctMana() or 0
-        mq.delay(10)
-        if curHP - lastHP > 10 or curMP - lastMP > 10 then
-            lastHP, lastMP = curHP, curMP
-            status = string.format('Paused for Sitting. HP %s MP %s', curHP, curMP)
-        end
+        if mq.gettime() - sitTime >= 10 then
+            if curHP - lastHP > 10 or curMP - lastMP > 10 then
+                lastHP, lastMP = curHP, curMP
+                status = string.format('Paused for Sitting. HP %s MP %s', curHP, curMP)
+            end
 
-        flag = true
+            flag = true
 
-        if curHP >= 100 and curMP >= 100 and settings[script].AutoStand then
-            interruptInProgress = false
-            mq.TLO.Me.Stand()
-            status = 'Idle'
-            flag = false
+            if curHP >= 100 and curMP >= 100 and settings[script].AutoStand then
+                interruptInProgress = false
+                mq.TLO.Me.Stand()
+                status = 'Idle'
+                flag = false
+            end
+            sitTime = 0
         end
     elseif mq.TLO.Me.Rooted() and InterruptSet.stopForRoot then
         if not interruptInProgress then
-            mq.cmdf("/nav stop")
+            mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
         status = 'Paused for Rooted.'
@@ -733,35 +739,35 @@ local function CheckInterrupts()
         ---@diagnostic disable-next-line: undefined-field
     elseif mq.TLO.Me.Feared() and InterruptSet.stopForFear then
         if not interruptInProgress then
-            mq.cmdf("/nav stop")
+            mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
         status = 'Paused for Feared.'
         flag = true
     elseif mq.TLO.Me.Mezzed() and InterruptSet.stopForMez then
         if not interruptInProgress then
-            mq.cmdf("/nav stop")
+            mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
         status = 'Paused for Mezzed.'
         flag = true
     elseif mq.TLO.Me.Charmed() and InterruptSet.stopForCharm then
         if not interruptInProgress then
-            mq.cmdf("/nav stop")
+            mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
         status = 'Paused for Charmed.'
         flag = true
     elseif mq.TLO.Me.Casting() ~= nil and mq.TLO.Me.Class.ShortName() ~= 'BRD' and InterruptSet.stopForCasting then
         if not interruptInProgress then
-            mq.cmdf("/nav stop")
+            mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
         status = 'Paused for Casting.'
         flag = true
     elseif not mq.TLO.Me.Invis() and InterruptSet.stopForInvis then
         if not interruptInProgress then
-            mq.cmdf("/nav stop")
+            mq.cmdf("/nav stop log=off")
             interruptInProgress = true
             status = 'Paused for Invis.'
         end
@@ -770,7 +776,7 @@ local function CheckInterrupts()
         invis = true
     elseif not (mq.TLO.Me.Invis(1)() and mq.TLO.Me.Invis(2)()) and InterruptSet.stopForDblInvis then
         if not interruptInProgress then
-            mq.cmdf("/nav stop")
+            mq.cmdf("/nav stop log=off")
             interruptInProgress = true
             status = 'Paused for Double Invis.'
         end
@@ -778,20 +784,20 @@ local function CheckInterrupts()
         flag = true
         invis = true
         -- elseif currZone ~= lastZone then
-        --     if not interruptInProgress then mq.cmdf("/nav stop") interruptInProgress = true end
+        --     if not interruptInProgress then mq.cmdf("/nav stop log=off") interruptInProgress = true end
         --     status = 'Paused for Zoning.'
         --     lastZone = ''
         --     flag = true
     elseif settings[script].GroupWatch == true and groupWatch(settings[script].WatchType) then
         flag = true
         if flag and not interruptInProgress then
-            mq.cmdf("/nav stop")
+            mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
     elseif InterruptSet.stopForDist == true and groupDistance() then
         flag = true
         if flag and not interruptInProgress then
-            mq.cmdf("/nav stop")
+            mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
     end
@@ -808,11 +814,16 @@ local function CheckInterrupts()
 end
 
 --------- Navigation Functions --------
-
+local doorTime = 0
 local function ToggleSwitches()
-    mq.cmdf("/squelch /multiline ; /doortarget; /timed 15, /click left door; /timed 25, /doortarget clear")
-    mq.delay(750)
-    InterruptSet.openDoor = not InterruptSet.openDoor
+    if doorTime == 0 then
+        mq.cmdf("/squelch /multiline ; /doortarget; /timed 15, /click left door; /timed 25, /doortarget clear")
+        doorTime = mq.gettime()
+    end
+    if mq.gettime() - doorTime >= 750 then
+        InterruptSet.openDoor = not InterruptSet.openDoor
+        doorTime = 0
+    end
 end
 
 local function FindIndexClosestWaypoint(table)
@@ -926,7 +937,7 @@ local function NavigatePath(name)
                 coroutine.yield() -- Yield here to allow updates
                 if not NavSet.doNav then return end
             end
-            -- mq.cmdf("/nav stop")
+            -- mq.cmdf("/nav stop log=off")
             -- status = "Arrived at WP #: "..tmp[i].step
 
             if NavSet.doSingle then
@@ -1343,7 +1354,7 @@ function MyPaths.RenderGUI()
                     ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(1, 0.4, 0.4, 0.4))
                     if ImGui.Button(MyUI_Icons.FA_PAUSE) then
                         NavSet.doPause = true
-                        mq.cmd("/nav stop")
+                        mq.cmd("/nav stop log=off")
                         table.insert(debugMessages, { Time = os.date("%H:%M:%S"), Zone = currZone, Path = NavSet.SelectedPath, WP = 'Pause', Status = 'Paused Navigation!', })
                     end
                     ImGui.PopStyleColor()
@@ -1358,7 +1369,7 @@ function MyPaths.RenderGUI()
                     if ImGui.Button(MyUI_Icons.FA_STOP) then
                         NavSet.doNav = false
                         NavSet.ChainStart = false
-                        mq.cmdf("/nav stop")
+                        mq.cmdf("/nav stop log=off")
                         PathStartClock, PathStartTime = nil, nil
                     end
                     ImGui.PopStyleColor()
@@ -1746,7 +1757,7 @@ function MyPaths.RenderGUI()
 
                                     if ImGui.Button(MyUI_Icons.FA_PAUSE) then
                                         NavSet.doPause = true
-                                        mq.cmd("/nav stop")
+                                        mq.cmd("/nav stop log=off")
                                         table.insert(debugMessages,
                                             { Time = os.date("%H:%M:%S"), Zone = currZone, Path = NavSet.SelectedPath, WP = 'Pause', Status = 'Paused Navigation!', })
                                     end
@@ -1768,7 +1779,7 @@ function MyPaths.RenderGUI()
                                     NavSet.doNav = not NavSet.doNav
                                     NavSet.ChainStart = false
                                     if not NavSet.doNav then
-                                        mq.cmdf("/nav stop")
+                                        mq.cmdf("/nav stop log=off")
                                         NavSet.ChainStart = false
                                         PathStartClock, PathStartTime = nil, nil
                                     else
@@ -2459,7 +2470,7 @@ local function bind(...)
     if #args == 1 then
         if key == 'stop' then
             NavSet.doNav = false
-            mq.cmdf("/nav stop")
+            mq.cmdf("/nav stop log=off")
             NavSet.ChainStart = false
             NavSet.SelectedPath = 'None'
             -- loadPaths()
@@ -2487,7 +2498,7 @@ local function bind(...)
             NavSet.doPause = false
         elseif key == 'quit' or key == 'exit' then
             -- mq.exit()
-            mq.cmd("/nav stop")
+            mq.cmd("/nav stop log=off")
             mq.TLO.Me.Stand()
             mq.delay(1)
             NavSet.doNav = false
@@ -2857,7 +2868,7 @@ function MyPaths.MainLoop()
             if mq.TLO.SpawnCount('gm')() > 0 and InterruptSet.stopForGM and not NavSet.PausedActiveGN then
                 printf("\ay[\at%s\ax] \arGM Detected, \ayPausing Navigation...", script)
                 NavSet.doNav = false
-                mq.cmdf("/nav stop")
+                mq.cmdf("/nav stop log=off")
                 NavSet.ChainStart = false
                 mq.cmd("/multiline ; /squelch /beep; /timed  3, /beep ; /timed 2, /beep ; /timed 1, /beep")
                 mq.delay(1)

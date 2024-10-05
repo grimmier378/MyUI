@@ -28,6 +28,7 @@ end
 
 function Module.unload(module_name)
 	package.loaded["modules." .. module_name:lower()] = nil
+	MyUI_Modules[module_name] = nil
 end
 
 return Module

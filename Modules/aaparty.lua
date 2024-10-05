@@ -207,7 +207,7 @@ end
 
 --create mailbox for actors to send messages to
 local function MessageHandler()
-    aaActor = MyUI_Actor.register('aa_party', function(message)
+    aaActor = MyUI_Actor.register(AAParty.ActorMailBox, function(message)
         local MemberEntry = message()
         local subject     = MemberEntry.Subject or 'Update'
         local aaXP        = MemberEntry.PctExpAA or 0

@@ -95,7 +95,7 @@ end
 
 --create mailbox for actors to send messages to
 local function RegisterRelayActor()
-    RelayActor = MyUI_Actor.register('chat_relay', function(message)
+    RelayActor = MyUI_Actor.register(ChatRelay.ActorMailBox, function(message)
         local MemberEntry = message()
         if MemberEntry == nil then return end
         local HelloMessage = false

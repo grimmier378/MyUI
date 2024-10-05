@@ -168,46 +168,28 @@ end
 local function GetBuff(slot)
     local fixSlotNum = slot + 1
     local buffTooltip, buffName, buffDuration, buffIcon, buffID, buffBeneficial, buffHr, buffMin, buffSec, totalMin, totalSec, buffDurHMS
-    if mq.TLO.MacroQuest.BuildName() == 'Emu' then
-        -- buffs are updated more reliably on the BuffWindow ingame on EMU as you will have to periodically retarget yourself to refresh the buffs otherwise.
-        buffTooltip = mq.TLO.Window('BuffWindow').Child('BW_Buff' .. slot .. '_Button').Tooltip() or ''
-        buffName = (buffTooltip ~= '' and buffTooltip:find('%(')) and buffTooltip:sub(1, buffTooltip:find('%(') - 2) or ''
-        buffDuration = (buffTooltip ~= '' and buffTooltip:find('%(')) and buffTooltip:sub(buffTooltip:find('%(') + 1, buffTooltip:find('%)') - 1) or ''
-        buffIcon = mq.TLO.Spell(buffName).SpellIcon() or 0
-        buffID = buffName ~= '' and (mq.TLO.Spell(buffName).ID() or 0) or 0
-        buffBeneficial = mq.TLO.Spell(buffName).Beneficial() or false
+    local buff = mq.TLO.Me.Buff(fixSlotNum)
+    local duration = buff.Duration
 
-        -- Extract hours, minutes, and seconds from buffDuration
-        buffHr, buffMin, buffSec = buffDuration:match("(%d+)h"), buffDuration:match("(%d+)m"), buffDuration:match("(%d+)s")
-        buffHr = buffHr and string.format("%02d", tonumber(buffHr)) or "00"
-        buffMin = buffMin and string.format("%02d", tonumber(buffMin)) or "00"
-        buffSec = buffSec and string.format("%02d", tonumber(buffSec)) or "00"
+    buffName = buff.Name() or ''
+    buffDuration = duration.TimeHMS() or ''
+    buffIcon = buff.SpellIcon() or 0
+    buffID = buff.ID() or 0
+    buffBeneficial = buff.Beneficial() or false
 
-        -- Calculate total minutes and total seconds
-        totalMin = tonumber(buffHr) * 60 + tonumber(buffMin)
-        totalSec = tonumber(totalMin) * 60 + tonumber(buffSec)
-        buffDurHMS = ''
+    -- Extract hours, minutes, and seconds from buffDuration
+    buffHr = duration.Hours() or 0
+    buffMin = duration.Minutes() or 0
+    buffSec = duration.Seconds() or 0
 
-        buffDurHMS = buffHr .. ":" .. buffMin .. ":" .. buffSec
-    else
-        buffName = mq.TLO.Me.Buff(fixSlotNum).Name() or ''
-        buffDuration = mq.TLO.Me.Buff(fixSlotNum).Duration.TimeHMS() or ''
-        buffIcon = mq.TLO.Me.Buff(fixSlotNum).SpellIcon() or 0
-        buffID = mq.TLO.Me.Buff(fixSlotNum).ID() or 0
-        buffBeneficial = mq.TLO.Me.Buff(fixSlotNum).Beneficial() or false
+    -- Calculate total minutes and total seconds
+    totalMin = duration.TotalMinutes() or 0
+    totalSec = duration.TotalSeconds() or 0
+    -- print(totalSec)
+    buffDurHMS = duration.TimeHMS() or ''
+    buffTooltip = string.format("%s) %s (%s)", fixSlotNum, buffName, buffDurHMS)
 
-        -- Extract hours, minutes, and seconds from buffDuration
-        buffHr = mq.TLO.Me.Buff(fixSlotNum).Duration.Hours() or 0
-        buffMin = mq.TLO.Me.Buff(fixSlotNum).Duration.Minutes() or 0
-        buffSec = mq.TLO.Me.Buff(fixSlotNum).Duration.Seconds() or 0
 
-        -- Calculate total minutes and total seconds
-        totalMin = mq.TLO.Me.Buff(fixSlotNum).Duration.TotalMinutes() or 0
-        totalSec = mq.TLO.Me.Buff(fixSlotNum).Duration.TotalSeconds() or 0
-        -- print(totalSec)
-        buffDurHMS = mq.TLO.Me.Buff(fixSlotNum).Duration.TimeHMS() or ''
-        buffTooltip = string.format("%s) %s (%s)", fixSlotNum, buffName, buffDurHMS)
-    end
 
     if MyBuffs.buffTable[fixSlotNum] ~= nil then
         if MyBuffs.buffTable[fixSlotNum].ID ~= buffID or (buffID > 0 and totalSec < 20) then changed = true end
@@ -278,35 +260,19 @@ local function GetSong(slot)
     totalMin = mq.TLO.Me.Song(fixSlotNum).Duration.TotalMinutes() or 0
     totalSec = mq.TLO.Me.Song(fixSlotNum).Duration.TotalSeconds() or 0
 
-    if mq.TLO.MacroQuest.BuildName() == "Emu" then
-        songTooltip = mq.TLO.Window('ShortDurationBuffWindow').Child('SDBW_Buff' .. slot .. '_Button').Tooltip() or ''
-        if songTooltip:find('%(') then
-            songDuration = songTooltip ~= '' and songTooltip:sub(songTooltip:find('%(') + 1, songTooltip:find('%)') - 1) or ''
-        else
-            songDuration = '99h 99m 99s'
-        end
-        songHr, songMin, songSec = songDuration:match("(%d+)h"), songDuration:match("(%d+)m"), songDuration:match("(%d+)s")
+    local song = mq.TLO.Me.Song(fixSlotNum)
+    local duration = song.Duration
 
-        -- Extract hours, minutes, and seconds from songDuration
-        songHr = songHr and string.format("%02d", tonumber(songHr)) or "00"
-        songMin = songMin and string.format("%02d", tonumber(songMin)) or "00"
-        songSec = songSec and string.format("%02d", tonumber(songSec)) or "99"
+    songName = song.Name() or ''
+    songIcon = song.SpellIcon() or 0
+    songID = song.ID() or 0
+    songBeneficial = song.Beneficial() or false
 
-        -- Calculate total minutes and total seconds
-        songDurHMS = ""
-        if songHr == "99" then
-            songDurHMS = "Permanent"
-            totalSec = 99999
-        else
-            songDurHMS = songHr .. ":" .. songMin .. ":" .. songSec
-        end
-    else
-        songDurHMS = mq.TLO.Me.Song(fixSlotNum).Duration.TimeHMS() or ''
-        songHr = mq.TLO.Me.Song(fixSlotNum).Duration.Hours() or 0
-        songMin = mq.TLO.Me.Song(fixSlotNum).Duration.Minutes() or 0
-        songSec = mq.TLO.Me.Song(fixSlotNum).Duration.Seconds() or 0
-        songTooltip = string.format("%s) %s (%s)", fixSlotNum, songName, songDurHMS)
-    end
+    songDurHMS = duration.TimeHMS() or ''
+    songHr = duration.Hours() or 0
+    songMin = duration.Minutes() or 0
+    songSec = duration.Seconds() or 0
+    songTooltip = string.format("%s) %s (%s)", fixSlotNum, songName, songDurHMS)
 
     if MyBuffs.songTable[slot + 1] ~= nil then
         if MyBuffs.songTable[slot + 1].ID ~= songID and os.time() - checkIn >= 6 then changed = true end
@@ -454,7 +420,7 @@ local function GetBuffs()
 end
 
 local function MessageHandler()
-    MyBuffs_Actor = MyUI_Actor.register('my_buffs', function(message)
+    MyBuffs_Actor = MyUI_Actor.register(MyBuffs.ActorMailBox, function(message)
         local MemberEntry    = message()
         local who            = MemberEntry.Who or 'Unknown'
         local charBuffs      = MemberEntry.Buffs or {}

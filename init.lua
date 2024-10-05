@@ -140,6 +140,77 @@ local function RenderModules()
 	end
 end
 
+local function ProcessModuleChanges()
+	-- Enable/Disable Modules
+	if MyUI_TempSettings.ModuleChanged then
+		local module_name = MyUI_TempSettings.ModuleName
+		local enabled = MyUI_TempSettings.ModuleEnabled
+
+		for _, data in ipairs(MyUI_Settings.mods_enabled) do
+			if data.name == module_name then
+				data.enabled = enabled
+				if enabled then
+					table.insert(mods, module_name)
+					MyUI_Modules[module_name] = MyUI_LoadModules.load(module_name)
+					InitModules()
+				else
+					for i, v in ipairs(mods) do
+						if v == module_name then
+							MyUI_Modules[module_name].Unload()
+							MyUI_LoadModules.unload(module_name)
+							MyUI_Modules[module_name] = nil
+							table.remove(mods, i)
+						end
+					end
+					InitModules()
+				end
+				mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+				break
+			end
+		end
+		MyUI_TempSettings.ModuleChanged = false
+	end
+
+	-- Add Custom Module
+	if MyUI_TempSettings.AddCustomModule then
+		local found = false
+		for _, data in ipairs(MyUI_Settings.mods_enabled) do
+			if data.name == MyUI_TempSettings.AddModule then
+				found = true
+				break
+			end
+		end
+		if not found then
+			table.insert(MyUI_Settings.mods_enabled, { name = MyUI_TempSettings.AddModule, enabled = false, })
+			mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+		end
+		MyUI_TempSettings.AddModule = ''
+		MyUI_TempSettings.AddCustomModule = false
+	end
+
+	-- Remove Module
+	if MyUI_TempSettings.RemoveModule then
+		for idx, data in ipairs(MyUI_Settings.mods_enabled) do
+			if data.name:lower() == MyUI_TempSettings.AddModule:lower() then
+				for i, v in ipairs(mods) do
+					if v == data.name then
+						MyUI_Modules[data.name].Unload()
+						MyUI_LoadModules.unload(data.name)
+						MyUI_Modules[data.name] = nil
+						table.remove(mods, i)
+					end
+				end
+				table.remove(MyUI_Settings.mods_enabled, idx)
+				mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+				break
+			end
+		end
+		MyUI_TempSettings.AddModule = ''
+		MyUI_TempSettings.RemoveModule = false
+	end
+end
+
+
 local function MyUI_Render()
 	if MyUI_Settings.ShowMain then
 		Minimized = false
@@ -162,31 +233,21 @@ local function MyUI_Render()
 					for _, data in ipairs(MyUI_Settings.mods_enabled) do
 						if data.name == name then
 							module_data = data
-							break
+							goto continue
 						end
 					end
+					::continue::
 
 					if module_data then
 						local pressed = false
 						ImGui.TableNextColumn()
-						module_data.enabled, pressed = ImGui.Checkbox(module_data.name, module_data.enabled)
-						if pressed then
-							if module_data.enabled then
-								table.insert(mods, module_data.name)
-								MyUI_Modules[module_data.name] = MyUI_LoadModules.load(module_data.name)
-								InitModules()
-							else
-								for i, v in ipairs(mods) do
-									if v == module_data.name then
-										MyUI_Modules[module_data.name].Unload()
-										MyUI_LoadModules.unload(module_data.name)
-										MyUI_Modules[module_data.name] = nil
-										table.remove(mods, i)
-									end
-								end
-								InitModules()
-							end
-							mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+						local new_state = ImGui.Checkbox(module_data.name, module_data.enabled)
+
+						-- If checkbox changed, set flags for processing
+						if new_state ~= module_data.enabled then
+							MyUI_TempSettings.ModuleChanged = true
+							MyUI_TempSettings.ModuleName = module_data.name
+							MyUI_TempSettings.ModuleEnabled = new_state
 						end
 					end
 				end
@@ -199,50 +260,22 @@ local function MyUI_Render()
 
 			if MyUI_TempSettings.AddModule ~= '' then
 				if ImGui.Button("Add") then
-					local found = false
-					for _, data in ipairs(MyUI_Settings.mods_enabled) do
-						if data.name == MyUI_TempSettings.AddModule then
-							found = true
-							break
-						end
-					end
-					if not found then
-						table.insert(MyUI_Settings.mods_enabled, { name = MyUI_TempSettings.AddModule, enabled = false, })
-						mq.pickle(MyUI_SettingsFile, MyUI_Settings)
-					end
-					MyUI_TempSettings.AddModule = ''
+					MyUI_TempSettings.AddCustomModule = true
 				end
 
-				local found
-
+				local found = false
 				for _, v in pairs(default_list) do
 					if v:lower() == MyUI_TempSettings.AddModule:lower() then
-						MyUI_TempSettings.AddModule = ''
 						found = true
+						MyUI_TempSettings.AddModule = ''
 						break
 					end
 				end
 
 				if not found then
 					ImGui.SameLine()
-
 					if ImGui.Button("Remove") then
-						for idx, data in ipairs(MyUI_Settings.mods_enabled) do
-							if data.name:lower() == MyUI_TempSettings.AddModule:lower() then
-								for i, v in ipairs(mods) do
-									if v == data.name then
-										MyUI_Modules[data.name].Unload()
-										MyUI_LoadModules.unload(data.name)
-										MyUI_Modules[data.name] = nil
-										table.remove(mods, i)
-									end
-								end
-								table.remove(MyUI_Settings.mods_enabled, idx)
-								mq.pickle(MyUI_SettingsFile, MyUI_Settings)
-								break
-							end
-						end
-						MyUI_TempSettings.AddModule = ''
+						MyUI_TempSettings.RemoveModule = true
 					end
 				end
 			end
@@ -269,13 +302,15 @@ local function MyUI_Render()
 		ImGui.End()
 	end
 
-	RenderModules() -- This stays unchanged to render the module UIs as before
+	RenderModules()
 end
+
 
 
 local function MyUI_Main()
 	while MyUI_IsRunning do
 		mq.doevents()
+		ProcessModuleChanges() -- Process the flags here
 		for idx, data in ipairs(MyUI_Settings.mods_enabled) do
 			if data.enabled and MyUI_Modules[data.name] ~= nil then
 				MyUI_Modules[data.name].MainLoop()
@@ -284,6 +319,7 @@ local function MyUI_Main()
 		mq.delay(1)
 	end
 end
+
 
 local args = { ..., }
 

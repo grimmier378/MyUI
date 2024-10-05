@@ -1663,6 +1663,7 @@ function MyChat.AddChannel(editChanID, isNewChannel)
     end
     ImGui.SameLine()
     if ImGui.Button('Save Settings') then
+        local date = os.date("%m_%d_%Y_%H_%M")
         local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, myName, date)
         mq.pickle(backup, MyChat.Settings)
         MyChat.tempSettings.Channels[editChanID] = MyChat.tempSettings.Channels[editChanID] or { Events = {}, Name = "New Channel", enabled = true, }
@@ -1704,6 +1705,8 @@ function MyChat.AddChannel(editChanID, isNewChannel)
     ImGui.SameLine()
     if ImGui.Button("DELETE Channel##" .. editChanID) then
         -- Delete the event
+        local date = os.date("%m_%d_%Y_%H_%M")
+
         local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, myName, date)
         mq.pickle(backup, MyChat.Settings)
         MyChat.tempSettings.Channels[editChanID] = nil

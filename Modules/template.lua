@@ -1,6 +1,6 @@
 local mq = require('mq')
 local ImGui = require 'ImGui'
-local ModuleName = {} -- Module Name Here Returns the table of functions and any variables you wish to expose to the main script.
+local Template = {} -- Module Name Here Returns the table of functions and any variables you wish to expose to the main script.
 
 --[[ GLOBAL MyUI_ variables and functions.
 	MyUI_Utils           = require('lib.common') -- some common functions on other scripts
@@ -31,7 +31,8 @@ local ModuleName = {} -- Module Name Here Returns the table of functions and any
 ]]
 
 -- Exposed Variables
-ModuleName.ShowGui = false
+Template.Name = "Template" -- Name of the module
+Template.ShowGui = true
 
 -- Local Variables
 
@@ -42,28 +43,29 @@ local function Init()
 end
 
 -- Exposed Functions
-function ModuleName.RenderGUI()
-	if ModuleName.ShowGui then
-		local open, show = ImGui.Begin(ModuleName .. "##" .. MyUI_CharLoaded, true, ImGuiWindowFlags.None)
+function Template.RenderGUI()
+	if Template.ShowGui then
+		local open, show = ImGui.Begin(Template.Name .. "##" .. MyUI_CharLoaded, true, ImGuiWindowFlags.None)
 		if not open then
 			show = false
-			ModuleName.ShowGui = false
+			Template.ShowGui = false
 		end
 		if show then
 			--GUI
 			-- your code here
+			ImGui.Text("Hello World!")
 		end
 
 		ImGui.End()
 	end
 end
 
-function ModuleName.Unload()
+function Template.Unload()
 	-- undo any binds and events before unloading
 	-- leave empty if you don't have any binds or events
 end
 
-function ModuleName.MainLoop()
+function Template.MainLoop()
 	--[[
 	your MainLoop code here without the loop.
 	
@@ -86,4 +88,4 @@ end
 -- Init the module
 
 Init()
-return ModuleName
+return Template

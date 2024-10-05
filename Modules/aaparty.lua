@@ -22,7 +22,7 @@ local settings                                                          = {}
 local TempSettings                                                      = {}
 local groupData                                                         = {}
 local mailBox                                                           = {}
-
+local aaActor                                                           = nil
 local AAPartyShow                                                       = false
 local MailBoxShow                                                       = false
 local AAPartyConfigShow                                                 = false
@@ -204,7 +204,7 @@ local function sortedBoxes(boxes)
     end)
     return boxes
 end
-local aaActor
+
 --create mailbox for actors to send messages to
 local function MessageHandler()
     aaActor = MyUI_Actor.register('aa_party', function(message)
@@ -235,9 +235,10 @@ local function MessageHandler()
         --New member connected if Hello is true. Lets send them our data so they have it.
         if subject == 'Hello' then
             -- if who ~= mq.TLO.Me.Name() then
-            aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(nil, 'Welcome'))
-            aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(nil, 'Welcome'))
-
+            if aaActor ~= nil then
+                aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(nil, 'Welcome'))
+                aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(nil, 'Welcome'))
+            end
             -- end
             return
             -- checkIn = os.time()
@@ -349,16 +350,20 @@ local function getMyAA()
         changed = true
     end
     if not changed and CheckIn() then
-        aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(nil, 'CheckIn'))
-        aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(nil, 'CheckIn'))
+        if aaActor ~= nil then
+            aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(nil, 'CheckIn'))
+            aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(nil, 'CheckIn'))
 
-        checkIn = os.time()
+            checkIn = os.time()
+        end
     end
     if changed then
-        aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent())
-        aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent())
-        checkIn = os.time()
-        changed = false
+        if aaActor ~= nil then
+            aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent())
+            aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent())
+            checkIn = os.time()
+            changed = false
+        end
     end
 end
 
@@ -368,8 +373,10 @@ local function SayGoodBye()
         Name = MyUI_CharLoaded,
         Check = 0,
     }
-    aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, message)
-    aaActor:send({ mailbox = 'aa_party', script = 'myui', }, message)
+    if aaActor ~= nil then
+        aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, message)
+        aaActor:send({ mailbox = 'aa_party', script = 'myui', }, message)
+    end
 end
 
 ---@param type string
@@ -503,8 +510,10 @@ function AAParty.RenderGUI()
                         if expand[groupData[i].Name] then
                             imgui.SetCursorPosX(ImGui.GetCursorPosX() + 12)
                             if imgui.Button("<##Decrease" .. groupData[i].Name) then
-                                aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
-                                aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
+                                if aaActor ~= nil then
+                                    aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
+                                    aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
+                                end
                             end
                             imgui.SameLine()
                             local tmp = groupData[i].Setting
@@ -526,8 +535,10 @@ function AAParty.RenderGUI()
                             end
 
                             if imgui.Button(">##Increase" .. groupData[i].Name) then
-                                aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(groupData[i].Name, 'Action', 'More'))
-                                aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(groupData[i].Name, 'Action', 'More'))
+                                if aaActor ~= nil then
+                                    aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(groupData[i].Name, 'Action', 'More'))
+                                    aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(groupData[i].Name, 'Action', 'More'))
+                                end
                             end
                         end
 
@@ -674,6 +685,7 @@ function AAParty.CheckMode()
 end
 
 function AAParty.Unload()
+    SayGoodBye()
     mq.unbind("/aaparty")
 end
 
@@ -721,11 +733,12 @@ local function init()
     if MyUI_Utils.File.Exists(themezDir) then
         hasThemeZ = true
     end
-    aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(nil, 'Hello'))
-    aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(nil, 'Hello'))
-end
 
-MessageHandler()
+    if aaActor ~= nil then
+        aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(nil, 'Hello'))
+        aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(nil, 'Hello'))
+    end
+end
 
 local clockTimer = mq.gettime()
 
@@ -736,12 +749,17 @@ function AAParty.MainLoop()
         if currZone ~= lastZone then
             lastZone = currZone
         end
-        getMyAA()
-        CheckStale()
+        if aaActor ~= nil then
+            getMyAA()
+            CheckStale()
+        else
+            MessageHandler()
+        end
         clockTimer = mq.gettime()
     end
 end
 
+MessageHandler()
 init()
 AAParty.MainLoop()
 return AAParty

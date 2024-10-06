@@ -146,7 +146,7 @@ end
 function CommonUtils.GiveItem(target_id)
 	if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
 		mq.cmdf("/target id %s", target_id)
-		if TLO.Cursor() then
+		if mq.TLO.Cursor() then
 			mq.cmdf('/multiline ; /tar id %s; /face; /if (${Cursor.ID}) /click left target', target_id)
 		end
 	end

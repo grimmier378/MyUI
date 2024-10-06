@@ -4,7 +4,7 @@ local actors = require('actors')
 local LoadTheme = require('lib.theme_loader')
 local MyDPS = {}
 MyDPS.ActorMailBox = 'my_dps'
-local ActorDPS
+local ActorDPS = nil
 local script = 'MyDPS'
 local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, script, mq.TLO.EverQuest.Server(), mq.TLO.Me.Name())
 local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
@@ -1298,7 +1298,7 @@ end
 
 --create mailbox for actors to send messages to
 local function RegisterActor()
-	ActorDPS = MyUI_Actor.register('my_dps', function(message)
+	ActorDPS = MyUI_Actor.register(MyDPS.ActorMailBox, function(message)
 		local MemberEntry  = message()
 		local who          = MemberEntry.Name
 		local timeSpan     = MemberEntry.TimeSpan or 0

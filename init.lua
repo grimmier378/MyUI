@@ -50,7 +50,7 @@ local default_list   = {
 MyUI_DefaultConfig   = {
 	ShowMain = true,
 	ThemeName = 'Default',
-	mods_enabled = {
+	mods_list = {
 		[13] = { name = 'AAParty', enabled = false, },
 		[12] = { name = 'ChatRelay', enabled = false, },
 		[2]  = { name = 'DialogDB', enabled = false, },
@@ -95,9 +95,9 @@ local function LoadSettings()
 		end
 	end
 
-	for k, v in pairs(MyUI_DefaultConfig.mods_enabled) do
-		if MyUI_Settings.mods_enabled[k] == nil then
-			MyUI_Settings.mods_enabled[k] = v
+	for k, v in pairs(MyUI_DefaultConfig.mods_list) do
+		if MyUI_Settings.mods_list[k] == nil then
+			MyUI_Settings.mods_list[k] = v
 		end
 	end
 
@@ -107,7 +107,7 @@ end
 
 local function GetSortedModuleNames()
 	local sorted_names = {}
-	for _, data in ipairs(MyUI_Settings.mods_enabled) do
+	for _, data in ipairs(MyUI_Settings.mods_list) do
 		table.insert(sorted_names, data.name)
 	end
 	table.sort(sorted_names)
@@ -116,8 +116,8 @@ end
 
 
 local function InitModules()
-	for idx, data in ipairs(MyUI_Settings.mods_enabled) do
-		if data.enabled and MyUI_Modules[data.name] ~= nil then
+	for idx, data in ipairs(MyUI_Settings.mods_list) do
+		if data.enabled and MyUI_Modules[data.name] ~= nil and MyUI_Modules[data.name].ActorMailBox ~= nil then
 			local message = {
 				Subject = 'Hello',
 				Message = 'Hello',
@@ -133,7 +133,7 @@ local function InitModules()
 end
 
 local function RenderModules()
-	for _, data in ipairs(MyUI_Settings.mods_enabled) do
+	for _, data in ipairs(MyUI_Settings.mods_list) do
 		if data.enabled and MyUI_Modules[data.name] ~= nil then
 			MyUI_Modules[data.name].RenderGUI()
 		end
@@ -146,9 +146,9 @@ local function ProcessModuleChanges()
 		local module_name = MyUI_TempSettings.ModuleName
 		local enabled = MyUI_TempSettings.ModuleEnabled
 
-		for _, data in ipairs(MyUI_Settings.mods_enabled) do
+		for idx, data in ipairs(MyUI_Settings.mods_list) do
 			if data.name == module_name then
-				data.enabled = enabled
+				MyUI_Settings.mods_list[idx].enabled = enabled
 				if enabled then
 					table.insert(mods, module_name)
 					MyUI_Modules[module_name] = MyUI_LoadModules.load(module_name)
@@ -158,7 +158,7 @@ local function ProcessModuleChanges()
 						if v == module_name then
 							MyUI_Modules[module_name].Unload()
 							MyUI_LoadModules.unload(module_name)
-							MyUI_Modules[module_name] = nil
+							-- MyUI_Modules[module_name] = nil
 							table.remove(mods, i)
 						end
 					end
@@ -174,14 +174,14 @@ local function ProcessModuleChanges()
 	-- Add Custom Module
 	if MyUI_TempSettings.AddCustomModule then
 		local found = false
-		for _, data in ipairs(MyUI_Settings.mods_enabled) do
+		for _, data in ipairs(MyUI_Settings.mods_list) do
 			if data.name == MyUI_TempSettings.AddModule then
 				found = true
 				break
 			end
 		end
 		if not found then
-			table.insert(MyUI_Settings.mods_enabled, { name = MyUI_TempSettings.AddModule, enabled = false, })
+			table.insert(MyUI_Settings.mods_list, { name = MyUI_TempSettings.AddModule, enabled = false, })
 			mq.pickle(MyUI_SettingsFile, MyUI_Settings)
 		end
 		MyUI_TempSettings.AddModule = ''
@@ -190,17 +190,17 @@ local function ProcessModuleChanges()
 
 	-- Remove Module
 	if MyUI_TempSettings.RemoveModule then
-		for idx, data in ipairs(MyUI_Settings.mods_enabled) do
+		for idx, data in ipairs(MyUI_Settings.mods_list) do
 			if data.name:lower() == MyUI_TempSettings.AddModule:lower() then
 				for i, v in ipairs(mods) do
 					if v == data.name then
 						MyUI_Modules[data.name].Unload()
 						MyUI_LoadModules.unload(data.name)
-						MyUI_Modules[data.name] = nil
+						-- MyUI_Modules[data.name] = nil
 						table.remove(mods, i)
 					end
 				end
-				table.remove(MyUI_Settings.mods_enabled, idx)
+				table.remove(MyUI_Settings.mods_list, idx)
 				mq.pickle(MyUI_SettingsFile, MyUI_Settings)
 				break
 			end
@@ -230,7 +230,7 @@ local function MyUI_Render()
 
 				for _, name in ipairs(sorted_names) do
 					local module_data = nil
-					for _, data in ipairs(MyUI_Settings.mods_enabled) do
+					for _, data in ipairs(MyUI_Settings.mods_list) do
 						if data.name == name then
 							module_data = data
 							goto continue
@@ -310,9 +310,9 @@ end
 local function MyUI_Main()
 	while MyUI_IsRunning do
 		mq.doevents()
-		ProcessModuleChanges() -- Process the flags here
-		for idx, data in ipairs(MyUI_Settings.mods_enabled) do
-			if data.enabled and MyUI_Modules[data.name] ~= nil then
+		ProcessModuleChanges()
+		for idx, data in ipairs(MyUI_Settings.mods_list) do
+			if data.enabled then
 				MyUI_Modules[data.name].MainLoop()
 			end
 		end
@@ -350,7 +350,7 @@ local function StartUp()
 	CheckMode(args)
 	LoadSettings()
 
-	for _, data in ipairs(MyUI_Settings.mods_enabled) do
+	for _, data in ipairs(MyUI_Settings.mods_list) do
 		if data.enabled then
 			table.insert(mods, data.name)
 		end

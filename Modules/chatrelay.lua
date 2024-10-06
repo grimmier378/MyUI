@@ -25,6 +25,7 @@ local Minimized                         = false
 local showMain                          = false
 local showConfig                        = false
 local aSize                             = false
+local RelayActor                        = nil
 
 local defaults                          = {
     Scale            = 1,

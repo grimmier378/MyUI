@@ -687,6 +687,7 @@ end
 function AAParty.Unload()
     SayGoodBye()
     mq.unbind("/aaparty")
+    aaActor = nil
 end
 
 local function processCommand(...)

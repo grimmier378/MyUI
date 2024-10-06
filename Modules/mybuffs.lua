@@ -8,7 +8,7 @@ MyBuffs.ActorMailBox                                                            
 local themeFile                                                                                                       = mq.configDir .. '/MyThemeZ.lua'
 local configFileOld                                                                                                   = mq.configDir .. '/MyUI_Configs.lua'
 local configFile                                                                                                      = ''
-local MyBuffs_Actor
+local MyBuffs_Actor                                                                                                   = nil
 -- Tables
 MyBuffs.boxes                                                                                                         = {}
 MyBuffs.settings                                                                                                      = {}
@@ -167,12 +167,11 @@ end
 
 local function GetBuff(slot)
     local fixSlotNum = slot + 1
-    local buffTooltip, buffName, buffDuration, buffIcon, buffID, buffBeneficial, buffHr, buffMin, buffSec, totalMin, totalSec, buffDurHMS
+    local buffTooltip, buffName, buffDuration, buffDurDisplay, buffIcon, buffID, buffBeneficial, buffHr, buffMin, buffSec, totalMin, totalSec, buffDurHMS
     local buff = mq.TLO.Me.Buff(fixSlotNum)
     local duration = buff.Duration
 
     buffName = buff.Name() or ''
-    buffDuration = duration.TimeHMS() or ''
     buffIcon = buff.SpellIcon() or 0
     buffID = buff.ID() or 0
     buffBeneficial = buff.Beneficial() or false
@@ -187,6 +186,13 @@ local function GetBuff(slot)
     totalSec = duration.TotalSeconds() or 0
     -- print(totalSec)
     buffDurHMS = duration.TimeHMS() or ''
+
+    -- format tooltip
+
+    buffHr = buffHr and string.format("%02d", tonumber(buffHr)) or "00"
+    buffMin = buffMin and string.format("%02d", tonumber(buffMin)) or "00"
+    buffSec = buffSec and string.format("%02d", tonumber(buffSec)) or "00"
+    buffDurDisplay = string.format("%s:%s:%s", buffHr, buffMin, buffSec)
     buffTooltip = string.format("%s) %s (%s)", fixSlotNum, buffName, buffDurHMS)
 
 
@@ -207,6 +213,7 @@ local function GetBuff(slot)
                 table.insert(debuffOnMe, {
                     Name = buffName,
                     Duration = buffDurHMS,
+                    DurationDisplay = buffDurDisplay,
                     Icon = buffIcon,
                     ID = buffID,
                     Hours = buffHr,
@@ -222,6 +229,7 @@ local function GetBuff(slot)
             table.insert(debuffOnMe, {
                 Name = buffName,
                 Duration = buffDurHMS,
+                DurationDisplay = buffDurDisplay,
                 Icon = buffIcon,
                 ID = buffID,
                 Hours = buffHr,
@@ -238,6 +246,7 @@ local function GetBuff(slot)
         Name = buffName,
         Beneficial = buffBeneficial,
         Duration = buffDurHMS,
+        DurationDisplay = buffDurDisplay,
         Icon = buffIcon,
         ID = buffID,
         Slot = fixSlotNum,
@@ -252,7 +261,7 @@ end
 
 local function GetSong(slot)
     local fixSlotNum = slot + 1
-    local songTooltip, songName, songDuration, songIcon, songID, songBeneficial, songHr, songMin, songSec, totalMin, totalSec, songDurHMS
+    local songTooltip, songName, songDurationDisplay, songIcon, songID, songBeneficial, songHr, songMin, songSec, totalMin, totalSec, songDurHMS
     songName = mq.TLO.Me.Song(fixSlotNum).Name() or ''
     songIcon = mq.TLO.Me.Song(fixSlotNum).SpellIcon() or 0
     songID = songName ~= '' and (mq.TLO.Me.Song(fixSlotNum).ID() or 0) or 0
@@ -272,6 +281,12 @@ local function GetSong(slot)
     songHr = duration.Hours() or 0
     songMin = duration.Minutes() or 0
     songSec = duration.Seconds() or 0
+    -- format tooltip
+    songHr = songHr and string.format("%02d", tonumber(songHr)) or "00"
+    songMin = songMin and string.format("%02d", tonumber(songMin)) or "00"
+    songSec = songSec and string.format("%02d", tonumber(songSec)) or "00"
+    songDurationDisplay = string.format("%s:%s:%s", songHr, songMin, songSec)
+
     songTooltip = string.format("%s) %s (%s)", fixSlotNum, songName, songDurHMS)
 
     if MyBuffs.songTable[slot + 1] ~= nil then
@@ -281,6 +296,7 @@ local function GetSong(slot)
         Name = songName,
         Beneficial = songBeneficial,
         Duration = songDurHMS,
+        DurationDisplay = songDurationDisplay,
         Icon = songIcon,
         ID = songID,
         Slot = fixSlotNum,
@@ -727,7 +743,7 @@ local function BoxBuffs(id, sorted, view)
                 ImGui.SetWindowFontScale(1)
             else
                 bName = boxBuffs[i].Name:sub(1, -1)
-                sDurT = boxBuffs[i].Duration ~= nil and boxBuffs[i].Duration or ' '
+                sDurT = boxBuffs[i].DurationDisplay ~= nil and boxBuffs[i].DurationDisplay or ' '
                 if MyBuffs.ShowIcons then
                     DrawInspectableSpellIcon(boxBuffs[i].Icon, boxBuffs[i], slot)
                     ImGui.SameLine()
@@ -768,7 +784,7 @@ local function BoxBuffs(id, sorted, view)
 
             if boxBuffs[i] ~= nil then
                 bName = boxBuffs[i].Name:sub(1, -1)
-                sDurT = boxBuffs[i].Duration or ' '
+                sDurT = boxBuffs[i].DurationDisplay or ' '
 
                 DrawInspectableSpellIcon(boxBuffs[i].Icon, boxBuffs[i], slot)
                 rowCount = rowCount + 1
@@ -1666,6 +1682,7 @@ end
 
 function MyBuffs.Unload()
     mq.unbind('/mybuffs')
+    MyBuffs_Actor = nil
 end
 
 local function init()

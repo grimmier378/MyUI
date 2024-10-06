@@ -53,12 +53,10 @@ MyUI_DefaultConfig   = {
 	ShowMain = true,
 	ThemeName = 'Default',
 	mods_list = {
-		[13] = { name = 'AAParty', enabled = false, },
-		[12] = { name = 'ChatRelay', enabled = false, },
-		[2]  = { name = 'DialogDB', enabled = false, },
-		[11] = { name = 'MyBuffs', enabled = false, },
+		-- load order = {name = 'mod_name', enabled = true/false}
+		-- Ideally we want to Load MyChat first if Enabled.This will allow the other modules can use it.
 		[1]  = { name = 'MyChat', enabled = false, },
-		[10] = { name = 'MyDPS', enabled = false, },
+		[2]  = { name = 'DialogDB', enabled = false, },
 		[3]  = { name = 'MyGroup', enabled = false, },
 		[4]  = { name = 'MyPaths', enabled = false, },
 		[5]  = { name = 'MyPet', enabled = false, },
@@ -66,6 +64,10 @@ MyUI_DefaultConfig   = {
 		[7]  = { name = 'PlayerTarg', enabled = false, },
 		[8]  = { name = 'SAST', enabled = false, },
 		[9]  = { name = 'SillySounds', enabled = false, },
+		[10] = { name = 'MyDPS', enabled = false, },
+		[11] = { name = 'MyBuffs', enabled = false, },
+		[12] = { name = 'ChatRelay', enabled = false, },
+		[13] = { name = 'AAParty', enabled = false, },
 		[14] = { name = 'AlertMaster', enabled = false, },
 	},
 }
@@ -207,6 +209,24 @@ local function ProcessModuleChanges()
 	end
 end
 
+local function DrawContextMenu()
+	if mq.TLO.Plugin('MQ2DanNet').IsLoaded() then
+		if ImGui.MenuItem('Start Clients') then
+			mq.cmd('/dge all /lua run myui client')
+		end
+		if ImGui.MenuItem('Stop Clients') then
+			mq.cmd('/dge all /myui quit')
+		end
+		if ImGui.MenuItem('Stop ALL') then
+			mq.cmd('/dgae /myui quit')
+		end
+	end
+	ImGui.Separator()
+	if ImGui.MenuItem('Exit') then
+		MyUI_IsRunning = false
+	end
+end
+
 local function MyUI_Render()
 	if MyUI_Settings.ShowMain then
 		Minimized = false
@@ -221,6 +241,11 @@ local function MyUI_Render()
 		end
 
 		if show_gui then
+			ImGui.Text(MyUI_Icons.MD_SETTINGS)
+			if ImGui.BeginPopupContextItem() then
+				DrawContextMenu()
+				ImGui.EndPopup()
+			end
 			if ImGui.BeginTable("Modules", 2, ImGuiWindowFlags.None) then
 				local sorted_names = GetSortedModuleNames()
 
@@ -300,6 +325,10 @@ local function MyUI_Render()
 				MyUI_Settings.ShowMain = true
 				Minimized = false
 			end
+		end
+		if ImGui.BeginPopupContextWindow() then
+			DrawContextMenu()
+			ImGui.EndPopup()
 		end
 		ImGui.End()
 	end

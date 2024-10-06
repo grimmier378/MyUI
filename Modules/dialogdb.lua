@@ -139,10 +139,11 @@ local function loadSettings()
 		if MyUI_Utils.File.Exists(dialogConfigOld) then
 			DialogDB.Config = dofile(dialogConfigOld)
 		else
-			ConFig = { cmdGroup = cmdGroup, cmdZone = cmdZone, cmdChar = cmdChar, autoAdd = autoAdd, cmdSelf = cmdSelf, themeName = DialogDB.themeName, }
+			DialogDB.ConFig = { cmdGroup = cmdGroup, cmdZone = cmdZone, cmdChar = cmdChar, autoAdd = autoAdd, cmdSelf = cmdSelf, themeName = DialogDB.themeName, }
 		end
 		DialogDB.ConfUI = true
 		tmpTarget = 'None'
+		mq.pickle(dialogConfig, DialogDB.Config)
 	else
 		DialogDB.Config = dofile(dialogConfig)
 		cmdGroup = DialogDB.Config.cmdGroup
@@ -152,10 +153,9 @@ local function loadSettings()
 		autoAdd = DialogDB.Config.autoAdd
 		DialogDB.themeName = DialogDB.Config.themeName or 'Default'
 	end
-	mq.pickle(dialogConfig, DialogDB.Config)
 	loadTheme()
 
-
+	local needSave = false
 	--- Ensure that the command is a '/'' command otherwise add '/say ' to the front of it
 	for server, sData in pairs(Dialog) do
 		for target, tData in pairs(sData) do
@@ -163,12 +163,15 @@ local function loadSettings()
 				for desc, cmd in pairs(zData) do
 					if not cmd:match("^/") then
 						Dialog[server][target][zone][desc] = string.format("/say %s", cmd)
+						needSave = true
 					end
 				end
 			end
 		end
 	end
-	mq.pickle(dialogData, Dialog)
+	if needSave then
+		mq.pickle(dialogData, Dialog)
+	end
 end
 
 local function printHelp()

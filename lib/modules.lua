@@ -1,4 +1,4 @@
-local Module = { _version = '0.1a', _author = 'Derple', } -- borrowed from the RGMercs Thanks Derple!
+local Module = { _version = '0.1a', _author = 'Derple, Grimmier', } -- Original borrowed from the RGMercs Thanks Derple! <3 then I hacked it apart.
 local mq = require 'mq'
 ---@param module_list table
 ---@return any
@@ -6,9 +6,7 @@ function Module.loadAll(module_list)
 	local modules = {}
 	for _, module in ipairs(module_list) do
 		local moduleName = mq.luaDir .. "/MyUI/modules/" .. module:lower() .. ".lua"
-		-- if moduleName then
 		modules[module] = dofile(moduleName)
-		-- end
 	end
 
 	local newModule = setmetatable(modules, Module)
@@ -16,7 +14,6 @@ function Module.loadAll(module_list)
 end
 
 function Module.unload(module_name)
-	-- Check if the module has an actor mailbox to unregister
 	if MyUI_Modules[module_name] and MyUI_Modules[module_name].ActorMailBox then
 		MyUI_Modules[module_name].ActorMailBox = nil
 	end
@@ -24,7 +21,6 @@ function Module.unload(module_name)
 	MyUI_Modules[module_name] = nil
 end
 
--- Load module and register actors
 function Module.load(module_name)
 	package.loaded["modules." .. module_name:lower()] = nil
 	local modPath = mq.luaDir .. "/MyUI/modules/" .. module_name:lower() .. ".lua"

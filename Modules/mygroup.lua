@@ -406,7 +406,7 @@ local function DrawGroupMember(id)
         ImGui.BeginGroup()
         if member.Pet() ~= 'NO PET' then
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('green2')))
-            ImGui.ProgressBar(((tonumber(member.Pet.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), 4 * Scale, '##PetHp' .. id)
+            ImGui.ProgressBar(((tonumber(member.Pet.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), 5 * Scale, '##PetHp' .. id)
             ImGui.PopStyleColor()
             if ImGui.IsItemHovered() then
                 ImGui.SetTooltip('%s\n%d%% health', member.Pet.DisplayName(), member.Pet.PctHPs())
@@ -602,7 +602,7 @@ local function DrawSelf()
         ImGui.BeginGroup()
         if mySelf.Pet() ~= 'NO PET' then
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('green2')))
-            ImGui.ProgressBar(((tonumber(mySelf.Pet.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), 4 * Scale, '##PetHpSelf')
+            ImGui.ProgressBar(((tonumber(mySelf.Pet.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), 5 * Scale, '##PetHpSelf')
             if ImGui.IsItemHovered() then
                 ImGui.SetTooltip('%s\n%d%% health', mySelf.Pet.DisplayName(), mySelf.Pet.PctHPs())
                 if ImGui.IsMouseClicked(0) then

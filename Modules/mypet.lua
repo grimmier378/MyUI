@@ -36,6 +36,7 @@ local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
 local configFileOld = string.format('%s/MyUI/%s/%s_Configs.lua', mq.configDir, script, script)
 local configFile = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, script, MyUI_Server, MyUI_CharLoaded)
 local themezDir = mq.luaDir .. '/themez/init.lua'
+MyPet.TempSettings = {}
 
 -- Default Settings
 defaults = {
@@ -72,6 +73,10 @@ defaults = {
 		['GREEN'] = { 0, 1, 0, 1, },
 		['GREY'] = { 0.6, 0.6, 0.6, 1, },
 	},
+	ColorHPMax = { 1.0, 0.0, 0.0, 1, },
+	ColorHPMin = { 0.2, 0.2, 1.0, 1, },
+	ColorTargMax = { 1.0, 0.0, 0.0, 1, },
+	ColorTargMin = { 0.2, 0.2, 1.0, 1, },
 }
 
 local function loadTheme()
@@ -156,7 +161,7 @@ local function loadSettings()
 	locked = settings[script].locked
 	scale = settings[script].Scale
 	themeName = settings[script].LoadTheme
-
+	MyPet.TempSettings = settings[script]
 	-- Save the settings if new settings were added
 	if newSetting then mq.pickle(configFile, settings) end
 end
@@ -295,7 +300,6 @@ function MyPet.RenderGUI()
 				if petName == 'No Pet' then
 					ImGui.Text("No Pet")
 				else
-					local r, g, b, a = 1, 1, 1, 0.8
 					petHP = mq.TLO.Me.Pet.PctHPs() or 0
 					petTarg = mq.TLO.Pet.Target.DisplayName() or nil
 					petTargHP = mq.TLO.Pet.Target.PctHPs() or 0
@@ -310,23 +314,19 @@ function MyPet.RenderGUI()
 						ImGui.BeginGroup()
 						ImGui.Text("Lvl:")
 						ImGui.SameLine()
-						ImGui.TextColored(0, 1, 1, 1, "%s", petLvl)
+						ImGui.TextColored((MyUI_Colors.color('teal')), "%s", petLvl)
 						ImGui.SameLine()
 						ImGui.Text("Dist:")
 						ImGui.SameLine()
 						petDist = mq.TLO.Pet.Distance() or 0
 
 						if petDist >= 150 then
-							ImGui.TextColored(1, 0, 0, 1, "%.0f", petDist)
+							ImGui.TextColored((MyUI_Colors.color('red')), "%.0f", petDist)
 						else
-							ImGui.TextColored(0, 1, 0, 1, "%.0f", petDist)
+							ImGui.TextColored((MyUI_Colors.color('green')), "%.0f", petDist)
 						end
-
-						r = 1
-						b = b * (100 - petHP) / 100
-						g = 0
 						local yPos = ImGui.GetCursorPosY() - 1
-						ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r, g, b, a))
+						ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor({ 0.245, 0.245, 0.938, 1.000, }, { 0.976, 0.134, 0.134, 1.000, }, petHP, nil, 0)))
 						ImGui.ProgressBar(petHP / 100, -1, 15, "##")
 						ImGui.PopStyleColor()
 						ImGui.SetCursorPosY(yPos)
@@ -335,10 +335,7 @@ function MyPet.RenderGUI()
 						ImGui.EndGroup()
 						if ImGui.IsItemHovered() then
 							if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
-								mq.cmdf("/target %s", petName)
-								if mq.TLO.Cursor() then
-									MyUI_Utils.GiveItem(mq.TLO.Me.Pet.ID())
-								end
+								MyUI_Utils.GiveItem(mq.TLO.Me.Pet.ID())
 							end
 						end
 						local conCol = mq.TLO.Pet.Target.ConColor() or 'WHITE'
@@ -346,11 +343,8 @@ function MyPet.RenderGUI()
 						local txCol = settings[script].ConColors[conCol]
 						ImGui.TextColored(ImVec4(txCol[1], txCol[2], txCol[3], txCol[4]), "%s", petTarg)
 						if petTarg ~= nil then
-							r, g, b, a = 1, 1, 1, 0.8
-							r = r * petTargHP / 100
-							g = g * (100 - petTargHP) / 100
-							b = 0
-							ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r, g, b, a))
+							ImGui.PushStyleColor(ImGuiCol.PlotHistogram,
+								(MyUI_Utils.CalculateColor({ 0.165, 0.488, 0.162, 1.000, }, { 0.858, 0.170, 0.106, 1.000, }, petTargHP, nil, 0)))
 							ImGui.ProgressBar(petTargHP / 100, -1, 15)
 							ImGui.PopStyleColor()
 						else
@@ -497,11 +491,47 @@ function MyPet.RenderGUI()
 			end
 			-- Configure Toggles for Button Display --
 			iconSize = ImGui.InputInt("Icon Size##" .. script, iconSize, 1, 5)
-			autoHide = ImGui.Checkbox("Auto Hide##" .. script, autoHide)
-			ImGui.SameLine()
-			locked = ImGui.Checkbox("Lock Window##" .. script, locked)
-			ImGui.SameLine()
-			showTitleBar = ImGui.Checkbox("Show Title Bar##" .. script, showTitleBar)
+			if ImGui.BeginTable("##Colors", 2) then
+				ImGui.TableNextColumn()
+				autoHide = ImGui.Checkbox("Auto Hide##" .. script, autoHide)
+				ImGui.TableNextColumn()
+
+				locked = ImGui.Checkbox("Lock Window##" .. script, locked)
+				ImGui.TableNextColumn()
+
+				showTitleBar = ImGui.Checkbox("Show Title Bar##" .. script, showTitleBar)
+				ImGui.TableNextColumn()
+				ImGui.TableNextColumn()
+
+				-- Configure Dynamic Color for Porgress Bars --
+				ImGui.SetNextItemWidth(60)
+				MyPet.TempSettings.ColorHPMin = ImGui.ColorEdit4("Pet HP Min##" .. script, MyPet.TempSettings.ColorHPMin, ImGuiColorEditFlags.NoInputs)
+				ImGui.TableNextColumn()
+
+				ImGui.SetNextItemWidth(60)
+				MyPet.TempSettings.ColorHPMax = ImGui.ColorEdit4("Pet HP Max##" .. script, MyPet.TempSettings.ColorHPMax, ImGuiColorEditFlags.NoInputs)
+				ImGui.TableNextColumn()
+
+				ImGui.SetNextItemWidth(60)
+				MyPet.TempSettings.ColorTargMin = ImGui.ColorEdit4("Target HP Min##" .. script, MyPet.TempSettings.ColorTargMin, ImGuiColorEditFlags.NoInputs)
+				ImGui.TableNextColumn()
+
+				ImGui.SetNextItemWidth(60)
+				MyPet.TempSettings.ColorTargMax = ImGui.ColorEdit4("Target HP Max##" .. script, MyPet.TempSettings.ColorTargMax, ImGuiColorEditFlags.NoInputs)
+				ImGui.EndTable()
+			end
+			local testVal = ImGui.SliderInt("Test Slider##" .. script, 100, 0, 100)
+
+			-- draw 2 test bars
+			ImGui.SetNextItemWidth(100)
+			ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(MyPet.TempSettings.ColorHPMin, MyPet.TempSettings.ColorHPMax, testVal, nil, 0))
+			ImGui.ProgressBar(testVal / 100, -1, 15, 'Pet HP')
+			ImGui.PopStyleColor()
+
+			ImGui.SetNextItemWidth(100)
+			ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(MyPet.TempSettings.ColorTargMin, MyPet.TempSettings.ColorTargMax, testVal, nil, 0))
+			ImGui.ProgressBar(testVal / 100, -1, 15, 'Target HP')
+			ImGui.PopStyleColor()
 
 			ImGui.SeparatorText("Buttons##" .. script)
 			if ImGui.CollapsingHeader('Buttons##PetConfigButtons') then
@@ -640,6 +670,10 @@ function MyPet.RenderGUI()
 				settings[script].IconSize = iconSize
 				settings[script].LoadTheme = themeName
 				settings[script].AutoHide = autoHide
+				settings[script].ColorHPMax = MyPet.TempSettings.ColorHPMax
+				settings[script].ColorHPMin = MyPet.TempSettings.ColorHPMin
+				settings[script].ColorTargMax = MyPet.TempSettings.ColorTargMax
+				settings[script].ColorTargMin = MyPet.TempSettings.ColorTargMin
 				mq.pickle(configFile, settings)
 				showConfigGUI = false
 			end

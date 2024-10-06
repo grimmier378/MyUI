@@ -75,7 +75,7 @@ defaults = {
 	},
 }
 
-local function pickColor(spellID)
+local function pickColorByType(spellID)
 	local spell = mq.TLO.Spell(spellID)
 	local categoryName = spell.Category()
 	local subcaterogy = spell.Subcategory()
@@ -391,13 +391,13 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 		end
 		-- draw the gem Color overlay faded out to show the spell is not ready
 		ImGui.SetCursorPos(cursor_x, cursor_y + 1)
-		ImGui.Image(pickColor(spell.sID):GetTextureID(), ImVec2(scale * (iconSize + 37), scale * (iconSize + 2)))
+		ImGui.Image(pickColorByType(spell.sID):GetTextureID(), ImVec2(scale * (iconSize + 37), scale * (iconSize + 2)))
 		ImGui.SetCursorPos(cursor_x, cursor_y + 1)
-		ImGui.Image(pickColor(spell.sID):GetTextureID(), ImVec2(scale * (iconSize + 37), scale * (iconSize + 2)), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0.85))
+		ImGui.Image(pickColorByType(spell.sID):GetTextureID(), ImVec2(scale * (iconSize + 37), scale * (iconSize + 2)), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0.85))
 	else
 		-- draw the gem Color overlay
 		ImGui.SetCursorPos(cursor_x, cursor_y + 1)
-		ImGui.Image(pickColor(spell.sID):GetTextureID(), ImVec2(scale * (iconSize + 37), scale * (iconSize + 2)))
+		ImGui.Image(pickColorByType(spell.sID):GetTextureID(), ImVec2(scale * (iconSize + 37), scale * (iconSize + 2)))
 		spell.sClicked = -1
 	end
 	---@diagnostic disable-next-line: undefined-field
@@ -858,7 +858,7 @@ function MySpells.RenderGUI()
 				ImGui.ProgressBar(remaining / castTime, ImVec2(ImGui.GetWindowWidth(), 15), '')
 				ImGui.PopStyleColor()
 				local lbl = remaining > 0 and string.format("%.1f", (remaining / 1000)) or '0'
-				local _, colorSetting = pickColor(spellID)
+				local _, colorSetting = pickColorByType(spellID)
 				if not CastTextColorByType then
 					colorSetting = ImVec4(timerColor[1], timerColor[2], timerColor[3], timerColor[4])
 				end

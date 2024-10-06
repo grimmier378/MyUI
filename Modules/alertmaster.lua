@@ -2374,7 +2374,7 @@ AlertMaster.MainLoop = function()
 				-- do text alerts
 				for _, v in pairs(tSpawns) do
 					if v ~= nil then
-						local cleanName = v.CleanName() ~= nil and v.CleanName() or 'Unknown'
+						local cleanName = v.DisplayName ~= nil and v.DisplayName or 'Unknown'
 						local distance = math.floor(v.Distance() or 0)
 						MyUI_Utils.PrintOutput('AlertMaster', nil, GetCharZone() .. '\ag' .. cleanName .. '\ax spawn alert! ' .. distance .. ' units away.')
 					end

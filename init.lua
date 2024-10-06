@@ -274,7 +274,13 @@ local function MyUI_Render()
 				end
 			end
 		end
-
+		if ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows) then
+			if ImGui.IsKeyPressed(ImGuiKey.Escape) then
+				MyUI_Settings.ShowMain = false
+				Minimized = true
+				mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+			end
+		end
 		ImGui.End()
 	end
 

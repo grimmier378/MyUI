@@ -48,7 +48,6 @@ local memSpell = -1
 local currentTime = os.time()
 local maxRow, rowCount, iconSize, scale = 1, 0, 30, 1
 local aSize, locked, castLocked, hasThemeZ, configWindowShow, loadSet, clearAll, CastTextColorByType = false, false, false, false, false, false, false, false
-local MyUI_CharLoaded
 local setName = 'None'
 local tmpName = ''
 local showTitle, showTitleCasting = true, false

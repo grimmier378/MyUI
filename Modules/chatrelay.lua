@@ -9,7 +9,7 @@ local ImGui                             = require 'ImGui'
 local ChatRelay                         = {}
 ChatRelay.ActorMailBox                  = 'chat_relay'
 local winFlags                          = bit32.bor(ImGuiWindowFlags.None)
-local currZone, lastZone, MyUI_Guild, configFile, mode
+local currZone, lastZone, configFile, mode
 local guildChat                         = {}
 local tellChat                          = {}
 local lastMessages                      = {}

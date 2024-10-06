@@ -2,7 +2,7 @@
 
 A MacroQuest LUA Script
 
-## Descriotion
+## Description
 
 This is a collection of the scripts I have written so far, bundled together and converted into Modules. This way you only need to run 1 command and have your choice of the currently 14 scripts to load at once. There is also a template included incase anyone wants to build their own modules or convert a script to a module.
 

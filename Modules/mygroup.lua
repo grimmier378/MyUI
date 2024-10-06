@@ -11,7 +11,7 @@ local MyGroup = {}
 local gIcon = MyUI_Icons.MD_SETTINGS
 -- set variables
 local winFlag = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.MenuBar)
-local iconSize = 26
+local iconSize = 15
 local mimicMe, followMe = false, false
 local ShowGUI, openConfigGUI = true, false
 local Scale = 1
@@ -446,7 +446,7 @@ local function DrawSelf()
 
         if mq.TLO.Group.MainTank.ID() == mySelf.ID() then
             ImGui.SameLine()
-            MyUI_Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank')
+            MyUI_Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
         end
     end
 
@@ -472,7 +472,7 @@ local function DrawSelf()
         if settings[script].ShowRoleIcons then
             if mq.TLO.Group.MainTank.ID() == mySelf.ID() then
                 ImGui.SameLine()
-                MyUI_Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank')
+                MyUI_Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
             end
 
             ImGui.TableSetColumnIndex(2)
@@ -481,12 +481,12 @@ local function DrawSelf()
 
             if mq.TLO.Group.MainAssist.ID() == mySelf.ID() then
                 ImGui.SameLine()
-                MyUI_Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist')
+                MyUI_Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
             end
 
             if mq.TLO.Group.Puller.ID() == mySelf.ID() then
                 ImGui.SameLine()
-                MyUI_Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller')
+                MyUI_Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
             end
 
             ImGui.SameLine()

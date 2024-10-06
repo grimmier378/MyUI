@@ -27,9 +27,9 @@ local AAPartyShow                                                       = false
 local MailBoxShow                                                       = false
 local AAPartyConfigShow                                                 = false
 local AAPartyMode                                                       = 'driver'
+local iconSize                                                          = 15
 
-
-local defaults = {
+local defaults                                                          = {
     Scale = 1,
     LoadTheme = 'Default',
     AutoSize = false,
@@ -431,17 +431,17 @@ function AAParty.RenderGUI()
                         ImGui.SameLine()
                         local combatState = groupData[i].State
                         if combatState == 'DEBUFFED' then
-                            MyUI_Utils.DrawStatusIcon('A_PWCSDebuff', 'pwcs', 'You are Debuffed and need a cure before resting.')
+                            MyUI_Utils.DrawStatusIcon('A_PWCSDebuff', 'pwcs', 'You are Debuffed and need a cure before resting.', iconSize)
                         elseif combatState == 'ACTIVE' then
-                            MyUI_Utils.DrawStatusIcon('A_PWCSStanding', 'pwcs', 'You are not in combat and may rest at any time.')
+                            MyUI_Utils.DrawStatusIcon('A_PWCSStanding', 'pwcs', 'You are not in combat and may rest at any time.', iconSize)
                         elseif combatState == 'COOLDOWN' then
-                            MyUI_Utils.DrawStatusIcon('A_PWCSTimer', 'pwcs', 'You are recovering from combat and can not reset yet')
+                            MyUI_Utils.DrawStatusIcon('A_PWCSTimer', 'pwcs', 'You are recovering from combat and can not reset yet', iconSize)
                         elseif combatState == 'RESTING' then
-                            MyUI_Utils.DrawStatusIcon('A_PWCSRegen', 'pwcs', 'You are Resting.')
+                            MyUI_Utils.DrawStatusIcon('A_PWCSRegen', 'pwcs', 'You are Resting.', iconSize)
                         elseif combatState == 'COMBAT' then
-                            MyUI_Utils.DrawStatusIcon('A_PWCSInCombat', 'pwcs', 'You are in Combat.')
+                            MyUI_Utils.DrawStatusIcon('A_PWCSInCombat', 'pwcs', 'You are in Combat.', iconSize)
                         else
-                            MyUI_Utils.DrawStatusIcon(3996, 'item', ' ')
+                            MyUI_Utils.DrawStatusIcon(3996, 'item', ' ', iconSize)
                         end
 
                         if not compact[groupData[i].Name] then

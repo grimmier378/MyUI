@@ -2235,6 +2235,8 @@ function MyChat.Unload()
     for eventName, _ in pairs(MyChat.eventNames) do
         mq.unevent(eventName)
     end
+    MyUI_MyChatLoaded = false
+    MyUI_MyChatHandler = nil
 end
 
 local function init()

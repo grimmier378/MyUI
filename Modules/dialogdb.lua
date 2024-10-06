@@ -36,6 +36,7 @@ local showCmds = true
 local showHelp = false
 local inputText = ""
 local currZoneShort = mq.TLO.Zone.ShortName() or 'None'
+local msgPref = "\aw[\atDialogDB\aw] "
 
 DialogDB.Config = {
 	cmdGroup = cmdGroup,
@@ -171,19 +172,17 @@ local function loadSettings()
 end
 
 local function printHelp()
-	local msgPref = string.format("\aw[\at%s\aw] ", mq.TLO.Time.Time24())
-
-	MyUI_Utils.PrintOutput("\aw[\at%s\aw] \agNPC Dialog DB \aoCommands:", msgPref)
-	MyUI_Utils.PrintOutput("%s\agNPC Dialog DB \aoCurrent Zone:", msgPref)
-	MyUI_Utils.PrintOutput("%s\ay/dialogdb add \aw[\at\"description\"\aw] [\at\"command\"\aw] \aoAdds to Current Zone description and command", msgPref)
-	MyUI_Utils.PrintOutput("%s\ay/dialogdb add \aw[\at\"Value\"\aw] \aoAdds to Current Zone description and command = Value ", msgPref)
-	MyUI_Utils.PrintOutput("%s\agNPC Dialog DB \aoAll Zones:", msgPref)
-	MyUI_Utils.PrintOutput("%s\ay/dialogdb addall \aw[\at\"description\"\aw] [\at\"command\"\aw] \aoAdds to All Zones description and command", msgPref)
-	MyUI_Utils.PrintOutput("%s\ay/dialogdb addall \aw[\at\"Value\"\aw] \aoAdds to All Zones description and command = Value ", msgPref)
-	MyUI_Utils.PrintOutput("%s\agNPC Dialog DB \aoCommon:", msgPref)
-	MyUI_Utils.PrintOutput("%s\ay/dialogdb help \aoDisplay Help", msgPref)
-	MyUI_Utils.PrintOutput("%s\ay/dialogdb config \aoDisplay Config Window", msgPref)
-	MyUI_Utils.PrintOutput("%s\ay/dialogdb debug \aoToggles Debugging, Turns off Commands and Prints them out so you can verify them", msgPref)
+	MyUI_Utils.PrintOutput('MyUI', "\aw[\at%s\aw] \agNPC Dialog DB \aoCommands:", msgPref)
+	MyUI_Utils.PrintOutput('MyUI', "%s\agNPC Dialog DB \aoCurrent Zone:", msgPref)
+	MyUI_Utils.PrintOutput('MyUI', "%s\ay/dialogdb add \aw[\at\"description\"\aw] [\at\"command\"\aw] \aoAdds to Current Zone description and command", msgPref)
+	MyUI_Utils.PrintOutput('MyUI', "%s\ay/dialogdb add \aw[\at\"Value\"\aw] \aoAdds to Current Zone description and command = Value ", msgPref)
+	MyUI_Utils.PrintOutput('MyUI', "%s\agNPC Dialog DB \aoAll Zones:", msgPref)
+	MyUI_Utils.PrintOutput('MyUI', "%s\ay/dialogdb addall \aw[\at\"description\"\aw] [\at\"command\"\aw] \aoAdds to All Zones description and command", msgPref)
+	MyUI_Utils.PrintOutput('MyUI', "%s\ay/dialogdb addall \aw[\at\"Value\"\aw] \aoAdds to All Zones description and command = Value ", msgPref)
+	MyUI_Utils.PrintOutput('MyUI', "%s\agNPC Dialog DB \aoCommon:", msgPref)
+	MyUI_Utils.PrintOutput('MyUI', "%s\ay/dialogdb help \aoDisplay Help", msgPref)
+	MyUI_Utils.PrintOutput('MyUI', "%s\ay/dialogdb config \aoDisplay Config Window", msgPref)
+	MyUI_Utils.PrintOutput('MyUI', "%s\ay/dialogdb debug \aoToggles Debugging, Turns off Commands and Prints them out so you can verify them", msgPref)
 end
 
 local function eventNPC(line, who)
@@ -195,13 +194,13 @@ local function eventNPC(line, who)
 	else
 		return
 	end
-	-- MyUI_Utils.PrintOutput(tmpCheck)
-	-- MyUI_Utils.PrintOutput(who)
+	-- MyUI_Utils.MyUI_Utils.PrintOutput('MyUI',tmpCheck)
+	-- MyUI_Utils.MyUI_Utils.PrintOutput('MyUI',who)
 	local found = false
-	-- MyUI_Utils.PrintOutput(nName)
+	-- MyUI_Utils.MyUI_Utils.PrintOutput('MyUI',nName)
 	local check = string.format("npc =%s", nName)
 	if mq.TLO.SpawnCount(check)() <= 0 then return end
-	-- MyUI_Utils.PrintOutput("%s",mq.TLO.SpawnCount(check)())
+	-- MyUI_Utils.MyUI_Utils.PrintOutput('MyUI',"%s",mq.TLO.SpawnCount(check)())
 	if not line:find("^" .. nName) then return end
 	line = line:gsub(nName, "")
 	for w in string.gmatch(line, "%[(.-)%]") do
@@ -243,7 +242,7 @@ local function checkDialog()
 	hasDialog = false
 	if mq.TLO.Target() ~= nil then
 		CurrTarget = mq.TLO.Target.DisplayName()
-		-- MyUI_Utils.PrintOutput("Server: %s  Zone: %s Target: %s",serverName,curZone,target)
+		-- MyUI_Utils.MyUI_Utils.PrintOutput('MyUI',"Server: %s  Zone: %s Target: %s",serverName,curZone,target)
 		if Dialog[MyUI_Server] == nil then
 			return hasDialog
 		elseif Dialog[MyUI_Server][CurrTarget] == nil then
@@ -277,11 +276,10 @@ local function bind(...)
 			return
 		elseif args[1] == 'debug' then
 			DEBUG = not DEBUG
-			local msgPref = string.format("\aw[\at%s\aw] ", mq.TLO.Time.Time24())
 			if DEBUG then
-				MyUI_Utils.PrintOutput("%s \ayDEBUGGING \agEnabled \ayALL COMMANDS WILL BE PRINTED TO CONSOLE", msgPref)
+				MyUI_Utils.PrintOutput('MyUI', "%s \ayDEBUGGING \agEnabled \ayALL COMMANDS WILL BE PRINTED TO CONSOLE", msgPref)
 			else
-				MyUI_Utils.PrintOutput("%s \ayDEBUGGING \arDisabled \ayALL COMMANDS WILL BE EXECUTED", msgPref)
+				MyUI_Utils.PrintOutput('MyUI', "%s \ayDEBUGGING \arDisabled \ayALL COMMANDS WILL BE EXECUTED", msgPref)
 			end
 			return
 		elseif args[1] == 'help' then
@@ -291,7 +289,7 @@ local function bind(...)
 		else
 			showHelp = true
 			printHelp()
-			MyUI_Utils.PrintOutput("No String Supplied try again~")
+			MyUI_Utils.PrintOutput('MyUI', "No String Supplied try again~")
 			return
 		end
 	end
@@ -315,7 +313,7 @@ local function bind(...)
 						local cmdValue = value
 						if not cmdValue:match("^/") then cmdValue = string.format("/say %s", cmdValue) end
 						Dialog[MyUI_Server][name][currZoneShort][value] = cmdValue
-						-- MyUI_Utils.PrintOutput("Server: %s  Zone: %s Target: %s Dialog: %s",serverName,curZone,name, value)
+						-- MyUI_Utils.MyUI_Utils.PrintOutput('MyUI',"Server: %s  Zone: %s Target: %s Dialog: %s",serverName,curZone,name, value)
 					end
 				elseif #args == 3 then
 					if Dialog[MyUI_Server][name][currZoneShort][args[2]] == nil then
@@ -772,7 +770,7 @@ local function DrawMainWin()
 						if not DEBUG then
 							mq.cmdf("%s", _G["cmdString"])
 						else
-							MyUI_Utils.PrintOutput("%s", _G["cmdString"])
+							MyUI_Utils.PrintOutput('MyUI', "%s", _G["cmdString"])
 						end
 						searchString = ""
 					end
@@ -785,7 +783,7 @@ local function DrawMainWin()
 							if not DEBUG then
 								mq.cmdf("/multiline ; %s/target %s; /timed 5, %s%s", cmdGroup, CurrTarget, cmdGroup, _G["cmdString"])
 							else
-								MyUI_Utils.PrintOutput("/multiline ; %s/target %s; /timed 5, %s%s", cmdGroup, CurrTarget, cmdGroup, _G["cmdString"])
+								MyUI_Utils.PrintOutput('MyUI', "/multiline ; %s/target %s; /timed 5, %s%s", cmdGroup, CurrTarget, cmdGroup, _G["cmdString"])
 							end
 							searchString = ""
 						end
@@ -812,7 +810,7 @@ local function DrawMainWin()
 										if not DEBUG then
 											mq.cmdf("/multiline ; %s %s/target %s; %s %s/timed %s, %s", cmdChar, pName, CurrTarget, cmdChar, pName, cDelay, _G["cmdString"])
 										else
-											MyUI_Utils.PrintOutput("/multiline ; %s %s/target %s; %s %s/timed %s, %s", cmdChar, pName, CurrTarget, cmdChar, pName, cDelay,
+											MyUI_Utils.PrintOutput('MyUI', "/multiline ; %s %s/target %s; %s %s/timed %s, %s", cmdChar, pName, CurrTarget, cmdChar, pName, cDelay,
 												_G["cmdString"])
 										end
 										cDelay = cDelay + (delay * 10)
@@ -822,7 +820,7 @@ local function DrawMainWin()
 							if not DEBUG then
 								mq.cmdf("/timed %s, %s", cDelay, _G["cmdString"])
 							else
-								MyUI_Utils.PrintOutput("/timed %s, %s", cDelay, _G["cmdString"])
+								MyUI_Utils.PrintOutput('MyUI', "/timed %s, %s", cDelay, _G["cmdString"])
 							end
 							searchString = ""
 						end
@@ -834,7 +832,7 @@ local function DrawMainWin()
 							if not DEBUG then
 								mq.cmdf("/multiline ; %s/target %s; /timed 5, %s%s", cmdZone, CurrTarget, cmdZone, _G["cmdString"])
 							else
-								MyUI_Utils.PrintOutput("/multiline ; %s/target %s; /timed 5, %s%s", cmdZone, CurrTarget, cmdZone, _G["cmdString"])
+								MyUI_Utils.PrintOutput('MyUI', "/multiline ; %s/target %s; /timed 5, %s%s", cmdZone, CurrTarget, cmdZone, _G["cmdString"])
 							end
 							searchString = ""
 						end
@@ -879,14 +877,13 @@ local function init()
 	MyUI_CharLoaded = mq.TLO.Me.Name()
 	if mq.TLO.MacroQuest.BuildName() ~= 'Emu' then MyUI_Server = 'Live' end -- really only care about server name for EMU as the dialogs may vary from serever to server to server
 	loadSettings()
-	MyUI_Utils.PrintOutput("Dialog Data Loaded for %s", MyUI_Server)
+	MyUI_Utils.PrintOutput('MyUI', "Dialog Data Loaded for %s", MyUI_Server)
 	Running = true
 	setEvents()
 	mq.bind('/dialogdb', bind)
 	currZoneShort = mq.TLO.Zone.ShortName() or 'None'
 	lastZone = currZoneShort
-	local msgPref = string.format("\aw[\at%s\aw] ", mq.TLO.Time.Time24())
-	MyUI_Utils.PrintOutput("%s\agDialog DB \aoLoaded... \at/dialogdb help \aoDisplay Help", msgPref)
+	MyUI_Utils.PrintOutput('MyUI', "%s\agDialog DB \aoLoaded... \at/dialogdb help \aoDisplay Help", msgPref)
 end
 
 local clockTimer = mq.gettime()

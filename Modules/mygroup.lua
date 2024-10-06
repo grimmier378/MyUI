@@ -10,28 +10,27 @@ local MyGroup = {}
 
 local gIcon = MyUI_Icons.MD_SETTINGS
 -- set variables
-local animSpell = mq.FindTextureAnimation('A_SpellIcons')
-local animItem = mq.FindTextureAnimation('A_DragItem')
-local TLO = mq.TLO
 local winFlag = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.MenuBar)
 local iconSize = 26
 local mimicMe, followMe = false, false
 local ShowGUI, openConfigGUI = true, false
 local Scale = 1
+local myName = MyUI_CharLoaded
+local serverName = mq.TLO.EverQuest.Server()
+serverName = serverName:gsub(" ", "_")
+local configFileold2 = string.format("%s/MyUI/MyGroup/%s_%s_Config.lua", mq.configDir, serverName, myName)
 local themeFile = mq.configDir .. '/MyThemeZ.lua'
 local configFileOld = mq.configDir .. '/MyUI_Configs.lua'
-local configFileold2 = ''
-local configFile = ''
+local configFile = string.format("%s/MyUI/MyGroup/%s/%s.lua", mq.configDir, serverName, myName)
 local ColorCount, ColorCountConf, StyleCount, StyleCountConf = 0, 0, 0, 0
-local lastTar = TLO.Target.ID() or 0
+local lastTar = mq.TLO.Target.ID() or 0
 local themeName = 'Default'
 local locked, showMana, showEnd, showPet, mouseHover = false, true, true, true, false
 local script = 'MyGroup'
 local defaults, settings, theme = {}, {}, {}
 local useEQBC = false
-local myName = TLO.Me.Name()
-local meID = TLO.Me.ID()
-local serverName = ''
+local meID = mq.TLO.Me.ID()
+
 local hideTitle, showSelf = false, false
 local currZone, lastZone
 
@@ -120,7 +119,8 @@ local function loadSettings()
 
     loadTheme()
 
-    newSetting = MyUI_Utils.CheckDefaultSettings(settings[script], defaults[script])
+    newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings[script])
+    newSetting = MyUI_Utils.CheckRemovedSettings(defaults, settings) or newSetting
 
     showSelf = settings[script].ShowSelf
     hideTitle = settings[script].HideTitleBar
@@ -179,7 +179,7 @@ local function DrawTheme(tName)
 end
 
 local function DrawGroupMember(id)
-    local member = TLO.Group.Member(id)
+    local member = mq.TLO.Group.Member(id)
     local memberName = member.Name()
     local r, g, b, a = 1, 1, 1, 1
     if member == 'NULL' then return end
@@ -195,17 +195,17 @@ local function DrawGroupMember(id)
                 '\nSitting: ' .. tostring(member.Sitting())
             )
             ImGui.Text(pInfoToolTip)
-            if TLO.Group.MainTank.ID() == member.ID() then
+            if mq.TLO.Group.MainTank.ID() == member.ID() then
                 ImGui.SameLine()
                 MyUI_Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
             end
 
-            if TLO.Group.MainAssist.ID() == member.ID() then
+            if mq.TLO.Group.MainAssist.ID() == member.ID() then
                 ImGui.SameLine()
                 MyUI_Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist')
             end
 
-            if TLO.Group.Puller.ID() == member.ID() then
+            if mq.TLO.Group.Puller.ID() == member.ID() then
                 ImGui.SameLine()
                 MyUI_Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
             end
@@ -223,7 +223,7 @@ local function DrawGroupMember(id)
         -- Name
         ImGui.TableSetColumnIndex(0)
 
-        if TLO.Group.Leader.ID() == member.ID() then
+        if mq.TLO.Group.Leader.ID() == member.ID() then
             ImGui.TextColored(0, 1, 1, 1, 'F%d', id + 1)
             ImGui.SameLine()
             ImGui.TextColored(0, 1, 1, 1, memberName)
@@ -248,17 +248,17 @@ local function DrawGroupMember(id)
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 0, 0)
         ImGui.Text('')
         if settings[script].ShowRoleIcons then
-            if TLO.Group.MainTank.ID() == member.ID() then
+            if mq.TLO.Group.MainTank.ID() == member.ID() then
                 ImGui.SameLine()
                 MyUI_Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
             end
 
-            if TLO.Group.MainAssist.ID() == member.ID() then
+            if mq.TLO.Group.MainAssist.ID() == member.ID() then
                 ImGui.SameLine()
                 MyUI_Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
             end
 
-            if TLO.Group.Puller.ID() == member.ID() then
+            if mq.TLO.Group.Puller.ID() == member.ID() then
                 ImGui.SameLine()
                 MyUI_Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
             end
@@ -327,10 +327,10 @@ local function DrawGroupMember(id)
             if ImGui.Selectable('Puller') then
                 mq.cmdf("/grouproles set %s 3", memberName)
             end
-            if TLO.Me.GroupLeader() and ImGui.Selectable('Make Leader') then
+            if mq.TLO.Me.GroupLeader() and ImGui.Selectable('Make Leader') then
                 mq.cmdf("/makeleader %s", memberName)
             end
-            if TLO.Group.Leader.ID() == member.ID() and ImGui.Selectable('Make Me Leader') then
+            if mq.TLO.Group.Leader.ID() == member.ID() and ImGui.Selectable('Make Me Leader') then
                 mq.cmdf("/dex %s /makeleader %s", member.Name(), myName)
             end
             ImGui.EndMenu()
@@ -420,7 +420,7 @@ local function DrawGroupMember(id)
 end
 
 local function DrawSelf()
-    local mySelf = TLO.Me
+    local mySelf = mq.TLO.Me
     local memberName = mySelf.Name()
     local r, g, b, a = 1, 1, 1, 1
     if mySelf == 'NULL' then return end
@@ -434,17 +434,17 @@ local function DrawSelf()
             '\nEnd: ' .. tostring(mySelf.CurrentEndurance()) .. ' of ' .. tostring(mySelf.MaxEndurance()) .. '\n'
         )
         ImGui.Text(pInfoToolTip)
-        if TLO.Group.MainAssist.ID() == mySelf.ID() then
+        if mq.TLO.Group.MainAssist.ID() == mySelf.ID() then
             ImGui.SameLine()
             MyUI_Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
         end
 
-        if TLO.Group.Puller.ID() == mySelf.ID() then
+        if mq.TLO.Group.Puller.ID() == mySelf.ID() then
             ImGui.SameLine()
             MyUI_Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
         end
 
-        if TLO.Group.MainTank.ID() == mySelf.ID() then
+        if mq.TLO.Group.MainTank.ID() == mySelf.ID() then
             ImGui.SameLine()
             MyUI_Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank')
         end
@@ -470,7 +470,7 @@ local function DrawSelf()
 
         ImGui.TableSetColumnIndex(1)
         if settings[script].ShowRoleIcons then
-            if TLO.Group.MainTank.ID() == mySelf.ID() then
+            if mq.TLO.Group.MainTank.ID() == mySelf.ID() then
                 ImGui.SameLine()
                 MyUI_Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank')
             end
@@ -479,12 +479,12 @@ local function DrawSelf()
             ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 0, 0)
             ImGui.Text('')
 
-            if TLO.Group.MainAssist.ID() == mySelf.ID() then
+            if mq.TLO.Group.MainAssist.ID() == mySelf.ID() then
                 ImGui.SameLine()
                 MyUI_Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist')
             end
 
-            if TLO.Group.Puller.ID() == mySelf.ID() then
+            if mq.TLO.Group.Puller.ID() == mySelf.ID() then
                 ImGui.SameLine()
                 MyUI_Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller')
             end
@@ -534,7 +534,7 @@ local function DrawSelf()
             if ImGui.Selectable('Puller') then
                 mq.cmdf("/grouproles set %s 3", memberName)
             end
-            if TLO.Me.GroupLeader() and ImGui.Selectable('Group Leader') then
+            if mq.TLO.Me.GroupLeader() and ImGui.Selectable('Group Leader') then
                 mq.cmdf("/makeleader %s", memberName)
             end
             ImGui.EndMenu()
@@ -608,7 +608,7 @@ local function DrawSelf()
                 ImGui.SetTooltip('%s\n%d%% health', mySelf.Pet.DisplayName(), mySelf.Pet.PctHPs())
                 if ImGui.IsMouseClicked(0) then
                     mq.cmdf("/target id %s", mySelf.Pet.ID())
-                    if TLO.Cursor() then
+                    if mq.TLO.Cursor() then
                         mq.cmdf('/multiline ; /tar id %s; /face; /if (${Cursor.ID}) /click left target', mySelf.Pet.ID())
                     end
                 end
@@ -638,7 +638,7 @@ function MyGroup.RenderGUI()
         -- Default window size
         ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
         ColorCount, StyleCount = DrawTheme(themeName)
-        local openGUI, showMain = ImGui.Begin("My Group##MyGroup" .. TLO.Me.DisplayName(), true, flags)
+        local openGUI, showMain = ImGui.Begin("My Group##MyGroup" .. mq.TLO.Me.DisplayName(), true, flags)
         if not openGUI then ShowGUI = false end
         if showMain then
             mouseHover = ImGui.IsWindowHovered(ImGuiHoveredFlags.ChildWindows)
@@ -666,9 +666,9 @@ function MyGroup.RenderGUI()
                 DrawSelf()
             end
 
-            if TLO.Me.GroupSize() > 0 then
-                for i = 1, TLO.Me.GroupSize() - 1 do
-                    local member = TLO.Group.Member(i)
+            if mq.TLO.Me.GroupSize() > 0 then
+                for i = 1, mq.TLO.Me.GroupSize() - 1 do
+                    local member = mq.TLO.Group.Member(i)
                     if member ~= 'NULL' then
                         ImGui.BeginGroup()
                         DrawGroupMember(i)
@@ -678,9 +678,9 @@ function MyGroup.RenderGUI()
             end
 
             if settings[script].ShowDummy then
-                if TLO.Me.GroupSize() < 6 then
-                    local dummyCount = 6 - TLO.Me.GroupSize()
-                    if TLO.Me.GroupSize() == 0 then dummyCount = 5 end
+                if mq.TLO.Me.GroupSize() < 6 then
+                    local dummyCount = 6 - mq.TLO.Me.GroupSize()
+                    if mq.TLO.Me.GroupSize() == 0 then dummyCount = 5 end
                     for i = 1, dummyCount do
                         ImGui.BeginChild("Dummy##" .. i, -1, 62, bit32.bor(ImGuiChildFlags.Border), ImGuiWindowFlags.NoScrollbar)
                         ImGui.Dummy(ImGui.GetContentRegionAvail(), 75)
@@ -691,17 +691,17 @@ function MyGroup.RenderGUI()
 
             ImGui.SeparatorText('Commands')
 
-            local lbl = TLO.Me.Invited() and 'Follow' or 'Invite'
+            local lbl = mq.TLO.Me.Invited() and 'Follow' or 'Invite'
 
             if ImGui.SmallButton(lbl) then
-                mq.cmdf("/invite %s", TLO.Target.Name())
+                mq.cmdf("/invite %s", mq.TLO.Target.Name())
             end
 
-            if TLO.Me.GroupSize() > 0 then
+            if mq.TLO.Me.GroupSize() > 0 then
                 ImGui.SameLine()
             end
 
-            if TLO.Me.GroupSize() > 0 then
+            if mq.TLO.Me.GroupSize() > 0 then
                 if ImGui.SmallButton('Disband') then
                     mq.cmdf("/disband")
                 end
@@ -863,21 +863,16 @@ function MyGroup.Unload()
 end
 
 local function init()
-    myName = mq.TLO.Me.Name()
-    serverName = TLO.EverQuest.Server()
-    serverName = serverName:gsub(" ", "_")
-    configFileold2 = string.format("%s/MyUI/MyGroup/%s_%s_Config.lua", mq.configDir, serverName, myName)
-    configFile = string.format("%s/MyUI/MyGroup/%s/%s.lua", mq.configDir, serverName, myName)
     loadSettings()
-    currZone = TLO.Zone.ID()
+    currZone = mq.TLO.Zone.ID()
     lastZone = currZone
 end
 
 local clockTimer = mq.gettime()
 
 function MyGroup.MainLoop()
-    meID = TLO.Me.ID()
-    if TLO.Window('CharacterListWnd').Open() then return false end
+    meID = mq.TLO.Me.ID()
+    if mq.TLO.Window('CharacterListWnd').Open() then return false end
     currZone = mq.TLO.Zone.ID()
     if currZone ~= lastZone then
         mimicMe = false
@@ -891,9 +886,9 @@ function MyGroup.MainLoop()
         winFlag = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.MenuBar)
     end
 
-    if mimicMe and lastTar ~= TLO.Target.ID() then
-        lastTar = TLO.Target.ID()
-        mq.cmdf("/dgge /target id %s", TLO.Target.ID())
+    if mimicMe and lastTar ~= mq.TLO.Target.ID() then
+        lastTar = mq.TLO.Target.ID()
+        mq.cmdf("/dgge /target id %s", mq.TLO.Target.ID())
     end
 end
 

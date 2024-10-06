@@ -278,7 +278,7 @@ local function MessageHandler()
                         groupData[i].State = MemberEntry.State
                         if groupData[i].LastPts ~= pts then
                             if who ~= MyUI_CharLoaded and AAPartyMode == 'driver' and groupData[i].LastPts < pts then
-                                printf("%s gained an AA, now has %d unspent", who, pts)
+                                MyUI_Utils.PrintOutput('MyUI', "%s gained an AA, now has %d unspent", who, pts)
                             end
                             groupData[i].LastPts = pts
                         end
@@ -654,13 +654,13 @@ function AAParty.CheckMode()
     if MyUI_Mode == 'driver' then
         AAPartyShow = true
         AAPartyMode = 'driver'
-        print('\ayAA Party:\ao Setting \atDriver\ax Mode. UI will be displayed.')
-        print('\ayAA Party:\ao Type \at/aaparty show\ax. to Toggle the UI')
+        MyUI_Utils.PrintOutput('MyUI', '\ayAA Party:\ao Setting \atDriver\ax Mode. UI will be displayed.')
+        MyUI_Utils.PrintOutput('MyUI', '\ayAA Party:\ao Type \at/aaparty show\ax. to Toggle the UI')
     elseif MyUI_Mode == 'client' then
         AAPartyMode = 'client'
         AAPartyShow = false
-        print('\ayAA Party:\ao Setting \atClient\ax Mode. UI will not be displayed.')
-        print('\ayAA Party:\ao Type \at/aaparty show\ax. to Toggle the UI')
+        MyUI_Utils.PrintOutput('MyUI', '\ayAA Party:\ao Setting \atClient\ax Mode. UI will not be displayed.')
+        MyUI_Utils.PrintOutput('MyUI', '\ayAA Party:\ao Type \at/aaparty show\ax. to Toggle the UI')
     end
 end
 
@@ -676,28 +676,28 @@ local function processCommand(...)
         if args[1] == 'gui' or args[1] == 'show' or args[1] == 'open' then
             AAPartyShow = not AAPartyShow
             if AAPartyShow then
-                print('\ayAA Party:\ao Toggling GUI \atOpen\ax.')
+                MyUI_Utils.PrintOutput('MyUI', '\ayAA Party:\ao Toggling GUI \atOpen\ax.')
             else
-                print('\ayAA Party:\ao Toggling GUI \atClosed\ax.')
+                MyUI_Utils.PrintOutput('MyUI', '\ayAA Party:\ao Toggling GUI \atClosed\ax.')
             end
         elseif args[1] == 'exit' or args[1] == 'quit' then
-            print('\ayAA Party:\ao Exiting.')
+            MyUI_Utils.PrintOutput('MyUI', '\ayAA Party:\ao Exiting.')
             SayGoodBye()
             RUNNING = false
         elseif args[1] == 'mailbox' then
             MailBoxShow = not MailBoxShow
             if MailBoxShow then
-                print('\ayAA Party:\ao Toggling MailBox \atOpen\ax.')
+                MyUI_Utils.PrintOutput('MyUI', '\ayAA Party:\ao Toggling MailBox \atOpen\ax.')
             else
-                print('\ayAA Party:\ao Toggling MailBox \atClosed\ax.')
+                MyUI_Utils.PrintOutput('MyUI', '\ayAA Party:\ao Toggling MailBox \atClosed\ax.')
             end
         else
-            print('\ayAA Party:\ao Invalid command given.')
+            MyUI_Utils.PrintOutput('MyUI', '\ayAA Party:\ao Invalid command given.')
         end
     else
-        print('\ayAA Party:\ao No command given.')
-        print('\ayAA Party:\ag /aaparty gui \ao- Toggles the GUI on and off.')
-        print('\ayAA Party:\ag /aaparty exit \ao- Exits the plugin.')
+        MyUI_Utils.PrintOutput('MyUI', '\ayAA Party:\ao No command given.')
+        MyUI_Utils.PrintOutput('MyUI', '\ayAA Party:\ag /aaparty gui \ao- Toggles the GUI on and off.')
+        MyUI_Utils.PrintOutput('MyUI', '\ayAA Party:\ag /aaparty exit \ao- Exits the plugin.')
     end
 end
 

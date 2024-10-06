@@ -1,55 +1,56 @@
 -- Imports
-local mq                                                                                                              = require('mq')
-local ImGui                                                                                                           = require('ImGui')
+local mq             = require('mq')
+local ImGui          = require('ImGui')
 
-local MyBuffs                                                                                                         = {}
-MyBuffs.ActorMailBox                                                                                                  = 'my_buffs'
+local MyBuffs        = {}
+MyBuffs.ActorMailBox = 'my_buffs'
 -- Config Paths
-local themeFile                                                                                                       = mq.configDir .. '/MyThemeZ.lua'
-local configFileOld                                                                                                   = mq.configDir .. '/MyUI_Configs.lua'
-local configFile                                                                                                      = ''
-local MyBuffs_Actor                                                                                                   = nil
+local themeFile      = mq.configDir .. '/MyThemeZ.lua'
+local configFileOld  = mq.configDir .. '/MyUI_Configs.lua'
+local configFile     = string.format("%s/MyUI/MyBuffs/%s/%s.lua", mq.configDir, MyUI_Server, MyUI_CharLoaded)
+local MyBuffs_Actor  = nil
 -- Tables
-MyBuffs.boxes                                                                                                         = {}
-MyBuffs.settings                                                                                                      = {}
-MyBuffs.timerColor                                                                                                    = {}
-MyBuffs.theme                                                                                                         = {}
-MyBuffs.buffTable                                                                                                     = {}
-MyBuffs.songTable                                                                                                     = {}
+MyBuffs.boxes        = {}
+MyBuffs.settings     = {}
+MyBuffs.timerColor   = {}
+MyBuffs.theme        = {}
+MyBuffs.buffTable    = {}
+MyBuffs.songTable    = {}
+
 
 -- local Variables
 MyBuffs.ShowGUI, MyBuffs.SplitWin, MyBuffs.ShowConfig, MyBuffs.MailBoxShow, MyBuffs.ShowDebuffs, MyBuffs.showTitleBar = true, false, false, false, false, true
 MyBuffs.locked, MyBuffs.ShowIcons, MyBuffs.ShowTimer, MyBuffs.ShowText, MyBuffs.ShowScroll, MyBuffs.DoPulse           = false, true, true, true, true, true
 MyBuffs.iconSize                                                                                                      = 24
 
-local winFlag                                                                                                         = bit32.bor(ImGuiWindowFlags.NoScrollbar,
-    ImGuiWindowFlags.NoScrollWithMouse, ImGuiWindowFlags.NoFocusOnAppearing)
-local flashAlpha, flashAlphaT                                                                                         = 1, 255
-local rise, riseT                                                                                                     = true, true
-local RUNNING, firstRun, changed, solo                                                                                = true, true, false, true
-local songTimer, buffTime                                                                                             = 20,
-    5                                                                                                                                                 -- timers for how many Minutes left before we show the timer.
-local numSlots                                                                                                        = mq.TLO.Me.MaxBuffSlots() or 0 --Max Buff Slots
-local Scale                                                                                                           = 1.0
-local animSpell                                                                                                       = mq.FindTextureAnimation('A_SpellIcons')
-local gIcon                                                                                                           = MyUI_Icons.MD_SETTINGS
-local activeButton                                                                                                    = MyUI_CharLoaded -- Initialize the active button with the first box's name
-local PulseSpeed                                                                                                      = 5
-local script                                                                                                          = 'MyBuffs'
-local themeName                                                                                                       = 'Default'
-local mailBox                                                                                                         = {}
-local useWinPos                                                                                                       = false
-local ShowMenu                                                                                                        = false
-local sortType                                                                                                        = 'none'
-local showTableView                                                                                                   = true
-local winPositions                                                                                                    = {
+
+local winFlag                          = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse, ImGuiWindowFlags.NoFocusOnAppearing)
+local flashAlpha, flashAlphaT          = 1, 255
+local rise, riseT                      = true, true
+local RUNNING, firstRun, changed, solo = true, true, false, true
+local songTimer, buffTime              = 20,
+    5                                                                  -- timers for how many Minutes left before we show the timer.
+local numSlots                         = mq.TLO.Me.MaxBuffSlots() or 0 --Max Buff Slots
+local Scale                            = 1.0
+local animSpell                        = mq.FindTextureAnimation('A_SpellIcons')
+local gIcon                            = MyUI_Icons.MD_SETTINGS
+local activeButton                     = MyUI_CharLoaded -- Initialize the active button with the first box's name
+local PulseSpeed                       = 5
+local script                           = 'MyBuffs'
+local themeName                        = 'Default'
+local mailBox                          = {}
+local useWinPos                        = false
+local ShowMenu                         = false
+local sortType                         = 'none'
+local showTableView                    = true
+local winPositions                     = {
     Config = { x = 500, y = 500, },
     MailBox = { x = 500, y = 500, },
     Debuffs = { x = 500, y = 500, },
     Buffs = { x = 500, y = 500, },
     Songs = { x = 500, y = 500, },
 }
-local winSizes                                                                                                        = {
+local winSizes                         = {
     Config = { x = 300, y = 500, },
     MailBox = { x = 500, y = 500, },
     Debuffs = { x = 500, y = 500, },
@@ -57,14 +58,14 @@ local winSizes                                                                  
     Songs = { x = 200, y = 300, },
 }
 -- Timing Variables
-local lastTime                                                                                                        = os.clock()
-local checkIn                                                                                                         = os.time()
-local frameTime                                                                                                       = 1 / 60
-local debuffOnMe                                                                                                      = {}
+local lastTime                         = os.clock()
+local checkIn                          = os.time()
+local frameTime                        = 1 / 60
+local debuffOnMe                       = {}
 local currZone, lastZone
 
 -- default config settings
-MyBuffs.defaults                                                                                                      = {
+MyBuffs.defaults                       = {
     Scale = 1.0,
     LoadTheme = 'Default',
     locked = false,
@@ -102,7 +103,7 @@ MyBuffs.defaults                                                                
     },
 }
 
-local clockTimer                                                                                                      = mq.gettime()
+local clockTimer                       = mq.gettime()
 
 -- Functions
 
@@ -184,7 +185,7 @@ local function GetBuff(slot)
     -- Calculate total minutes and total seconds
     totalMin = duration.TotalMinutes() or 0
     totalSec = duration.TotalSeconds() or 0
-    -- print(totalSec)
+    -- MyUI_Utils.PrintOutput('MyUI',totalSec)
     buffDurHMS = duration.TimeHMS() or ''
 
     -- format tooltip
@@ -1616,18 +1617,18 @@ function MyBuffs.CheckMode()
     if MyUI_Mode == 'driver' then
         MyBuffs.ShowGUI = true
         solo = false
-        print('\ayMyBuffs.\ao Setting \atDriver\ax Mode. Actors [\agEnabled\ax] UI [\agOn\ax].')
-        print('\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
+        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Setting \atDriver\ax Mode. Actors [\agEnabled\ax] UI [\agOn\ax].')
+        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
     elseif MyUI_Mode == 'client' then
         MyBuffs.ShowGUI = false
         solo = false
-        print('\ayMyBuffs.\ao Setting \atClient\ax Mode.Actors [\agEnabled\ax] UI [\arOff\ax].')
-        print('\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
+        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Setting \atClient\ax Mode.Actors [\agEnabled\ax] UI [\arOff\ax].')
+        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
     else
         MyBuffs.ShowGUI = true
         solo = true
-        print('\ayMyBuffs.\ao Setting \atSolo\ax Mode. Actors [\arDisabled\ax] UI [\agOn\ax].')
-        print('\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
+        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Setting \atSolo\ax Mode. Actors [\arDisabled\ax] UI [\agOn\ax].')
+        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
     end
 end
 
@@ -1637,21 +1638,21 @@ local function processCommand(...)
         if args[1] == 'gui' or args[1] == 'show' or args[1] == 'open' then
             MyBuffs.ShowGUI = not MyBuffs.ShowGUI
             if MyBuffs.ShowGUI then
-                print('\ayMyBuffs.\ao Toggling GUI \atOpen\ax.')
+                MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Toggling GUI \atOpen\ax.')
             else
-                print('\ayMyBuffs.\ao Toggling GUI \atClosed\ax.')
+                MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Toggling GUI \atClosed\ax.')
             end
         elseif args[1] == 'exit' or args[1] == 'quit' then
-            print('\ayMyBuffs.\ao Exiting.')
+            MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Exiting.')
             if not solo then SayGoodBye() end
             RUNNING = false
         elseif args[1] == 'mailbox' then
             MyBuffs.MailBoxShow = not MyBuffs.MailBoxShow
         end
     else
-        print('\ayMyBuffs.\ao No command given.')
-        print('\ayMyBuffs.\ag /mybuffs gui \ao- Toggles the GUI on and off.')
-        print('\ayMyBuffs.\ag /mybuffs exit \ao- Exits the plugin.')
+        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao No command given.')
+        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ag /mybuffs gui \ao- Toggles the GUI on and off.')
+        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ag /mybuffs exit \ao- Exits the plugin.')
     end
 end
 
@@ -1661,8 +1662,6 @@ function MyBuffs.Unload()
 end
 
 local function init()
-    configFile = string.format("%s/MyUI/MyBuffs/%s/%s.lua", mq.configDir, MyUI_Server, MyUI_CharLoaded)
-
     MyBuffs.CheckMode()
     -- check for theme file or load defaults from our themes.lua
     loadSettings()

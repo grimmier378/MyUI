@@ -75,9 +75,17 @@ function CommonUtils.SetImage(file_path)
 	return mq.CreateTexture(file_path)
 end
 
-function CommonUtils.PrintOutput(msg, ...)
+---comment Print Output to the Console or MyChat
+---@param mychat_tab any @ the MyChat Tab to output to or Pass nil to output to the main console
+---@param msg any @ the message to output
+---@param ... unknown @ any additional arguments to format the message
+function CommonUtils.PrintOutput(mychat_tab, msg, ...)
 	msg = string.format(msg, ...)
-	printf(msg)
+	if MyUI_MyChatHandler ~= nil and mychat_tab ~= nil then
+		MyUI_MyChatHandler(mychat_tab, msg)
+	else
+		print(msg)
+	end
 end
 
 ---comment
@@ -91,7 +99,7 @@ function CommonUtils.CheckRemovedSettings(default_settings, loaded_settings)
 	local newSetting = false
 	for setting, value in pairs(loaded_settings or {}) do
 		if default_settings[setting] == nil then
-			CommonUtils.PrintOutput("\ayFound Depreciated Setting: \ao%s \ayRemoving it from the Settings File.", setting)
+			CommonUtils.PrintOutput('MyUI', "\ayFound Depreciated Setting: \ao%s \ayRemoving it from the Settings File.", setting)
 			loaded_settings[setting] = nil
 			newSetting = true
 		end
@@ -110,7 +118,7 @@ function CommonUtils.CheckDefaultSettings(default_settings, loaded_settings)
 	local newSetting = false
 	for setting, value in pairs(default_settings or {}) do
 		if loaded_settings[setting] == nil then
-			CommonUtils.PrintOutput("\ayNew Default Setting: \ao%s \ayAdding it from the Settings File.", setting)
+			CommonUtils.PrintOutput('MyUI', "\ayNew Default Setting: \ao%s \ayAdding it from the Settings File.", setting)
 			loaded_settings[setting] = value
 			newSetting = true
 		end

@@ -59,19 +59,21 @@ local castTransparency = 1.0
 local startedCast, startCastTime, castBarShow = false, 0, false
 
 defaults = {
-	Scale = 1.0,
-	LoadTheme = 'Default',
-	locked = false,
-	CastLocked = false,
-	CastTransperancy = 1.0,
-	ShowTitleCasting = false,
-	ShowTitleBar = true,
-	enableCastBar = false,
-	CastTextColorByType = false,
-	IconSize = 30,
-	TimerColor = { 1, 1, 1, 1, },
-	maxRow = 1,
-	AutoSize = false,
+	[script] = {
+		Scale = 1.0,
+		LoadTheme = 'Default',
+		locked = false,
+		CastLocked = false,
+		CastTransperancy = 1.0,
+		ShowTitleCasting = false,
+		ShowTitleBar = true,
+		enableCastBar = false,
+		CastTextColorByType = false,
+		IconSize = 30,
+		TimerColor = { 1, 1, 1, 1, },
+		maxRow = 1,
+		AutoSize = false,
+	},
 }
 
 local function pickColor(spellID)
@@ -174,16 +176,11 @@ local function loadSettings()
 		-- Load settings from the Lua config file
 
 		settings = dofile(configFile)
-		if settings[script] == nil then
-			settings[script] = {}
-			settings[script] = defaults
-			newSetting = true
-		end
 	end
 
 	-- check for new settings and add them to the settings file
-
-	newSetting = MyUI_Utils.CheckRemovedSettings(defaults, settings[script])
+	newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings)
+	newSetting = MyUI_Utils.CheckRemovedSettings(defaults, settings) or newSetting
 
 	if settings[script][meName] == nil then
 		settings[script][meName] = {}
@@ -211,7 +208,7 @@ local function loadSettings()
 end
 
 local function MemSpell(line, spell)
-	-- print("Memorized: ", spell)
+	-- MyUI_Utils.PrintOutput(nil,"Memorized: ", spell)
 	for i = 1, numGems do
 		if spellBar[i].sName == spell then
 			mq.delay(1)
@@ -222,7 +219,7 @@ local function MemSpell(line, spell)
 end
 
 local function CastDetect(line, spell)
-	-- print("Memorized: ", spell)
+	-- MyUI_Utils.PrintOutput(nil,"Memorized: ", spell)
 	if not startedCast then
 		startedCast = true
 		startCastTime = os.time()
@@ -901,7 +898,7 @@ end
 local function Init()
 	meName = mq.TLO.Me.Name()
 	if mq.TLO.Me.MaxMana() == 0 then
-		print("You are not a caster!")
+		MyUI_Utils.PrintOutput(nil, "You are not a caster!")
 		RUNNING = false
 		return
 	end

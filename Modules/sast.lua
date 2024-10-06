@@ -212,7 +212,7 @@ local function doBind(...)
 	local args = { ..., }
 	if args[1] == 'stats' then
 		forcedOpen = not forcedOpen
-		-- print('Opening Stats: ',forcedOpen)
+		-- MyUI_Utils.PrintOutput('MyUI','Opening Stats: ',forcedOpen)
 		if forcedOpen then showAdv = true end
 	elseif args[1] == 'exped' then
 		if not eqWinExpOpen then
@@ -247,16 +247,16 @@ if #arg > 0 then
 				delayTime = tonumber(arg[3])
 				delayTime = delayTime * 1000
 			else
-				print('Invalid Delay Time')
+				MyUI_Utils.PrintOutput('MyUI', 'Invalid Delay Time')
 			end
 		else
-			print('Invalid Command')
+			MyUI_Utils.PrintOutput('MyUI', 'Invalid Command')
 		end
 	end
-	print('Simple Adventure Status Tracking')
-	print('Usage: /lua run sast [mode]')
-	print('Usage: /lua run sast [mode] delay [time] to add a delay to closing the window.')
-	print('Modes: solo, dannet, eqbc')
+	MyUI_Utils.PrintOutput('MyUI', 'Simple Adventure Status Tracking')
+	MyUI_Utils.PrintOutput('MyUI', 'Usage: /lua run sast [mode]')
+	MyUI_Utils.PrintOutput('MyUI', 'Usage: /lua run sast [mode] delay [time] to add a delay to closing the window.')
+	MyUI_Utils.PrintOutput('MyUI', 'Modes: solo, dannet, eqbc')
 end
 
 function SAST.Unload()
@@ -267,24 +267,24 @@ local function startup()
 	--check for MQ2EQBC plugin
 	if mode == 'EQBC' then
 		if not mq.TLO.Plugin('mq2eqbc').IsLoaded() then
-			print('EQBC Not Loaded... Loading EQBC...')
+			MyUI_Utils.PrintOutput('MyUI', 'EQBC Not Loaded... Loading EQBC...')
 			mq.cmd('/plugin eqbc')
 		end
 		groupCmd = '/bcaa /'
 	elseif mode == 'DanNet' then
 		if not mq.TLO.Plugin('mq2dannet').IsLoaded() then
-			print('DanNet Not Loaded... Loading DanNet...')
+			MyUI_Utils.PrintOutput('MyUI', 'DanNet Not Loaded... Loading DanNet...')
 			mq.cmd('/plugin dannet')
 		end
 		groupCmd = '/dgae '
 	end
 	mq.bind("/sast", doBind)
 	local dTime = delayTime ~= nil and delayTime / 1000 or 'None'
-	printf('Starting SAST \aoMode: \at%s \aodoDelay: \at%s \aoDelayTime: \at%ss', mode, doDelay, dTime)
-	print('\agSimple Adventure Status Tracking\ax\ay Loaded...\ax')
-	print('Use: \ay/sast stats\ax to toggle Adventure Stats')
-	print('Use: \ay/sast adv\ax to toggle Adventure Window')
-	print('Use: \ay/sast exped\ax to toggle Expedition Window')
+	MyUI_Utils.PrintOutput('MyUI', 'Starting SAST \aoMode: \at%s \aodoDelay: \at%s \aoDelayTime: \at%ss', mode, doDelay, dTime)
+	MyUI_Utils.PrintOutput('MyUI', '\agSimple Adventure Status Tracking\ax\ay Loaded...\ax')
+	MyUI_Utils.PrintOutput('MyUI', 'Use: \ay/sast stats\ax to toggle Adventure Stats')
+	MyUI_Utils.PrintOutput('MyUI', 'Use: \ay/sast adv\ax to toggle Adventure Window')
+	MyUI_Utils.PrintOutput('MyUI', 'Use: \ay/sast exped\ax to toggle Expedition Window')
 	currZone = mq.TLO.Zone.ID()
 	lastZone = currZone
 end

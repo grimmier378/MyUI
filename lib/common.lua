@@ -123,6 +123,40 @@ function CommonUtils.PrintOutput(mychat_tab, main_console, msg, ...)
 	end
 end
 
+---comments Takes in a table and returns a sorted table of keys based on the number of columns Sorted by Columns
+---@param input_table table|nil @ the table to sort (optional) You can send a set of sorted keys if you have already custom sorted it.
+---@param sorted_keys table|nil @ the sorted keys table (optional) if you have already sorted the keys
+---@param num_columns integer @ the number of column groups to sort the keys into
+---@return table
+function CommonUtils.SortTableColums(input_table, sorted_keys, num_columns)
+	if input_table == nil and sorted_keys == nil then return {} end
+
+	-- If sorted_keys is provided, use it, otherwise extract the keys from the input_table
+	local keys = sorted_keys or {}
+	if #keys == 0 then
+		for k, _ in pairs(input_table) do
+			table.insert(keys, k)
+		end
+		table.sort(keys) -- Sort keys alphabetically
+	end
+
+	local total_items = #keys
+	local num_rows = math.ceil(total_items / num_columns)
+	local column_sorted = {}
+
+	-- Reorganize the keys to fill by columns instead of rows
+	for col = 1, num_columns do
+		for row = 1, num_rows do
+			local index = (row - 1) * num_columns + col
+			if index <= total_items then
+				table.insert(column_sorted, keys[index])
+			end
+		end
+	end
+
+	return column_sorted
+end
+
 ---comment
 --- Takes in a table of default settings and a table of loaded settings and checks for depreciated settings
 --- If a depreciated setting is found it will remove it from the loaded settings table

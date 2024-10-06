@@ -1,8 +1,6 @@
-local mq = require('mq')
-local ImGui = require 'ImGui'
-local Template = {} -- Module Name Here Returns the table of functions and any variables you wish to expose to the main script.
+--[[ Template for Module Creatio/Conversion
 
---[[ GLOBAL MyUI_ variables and functions.
+GLOBAL MyUI_ variables and functions.
 	MyUI_Utils           = require('lib.common') -- some common functions on other scripts
 	MyUI_Actor           = require('actors') -- Load Actors globally for use in modules
 
@@ -40,26 +38,45 @@ local Template = {} -- Module Name Here Returns the table of functions and any v
 
 ]]
 
+local mq = require('mq')
+local ImGui = require 'ImGui'
+
 -- Exposed Variables
-Template.Name = "Template" -- Name of the module
-Template.ShowGui = true
+local Module = {}
+Module.Name = "Template" -- Name of the module used when loading and unloaing the modules.
+Module.IsRunning = false -- Keep track of running state. if not running we can unload it.
+Module.ShowGui = true
 
 -- Local Variables
 
 --Helpers
 -- You can keep your functions local to the module the ones here are the only ones we care about from the main script.
+local function CommandHandler(...)
+	local args = { ..., }
+	if args[1] ~= nil then
+		if args[1] == 'exit' or args[1] == 'quit' then
+			Module.IsRunning = false
+			MyUI_Utils.PrintOutput('MyUI', true, "\ay%s \awis \arExiting\aw...", Module.Name)
+		elseif args[1] == 'show' or args[1] == 'ui' then
+			Module.ShowGui = not Module.ShowGui
+		end
+	end
+end
+
 local function Init()
 	-- your Init code here
-	MyUI_Utils.PrintOutput('main', true, "\ayModule \a-w[\at%s\a-w] \agLoaded\aw!", Template.Name)
+	mq.bind('/template', CommandHandler)
+	Module.IsRunning = true
+	MyUI_Utils.PrintOutput('main', true, "\ayModule \a-w[\at%s\a-w] \agLoaded\aw!", Module.Name)
 end
 
 -- Exposed Functions
-function Template.RenderGUI()
-	if Template.ShowGui then
-		local open, show = ImGui.Begin(Template.Name .. "##" .. MyUI_CharLoaded, true, ImGuiWindowFlags.None)
+function Module.RenderGUI()
+	if Module.ShowGui then
+		local open, show = ImGui.Begin(Module.Name .. "##" .. MyUI_CharLoaded, true, ImGuiWindowFlags.None)
 		if not open then
 			show = false
-			Template.ShowGui = false
+			Module.ShowGui = false
 		end
 		if show then
 			--GUI
@@ -71,12 +88,16 @@ function Template.RenderGUI()
 	end
 end
 
-function Template.Unload()
+function Module.Unload()
 	-- undo any binds and events before unloading
 	-- leave empty if you don't have any binds or events
+	mq.unbind('/template')
 end
 
-function Template.MainLoop()
+function Module.MainLoop()
+	-- This will unload the module gracefully if IsRunning state changes.
+	if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+
 	--[[
 	your MainLoop code here without the loop.
 	
@@ -99,4 +120,4 @@ end
 -- Init the module
 
 Init()
-return Template
+return Module

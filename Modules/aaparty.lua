@@ -1,7 +1,12 @@
-local mq                                                                = require('mq')
-local imgui                                                             = require 'ImGui'
-local AAParty                                                           = {}
-AAParty.ActorMailBox                                                    = 'aa_party'
+local mq            = require('mq')
+local imgui         = require 'ImGui'
+
+local Module        = {}
+Module.ActorMailBox = 'aa_party'
+Module.IsRunning    = false
+Module.Name         = 'AAParty'
+
+
 local themeID                                                           = 1
 local expand, compact                                                   = {}, {}
 local themeFile                                                         = string.format('%s/MyThemeZ.lua', mq.configDir)
@@ -207,7 +212,7 @@ end
 
 --create mailbox for actors to send messages to
 local function MessageHandler()
-    aaActor = MyUI_Actor.register(AAParty.ActorMailBox, function(message)
+    aaActor = MyUI_Actor.register(Module.ActorMailBox, function(message)
         local MemberEntry = message()
         local subject     = MemberEntry.Subject or 'Update'
         local aaXP        = MemberEntry.PctExpAA or 0
@@ -379,7 +384,7 @@ local function SayGoodBye()
     end
 end
 
-function AAParty.RenderGUI()
+function Module.RenderGUI()
     if AAPartyShow then
         imgui.SetNextWindowSize(185, 480, ImGuiCond.FirstUseEver)
         if TempSettings.aSize then
@@ -650,7 +655,7 @@ function AAParty.RenderGUI()
     end
 end
 
-function AAParty.CheckMode()
+function Module.CheckMode()
     if MyUI_Mode == 'driver' then
         AAPartyShow = true
         AAPartyMode = 'driver'
@@ -664,7 +669,7 @@ function AAParty.CheckMode()
     end
 end
 
-function AAParty.Unload()
+function Module.Unload()
     SayGoodBye()
     mq.unbind("/aaparty")
     aaActor = nil
@@ -681,9 +686,10 @@ local function processCommand(...)
                 MyUI_Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Toggling GUI \atClosed\ax.')
             end
         elseif args[1] == 'exit' or args[1] == 'quit' then
+            Module.IsRunning = false
             MyUI_Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Exiting.')
             SayGoodBye()
-            RUNNING = false
+            Module.IsRunning = false
         elseif args[1] == 'mailbox' then
             MailBoxShow = not MailBoxShow
             if MailBoxShow then
@@ -705,12 +711,12 @@ local function init()
     currZone = mq.TLO.Zone.ID()
     lastZone = currZone
     firstRun = true
-    AAParty.CheckMode()
+    Module.CheckMode()
     mq.bind('/aaparty', processCommand)
     PtsAA = mq.TLO.Me.AAPoints()
     loadSettings()
     getMyAA()
-    RUNNING = true
+    Module.IsRunning = true
     if MyUI_Utils.File.Exists(themezDir) then
         hasThemeZ = true
     end
@@ -719,11 +725,13 @@ local function init()
         aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(nil, 'Hello'))
         aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(nil, 'Hello'))
     end
+    Module.IsRunning = true
 end
 
 local clockTimer = mq.gettime()
 
-function AAParty.MainLoop()
+function Module.MainLoop()
+    if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     local elapsedTime = mq.gettime() - clockTimer
     if elapsedTime >= 50 then
         currZone = mq.TLO.Zone.ID()
@@ -742,5 +750,5 @@ end
 
 MessageHandler()
 init()
-AAParty.MainLoop()
-return AAParty
+Module.MainLoop()
+return Module

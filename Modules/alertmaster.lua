@@ -25,7 +25,8 @@
 local LIP = require('lib.lip')
 local mq = require('mq')
 local ImGui = require('ImGui')
-AlertMaster = {}
+Module = {}
+Module.Name = 'AlertMaster'
 -- Variables
 local arg = { ..., }
 local amVer = '2.07'
@@ -99,8 +100,8 @@ local spawnListFlags = bit32.bor(
 	ImGuiTableFlags.ScrollX,
 	ImGuiTableFlags.Hideable
 )
-
-AlertMaster.GUI_Main = {
+Module.IsRunning = false
+Module.GUI_Main = {
 	Open    = false,
 	Show    = false,
 	Locked  = false,
@@ -164,7 +165,7 @@ AlertMaster.GUI_Main = {
 	},
 }
 
-AlertMaster.GUI_Alert = {
+Module.GUI_Alert = {
 	Open    = false,
 	Show    = false,
 	Locked  = false,
@@ -375,8 +376,8 @@ local function load_settings()
 	settings[CharConfig]['beep'] = doBeep
 	DoDrawArrow = settings[CharConfig]['arrows'] or false
 	settings[CharConfig]['arrows'] = DoDrawArrow
-	AlertMaster.GUI_Main.Locked = settings[CharConfig]['locked'] or false
-	settings[CharConfig]['locked'] = AlertMaster.GUI_Main.Locked
+	Module.GUI_Main.Locked = settings[CharConfig]['locked'] or false
+	settings[CharConfig]['locked'] = Module.GUI_Main.Locked
 	doAlert = settings[CharConfig]['popup'] or false
 	settings[CharConfig]['popup'] = doAlert
 	showAggro = settings[CharConfig]['aggro'] or false
@@ -412,7 +413,7 @@ local function load_settings()
 	volPCLeft = settings[CharConfig]['volPCLeft'] or volPCLeft
 	settings[CharConfig]['volPCLeft'] = volPCLeft
 	save_settings()
-	if AlertMaster.GUI_Main.Locked then
+	if Module.GUI_Main.Locked then
 		SearchWindow_Show = true
 		SearchWindowOpen = true
 	else
@@ -486,10 +487,10 @@ local function InsertTableSpawn(dataTable, spawn, id, opts)
 end
 
 local function TableSortSpecs(a, b)
-	for i = 1, AlertMaster.GUI_Main.Table.SortSpecs.SpecsCount do
-		local spec = AlertMaster.GUI_Main.Table.SortSpecs:Specs(i)
+	for i = 1, Module.GUI_Main.Table.SortSpecs.SpecsCount do
+		local spec = Module.GUI_Main.Table.SortSpecs:Specs(i)
 		local delta = 0
-		if spec.ColumnUserID == AlertMaster.GUI_Main.Table.Column_ID.MobName then
+		if spec.ColumnUserID == Module.GUI_Main.Table.Column_ID.MobName then
 			if a.MobName and b.MobName then
 				if a.MobName < b.MobName then
 					delta = -1
@@ -499,7 +500,7 @@ local function TableSortSpecs(a, b)
 			else
 				return 0
 			end
-		elseif spec.ColumnUserID == AlertMaster.GUI_Main.Table.Column_ID.MobID then
+		elseif spec.ColumnUserID == Module.GUI_Main.Table.Column_ID.MobID then
 			if a.MobID and b.MobID then
 				if a.MobID < b.MobID then
 					delta = -1
@@ -509,7 +510,7 @@ local function TableSortSpecs(a, b)
 			else
 				return 0
 			end
-		elseif spec.ColumnUserID == AlertMaster.GUI_Main.Table.Column_ID.MobLvl then
+		elseif spec.ColumnUserID == Module.GUI_Main.Table.Column_ID.MobLvl then
 			if a.MobLvl and b.MobLvl then
 				if a.MobLvl < b.MobLvl then
 					delta = -1
@@ -519,7 +520,7 @@ local function TableSortSpecs(a, b)
 			else
 				return 0
 			end
-		elseif spec.ColumnUserID == AlertMaster.GUI_Main.Table.Column_ID.MobDist then
+		elseif spec.ColumnUserID == Module.GUI_Main.Table.Column_ID.MobDist then
 			if a.MobDist and b.MobDist then
 				if a.MobDist < b.MobDist then
 					delta = -1
@@ -529,7 +530,7 @@ local function TableSortSpecs(a, b)
 			else
 				return 0
 			end
-		elseif spec.ColumnUserID == AlertMaster.GUI_Main.Table.Column_ID.MobAggro then
+		elseif spec.ColumnUserID == Module.GUI_Main.Table.Column_ID.MobAggro then
 			if a.MobAggro and b.MobAggro then
 				if a.MobAggro < b.MobAggro then
 					delta = -1
@@ -539,7 +540,7 @@ local function TableSortSpecs(a, b)
 			else
 				return 0
 			end
-		elseif spec.ColumnUserID == AlertMaster.GUI_Main.Table.Column_ID.Action then
+		elseif spec.ColumnUserID == Module.GUI_Main.Table.Column_ID.Action then
 			if a.Enum_Action < b.Enum_Action then
 				delta = -1
 			elseif a.Enum_Action > b.Enum_Action then
@@ -558,10 +559,10 @@ local function TableSortSpecs(a, b)
 end
 
 local function AlertTableSortSpecs(a, b)
-	for i = 1, AlertMaster.GUI_Alert.Table.SortSpecs.SpecsCount do
-		local spec = AlertMaster.GUI_Alert.Table.SortSpecs:Specs(i)
+	for i = 1, Module.GUI_Alert.Table.SortSpecs.SpecsCount do
+		local spec = Module.GUI_Alert.Table.SortSpecs:Specs(i)
 		local delta = 0
-		if spec.ColumnUserID == AlertMaster.GUI_Alert.Table.Column_ID.MobName then
+		if spec.ColumnUserID == Module.GUI_Alert.Table.Column_ID.MobName then
 			if a.MobName and b.MobName then
 				if a.MobName < b.MobName then
 					delta = -1
@@ -571,7 +572,7 @@ local function AlertTableSortSpecs(a, b)
 			else
 				return 0
 			end
-		elseif spec.ColumnUserID == AlertMaster.GUI_Alert.Table.Column_ID.MobDist then
+		elseif spec.ColumnUserID == Module.GUI_Alert.Table.Column_ID.MobDist then
 			if a.MobDist and b.MobDist then
 				if math.floor(mq.TLO.Spawn(a.MobID).Distance()) < math.floor(mq.TLO.Spawn(b.MobID).Distance()) then
 					delta = -1
@@ -595,7 +596,7 @@ end
 
 local function RefreshUnhandled()
 	local splitSearch = {}
-	for part in string.gmatch(AlertMaster.GUI_Main.Search, '[^%s]+') do
+	for part in string.gmatch(Module.GUI_Main.Search, '[^%s]+') do
 		table.insert(splitSearch, part)
 	end
 	local newTable = {}
@@ -609,8 +610,8 @@ local function RefreshUnhandled()
 		if #splitSearch == found then table.insert(newTable, v) end
 	end
 	Table_Cache.Unhandled = newTable
-	AlertMaster.GUI_Main.Refresh.Sort.Rules = true
-	AlertMaster.GUI_Main.Refresh.Table.Unhandled = true
+	Module.GUI_Main.Refresh.Sort.Rules = true
+	Module.GUI_Main.Refresh.Table.Unhandled = true
 end
 
 local function RefreshAlerts()
@@ -627,8 +628,8 @@ local function RefreshAlerts()
 		if #tmp > 0 then InsertTableSpawn(newTable, spawn, tonumber(spawn.ID())) end
 	end
 	Table_Cache.Alerts = newTable
-	AlertMaster.GUI_Alert.Refresh.Sort.Alerts = true
-	AlertMaster.GUI_Alert.Refresh.Table.Alerts = false
+	Module.GUI_Alert.Refresh.Sort.Alerts = true
+	Module.GUI_Alert.Refresh.Table.Alerts = false
 end
 
 local function RefreshZone()
@@ -660,8 +661,8 @@ local function RefreshZone()
 	end
 	Table_Cache.Rules = newTable
 	Table_Cache.Mobs = newTable
-	AlertMaster.GUI_Main.Refresh.Sort.Mobs = true
-	AlertMaster.GUI_Main.Refresh.Table.Mobs = false
+	Module.GUI_Main.Refresh.Sort.Mobs = true
+	Module.GUI_Main.Refresh.Table.Mobs = false
 end
 
 -----------------------
@@ -1035,12 +1036,12 @@ local function DrawTheme(tName)
 end
 
 local function DrawToggles()
-	local lockedIcon = AlertMaster.GUI_Main.Locked and MyUI_Icons.FA_LOCK .. '##lockTabButton' or
+	local lockedIcon = Module.GUI_Main.Locked and MyUI_Icons.FA_LOCK .. '##lockTabButton' or
 		MyUI_Icons.FA_UNLOCK .. '##lockTablButton'
 	if ImGui.SmallButton(lockedIcon) then
 		--ImGuiWindowFlags.NoMove
-		AlertMaster.GUI_Main.Locked = not AlertMaster.GUI_Main.Locked
-		settings[CharConfig]['locked'] = AlertMaster.GUI_Main.Locked
+		Module.GUI_Main.Locked = not Module.GUI_Main.Locked
+		settings[CharConfig]['locked'] = Module.GUI_Main.Locked
 		save_settings()
 	end
 	if ImGui.IsItemHovered() and showTooltips then
@@ -1316,16 +1317,16 @@ end
 local btnIconDel = MyUI_Icons.MD_DELETE
 local function DrawSearchWindow()
 	if currZone ~= lastZone then return end
-	if AlertMaster.GUI_Main.Locked then
-		AlertMaster.GUI_Main.Flags = bit32.bor(AlertMaster.GUI_Main.Flags, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoResize)
+	if Module.GUI_Main.Locked then
+		Module.GUI_Main.Flags = bit32.bor(Module.GUI_Main.Flags, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoResize)
 	else
-		AlertMaster.GUI_Main.Flags = bit32.band(AlertMaster.GUI_Main.Flags, bit32.bnot(ImGuiWindowFlags.NoMove), bit32.bnot(ImGuiWindowFlags.NoResize))
+		Module.GUI_Main.Flags = bit32.band(Module.GUI_Main.Flags, bit32.bnot(ImGuiWindowFlags.NoMove), bit32.bnot(ImGuiWindowFlags.NoResize))
 	end
 	if SearchWindowOpen then
 		-- ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 5)
 		local ColorCount, StyleCount = DrawTheme(useThemeName)
 		if ZoomLvl > 1.25 then ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, 4, 7) end
-		SearchWindowOpen = ImGui.Begin("Alert Master##" .. MyUI_CharLoaded, SearchWindowOpen, AlertMaster.GUI_Main.Flags)
+		SearchWindowOpen = ImGui.Begin("Alert Master##" .. MyUI_CharLoaded, SearchWindowOpen, Module.GUI_Main.Flags)
 		ImGui.BeginMenuBar()
 		ImGui.SetWindowFontScale(ZoomLvl)
 		DrawToggles()
@@ -1363,44 +1364,44 @@ local function DrawSearchWindow()
 		end
 
 		if currentTab == "zone" then
-			local searchText, selected = ImGui.InputText("Search##RulesSearch", AlertMaster.GUI_Main.Search)
+			local searchText, selected = ImGui.InputText("Search##RulesSearch", Module.GUI_Main.Search)
 			-- ImGui.PopItemWidth()
-			if selected and AlertMaster.GUI_Main.Search ~= searchText then
-				AlertMaster.GUI_Main.Search = searchText
-				AlertMaster.GUI_Main.Refresh.Sort.Rules = true
-				AlertMaster.GUI_Main.Refresh.Table.Unhandled = true
+			if selected and Module.GUI_Main.Search ~= searchText then
+				Module.GUI_Main.Search = searchText
+				Module.GUI_Main.Refresh.Sort.Rules = true
+				Module.GUI_Main.Refresh.Table.Unhandled = true
 			end
 			ImGui.SameLine()
 			if ImGui.Button("Clear##ClearRulesSearch") then
-				AlertMaster.GUI_Main.Search = ''
-				AlertMaster.GUI_Main.Refresh.Sort.Rules = false
-				AlertMaster.GUI_Main.Refresh.Table.Unhandled = true
+				Module.GUI_Main.Search = ''
+				Module.GUI_Main.Refresh.Sort.Rules = false
+				Module.GUI_Main.Refresh.Table.Unhandled = true
 			end
 			ImGui.Separator()
 			local sizeX = ImGui.GetContentRegionAvail() - 4
 			ImGui.SetWindowFontScale(ZoomLvl)
-			if ImGui.BeginTable('##RulesTable', 8, AlertMaster.GUI_Main.Table.Flags) then
+			if ImGui.BeginTable('##RulesTable', 8, Module.GUI_Main.Table.Flags) then
 				ImGui.TableSetupScrollFreeze(0, 1)
-				ImGui.TableSetupColumn(MyUI_Icons.FA_USER_PLUS, ImGuiTableColumnFlags.NoSort, 15, AlertMaster.GUI_Main.Table.Column_ID.Remove)
-				ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.DefaultSort, 120, AlertMaster.GUI_Main.Table.Column_ID.MobName)
-				ImGui.TableSetupColumn("Lvl", ImGuiTableColumnFlags.DefaultSort, 30, AlertMaster.GUI_Main.Table.Column_ID.MobLvl)
-				ImGui.TableSetupColumn("Dist", ImGuiTableColumnFlags.DefaultSort, 40, AlertMaster.GUI_Main.Table.Column_ID.MobDist)
-				ImGui.TableSetupColumn("Aggro", ImGuiTableColumnFlags.DefaultSort, 30, AlertMaster.GUI_Main.Table.Column_ID.MobAggro)
-				ImGui.TableSetupColumn("ID", ImGuiTableColumnFlags.DefaultSort, 30, AlertMaster.GUI_Main.Table.Column_ID.MobID)
-				ImGui.TableSetupColumn("Loc", ImGuiTableColumnFlags.NoSort, 90, AlertMaster.GUI_Main.Table.Column_ID.MobLoc)
+				ImGui.TableSetupColumn(MyUI_Icons.FA_USER_PLUS, ImGuiTableColumnFlags.NoSort, 15, Module.GUI_Main.Table.Column_ID.Remove)
+				ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.DefaultSort, 120, Module.GUI_Main.Table.Column_ID.MobName)
+				ImGui.TableSetupColumn("Lvl", ImGuiTableColumnFlags.DefaultSort, 30, Module.GUI_Main.Table.Column_ID.MobLvl)
+				ImGui.TableSetupColumn("Dist", ImGuiTableColumnFlags.DefaultSort, 40, Module.GUI_Main.Table.Column_ID.MobDist)
+				ImGui.TableSetupColumn("Aggro", ImGuiTableColumnFlags.DefaultSort, 30, Module.GUI_Main.Table.Column_ID.MobAggro)
+				ImGui.TableSetupColumn("ID", ImGuiTableColumnFlags.DefaultSort, 30, Module.GUI_Main.Table.Column_ID.MobID)
+				ImGui.TableSetupColumn("Loc", ImGuiTableColumnFlags.NoSort, 90, Module.GUI_Main.Table.Column_ID.MobLoc)
 				ImGui.TableSetupColumn(MyUI_Icons.FA_COMPASS, bit32.bor(ImGuiTableColumnFlags.NoResize, ImGuiTableColumnFlags.NoSort, ImGuiTableColumnFlags.WidthFixed), 15,
-					AlertMaster.GUI_Main.Table.Column_ID.MobDirection)
+					Module.GUI_Main.Table.Column_ID.MobDirection)
 				ImGui.TableHeadersRow()
 				local sortSpecs = ImGui.TableGetSortSpecs()
 
-				if sortSpecs and (sortSpecs.SpecsDirty or AlertMaster.GUI_Main.Refresh.Sort.Rules) then
+				if sortSpecs and (sortSpecs.SpecsDirty or Module.GUI_Main.Refresh.Sort.Rules) then
 					if #Table_Cache.Unhandled > 0 then
-						AlertMaster.GUI_Main.Table.SortSpecs = sortSpecs
+						Module.GUI_Main.Table.SortSpecs = sortSpecs
 						table.sort(Table_Cache.Unhandled, TableSortSpecs)
-						AlertMaster.GUI_Main.Table.SortSpecs = nil
+						Module.GUI_Main.Table.SortSpecs = nil
 					end
 					sortSpecs.SpecsDirty = false
-					AlertMaster.GUI_Main.Refresh.Sort.Rules = false
+					Module.GUI_Main.Refresh.Sort.Rules = false
 				end
 				local clipper = ImGuiListClipper.new()
 				clipper:Begin(#Table_Cache.Unhandled)
@@ -1809,23 +1810,23 @@ local function BuildAlertRows() -- Build the Button Rows for the GUI Window
 	if zone_id == Zone.ID() then
 		-- Start a new table for alerts
 		local sizeX = ImGui.GetContentRegionAvail() - 4
-		if ImGui.BeginTable("AlertTable", 3, AlertMaster.GUI_Alert.Table.Flags) then
+		if ImGui.BeginTable("AlertTable", 3, Module.GUI_Alert.Table.Flags) then
 			ImGui.TableSetupScrollFreeze(0, 1)
-			ImGui.TableSetupColumn("Name", bit32.bor(ImGuiTableColumnFlags.DefaultSort), 90, AlertMaster.GUI_Alert.Table.Column_ID.MobName)
-			ImGui.TableSetupColumn("Dist", bit32.bor(ImGuiTableColumnFlags.DefaultSort), 50, AlertMaster.GUI_Alert.Table.Column_ID.MobDist)
+			ImGui.TableSetupColumn("Name", bit32.bor(ImGuiTableColumnFlags.DefaultSort), 90, Module.GUI_Alert.Table.Column_ID.MobName)
+			ImGui.TableSetupColumn("Dist", bit32.bor(ImGuiTableColumnFlags.DefaultSort), 50, Module.GUI_Alert.Table.Column_ID.MobDist)
 			ImGui.TableSetupColumn("Dir", bit32.bor(ImGuiTableColumnFlags.NoResize, ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.NoSort), 30,
-				AlertMaster.GUI_Alert.Table.Column_ID.MobDirection)
+				Module.GUI_Alert.Table.Column_ID.MobDirection)
 			ImGui.TableHeadersRow()
 			local sortSpecsAlerts = ImGui.TableGetSortSpecs()
 
-			if sortSpecsAlerts and (sortSpecsAlerts.SpecsDirty or AlertMaster.GUI_Alert.Refresh.Sort.Rules) then
+			if sortSpecsAlerts and (sortSpecsAlerts.SpecsDirty or Module.GUI_Alert.Refresh.Sort.Rules) then
 				if #Table_Cache.Alerts > 0 then
-					AlertMaster.GUI_Alert.Table.SortSpecs = sortSpecsAlerts
+					Module.GUI_Alert.Table.SortSpecs = sortSpecsAlerts
 					table.sort(Table_Cache.Alerts, AlertTableSortSpecs)
-					AlertMaster.GUI_Alert.Table.SortSpecs = nil
+					Module.GUI_Alert.Table.SortSpecs = nil
 				end
 				sortSpecsAlerts.SpecsDirty = false
-				AlertMaster.GUI_Alert.Refresh.Sort.Rules = false
+				Module.GUI_Alert.Refresh.Sort.Rules = false
 			end
 			local clipper = ImGuiListClipper.new()
 			clipper:Begin(#Table_Cache.Alerts)
@@ -1853,7 +1854,7 @@ function DrawAlertGUI() -- Draw GUI Window
 		if currZone ~= lastZone then return end
 		-- ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 5)
 		ColorCountAlert, StyleCountAlert = DrawTheme(useThemeName)
-		AlertWindowOpen, opened = ImGui.Begin("Alert Window##" .. MyUI_CharLoaded, AlertWindowOpen, AlertMaster.GUI_Alert.Flags)
+		AlertWindowOpen, opened = ImGui.Begin("Alert Window##" .. MyUI_CharLoaded, AlertWindowOpen, Module.GUI_Alert.Flags)
 		if not opened then
 			AlertWindowOpen = false
 			AlertWindow_Show = false
@@ -1877,7 +1878,7 @@ function DrawAlertGUI() -- Draw GUI Window
 	end
 end
 
-function AlertMaster.RenderGUI()
+function Module.RenderGUI()
 	DrawSearchWindow()
 	DrawAlertGUI()
 	Config_GUI()
@@ -1896,6 +1897,11 @@ local load_binds = function()
 			active = false
 			tGMs, tAnnounce, tPlayers, tSpawns = {}, {}, {}, {}
 			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayAlert Master disabled.')
+		end
+
+		if cmd == 'quit' or cmd == 'exit' then
+			Module.IsRunning = false
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayAlert Master\ao Shutting Down.')
 		end
 		-- Alert Show / Hide
 		if cmd == 'popup' then
@@ -2324,7 +2330,7 @@ local load_binds = function()
 	mq.bind('/am', bind_alertmaster)
 end
 
-function AlertMaster.Unload()
+function Module.Unload()
 	mq.unbind('/alertmaster')
 	mq.unbind('/am')
 end
@@ -2340,21 +2346,23 @@ local setup = function()
 	load_settings()
 	load_binds()
 	-- Kickstart the data
-	AlertMaster.GUI_Main.Refresh.Table.Rules = true
-	AlertMaster.GUI_Main.Refresh.Table.Filtered = true
-	AlertMaster.GUI_Main.Refresh.Table.Unhandled = true
+	Module.GUI_Main.Refresh.Table.Rules = true
+	Module.GUI_Main.Refresh.Table.Filtered = true
+	Module.GUI_Main.Refresh.Table.Unhandled = true
 	MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayAlert Master version:\a-g' ..
 		amVer .. '\n' .. MsgPrefix() .. '\ayOriginal by (\a-to_O\ay) Special.Ed (\a-tO_o\ay)\n' .. MsgPrefix() .. '\ayUpdated by (\a-tO_o\ay) Grimmier (\a-to_O\ay)')
 	MyUI_Utils.PrintOutput('AlertMaster', nil, '\atLoaded ' .. settings_file)
 	MyUI_Utils.PrintOutput('AlertMaster', nil, '\ay/am help for usage')
 	print_status()
 	RefreshZone()
+	Module.IsRunning = true
 end
 
 local cTime = os.time()
 local firstRun = true
-AlertMaster.MainLoop = function()
+Module.MainLoop = function()
 	-- while true do
+	if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
 	if currZone ~= lastZone then
 		numAlerts = 0
 		RefreshZone()
@@ -2375,7 +2383,7 @@ AlertMaster.MainLoop = function()
 				for _, v in pairs(tSpawns) do
 					if v ~= nil then
 						local cleanName = v.DisplayName ~= nil and v.DisplayName or 'Unknown'
-						local distance = math.floor(v.Distance() or 0)
+						local distance = math.floor(v.Spawn.Distance() or 0)
 						MyUI_Utils.PrintOutput('AlertMaster', nil, GetCharZone() .. '\ag' .. cleanName .. '\ax spawn alert! ' .. distance .. ' units away.')
 					end
 				end
@@ -2417,11 +2425,11 @@ AlertMaster.MainLoop = function()
 		originalVolume = getVolume()
 	end
 
-	if AlertMaster.GUI_Main.Refresh.Table.Unhandled then RefreshUnhandled() end
+	if Module.GUI_Main.Refresh.Table.Unhandled then RefreshUnhandled() end
 	if SearchWindow_Show == true or #Table_Cache.Mobs < 1 then RefreshZone() end
 
 	-- mq.delay(delay .. 's')
 end
 
 setup()
-return AlertMaster
+return Module

@@ -15,7 +15,10 @@
 
 local mq = require('mq')
 local ImGui = require('ImGui')
-local MySpells = {}
+local Module = {}
+Module.IsRunning = false
+Module.Name = "MySpells"
+
 
 local picker = MyUI_AbilityPicker.new()
 local pickerOpen = false
@@ -29,7 +32,6 @@ local configFileOld = mq.configDir .. '/myui/MySpells_Configs.lua'
 local configFileOld2 = ''
 local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
 local configFile = ''
-local RUNNING = true
 local themezDir = mq.luaDir .. '/themez/init.lua'
 local themeName = 'Default'
 local script = 'MySpells'
@@ -557,8 +559,8 @@ local function DrawConfigWin()
 	ImGui.End()
 end
 
-function MySpells.RenderGUI()
-	if not RUNNING then return end
+function Module.RenderGUI()
+	if not Module.IsRunning then return end
 	local winFlags = bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoFocusOnAppearing)
 	if not aSize then winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse) end
 	if locked then winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoMove) end
@@ -566,7 +568,7 @@ function MySpells.RenderGUI()
 	local ColorCount, StyleCount = DrawTheme(themeName, theme.Theme)
 	local open, show = ImGui.Begin(bIcon .. '##MySpells_' .. MyUI_CharLoaded, true, winFlags)
 	if not open then
-		RUNNING = false
+		Module.IsRunning = false
 	end
 	if show then
 		-- Calculate maxRow to account for window padding and element size
@@ -886,7 +888,7 @@ function MySpells.RenderGUI()
 	end
 end
 
-function MySpells.Unload()
+function Module.Unload()
 	mq.unevent("mem_spell")
 	mq.unevent("int_spell")
 	mq.unevent("fiz_spell")
@@ -896,7 +898,7 @@ end
 local function Init()
 	if mq.TLO.Me.MaxMana() == 0 then
 		MyUI_Utils.PrintOutput(nil, true, "You are not a caster!")
-		RUNNING = false
+		Module.IsRunning = false
 		return
 	end
 	configFileOld2 = string.format('%s/myui/MySpells/MySpells_%s_Configs.lua', mq.configDir, MyUI_CharLoaded)
@@ -911,9 +913,12 @@ local function Init()
 	mq.event("fiz_spell", "Your#*#spell fizzles#*#", InterruptSpell)
 	mq.event('cast_start', "You begin casting #1#.#*#", CastDetect)
 	GetSpells()
+	Module.IsRunning = true
 end
 
-function MySpells.MainLoop()
+function Module.MainLoop()
+	if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+
 	mq.doevents()
 	if loadSet then LoadSet(setName) end
 	if clearAll then ClearGems() end
@@ -925,4 +930,4 @@ function MySpells.MainLoop()
 end
 
 Init()
-return MySpells
+return Module

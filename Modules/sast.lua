@@ -1,6 +1,10 @@
 local mq = require('mq')
 local ImGui = require 'ImGui'
-local SAST = {}
+local Module = {}
+Module.Name = 'SAST'
+Module.IsRunning = false
+
+
 -- Variables
 local AdvWIN = mq.TLO.Window('AdventureRequestWnd')
 local ExpWIN = mq.TLO.Window('DynamicZoneWnd')
@@ -41,7 +45,7 @@ local function checkExp()
 end
 
 --GUI
-function SAST.RenderGUI()
+function Module.RenderGUI()
 	if currZone ~= lastZone then return end
 	if guiOpen or forcedOpen then
 		if locked then
@@ -230,6 +234,9 @@ local function doBind(...)
 			AdvWIN.DoClose()
 			eqWinAdvOpen = false
 		end
+	elseif args[1] == 'exit' or args[1] == 'quit' then
+		Module.IsRunning = false
+		MyUI_Utils.PrintOutput('MyUI', nil, '\aySimple Adventure Status Tracking\ao Exiting...')
 	end
 end
 
@@ -259,7 +266,7 @@ if #arg > 0 then
 	MyUI_Utils.PrintOutput('MyUI', nil, 'Modes: solo, dannet, eqbc')
 end
 
-function SAST.Unload()
+function Module.Unload()
 	mq.unbind("/sast")
 end
 
@@ -287,11 +294,14 @@ local function startup()
 	MyUI_Utils.PrintOutput('MyUI', nil, 'Use: \ay/sast exped\ax to toggle Expedition Window')
 	currZone = mq.TLO.Zone.ID()
 	lastZone = currZone
+	Module.IsRunning = true
 end
 
 local clockTimer = mq.gettime()
 local refreshTimer = 0
-function SAST.MainLoop()
+function Module.MainLoop()
+	if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+
 	if refreshStats and refreshTimer == 0 then
 		refreshTimer = mq.gettime()
 		-- mq.delay(3000, function() return (mq.TLO.Window("AdventureStatsWnd/AdvStats_ThemeList").List(1)() or 0) ~= 0 end)
@@ -338,4 +348,4 @@ function SAST.MainLoop()
 end
 
 startup()
-return SAST
+return Module

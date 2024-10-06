@@ -1,7 +1,9 @@
 local mq = require('mq')
 local ffi = require("ffi")
 local ImGui = require('ImGui')
-local SillySounds = {}
+local Module = {}
+Module.Name = "SillySounds"
+Module.IsRunning = false
 
 local script = "SillySounds"
 local itemWatch = false
@@ -23,7 +25,6 @@ local timerPlay = 0
 local playing = false
 
 -- Main Settings
-local RUNNING = true
 local path = string.format("%s/%s/sounds/", mq.TLO.Lua.Dir(), script)
 local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, script, MyUI_Server, MyUI_CharLoaded)
 local settings, defaults = {}, {}
@@ -286,7 +287,7 @@ local function bind(...)
     elseif string.lower(key) == 'show' then
         helpList(key)
     elseif string.lower(key) == 'quit' or key == nil then
-        RUNNING = false
+        Module.IsRunning = false
     end
     if newSetting then mq.pickle(configFile, settings) end
 end
@@ -318,7 +319,7 @@ local function DrawAlertSettings(alertName, script, path, configFile)
 end
 
 -- UI
-function SillySounds.RenderGUI()
+function Module.RenderGUI()
     if not openConfigGUI then return end
     local lbl = string.format("%s##%s", script, script)
     local openUI, openConfigUI = ImGui.Begin(lbl, true, bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoCollapse))
@@ -407,7 +408,9 @@ end
 
 local clockTimer = mq.gettime()
 -- Main loop
-function SillySounds.MainLoop()
+function Module.MainLoop()
+    if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+
     mq.doevents()
 
     if mq.TLO.Window('ConfirmationDialogBox').Open() then
@@ -447,7 +450,7 @@ function SillySounds.MainLoop()
     end
 end
 
-function SillySounds.Unload()
+function Module.Unload()
     mq.unevent("gained_level")
     mq.unevent("hit")
     mq.unevent("been_hit")
@@ -496,8 +499,9 @@ local function init()
 
     -- Slash Command Binding
     mq.bind('/sillysounds', bind)
+    Module.IsRunning = true
 end
 
 init()
 
-return SillySounds
+return Module

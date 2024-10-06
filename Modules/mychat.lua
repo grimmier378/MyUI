@@ -31,7 +31,6 @@ local settingsOld                                = string.format('%s/MyChat_%s_%
 local cleanImport                                = false
 -- local Tokens = {} -- may use this later to hold the tokens and remove a long string of if elseif.
 local enableSpam, resetConsoles                  = false, false
-local running                                    = false
 local eChan                                      = '/say'
 local keyName                                    = 'RightShift'
 
@@ -78,7 +77,7 @@ local keyboardKeys                               = {
 
 -- local build, server
 
-local MyChat                                     = {
+local Module                                     = {
     SHOW = true,
     openGUI = true,
     openConfigGUI = false,
@@ -106,16 +105,18 @@ local MyChat                                     = {
     PopOutFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar),
 
 }
-MyChat.defaults                                  = MyUI_Utils.Library.Include('defaults.default_chat_settings')
-MyChat.tempSettings                              = {}
-MyChat.eventNames                                = {}
-MyChat.tempFilterStrings                         = {}
-MyChat.tempEventStrings                          = {}
-MyChat.tempChanColors                            = {}
-MyChat.tempFiltColors                            = {}
-MyChat.hString                                   = {}
-MyChat.TLOConsoles                               = {}
-MyChat.theme                                     = {} -- table to hold the themes file into.
+Module.Name                                      = "MyChat"
+Module.IsRunning                                 = false
+Module.defaults                                  = MyUI_Utils.Library.Include('defaults.default_chat_settings')
+Module.tempSettings                              = {}
+Module.eventNames                                = {}
+Module.tempFilterStrings                         = {}
+Module.tempEventStrings                          = {}
+Module.tempChanColors                            = {}
+Module.tempFiltColors                            = {}
+Module.hString                                   = {}
+Module.TLOConsoles                               = {}
+Module.theme                                     = {} -- table to hold the themes file into.
 
 
 local MyColorFlags = bit32.bor(
@@ -163,27 +164,27 @@ end
 ---Build the consoles for each channel based on ChannelID
 ---@param channelID integer -- the channel ID number for the console we are setting up
 local function SetUpConsoles(channelID)
-    if MyChat.Consoles[channelID].console == nil then
-        MyChat.Consoles[channelID].txtBuffer = {
+    if Module.Consoles[channelID].console == nil then
+        Module.Consoles[channelID].txtBuffer = {
             [1] = {
                 color = { [1] = 1, [2] = 1, [3] = 1, [4] = 1, },
                 text = '',
             },
         }
-        MyChat.Consoles[channelID].CommandBuffer = ''
-        MyChat.Consoles[channelID].txtAutoScroll = true
+        Module.Consoles[channelID].CommandBuffer = ''
+        Module.Consoles[channelID].txtAutoScroll = true
         -- ChatWin.Consoles[channelID].enableLinks = ChatWin.Settings[channelID].enableLinks
-        MyChat.Consoles[channelID].console = ImGui.ConsoleWidget.new(channelID .. "##Console")
+        Module.Consoles[channelID].console = ImGui.ConsoleWidget.new(channelID .. "##Console")
     end
 end
 
 local function ResetConsoles()
-    for channelID, _ in pairs(MyChat.Consoles) do
-        MyChat.Consoles[channelID].console = nil
+    for channelID, _ in pairs(Module.Consoles) do
+        Module.Consoles[channelID].console = nil
         SetUpConsoles(channelID)
     end
-    MyChat.console = nil
-    MyChat.console = ImGui.ConsoleWidget.new("MainConsole")
+    Module.console = nil
+    Module.console = ImGui.ConsoleWidget.new("MainConsole")
 end
 
 ---Takes in a table and re-numbers the Indicies to be concurrent
@@ -293,182 +294,182 @@ end
 ---@param table table -- Table of settings to write
 local function writeSettings(file, table)
     mq.pickle(file, table)
-    MyChat.SortChannels()
+    Module.SortChannels()
 end
 
 local function loadSettings()
-    if not MyUI_Utils.File.Exists(MyChat.SettingsFile) then
+    if not MyUI_Utils.File.Exists(Module.SettingsFile) then
         settingsOld = string.format('%s/MyChat_%s_%s.lua', mq.configDir, serverName, MyUI_CharLoaded)
         if MyUI_Utils.File.Exists(settingsOld) then
-            MyChat.Settings = dofile(settingsOld)
-            mq.pickle(MyChat.SettingsFile, MyChat.Settings)
+            Module.Settings = dofile(settingsOld)
+            mq.pickle(Module.SettingsFile, Module.Settings)
         else
-            MyChat.Settings = MyChat.defaults
-            mq.pickle(MyChat.SettingsFile, MyChat.defaults)
+            Module.Settings = Module.defaults
+            mq.pickle(Module.SettingsFile, Module.defaults)
             -- loadSettings()
         end
     else
         -- Load settings from the Lua config file
-        MyChat.Settings = dofile(MyChat.SettingsFile)
+        Module.Settings = dofile(Module.SettingsFile)
         if firstPass then
             local date = os.date("%m_%d_%Y_%H_%M")
             local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, MyUI_CharLoaded, date)
-            if not MyUI_Utils.File.Exists(backup) then mq.pickle(backup, MyChat.Settings) end
-            reIndexSettings(MyChat.SettingsFile, MyChat.Settings)
+            if not MyUI_Utils.File.Exists(backup) then mq.pickle(backup, Module.Settings) end
+            reIndexSettings(Module.SettingsFile, Module.Settings)
             firstPass = false
         end
     end
 
-    if MyChat.Settings.Channels[0] == nil then
-        MyChat.Settings.Channels[0] = {}
-        MyChat.Settings.Channels[0] = MyChat.defaults['Channels'][0]
+    if Module.Settings.Channels[0] == nil then
+        Module.Settings.Channels[0] = {}
+        Module.Settings.Channels[0] = Module.defaults['Channels'][0]
     end
-    if MyChat.Settings.Channels[9000] == nil then
-        MyChat.Settings.Channels[9000] = {}
-        MyChat.Settings.Channels[9000] = MyChat.defaults['Channels'][9000]
+    if Module.Settings.Channels[9000] == nil then
+        Module.Settings.Channels[9000] = {}
+        Module.Settings.Channels[9000] = Module.defaults['Channels'][9000]
     end
-    if MyChat.Settings.Channels[9100] == nil then
-        MyChat.Settings.Channels[9100] = {}
-        MyChat.Settings.Channels[9100] = MyChat.defaults['Channels'][9100]
+    if Module.Settings.Channels[9100] == nil then
+        Module.Settings.Channels[9100] = {}
+        Module.Settings.Channels[9100] = Module.defaults['Channels'][9100]
     end
-    MyChat.Settings.Channels[9000].enabled = enableSpam
-    if MyChat.Settings.refreshLinkDB == nil then
-        MyChat.Settings.refreshLinkDB = MyChat.defaults.refreshLinkDB
+    Module.Settings.Channels[9000].enabled = enableSpam
+    if Module.Settings.refreshLinkDB == nil then
+        Module.Settings.refreshLinkDB = Module.defaults.refreshLinkDB
     end
-    doRefresh = MyChat.Settings.refreshLinkDB >= 5 or false
-    if MyChat.Settings.doRefresh == nil then
-        MyChat.Settings.doRefresh = doRefresh
+    doRefresh = Module.Settings.refreshLinkDB >= 5 or false
+    if Module.Settings.doRefresh == nil then
+        Module.Settings.doRefresh = doRefresh
     end
     local i = 1
-    for channelID, channelData in pairs(MyChat.Settings.Channels) do
+    for channelID, channelData in pairs(Module.Settings.Channels) do
         -- setup default Echo command channels.
         if not channelData.Echo then
-            MyChat.Settings.Channels[channelID].Echo = '/say'
+            Module.Settings.Channels[channelID].Echo = '/say'
         end
         -- Ensure each channel's console widget is initialized
-        if not MyChat.Consoles[channelID] then
-            MyChat.Consoles[channelID] = {}
+        if not Module.Consoles[channelID] then
+            Module.Consoles[channelID] = {}
         end
 
-        if MyChat.Settings.Channels[channelID].MainEnable == nil then
-            MyChat.Settings.Channels[channelID].MainEnable = true
+        if Module.Settings.Channels[channelID].MainEnable == nil then
+            Module.Settings.Channels[channelID].MainEnable = true
         end
-        if MyChat.Settings.Channels[channelID].enableLinks == nil then
-            MyChat.Settings.Channels[channelID].enableLinks = false
+        if Module.Settings.Channels[channelID].enableLinks == nil then
+            Module.Settings.Channels[channelID].enableLinks = false
         end
-        if MyChat.Settings.Channels[channelID].PopOut == nil then
-            MyChat.Settings.Channels[channelID].PopOut = false
+        if Module.Settings.Channels[channelID].PopOut == nil then
+            Module.Settings.Channels[channelID].PopOut = false
         end
-        if MyChat.Settings.Channels[channelID].locked == nil then
-            MyChat.Settings.Channels[channelID].locked = false
-        end
-
-        if MyChat.Settings.Scale == nil then
-            MyChat.Settings.Scale = 1.0
+        if Module.Settings.Channels[channelID].locked == nil then
+            Module.Settings.Channels[channelID].locked = false
         end
 
-        if MyChat.Settings.Channels[channelID].TabOrder == nil then
-            MyChat.Settings.Channels[channelID].TabOrder = i
-        end
-        if MyChat.Settings.locked == nil then
-            MyChat.Settings.locked = false
+        if Module.Settings.Scale == nil then
+            Module.Settings.Scale = 1.0
         end
 
-        if MyChat.Settings.timeStamps == nil then
-            MyChat.Settings.timeStamps = timeStamps
+        if Module.Settings.Channels[channelID].TabOrder == nil then
+            Module.Settings.Channels[channelID].TabOrder = i
         end
-        timeStamps = MyChat.Settings.timeStamps
+        if Module.Settings.locked == nil then
+            Module.Settings.locked = false
+        end
+
+        if Module.Settings.timeStamps == nil then
+            Module.Settings.timeStamps = timeStamps
+        end
+        timeStamps = Module.Settings.timeStamps
         if forceIndex then
-            MyChat.Consoles[channelID].console = nil
+            Module.Consoles[channelID].console = nil
         end
 
         SetUpConsoles(channelID)
-        if not MyChat.Settings.Channels[channelID]['Scale'] then
-            MyChat.Settings.Channels[channelID]['Scale'] = 1.0
+        if not Module.Settings.Channels[channelID]['Scale'] then
+            Module.Settings.Channels[channelID]['Scale'] = 1.0
         end
 
         for eID, eData in pairs(channelData['Events']) do
             if eData.color then
-                if not MyChat.Settings.Channels[channelID]['Events'][eID]['Filters'] then
-                    MyChat.Settings.Channels[channelID]['Events'][eID]['Filters'] = {}
+                if not Module.Settings.Channels[channelID]['Events'][eID]['Filters'] then
+                    Module.Settings.Channels[channelID]['Events'][eID]['Filters'] = {}
                 end
-                if MyChat.Settings.Channels[channelID]['Events'][eID].enabled == nil then
-                    MyChat.Settings.Channels[channelID]['Events'][eID].enabled = true
+                if Module.Settings.Channels[channelID]['Events'][eID].enabled == nil then
+                    Module.Settings.Channels[channelID]['Events'][eID].enabled = true
                 end
-                if not MyChat.Settings.Channels[channelID]['Events'][eID]['Filters'][0] then
-                    MyChat.Settings.Channels[channelID]['Events'][eID]['Filters'][0] = { filterString = '', color = {}, }
+                if not Module.Settings.Channels[channelID]['Events'][eID]['Filters'][0] then
+                    Module.Settings.Channels[channelID]['Events'][eID]['Filters'][0] = { filterString = '', color = {}, }
                 end
-                MyChat.Settings.Channels[channelID]['Events'][eID]['Filters'][0].color = eData.color
+                Module.Settings.Channels[channelID]['Events'][eID]['Filters'][0].color = eData.color
                 eData.color = nil
             end
             for fID, fData in pairs(eData.Filters) do
                 if fData.filterString == 'TANK' then
-                    MyChat.Settings.Channels[channelID].Events[eID].Filters[fID].filterString = 'TK1'
+                    Module.Settings.Channels[channelID].Events[eID].Filters[fID].filterString = 'TK1'
                 elseif fData.filterString == 'PET' then
-                    MyChat.Settings.Channels[channelID].Events[eID].Filters[fID].filterString = 'PT1'
+                    Module.Settings.Channels[channelID].Events[eID].Filters[fID].filterString = 'PT1'
                 elseif fData.filterString == 'P1' then
-                    MyChat.Settings.Channels[channelID].Events[eID].Filters[fID].filterString = 'PT1'
+                    Module.Settings.Channels[channelID].Events[eID].Filters[fID].filterString = 'PT1'
                 elseif fData.filterString == 'MA' then
-                    MyChat.Settings.Channels[channelID].Events[eID].Filters[fID].filterString = 'M1'
+                    Module.Settings.Channels[channelID].Events[eID].Filters[fID].filterString = 'M1'
                 elseif fData.filterString == 'HEALER' then
-                    MyChat.Settings.Channels[channelID].Events[eID].Filters[fID].filterString = 'H1'
+                    Module.Settings.Channels[channelID].Events[eID].Filters[fID].filterString = 'H1'
                 elseif fData.filterString == 'GROUP' then
-                    MyChat.Settings.Channels[channelID].Events[eID].Filters[fID].filterString = 'GP1'
+                    Module.Settings.Channels[channelID].Events[eID].Filters[fID].filterString = 'GP1'
                 elseif fData.filterString == 'ME' then
-                    MyChat.Settings.Channels[channelID].Events[eID].Filters[fID].filterString = 'M3'
+                    Module.Settings.Channels[channelID].Events[eID].Filters[fID].filterString = 'M3'
                 end
             end
         end
         i = i + 1
     end
 
-    useThemeName = MyChat.Settings.LoadTheme
-    if not MyUI_Utils.File.Exists(MyChat.ThemesFile) then
+    useThemeName = Module.Settings.LoadTheme
+    if not MyUI_Utils.File.Exists(Module.ThemesFile) then
         local defaultThemes = MyUI_Utils.Library.Include('defaults.themes')
-        MyChat.theme = defaultThemes
+        Module.theme = defaultThemes
     else
         -- Load settings from the Lua config file
-        MyChat.theme = dofile(MyChat.ThemesFile)
+        Module.theme = dofile(Module.ThemesFile)
     end
 
-    if not MyChat.Settings.LoadTheme then
-        MyChat.Settings.LoadTheme = MyChat.theme.LoadTheme
+    if not Module.Settings.LoadTheme then
+        Module.Settings.LoadTheme = Module.theme.LoadTheme
     end
 
     if useThemeName ~= 'Default' then
         useTheme = true
     end
 
-    if MyChat.Settings.doLinks == nil then
-        MyChat.Settings.doLinks = true
+    if Module.Settings.doLinks == nil then
+        Module.Settings.doLinks = true
     end
-    if MyChat.Settings.mainEcho == nil then
-        MyChat.Settings.mainEcho = '/say'
+    if Module.Settings.mainEcho == nil then
+        Module.Settings.mainEcho = '/say'
     end
-    eChan = MyChat.Settings.mainEcho
-    MyChat.Settings.doLinks = true
+    eChan = Module.Settings.mainEcho
+    Module.Settings.doLinks = true
     forceIndex = false
-    MyChat.KeyFocus = MyChat.Settings.keyFocus ~= nil or false
-    MyChat.KeyName = MyChat.Settings.keyName ~= nil and MyChat.Settings.keyName or 'RightShift'
-    writeSettings(MyChat.SettingsFile, MyChat.Settings)
-    MyChat.tempSettings = MyChat.Settings
+    Module.KeyFocus = Module.Settings.keyFocus ~= nil or false
+    Module.KeyName = Module.Settings.keyName ~= nil and Module.Settings.keyName or 'RightShift'
+    writeSettings(Module.SettingsFile, Module.Settings)
+    Module.tempSettings = Module.Settings
 end
 
 local function BuildEvents()
-    MyChat.eventNames = {}
-    for channelID, channelData in pairs(MyChat.Settings.Channels) do
+    Module.eventNames = {}
+    for channelID, channelData in pairs(Module.Settings.Channels) do
         local eventOptions = { keepLinks = channelData.enableLinks, }
         for eventId, eventDetails in pairs(channelData.Events) do
             if eventDetails.enabled then
                 if eventDetails.eventString then
                     local eventName = string.format("event_%s_%d", channelID, eventId)
                     if channelID ~= 9000 then
-                        mq.event(eventName, eventDetails.eventString, function(line) MyChat.EventChat(channelID, eventName, line, false) end, eventOptions)
+                        mq.event(eventName, eventDetails.eventString, function(line) Module.EventChat(channelID, eventName, line, false) end, eventOptions)
                     elseif channelID == 9000 and enableSpam then
-                        mq.event(eventName, eventDetails.eventString, function(line) MyChat.EventChatSpam(channelID, line) end)
+                        mq.event(eventName, eventDetails.eventString, function(line) Module.EventChatSpam(channelID, line) end)
                     end
                     -- Store event details for direct access
-                    MyChat.eventNames[eventName] = eventDetails
+                    Module.eventNames[eventName] = eventDetails
                 end
             end
         end
@@ -476,8 +477,8 @@ local function BuildEvents()
 end
 
 local function ModifyEvent(chanID)
-    local channelEvents = MyChat.Settings.Channels[chanID].Events
-    local linksEnabled = MyChat.Settings.Channels[chanID].enableLinks
+    local channelEvents = Module.Settings.Channels[chanID].Events
+    local linksEnabled = Module.Settings.Channels[chanID].enableLinks
     local eventOptions = { keep_links = linksEnabled, }
     for eID, eData in pairs(channelEvents) do
         local eName = string.format("event_%s_%d", chanID, eID)
@@ -489,24 +490,24 @@ local function ModifyEvent(chanID)
         if eData.enabled then
             if eData.eventString then
                 if chanID ~= 9000 then
-                    mq.event(eName, eData.eventString, function(line) MyChat.EventChat(chanID, eName, line, false) end, eventOptions)
+                    mq.event(eName, eData.eventString, function(line) Module.EventChat(chanID, eName, line, false) end, eventOptions)
                 elseif chanID == 9000 and enableSpam then
-                    mq.event(eName, eData.eventString, function(line) MyChat.EventChatSpam(chanID, line) end)
+                    mq.event(eName, eData.eventString, function(line) Module.EventChatSpam(chanID, line) end)
                 end
-                MyChat.eventNames[eName] = eData
+                Module.eventNames[eName] = eData
             end
         end
     end
 end
 
 local function ResetEvents()
-    MyChat.Settings = MyChat.tempSettings
-    writeSettings(MyChat.SettingsFile, MyChat.Settings)
+    Module.Settings = Module.tempSettings
+    writeSettings(Module.SettingsFile, Module.Settings)
     -- Unregister and reregister events to apply changes
-    for eventName, _ in pairs(MyChat.eventNames) do
+    for eventName, _ in pairs(Module.eventNames) do
         mq.unevent(eventName)
     end
-    MyChat.eventNames = {}
+    Module.eventNames = {}
     loadSettings()
     BuildEvents()
 end
@@ -601,14 +602,14 @@ end
 ---@param line string @ the line of text that triggred the event
 ---@param spam boolean @ are we parsing this from the spam channel?
 ---@return boolean
-function MyChat.EventChat(channelID, eventName, line, spam)
+function Module.EventChat(channelID, eventName, line, spam)
     local conLine = line
     -- if spam then print('Called from Spam') end
-    local eventDetails = MyChat.eventNames[eventName]
+    local eventDetails = Module.eventNames[eventName]
     if not eventDetails then return false end
 
-    if MyChat.Consoles[channelID] then
-        local txtBuffer = MyChat.Consoles[channelID].txtBuffer            -- Text buffer for the channel ID we are working with.
+    if Module.Consoles[channelID] then
+        local txtBuffer = Module.Consoles[channelID].txtBuffer            -- Text buffer for the channel ID we are working with.
         local colorVec = eventDetails.Filters[0].color or { 1, 1, 1, 1, } -- Color Code to change line to, default is white
         local fMatch = false
         local negMatch = false
@@ -698,7 +699,7 @@ function MyChat.EventChat(channelID, eventName, line, spam)
             --print(tostring(#eventDetails.Filters))
             if not fMatch and haveFilters then return fMatch end -- we had filters and didn't match so leave
             if not spam then
-                if string.lower(MyChat.Settings.Channels[channelID].Name) == 'consider' then
+                if string.lower(Module.Settings.Channels[channelID].Name) == 'consider' then
                     local conTarg = mq.TLO.Target
                     if conTarg ~= nil then
                         conColorStr = string.lower(conTarg.ConColor() or 'white')
@@ -709,8 +710,8 @@ function MyChat.EventChat(channelID, eventName, line, spam)
                 local tStamp = mq.TLO.Time.Time24() -- Get the current timestamp
                 local colorCode = ImVec4(colorVec[1], colorVec[2], colorVec[3], colorVec[4])
 
-                if MyChat.Consoles[channelID].console then
-                    MyUI_Utils.AppendColoredTimestamp(MyChat.Consoles[channelID].console, tStamp, conLine, colorCode, timeStamps)
+                if Module.Consoles[channelID].console then
+                    MyUI_Utils.AppendColoredTimestamp(Module.Consoles[channelID].console, tStamp, conLine, colorCode, timeStamps)
                 end
 
                 -- -- write channel console
@@ -721,8 +722,8 @@ function MyChat.EventChat(channelID, eventName, line, spam)
                 end
 
                 -- write main console
-                if MyChat.tempSettings.Channels[channelID].MainEnable then
-                    MyUI_Utils.AppendColoredTimestamp(MyChat.console, tStamp, conLine, colorCode, timeStamps)
+                if Module.tempSettings.Channels[channelID].MainEnable then
+                    MyUI_Utils.AppendColoredTimestamp(Module.console, tStamp, conLine, colorCode, timeStamps)
                     -- ChatWin.console:AppendText(colorCode,conLine)
                     local z = getNextID(mainBuffer)
 
@@ -776,26 +777,26 @@ end
 
 ---Reads in the line and channelID of the triggered events. Parses the line against the Events and Filters for that channel.
 ---@param channelID integer @ The ID number of the Channel the triggered event belongs to
-function MyChat.EventChatSpam(channelID, line)
-    local eventDetails = MyChat.eventNames
+function Module.EventChatSpam(channelID, line)
+    local eventDetails = Module.eventNames
     local conLine = line
     if not eventDetails then return end
-    if MyChat.Consoles[channelID] then
-        local txtBuffer = MyChat.Consoles[channelID].txtBuffer -- Text buffer for the channel ID we are working with.
+    if Module.Consoles[channelID] then
+        local txtBuffer = Module.Consoles[channelID].txtBuffer -- Text buffer for the channel ID we are working with.
         local colorVec = { 1, 1, 1, 1, }                       -- Color Code to change line to, default is white
         local fMatch = false
         local gSize = mq.TLO.Me.GroupSize()                    -- size of the group including yourself
         gSize = gSize - 1
         if txtBuffer then
-            for cID, cData in pairs(MyChat.Settings.Channels) do
+            for cID, cData in pairs(Module.Settings.Channels) do
                 if cID ~= channelID then
                     for eID, eData in pairs(cData.Events) do
                         local tmpEname = string.format("event_%d_%d", cID, eID)
-                        for name, data in pairs(MyChat.eventNames) do
+                        for name, data in pairs(Module.eventNames) do
                             if name ~= 'event_9000_1' and name == tmpEname then
                                 local eventPattern = convertEventString(data.eventString)
                                 if string.match(line, eventPattern) then
-                                    fMatch = MyChat.EventChat(cID, name, line, true)
+                                    fMatch = Module.EventChat(cID, name, line, true)
                                     -- print(tostring(fMatch))
                                 end
                                 -- we found a match lets exit this loop.
@@ -817,8 +818,8 @@ function MyChat.EventChatSpam(channelID, line)
                 line = string.format("%s %s", tStamp, line)
             end
             -- write channel console
-            if MyChat.Consoles[channelID].console then
-                MyUI_Utils.AppendColoredTimestamp(MyChat.Consoles[channelID].console, tStamp, conLine, colorCode, timeStamps)
+            if Module.Consoles[channelID].console then
+                MyUI_Utils.AppendColoredTimestamp(Module.Consoles[channelID].console, tStamp, conLine, colorCode, timeStamps)
                 -- ChatWin.Consoles[channelID].console:AppendText(colorCode, conLine)
             end
 
@@ -856,15 +857,15 @@ end
 local function DrawTheme(tName)
     local StyleCounter = 0
     local ColorCounter = 0
-    for tID, tData in pairs(MyChat.theme.Theme) do
+    for tID, tData in pairs(Module.theme.Theme) do
         if tData.Name == tName then
-            for pID, cData in pairs(MyChat.theme.Theme[tID].Color) do
+            for pID, cData in pairs(Module.theme.Theme[tID].Color) do
                 ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
                 ColorCounter = ColorCounter + 1
             end
             if tData['Style'] ~= nil then
                 if next(tData['Style']) ~= nil then
-                    for sID, sData in pairs(MyChat.theme.Theme[tID].Style) do
+                    for sID, sData in pairs(Module.theme.Theme[tID].Style) do
                         if sData.Size ~= nil then
                             ImGui.PushStyleVar(sID, sData.Size)
                             StyleCounter = StyleCounter + 1
@@ -881,18 +882,18 @@ local function DrawTheme(tName)
 end
 
 local function DrawConsole(channelID)
-    local name = MyChat.Settings.Channels[channelID].Name .. '##' .. channelID
-    local zoom = MyChat.Consoles[channelID].zoom
-    local scale = MyChat.Settings.Channels[channelID].Scale
-    local PopOut = MyChat.Settings.Channels[channelID].PopOut
-    if zoom and MyChat.Consoles[channelID].txtBuffer ~= '' then
+    local name = Module.Settings.Channels[channelID].Name .. '##' .. channelID
+    local zoom = Module.Consoles[channelID].zoom
+    local scale = Module.Settings.Channels[channelID].Scale
+    local PopOut = Module.Settings.Channels[channelID].PopOut
+    if zoom and Module.Consoles[channelID].txtBuffer ~= '' then
         local footerHeight = 35
         local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
         contentSizeY = contentSizeY - footerHeight
 
         if ImGui.BeginChild("ZoomScrollRegion##" .. channelID, contentSizeX, contentSizeY, ImGuiWindowFlags.HorizontalScrollbar) then
             if ImGui.BeginTable('##channelID_' .. channelID, 1, bit32.bor(ImGuiTableFlags.NoBordersInBody, ImGuiTableFlags.RowBg)) then
-                ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+                ImGui.SetWindowFontScale(Module.Settings.Scale)
                 ImGui.TableSetupColumn("##txt" .. channelID, ImGuiTableColumnFlags.NoHeaderLabel)
                 --- draw rows ---
 
@@ -900,7 +901,7 @@ local function DrawConsole(channelID)
                 ImGui.TableSetColumnIndex(0)
                 ImGui.SetWindowFontScale(scale)
 
-                for line, data in pairs(MyChat.Consoles[channelID].txtBuffer) do
+                for line, data in pairs(Module.Consoles[channelID].txtBuffer) do
                     ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(data.color[1], data.color[2], data.color[3], data.color[4]))
                     if ImGui.Selectable("##selectable" .. line, false, ImGuiSelectableFlags.None) then end
                     ImGui.SameLine()
@@ -918,25 +919,25 @@ local function DrawConsole(channelID)
 
 
                 --Scroll to the bottom if autoScroll is enabled
-                local autoScroll = MyChat.Consoles[channelID].txtAutoScroll
+                local autoScroll = Module.Consoles[channelID].txtAutoScroll
                 if autoScroll then
                     ImGui.SetScrollHereY()
-                    MyChat.Consoles[channelID].bottomPosition = ImGui.GetCursorPosY()
+                    Module.Consoles[channelID].bottomPosition = ImGui.GetCursorPosY()
                 end
 
-                local bottomPosition = MyChat.Consoles[channelID].bottomPosition or 0
+                local bottomPosition = Module.Consoles[channelID].bottomPosition or 0
                 -- Detect manual scroll
-                local lastScrollPos = MyChat.Consoles[channelID].lastScrollPos or 0
+                local lastScrollPos = Module.Consoles[channelID].lastScrollPos or 0
                 local scrollPos = ImGui.GetScrollY()
 
                 if scrollPos < lastScrollPos then
-                    MyChat.Consoles[channelID].txtAutoScroll = false -- Turn off autoscroll if scrolled up manually
+                    Module.Consoles[channelID].txtAutoScroll = false -- Turn off autoscroll if scrolled up manually
                 elseif scrollPos >= bottomPosition - (30 * scale) then
-                    MyChat.Consoles[channelID].txtAutoScroll = true
+                    Module.Consoles[channelID].txtAutoScroll = true
                 end
 
                 lastScrollPos = scrollPos
-                MyChat.Consoles[channelID].lastScrollPos = lastScrollPos
+                Module.Consoles[channelID].lastScrollPos = lastScrollPos
 
                 ImGui.EndTable()
             end
@@ -946,7 +947,7 @@ local function DrawConsole(channelID)
         local footerHeight = 35
         local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
         contentSizeY = contentSizeY - footerHeight
-        MyChat.Consoles[channelID].console:Render(ImVec2(0, contentSizeY))
+        Module.Consoles[channelID].console:Render(ImVec2(0, contentSizeY))
     end
     --Command Line
     ImGui.Separator()
@@ -963,28 +964,28 @@ local function DrawConsole(channelID)
     ImGui.PushStyleColor(ImGuiCol.FrameBg, ImVec4(0, 0, 0, 0))
     --ImGui.PushFont(ImGui.ConsoleFont)
     local accept = false
-    local cmdBuffer = MyChat.Settings.Channels[channelID].commandBuffer
+    local cmdBuffer = Module.Settings.Channels[channelID].commandBuffer
     cmdBuffer, accept = ImGui.InputText('##Input##' .. name, cmdBuffer, textFlags)
     --ImGui.PopFont()
     ImGui.PopStyleColor()
     ImGui.PopItemWidth()
     if ImGui.IsItemHovered() then
         ImGui.BeginTooltip()
-        ImGui.Text(MyChat.Settings.Channels[channelID].Echo)
+        ImGui.Text(Module.Settings.Channels[channelID].Echo)
         if PopOut then
-            ImGui.Text(MyChat.Settings.Channels[channelID].Name)
-            local sizeBuff = string.format("Buffer Size: %s lines.", tostring(getNextID(MyChat.Consoles[channelID].txtBuffer) - 1))
+            ImGui.Text(Module.Settings.Channels[channelID].Name)
+            local sizeBuff = string.format("Buffer Size: %s lines.", tostring(getNextID(Module.Consoles[channelID].txtBuffer) - 1))
             ImGui.Text(sizeBuff)
         end
         ImGui.EndTooltip()
     end
     if accept then
-        MyChat.ChannelExecCommand(cmdBuffer, channelID)
+        Module.ChannelExecCommand(cmdBuffer, channelID)
         cmdBuffer = ''
-        MyChat.Settings.Channels[channelID].commandBuffer = cmdBuffer
+        Module.Settings.Channels[channelID].commandBuffer = cmdBuffer
         setFocus = true
     end
-    if MyChat.KeyFocus and not ImGui.IsItemFocused() and ImGui.IsKeyPressed(ImGuiKey[MyChat.KeyName]) then
+    if Module.KeyFocus and not ImGui.IsItemFocused() and ImGui.IsKeyPressed(ImGuiKey[Module.KeyName]) then
         setFocus = true
     end
     ImGui.SetItemDefaultFocus()
@@ -997,51 +998,51 @@ end
 local function DrawChatWindow()
     -- Main menu bar
     if ImGui.BeginMenuBar() then
-        ImGui.SetWindowFontScale(MyChat.Settings.Scale)
-        local lockedIcon = MyChat.Settings.locked and MyUI_Icons.FA_LOCK .. '##lockTabButton_MyChat' or
+        ImGui.SetWindowFontScale(Module.Settings.Scale)
+        local lockedIcon = Module.Settings.locked and MyUI_Icons.FA_LOCK .. '##lockTabButton_MyChat' or
             MyUI_Icons.FA_UNLOCK .. '##lockTablButton_MyChat'
         if ImGui.Button(lockedIcon) then
             --ImGuiWindowFlags.NoMove
-            MyChat.Settings.locked = not MyChat.Settings.locked
-            MyChat.tempSettings.locked = MyChat.Settings.locked
+            Module.Settings.locked = not Module.Settings.locked
+            Module.tempSettings.locked = Module.Settings.locked
             ResetEvents()
         end
         if ImGui.IsItemHovered() then
-            ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+            ImGui.SetWindowFontScale(Module.Settings.Scale)
             ImGui.BeginTooltip()
             ImGui.Text("Lock Window")
             ImGui.EndTooltip()
         end
         if ImGui.MenuItem(gIcon .. '##' .. windowNum) then
-            MyChat.openConfigGUI = not MyChat.openConfigGUI
+            Module.openConfigGUI = not Module.openConfigGUI
         end
         if ImGui.IsItemHovered() then
-            ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+            ImGui.SetWindowFontScale(Module.Settings.Scale)
             ImGui.BeginTooltip()
             ImGui.Text("Open Main Config")
             ImGui.EndTooltip()
         end
         if ImGui.BeginMenu('Options##' .. windowNum) then
             local spamOn
-            ImGui.SetWindowFontScale(MyChat.Settings.Scale)
-            _, MyChat.console.autoScroll = ImGui.MenuItem('Auto-scroll##' .. windowNum, nil, MyChat.console.autoScroll)
+            ImGui.SetWindowFontScale(Module.Settings.Scale)
+            _, Module.console.autoScroll = ImGui.MenuItem('Auto-scroll##' .. windowNum, nil, Module.console.autoScroll)
             _, LocalEcho = ImGui.MenuItem('Local echo##' .. windowNum, nil, LocalEcho)
             _, timeStamps = ImGui.MenuItem('Time Stamps##' .. windowNum, nil, timeStamps)
-            _, MyChat.KeyFocus = ImGui.MenuItem('Enter Focus##' .. windowNum, nil, MyChat.KeyFocus)
-            if MyChat.KeyFocus ~= MyChat.Settings.keyFocus then
-                MyChat.Settings.keyFocus = MyChat.KeyFocus
-                writeSettings(MyChat.SettingsFile, MyChat.Settings)
+            _, Module.KeyFocus = ImGui.MenuItem('Enter Focus##' .. windowNum, nil, Module.KeyFocus)
+            if Module.KeyFocus ~= Module.Settings.keyFocus then
+                Module.Settings.keyFocus = Module.KeyFocus
+                writeSettings(Module.SettingsFile, Module.Settings)
             end
-            if MyChat.KeyFocus then
+            if Module.KeyFocus then
                 if ImGui.BeginMenu('Focus Key') then
-                    ImGui.SetWindowFontScale(MyChat.Settings.Scale)
-                    if ImGui.BeginCombo('##FocusKey', MyChat.KeyName) then
+                    ImGui.SetWindowFontScale(Module.Settings.Scale)
+                    if ImGui.BeginCombo('##FocusKey', Module.KeyName) then
                         for _, key in pairs(keyboardKeys) do
-                            local isSelected = MyChat.KeyName == key
+                            local isSelected = Module.KeyName == key
                             if ImGui.Selectable(key, isSelected) then
-                                MyChat.KeyName = key
-                                MyChat.Settings.keyName = key
-                                writeSettings(MyChat.SettingsFile, MyChat.Settings)
+                                Module.KeyName = key
+                                Module.Settings.keyName = key
+                                writeSettings(Module.SettingsFile, Module.Settings)
                             end
                         end
                         ImGui.EndCombo()
@@ -1056,7 +1057,7 @@ local function DrawChatWindow()
             end
             if ImGui.IsItemHovered() then
                 ImGui.BeginTooltip()
-                ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+                ImGui.SetWindowFontScale(Module.Settings.Scale)
                 ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(1, 0, 0, 1))
                 ImGui.Text("!!! WARNING !!!")
                 ImGui.Text("This will re-Index the ID's in your settings file!!")
@@ -1071,17 +1072,17 @@ local function DrawChatWindow()
                 resetConsoles = true
             end
             if ImGui.MenuItem('Clear Main Console##' .. windowNum) then
-                MyChat.console:Clear()
+                Module.console:Clear()
             end
             if ImGui.MenuItem('Exit##' .. windowNum) then
                 -- ChatWin.SHOW = false
                 -- ChatWin.openGUI = false
                 mq.RemoveTopLevelObject('MyChatTlo')
-                running = false
+                Module.IsRunning = false
             end
             if spamOn then
                 if not enableSpam then
-                    MyChat.Consoles[9000].console = nil
+                    Module.Consoles[9000].console = nil
                 end
                 ResetEvents()
             end
@@ -1090,23 +1091,23 @@ local function DrawChatWindow()
             ImGui.EndMenu()
         end
         if ImGui.BeginMenu('Channels##' .. windowNum) then
-            ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+            ImGui.SetWindowFontScale(Module.Settings.Scale)
             for _, Data in ipairs(sortedChannels) do
                 -- for channelID, settings in pairs(ChatWin.Settings.Channels) do
                 local channelID = Data[1]
-                local enabled = MyChat.Settings.Channels[channelID].enabled
-                local name = MyChat.Settings.Channels[channelID].Name
+                local enabled = Module.Settings.Channels[channelID].enabled
+                local name = Module.Settings.Channels[channelID].Name
                 if channelID ~= 9000 or enableSpam then
                     if ImGui.MenuItem(name, '', enabled) then
-                        MyChat.Settings.Channels[channelID].enabled = not enabled
-                        writeSettings(MyChat.SettingsFile, MyChat.Settings)
+                        Module.Settings.Channels[channelID].enabled = not enabled
+                        writeSettings(Module.SettingsFile, Module.Settings)
                     end
                 end
             end
             ImGui.EndMenu()
         end
         if ImGui.BeginMenu('Zoom##' .. windowNum) then
-            ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+            ImGui.SetWindowFontScale(Module.Settings.Scale)
             if ImGui.MenuItem('Main##MyChat', '', zoomMain) then
                 zoomMain = not zoomMain
             end
@@ -1114,10 +1115,10 @@ local function DrawChatWindow()
                 -- for channelID, settings in pairs(ChatWin.Settings.Channels) do
                 local channelID = Data[1]
                 if channelID ~= 9000 or enableSpam then
-                    local zoom = MyChat.Consoles[channelID].zoom
-                    local name = MyChat.Settings.Channels[channelID].Name
+                    local zoom = Module.Consoles[channelID].zoom
+                    local name = Module.Settings.Channels[channelID].Name
                     if ImGui.MenuItem(name, '', zoom) then
-                        MyChat.Consoles[channelID].zoom = not zoom
+                        Module.Consoles[channelID].zoom = not zoom
                     end
                 end
             end
@@ -1125,16 +1126,16 @@ local function DrawChatWindow()
             ImGui.EndMenu()
         end
         if ImGui.BeginMenu('Links##' .. windowNum) then
-            ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+            ImGui.SetWindowFontScale(Module.Settings.Scale)
             for _, Data in ipairs(sortedChannels) do
                 -- for channelID, settings in pairs(ChatWin.Settings.Channels) do
                 local channelID = Data[1]
-                local enableLinks = MyChat.Settings.Channels[channelID].enableLinks
-                local name = MyChat.Settings.Channels[channelID].Name
+                local enableLinks = Module.Settings.Channels[channelID].enableLinks
+                local name = Module.Settings.Channels[channelID].Name
                 if channelID ~= 9000 then
                     if ImGui.MenuItem(name, '', enableLinks) then
-                        MyChat.Settings.Channels[channelID].enableLinks = not enableLinks
-                        writeSettings(MyChat.SettingsFile, MyChat.Settings)
+                        Module.Settings.Channels[channelID].enableLinks = not enableLinks
+                        writeSettings(Module.SettingsFile, Module.Settings)
                         ModifyEvent(channelID)
                     end
                 end
@@ -1144,18 +1145,18 @@ local function DrawChatWindow()
             ImGui.EndMenu()
         end
         if ImGui.BeginMenu('PopOut##' .. windowNum) then
-            ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+            ImGui.SetWindowFontScale(Module.Settings.Scale)
             for _, Data in ipairs(sortedChannels) do
                 -- for channelID, settings in pairs(ChatWin.Settings.Channels) do
                 local channelID = Data[1]
                 if channelID ~= 9000 or enableSpam then
-                    local PopOut = MyChat.Settings.Channels[channelID].PopOut
-                    local name = MyChat.Settings.Channels[channelID].Name
+                    local PopOut = Module.Settings.Channels[channelID].PopOut
+                    local name = Module.Settings.Channels[channelID].Name
                     if ImGui.MenuItem(name, '', PopOut) then
                         PopOut = not PopOut
-                        MyChat.Settings.Channels[channelID].PopOut = PopOut
-                        MyChat.tempSettings.Channels[channelID].PopOut = PopOut
-                        writeSettings(MyChat.SettingsFile, MyChat.Settings)
+                        Module.Settings.Channels[channelID].PopOut = PopOut
+                        Module.tempSettings.Channels[channelID].PopOut = PopOut
+                        writeSettings(Module.SettingsFile, Module.Settings)
                     end
                 end
             end
@@ -1168,10 +1169,10 @@ local function DrawChatWindow()
 
     -- Begin Tabs Bars
     ImGui.SetWindowFontScale(1)
-    if ImGui.BeginTabBar('Channels##', MyChat.tabFlags) then
+    if ImGui.BeginTabBar('Channels##', Module.tabFlags) then
         -- Begin Main tab
         if ImGui.BeginTabItem('Main##' .. windowNum) then
-            ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+            ImGui.SetWindowFontScale(Module.Settings.Scale)
             if ImGui.IsItemHovered() then
                 ImGui.BeginTooltip()
                 ImGui.Text('Main')
@@ -1185,9 +1186,9 @@ local function DrawChatWindow()
             local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
             contentSizeY = contentSizeY - footerHeight
             if ImGui.BeginPopupContextWindow() then
-                ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+                ImGui.SetWindowFontScale(Module.Settings.Scale)
                 if ImGui.Selectable('Clear##' .. windowNum) then
-                    MyChat.console:Clear()
+                    Module.console:Clear()
                     mainBuffer = {}
                 end
                 ImGui.Separator()
@@ -1198,7 +1199,7 @@ local function DrawChatWindow()
                 ImGui.EndPopup()
             end
             if not zoomMain then
-                MyChat.console:Render(ImVec2(0, contentSizeY))
+                Module.console:Render(ImVec2(0, contentSizeY))
                 --Command Line
                 ImGui.Separator()
                 local textFlags = bit32.bor(0,
@@ -1214,13 +1215,13 @@ local function DrawChatWindow()
 
                 if ImGui.BeginChild("ZoomScrollRegion##" .. windowNum, contentSizeX, contentSizeY, ImGuiWindowFlags.HorizontalScrollbar) then
                     if ImGui.BeginTable('##channelID_' .. windowNum, 1, bit32.bor(ImGuiTableFlags.NoBordersInBody, ImGuiTableFlags.RowBg)) then
-                        ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+                        ImGui.SetWindowFontScale(Module.Settings.Scale)
                         ImGui.TableSetupColumn("##txt" .. windowNum, ImGuiTableColumnFlags.NoHeaderLabel)
                         --- draw rows ---
 
                         ImGui.TableNextRow()
                         ImGui.TableSetColumnIndex(0)
-                        ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+                        ImGui.SetWindowFontScale(Module.Settings.Scale)
 
                         for line, data in pairs(mainBuffer) do
                             ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(data.color[1], data.color[2], data.color[3], data.color[4]))
@@ -1253,7 +1254,7 @@ local function DrawChatWindow()
 
                         if scrollPos < lastScrollPos then
                             AutoScroll = false -- Turn off autoscroll if scrolled up manually
-                        elseif scrollPos >= bottomPosition - (30 * MyChat.Settings.Scale) then
+                        elseif scrollPos >= bottomPosition - (30 * Module.Settings.Scale) then
                             AutoScroll = true
                         end
 
@@ -1278,17 +1279,17 @@ local function DrawChatWindow()
             ImGui.PushStyleColor(ImGuiCol.FrameBg, ImVec4(0, 0, 0, 0))
             --  ImGui.PushFont(ImGui.ConsoleFont)
             local accept = false
-            MyChat.commandBuffer, accept = ImGui.InputText('##Input##' .. windowNum, MyChat.commandBuffer, textFlags)
+            Module.commandBuffer, accept = ImGui.InputText('##Input##' .. windowNum, Module.commandBuffer, textFlags)
             -- ImGui.PopFont()
             ImGui.PopStyleColor()
             ImGui.PopItemWidth()
             if accept then
-                MyChat.ExecCommand(MyChat.commandBuffer)
-                MyChat.commandBuffer = ''
+                Module.ExecCommand(Module.commandBuffer)
+                Module.commandBuffer = ''
                 setFocus = true
             end
             ImGui.SetItemDefaultFocus()
-            if MyChat.KeyFocus and not ImGui.IsItemFocused() and ImGui.IsKeyPressed(ImGuiKey[MyChat.KeyName]) then
+            if Module.KeyFocus and not ImGui.IsItemFocused() and ImGui.IsKeyPressed(ImGuiKey[Module.KeyName]) then
                 setFocus = true
             end
             if setFocus then
@@ -1309,13 +1310,13 @@ local function DrawChatWindow()
         -- for tabNum = 1 , #ChatWin.Settings.Channels do
         for _, channelData in ipairs(sortedChannels) do
             local channelID = channelData[1]
-            if MyChat.Settings.Channels[channelID].enabled then
-                local name = MyChat.Settings.Channels[channelID].Name:gsub("^%d+%s*", "") .. '##' .. windowNum
-                local zoom = MyChat.Consoles[channelID].zoom or false
-                local scale = MyChat.Settings.Channels[channelID].Scale
-                local links = MyChat.Settings.Channels[channelID].enableLinks
-                local enableMain = MyChat.Settings.Channels[channelID].MainEnable
-                local PopOut = MyChat.Settings.Channels[channelID].PopOut
+            if Module.Settings.Channels[channelID].enabled then
+                local name = Module.Settings.Channels[channelID].Name:gsub("^%d+%s*", "") .. '##' .. windowNum
+                local zoom = Module.Consoles[channelID].zoom or false
+                local scale = Module.Settings.Channels[channelID].Scale
+                local links = Module.Settings.Channels[channelID].enableLinks
+                local enableMain = Module.Settings.Channels[channelID].MainEnable
+                local PopOut = Module.Settings.Channels[channelID].PopOut
                 local tNameZ = zoom and 'Disable Zoom' or 'Enable Zoom'
                 local tNameP = PopOut and 'Disable PopOut' or 'Enable PopOut'
                 local tNameM = enableMain and 'Disable Main' or 'Enable Main'
@@ -1323,8 +1324,8 @@ local function DrawChatWindow()
 
                 local function tabToolTip()
                     ImGui.BeginTooltip()
-                    ImGui.Text(MyChat.Settings.Channels[channelID].Name)
-                    local sizeBuff = string.format("Buffer Size: %s lines.", tostring(getNextID(MyChat.Consoles[channelID].txtBuffer) - 1))
+                    ImGui.Text(Module.Settings.Channels[channelID].Name)
+                    local sizeBuff = string.format("Buffer Size: %s lines.", tostring(getNextID(Module.Consoles[channelID].txtBuffer) - 1))
                     ImGui.Text(sizeBuff)
                     ImGui.EndTooltip()
                 end
@@ -1334,60 +1335,60 @@ local function DrawChatWindow()
                     if ImGui.BeginTabItem(name) then
                         ActTab = name
                         activeID = channelID
-                        ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+                        ImGui.SetWindowFontScale(Module.Settings.Scale)
                         if ImGui.IsItemHovered() then
                             tabToolTip()
                         end
                         if ImGui.BeginPopupContextWindow() then
-                            ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+                            ImGui.SetWindowFontScale(Module.Settings.Scale)
                             if ImGui.Selectable('Configure##' .. windowNum) then
                                 editChanID = channelID
                                 addChannel = false
                                 fromConf = false
-                                MyChat.tempSettings = MyChat.Settings
-                                MyChat.openEditGUI = true
-                                MyChat.openConfigGUI = false
+                                Module.tempSettings = Module.Settings
+                                Module.openEditGUI = true
+                                Module.openConfigGUI = false
                             end
 
                             ImGui.Separator()
                             if ImGui.Selectable(tNameZ .. '##' .. windowNum) then
                                 zoom = not zoom
-                                MyChat.Consoles[channelID].zoom = zoom
+                                Module.Consoles[channelID].zoom = zoom
                             end
                             if ImGui.Selectable(tNameP .. '##' .. windowNum) then
                                 PopOut = not PopOut
-                                MyChat.Settings.Channels[channelID].PopOut = PopOut
-                                MyChat.tempSettings.Channels[channelID].PopOut = PopOut
-                                writeSettings(MyChat.SettingsFile, MyChat.Settings)
+                                Module.Settings.Channels[channelID].PopOut = PopOut
+                                Module.tempSettings.Channels[channelID].PopOut = PopOut
+                                writeSettings(Module.SettingsFile, Module.Settings)
                             end
 
                             if ImGui.Selectable(tNameM .. '##' .. windowNum) then
                                 enableMain = not enableMain
-                                MyChat.Settings.Channels[channelID].MainEnable = enableMain
-                                MyChat.tempSettings.Channels[channelID].MainEnable = enableMain
-                                writeSettings(MyChat.SettingsFile, MyChat.Settings)
+                                Module.Settings.Channels[channelID].MainEnable = enableMain
+                                Module.tempSettings.Channels[channelID].MainEnable = enableMain
+                                writeSettings(Module.SettingsFile, Module.Settings)
                             end
 
                             if channelID < 9000 then
                                 if ImGui.Selectable(tNameL .. '##' .. windowNum) then
                                     links = not links
-                                    MyChat.Settings.Channels[channelID].enableLinks = links
-                                    MyChat.tempSettings.Channels[channelID].enableLinks = links
-                                    writeSettings(MyChat.SettingsFile, MyChat.Settings)
+                                    Module.Settings.Channels[channelID].enableLinks = links
+                                    Module.tempSettings.Channels[channelID].enableLinks = links
+                                    writeSettings(Module.SettingsFile, Module.Settings)
                                     ModifyEvent(channelID)
                                 end
                             else
                                 if ImGui.Selectable('Spam Off##' .. windowNum) then
                                     enableSpam = false
-                                    MyChat.Consoles[9000].console = nil
+                                    Module.Consoles[9000].console = nil
                                     ResetEvents()
                                 end
                             end
 
                             ImGui.Separator()
                             if ImGui.Selectable('Clear##' .. windowNum) then
-                                MyChat.Consoles[channelID].console:Clear()
-                                MyChat.Consoles[channelID].txtBuffer = {}
+                                Module.Consoles[channelID].console:Clear()
+                                Module.Consoles[channelID].txtBuffer = {}
                             end
 
                             ImGui.EndPopup()
@@ -1407,24 +1408,24 @@ local function DrawChatWindow()
     end
 end
 
-function MyChat.RenderGUI()
-    if not running then return end
+function Module.RenderGUI()
+    if not Module.IsRunning then return end
 
     local windowName = 'My Chat - Main##' .. MyUI_CharLoaded .. '_' .. windowNum
     ImGui.SetWindowPos(windowName, ImVec2(20, 20), ImGuiCond.FirstUseEver)
     ImGui.SetNextWindowSize(ImVec2(640, 480), ImGuiCond.FirstUseEver)
     if useTheme then
-        local themeName = MyChat.tempSettings.LoadTheme
+        local themeName = Module.tempSettings.LoadTheme
         ColorCount, StyleCount = DrawTheme(themeName)
     end
-    local winFlags = MyChat.winFlags
-    if MyChat.Settings.locked then
+    local winFlags = Module.winFlags
+    if Module.Settings.locked then
         winFlags = bit32.bor(ImGuiWindowFlags.MenuBar, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoScrollbar)
     end
     local openMain
-    openMain, MyChat.SHOW = ImGui.Begin(windowName, openMain, winFlags)
+    openMain, Module.SHOW = ImGui.Begin(windowName, openMain, winFlags)
 
-    if not MyChat.SHOW then
+    if not Module.SHOW then
         if StyleCount > 0 then ImGui.PopStyleVar(StyleCount) end
         if ColorCount > 0 then ImGui.PopStyleColor(ColorCount) end
         ImGui.End()
@@ -1437,41 +1438,41 @@ function MyChat.RenderGUI()
         ImGui.End()
     end
 
-    for channelID, data in pairs(MyChat.Settings.Channels) do
-        if MyChat.Settings.Channels[channelID].enabled then
-            local name = MyChat.Settings.Channels[channelID].Name .. '##' .. windowNum
-            local PopOut = MyChat.Settings.Channels[channelID].PopOut
-            local ShowPop = MyChat.Settings.Channels[channelID].PopOut
-            if MyChat.Settings.Channels[channelID].locked then
-                MyChat.PopOutFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoMove)
+    for channelID, data in pairs(Module.Settings.Channels) do
+        if Module.Settings.Channels[channelID].enabled then
+            local name = Module.Settings.Channels[channelID].Name .. '##' .. windowNum
+            local PopOut = Module.Settings.Channels[channelID].PopOut
+            local ShowPop = Module.Settings.Channels[channelID].PopOut
+            if Module.Settings.Channels[channelID].locked then
+                Module.PopOutFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoMove)
             else
-                MyChat.PopOutFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar)
+                Module.PopOutFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar)
             end
             if PopOut then
                 ImGui.SetNextWindowSize(ImVec2(640, 480), ImGuiCond.FirstUseEver)
 
-                local themeName = MyChat.tempSettings.LoadTheme
+                local themeName = Module.tempSettings.LoadTheme
                 local PopoutColorCount, PopoutStyleCount = DrawTheme(themeName)
                 local show
-                PopOut, show = ImGui.Begin(name .. "##" .. channelID .. name, PopOut, MyChat.PopOutFlags)
+                PopOut, show = ImGui.Begin(name .. "##" .. channelID .. name, PopOut, Module.PopOutFlags)
                 if show then
-                    local lockedIcon = MyChat.Settings.Channels[channelID].locked and MyUI_Icons.FA_LOCK .. '##lockTabButton' .. channelID or
+                    local lockedIcon = Module.Settings.Channels[channelID].locked and MyUI_Icons.FA_LOCK .. '##lockTabButton' .. channelID or
                         MyUI_Icons.FA_UNLOCK .. '##lockTablButton' .. channelID
                     if ImGui.Button(lockedIcon) then
                         --ImGuiWindowFlags.NoMove
-                        MyChat.Settings.Channels[channelID].locked = not MyChat.Settings.Channels[channelID].locked
-                        MyChat.tempSettings.Channels[channelID].locked = MyChat.Settings.Channels[channelID].locked
+                        Module.Settings.Channels[channelID].locked = not Module.Settings.Channels[channelID].locked
+                        Module.tempSettings.Channels[channelID].locked = Module.Settings.Channels[channelID].locked
                         ResetEvents()
                     end
                     if ImGui.IsItemHovered() then
-                        ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+                        ImGui.SetWindowFontScale(Module.Settings.Scale)
                         ImGui.BeginTooltip()
                         ImGui.Text("Lock Window")
                         ImGui.EndTooltip()
                     end
-                    if PopOut ~= MyChat.Settings.Channels[channelID].PopOut then
-                        MyChat.Settings.Channels[channelID].PopOut = PopOut
-                        MyChat.tempSettings.Channels[channelID].PopOut = PopOut
+                    if PopOut ~= Module.Settings.Channels[channelID].PopOut then
+                        Module.Settings.Channels[channelID].PopOut = PopOut
+                        Module.tempSettings.Channels[channelID].PopOut = PopOut
                         ResetEvents()
                     end
                     ImGui.SameLine()
@@ -1479,12 +1480,12 @@ function MyChat.RenderGUI()
                         editChanID = channelID
                         addChannel = false
                         fromConf = false
-                        MyChat.tempSettings = MyChat.Settings
-                        MyChat.openEditGUI = not MyChat.openEditGUI
-                        MyChat.openConfigGUI = false
+                        Module.tempSettings = Module.Settings
+                        Module.openEditGUI = not Module.openEditGUI
+                        Module.openConfigGUI = false
                     end
                     if ImGui.IsItemHovered() then
-                        ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+                        ImGui.SetWindowFontScale(Module.Settings.Scale)
                         ImGui.BeginTooltip()
                         ImGui.Text("Opens the Edit window for this channel")
                         ImGui.EndTooltip()
@@ -1493,8 +1494,8 @@ function MyChat.RenderGUI()
                     DrawConsole(channelID)
                 else
                     if not ShowPop then
-                        MyChat.Settings.Channels[channelID].PopOut = ShowPop
-                        MyChat.tempSettings.Channels[channelID].PopOut = ShowPop
+                        Module.Settings.Channels[channelID].PopOut = ShowPop
+                        Module.tempSettings.Channels[channelID].PopOut = ShowPop
                         ResetEvents()
                         if PopoutStyleCount > 0 then ImGui.PopStyleVar(PopoutStyleCount) end
                         if PopoutColorCount > 0 then ImGui.PopStyleColor(PopoutColorCount) end
@@ -1508,12 +1509,11 @@ function MyChat.RenderGUI()
             end
         end
     end
-    if MyChat.openEditGUI then MyChat.Edit_GUI() end
-    if MyChat.openConfigGUI then MyChat.Config_GUI() end
+    if Module.openEditGUI then Module.Edit_GUI() end
+    if Module.openConfigGUI then Module.Config_GUI() end
 
     if not openMain then
-        mq.RemoveTopLevelObject('MyChatTlo')
-        running = false
+        Module.IsRunning = false
     end
 end
 
@@ -1523,34 +1523,34 @@ local resetEvnts = false
 ---Draws the Channel data for editing. Can be either an exisiting Channel or a New one.
 ---@param editChanID integer -- the channelID we are working with
 ---@param isNewChannel boolean -- is this a new channel or are we editing an old one.
-function MyChat.AddChannel(editChanID, isNewChannel)
+function Module.AddChannel(editChanID, isNewChannel)
     local tmpName = 'NewChan'
     local tmpString = 'NewString'
     local tmpEcho = '/say'
     local tmpFilter = 'NewFilter'
     local channelData = {}
 
-    if not MyChat.tempEventStrings[editChanID] then MyChat.tempEventStrings[editChanID] = {} end
-    if not MyChat.tempChanColors then MyChat.tempChanColors = {} end
-    if not MyChat.tempFiltColors[editChanID] then MyChat.tempFiltColors[editChanID] = {} end
-    if not MyChat.tempChanColors[editChanID] then MyChat.tempChanColors[editChanID] = {} end
-    if not MyChat.tempFilterStrings[editChanID] then MyChat.tempFilterStrings[editChanID] = {} end
-    if not MyChat.tempEventStrings[editChanID] then channelData[editChanID] = {} end
-    if not MyChat.tempEventStrings[editChanID][editEventID] then MyChat.tempEventStrings[editChanID][editEventID] = {} end
+    if not Module.tempEventStrings[editChanID] then Module.tempEventStrings[editChanID] = {} end
+    if not Module.tempChanColors then Module.tempChanColors = {} end
+    if not Module.tempFiltColors[editChanID] then Module.tempFiltColors[editChanID] = {} end
+    if not Module.tempChanColors[editChanID] then Module.tempChanColors[editChanID] = {} end
+    if not Module.tempFilterStrings[editChanID] then Module.tempFilterStrings[editChanID] = {} end
+    if not Module.tempEventStrings[editChanID] then channelData[editChanID] = {} end
+    if not Module.tempEventStrings[editChanID][editEventID] then Module.tempEventStrings[editChanID][editEventID] = {} end
 
     if not isNewChannel then
-        for eID, eData in pairs(MyChat.tempSettings.Channels[editChanID].Events) do
-            if not MyChat.tempFiltColors[editChanID][eID] then MyChat.tempFiltColors[editChanID][eID] = {} end
+        for eID, eData in pairs(Module.tempSettings.Channels[editChanID].Events) do
+            if not Module.tempFiltColors[editChanID][eID] then Module.tempFiltColors[editChanID][eID] = {} end
             for fID, fData in pairs(eData.Filters) do
-                if not MyChat.tempFiltColors[editChanID][eID][fID] then MyChat.tempFiltColors[editChanID][eID][fID] = {} end
+                if not Module.tempFiltColors[editChanID][eID][fID] then Module.tempFiltColors[editChanID][eID][fID] = {} end
                 -- if not tempFiltColors[editChanID][eID][fID] then tempFiltColors[editChanID][eID][fID] = {} end
-                MyChat.tempFiltColors[editChanID][eID][fID] = fData.color or { 1, 1, 1, 1, }
+                Module.tempFiltColors[editChanID][eID][fID] = fData.color or { 1, 1, 1, 1, }
             end
         end
     end
 
-    if MyChat.tempSettings.Channels[editChanID] then
-        channelData = MyChat.tempSettings.Channels
+    if Module.tempSettings.Channels[editChanID] then
+        channelData = Module.tempSettings.Channels
     elseif
         isNewChannel then
         channelData = {
@@ -1577,7 +1577,7 @@ function MyChat.AddChannel(editChanID, isNewChannel)
                 },
             },
         }
-        MyChat.tempSettings.Channels[editChanID] = channelData[editChanID]
+        Module.tempSettings.Channels[editChanID] = channelData[editChanID]
     end
 
     if newEvent then
@@ -1596,32 +1596,32 @@ function MyChat.AddChannel(editChanID, isNewChannel)
         newEvent = false
     end
     ---------------- Buttons Sliders and Channel Name ------------------------
-    ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+    ImGui.SetWindowFontScale(Module.Settings.Scale)
     if lastChan == 0 then
         --print(channelData.Name)
-        if not MyChat.tempEventStrings[editChanID].Name then
-            MyChat.tempEventStrings[editChanID].Name = channelData[editChanID].Name
+        if not Module.tempEventStrings[editChanID].Name then
+            Module.tempEventStrings[editChanID].Name = channelData[editChanID].Name
         end
-        if not MyChat.tempSettings.Channels[editChanID].Echo then
-            MyChat.tempSettings.Channels[editChanID].Echo = '/say'
+        if not Module.tempSettings.Channels[editChanID].Echo then
+            Module.tempSettings.Channels[editChanID].Echo = '/say'
         end
-        tmpEcho = MyChat.tempSettings.Channels[editChanID].Echo or '/say'
-        tmpName = MyChat.tempEventStrings[editChanID].Name
+        tmpEcho = Module.tempSettings.Channels[editChanID].Echo or '/say'
+        tmpName = Module.tempEventStrings[editChanID].Name
         tmpName, _ = ImGui.InputText("Channel Name##ChanName" .. editChanID, tmpName, 256)
         tmpEcho, _ = ImGui.InputText("Echo Channel##Echo_ChanName" .. editChanID, tmpEcho, 256)
-        if MyChat.tempSettings.Channels[editChanID].Echo ~= tmpEcho then
-            MyChat.tempSettings.Channels[editChanID].Echo = tmpEcho
+        if Module.tempSettings.Channels[editChanID].Echo ~= tmpEcho then
+            Module.tempSettings.Channels[editChanID].Echo = tmpEcho
         end
-        if MyChat.tempEventStrings[editChanID].Name ~= tmpName then
-            MyChat.tempEventStrings[editChanID].Name = tmpName
+        if Module.tempEventStrings[editChanID].Name ~= tmpName then
+            Module.tempEventStrings[editChanID].Name = tmpName
         end
         lastChan = lastChan + 1
     else
         ImGui.Text('')
     end
     -- Slider for adjusting zoom level
-    if MyChat.tempSettings.Channels[editChanID] then
-        MyChat.tempSettings.Channels[editChanID].Scale = ImGui.SliderFloat("Zoom Level", MyChat.tempSettings.Channels[editChanID].Scale, 0.5, 2.0)
+    if Module.tempSettings.Channels[editChanID] then
+        Module.tempSettings.Channels[editChanID].Scale = ImGui.SliderFloat("Zoom Level", Module.tempSettings.Channels[editChanID].Scale, 0.5, 2.0)
     end
     if ImGui.Button('Add New Event') then
         newEvent = true
@@ -1630,13 +1630,13 @@ function MyChat.AddChannel(editChanID, isNewChannel)
     if ImGui.Button('Save Settings') then
         local date = os.date("%m_%d_%Y_%H_%M")
         local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, MyUI_CharLoaded, date)
-        mq.pickle(backup, MyChat.Settings)
-        MyChat.tempSettings.Channels[editChanID] = MyChat.tempSettings.Channels[editChanID] or { Events = {}, Name = "New Channel", enabled = true, }
-        MyChat.tempSettings.Channels[editChanID].Name = MyChat.tempEventStrings[editChanID].Name or "New Channel"
-        MyChat.tempSettings.Channels[editChanID].enabled = true
-        MyChat.tempSettings.Channels[editChanID].MainEnable = MyChat.tempSettings.Channels[editChanID].MainEnable
-        local channelEvents = MyChat.tempSettings.Channels[editChanID].Events
-        for eventId, eventData in pairs(MyChat.tempEventStrings[editChanID]) do
+        mq.pickle(backup, Module.Settings)
+        Module.tempSettings.Channels[editChanID] = Module.tempSettings.Channels[editChanID] or { Events = {}, Name = "New Channel", enabled = true, }
+        Module.tempSettings.Channels[editChanID].Name = Module.tempEventStrings[editChanID].Name or "New Channel"
+        Module.tempSettings.Channels[editChanID].enabled = true
+        Module.tempSettings.Channels[editChanID].MainEnable = Module.tempSettings.Channels[editChanID].MainEnable
+        local channelEvents = Module.tempSettings.Channels[editChanID].Events
+        for eventId, eventData in pairs(Module.tempEventStrings[editChanID]) do
             -- Skip 'Name' key used for the channel name
             if eventId ~= 'Name' then
                 if eventData and eventData.eventString then
@@ -1644,27 +1644,27 @@ function MyChat.AddChannel(editChanID, isNewChannel)
                     if tempEString == '' then tempEString = 'New' end
                     channelEvents[eventId] = channelEvents[eventId] or { color = { 1.0, 1.0, 1.0, 1.0, }, Filters = {}, }
                     channelEvents[eventId].eventString = tempEString --eventData.eventString
-                    channelEvents[eventId].color = MyChat.tempChanColors[editChanID][eventId] or channelEvents[eventId].color
+                    channelEvents[eventId].color = Module.tempChanColors[editChanID][eventId] or channelEvents[eventId].color
                     channelEvents[eventId].Filters = {}
-                    for filterID, filterData in pairs(MyChat.tempFilterStrings[editChanID][eventId] or {}) do
+                    for filterID, filterData in pairs(Module.tempFilterStrings[editChanID][eventId] or {}) do
                         local tempFString = filterData or 'New'
                         --print(filterData.." : "..tempFString)
                         if tempFString == '' or tempFString == nil then tempFString = 'New' end
                         channelEvents[eventId].Filters[filterID] = {
                             filterString = tempFString,
-                            color = MyChat.tempFiltColors[editChanID][eventId][filterID] or { 1.0, 1.0, 1.0, 1.0, }, -- Default to white with full opacity if color not found
+                            color = Module.tempFiltColors[editChanID][eventId][filterID] or { 1.0, 1.0, 1.0, 1.0, }, -- Default to white with full opacity if color not found
                         }
                     end
                 end
             end
         end
-        MyChat.tempSettings.Channels[editChanID].Events = channelEvents
-        MyChat.Settings = MyChat.tempSettings
+        Module.tempSettings.Channels[editChanID].Events = channelEvents
+        Module.Settings = Module.tempSettings
         ResetEvents()
         resetEvnts = true
-        MyChat.openEditGUI = false
-        MyChat.tempFilterStrings, MyChat.tempEventStrings, MyChat.tempChanColors, MyChat.tempFiltColors, MyChat.hString, channelData = {}, {}, {}, {}, {}, {}
-        if fromConf then MyChat.openConfigGUI = true end
+        Module.openEditGUI = false
+        Module.tempFilterStrings, Module.tempEventStrings, Module.tempChanColors, Module.tempFiltColors, Module.hString, channelData = {}, {}, {}, {}, {}, {}
+        if fromConf then Module.openConfigGUI = true end
         return
     end
     ImGui.SameLine()
@@ -1673,28 +1673,28 @@ function MyChat.AddChannel(editChanID, isNewChannel)
         local date = os.date("%m_%d_%Y_%H_%M")
 
         local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, MyUI_CharLoaded, date)
-        mq.pickle(backup, MyChat.Settings)
-        MyChat.tempSettings.Channels[editChanID] = nil
-        MyChat.tempEventStrings[editChanID] = nil
-        MyChat.tempChanColors[editChanID] = nil
-        MyChat.tempFiltColors[editChanID] = nil
-        MyChat.tempFilterStrings[editChanID] = nil
+        mq.pickle(backup, Module.Settings)
+        Module.tempSettings.Channels[editChanID] = nil
+        Module.tempEventStrings[editChanID] = nil
+        Module.tempChanColors[editChanID] = nil
+        Module.tempFiltColors[editChanID] = nil
+        Module.tempFilterStrings[editChanID] = nil
 
         isNewChannel = true
         ResetEvents()
         resetEvnts = true
-        MyChat.openEditGUI = false
-        MyChat.openConfigGUI = false
+        Module.openEditGUI = false
+        Module.openConfigGUI = false
         return
     end
     ImGui.SameLine()
     if ImGui.Button(' Close ##_close') then
-        MyChat.openEditGUI = false
-        if fromConf then MyChat.openConfigGUI = true end
+        Module.openEditGUI = false
+        if fromConf then Module.openConfigGUI = true end
     end
     ImGui.SameLine()
-    if MyChat.tempSettings.Channels[editChanID] then
-        MyChat.tempSettings.Channels[editChanID].MainEnable = ImGui.Checkbox('Show on Main Tab##Main', MyChat.tempSettings.Channels[editChanID].MainEnable)
+    if Module.tempSettings.Channels[editChanID] then
+        Module.tempSettings.Channels[editChanID].MainEnable = ImGui.Checkbox('Show on Main Tab##Main', Module.tempSettings.Channels[editChanID].MainEnable)
         if ImGui.IsItemHovered() then
             ImGui.BeginTooltip()
             ImGui.Text('Do you want this channel to display on the Main Tab?')
@@ -1708,13 +1708,13 @@ function MyChat.AddChannel(editChanID, isNewChannel)
         ------------------------------ table -------------------------------------
         if channelData[editChanID].Events ~= nil then
             for eventID, eventDetails in pairs(channelData[editChanID].Events) do
-                if MyChat.hString[eventID] == nil then MyChat.hString[eventID] = string.format(channelData[editChanID].Name .. ' : ' .. eventDetails.eventString) end
-                if ImGui.CollapsingHeader(MyChat.hString[eventID]) then
+                if Module.hString[eventID] == nil then Module.hString[eventID] = string.format(channelData[editChanID].Name .. ' : ' .. eventDetails.eventString) end
+                if ImGui.CollapsingHeader(Module.hString[eventID]) then
                     local contentSizeX = ImGui.GetWindowContentRegionWidth()
-                    ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+                    ImGui.SetWindowFontScale(Module.Settings.Scale)
                     if ImGui.BeginChild('Events##' .. eventID, contentSizeX, 0.0, bit32.bor(ImGuiChildFlags.Border, ImGuiChildFlags.AutoResizeY)) then
                         if ImGui.BeginTable("Channel Events##" .. editChanID, 4, bit32.bor(ImGuiTableFlags.NoHostExtendX)) then
-                            ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+                            ImGui.SetWindowFontScale(Module.Settings.Scale)
                             ImGui.TableSetupColumn("ID's##_", ImGuiTableColumnFlags.WidthAlwaysAutoResize, 100)
                             ImGui.TableSetupColumn("Strings", ImGuiTableColumnFlags.WidthStretch, 150)
                             ImGui.TableSetupColumn("Color", ImGuiTableColumnFlags.WidthFixed, 50)
@@ -1760,28 +1760,28 @@ function MyChat.AddChannel(editChanID, isNewChannel)
 
                             ImGui.TableSetColumnIndex(1)
 
-                            if not MyChat.tempEventStrings[editChanID][eventID] then MyChat.tempEventStrings[editChanID][eventID] = eventDetails end
-                            tmpString = MyChat.tempEventStrings[editChanID][eventID].eventString
+                            if not Module.tempEventStrings[editChanID][eventID] then Module.tempEventStrings[editChanID][eventID] = eventDetails end
+                            tmpString = Module.tempEventStrings[editChanID][eventID].eventString
                             local bufferKey = editChanID .. "_" .. tostring(eventID)
                             tmpString = ImGui.InputText("Event String##EventString" .. bufferKey, tmpString, 256)
-                            MyChat.hString[eventID] = MyChat.hString[eventID]
-                            if MyChat.tempEventStrings[editChanID][eventID].eventString ~= tmpString then MyChat.tempEventStrings[editChanID][eventID].eventString = tmpString end
+                            Module.hString[eventID] = Module.hString[eventID]
+                            if Module.tempEventStrings[editChanID][eventID].eventString ~= tmpString then Module.tempEventStrings[editChanID][eventID].eventString = tmpString end
 
                             ImGui.TableSetColumnIndex(2)
 
-                            if not MyChat.tempChanColors[editChanID][eventID] then
-                                MyChat.tempChanColors[editChanID][eventID] = eventDetails.Filters[0].color or { 1.0, 1.0, 1.0, 1.0, } -- Default to white with full opacity
+                            if not Module.tempChanColors[editChanID][eventID] then
+                                Module.tempChanColors[editChanID][eventID] = eventDetails.Filters[0].color or { 1.0, 1.0, 1.0, 1.0, } -- Default to white with full opacity
                             end
 
-                            MyChat.tempChanColors[editChanID][eventID] = ImGui.ColorEdit4("##Color" .. bufferKey, MyChat.tempChanColors[editChanID][eventID], MyColorFlags)
+                            Module.tempChanColors[editChanID][eventID] = ImGui.ColorEdit4("##Color" .. bufferKey, Module.tempChanColors[editChanID][eventID], MyColorFlags)
                             ImGui.TableSetColumnIndex(3)
                             if ImGui.Button("Delete##" .. bufferKey) then
                                 -- Delete the event
-                                MyChat.tempSettings.Channels[editChanID].Events[eventID] = nil
-                                MyChat.tempEventStrings[editChanID][eventID] = nil
-                                MyChat.tempChanColors[editChanID][eventID] = nil
-                                MyChat.tempFiltColors[editChanID][eventID] = nil
-                                MyChat.tempFilterStrings[editChanID][eventID] = nil
+                                Module.tempSettings.Channels[editChanID].Events[eventID] = nil
+                                Module.tempEventStrings[editChanID][eventID] = nil
+                                Module.tempChanColors[editChanID][eventID] = nil
+                                Module.tempFiltColors[editChanID][eventID] = nil
+                                Module.tempFilterStrings[editChanID][eventID] = nil
                                 ResetEvents()
                             end
                             ImGui.TableNextRow()
@@ -1800,36 +1800,36 @@ function MyChat.AddChannel(editChanID, isNewChannel)
                                     ImGui.TableSetColumnIndex(0)
                                     ImGui.Text("fID: %s", tostring(filterID))
                                     ImGui.TableSetColumnIndex(1)
-                                    if not MyChat.tempFilterStrings[editChanID][eventID] then
-                                        MyChat.tempFilterStrings[editChanID][eventID] = {}
+                                    if not Module.tempFilterStrings[editChanID][eventID] then
+                                        Module.tempFilterStrings[editChanID][eventID] = {}
                                     end
-                                    if not MyChat.tempFilterStrings[editChanID][eventID][filterID] then
-                                        MyChat.tempFilterStrings[editChanID][eventID][filterID] = filterData.filterString
+                                    if not Module.tempFilterStrings[editChanID][eventID][filterID] then
+                                        Module.tempFilterStrings[editChanID][eventID][filterID] = filterData.filterString
                                     end
-                                    local tempFilter = MyChat.tempFilterStrings[editChanID][eventID][filterID]
+                                    local tempFilter = Module.tempFilterStrings[editChanID][eventID][filterID]
                                     -- Display the filter string input field
                                     local tmpKey = string.format("%s_%s", eventID, filterID)
                                     tempFilter, _ = ImGui.InputText("Filter String##_" .. tmpKey, tempFilter)
                                     -- Update the filter string in tempFilterStrings
-                                    if MyChat.tempFilterStrings[editChanID][eventID][filterID] ~= tempFilter then
-                                        MyChat.tempFilterStrings[editChanID][eventID][filterID] = tempFilter
+                                    if Module.tempFilterStrings[editChanID][eventID][filterID] ~= tempFilter then
+                                        Module.tempFilterStrings[editChanID][eventID][filterID] = tempFilter
                                     end
                                     ImGui.TableSetColumnIndex(2)
-                                    if not MyChat.tempFiltColors[editChanID][eventID] then MyChat.tempFiltColors[editChanID][eventID] = {} end
-                                    if not MyChat.tempFiltColors[editChanID][eventID][filterID] then MyChat.tempFiltColors[editChanID][eventID][filterID] = filterData.color or {} end
+                                    if not Module.tempFiltColors[editChanID][eventID] then Module.tempFiltColors[editChanID][eventID] = {} end
+                                    if not Module.tempFiltColors[editChanID][eventID][filterID] then Module.tempFiltColors[editChanID][eventID][filterID] = filterData.color or {} end
                                     local tmpColor = {}
                                     tmpColor = filterData['color']
                                     -- Display the color picker for the filter
                                     filterData['color'] = ImGui.ColorEdit4("##Color_" .. filterID, tmpColor, MyColorFlags)
-                                    if MyChat.tempFiltColors[editChanID][eventID][filterID] ~= tmpColor then MyChat.tempFiltColors[editChanID][eventID][filterID] = tmpColor end
+                                    if Module.tempFiltColors[editChanID][eventID][filterID] ~= tmpColor then Module.tempFiltColors[editChanID][eventID][filterID] = tmpColor end
                                     ImGui.TableSetColumnIndex(3)
                                     if ImGui.Button("Delete##_" .. filterID) then
                                         -- Delete the Filter
-                                        MyChat.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID] = nil
+                                        Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID] = nil
                                         --printf("chanID: %s, eID: %s, fID: %s",editChanID,eventID,filterID)
-                                        MyChat.tempFilterStrings[editChanID][eventID][filterID] = nil
-                                        MyChat.tempChanColors[editChanID][eventID][filterID] = nil
-                                        MyChat.tempFiltColors[editChanID][eventID][filterID] = nil
+                                        Module.tempFilterStrings[editChanID][eventID][filterID] = nil
+                                        Module.tempChanColors[editChanID][eventID][filterID] = nil
+                                        Module.tempFiltColors[editChanID][eventID][filterID] = nil
                                         ResetEvents()
                                     end
                                 end
@@ -1839,7 +1839,7 @@ function MyChat.AddChannel(editChanID, isNewChannel)
                     end
                     ImGui.EndChild()
                 else
-                    MyChat.hString[eventID] = string.format(channelData[editChanID].Name .. ' : ' .. eventDetails.eventString)
+                    Module.hString[eventID] = string.format(channelData[editChanID].Name .. ' : ' .. eventDetails.eventString)
                 end
                 lastChan = 0
             end
@@ -1852,16 +1852,16 @@ end
 local function buildConfig()
     lastID = 0
     if ImGui.BeginChild("Channels##") then
-        for channelID, channelData in pairs(MyChat.tempSettings.Channels) do
+        for channelID, channelData in pairs(Module.tempSettings.Channels) do
             if channelID ~= lastID then
                 -- Check if the header is collapsed
                 if ImGui.CollapsingHeader(channelData.Name) then
                     local contentSizeX = ImGui.GetWindowContentRegionWidth()
-                    ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+                    ImGui.SetWindowFontScale(Module.Settings.Scale)
                     if ImGui.BeginChild('Channels##' .. channelID, contentSizeX, 0.0, bit32.bor(ImGuiChildFlags.Border, ImGuiChildFlags.AutoResizeY, ImGuiChildFlags.AlwaysAutoResize)) then
                         -- Begin a table for events within this channel
                         if ImGui.BeginTable("ChannelEvents_" .. channelData.Name, 4, bit32.bor(ImGuiTableFlags.Resizable, ImGuiTableFlags.RowBg, ImGuiTableFlags.Borders, ImGui.GetWindowWidth() - 5)) then
-                            ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+                            ImGui.SetWindowFontScale(Module.Settings.Scale)
                             -- Set up table columns once
                             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 50)
                             ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthAlwaysAutoResize, 100)
@@ -1880,17 +1880,17 @@ local function buildConfig()
                                     if ImGui.Button("Edit Channel##" .. bufferKey) then
                                         editChanID = channelID
                                         addChannel = false
-                                        MyChat.tempSettings = MyChat.Settings
-                                        MyChat.openEditGUI = true
-                                        MyChat.openConfigGUI = false
+                                        Module.tempSettings = Module.Settings
+                                        Module.openEditGUI = true
+                                        Module.openConfigGUI = false
                                     end
                                     once = false
                                 else
                                     ImGui.Dummy(1, 1)
                                 end
                                 ImGui.TableSetColumnIndex(1)
-                                MyChat.tempSettings.Channels[channelID].Events[eventId].enabled = ImGui.Checkbox('Enabled##' .. eventId,
-                                    MyChat.tempSettings.Channels[channelID].Events[eventId].enabled)
+                                Module.tempSettings.Channels[channelID].Events[eventId].enabled = ImGui.Checkbox('Enabled##' .. eventId,
+                                    Module.tempSettings.Channels[channelID].Events[eventId].enabled)
                                 ImGui.TableSetColumnIndex(2)
                                 ImGui.Text(eventDetails.eventString)
                                 ImGui.TableSetColumnIndex(3)
@@ -1914,27 +1914,27 @@ local function buildConfig()
     ImGui.EndChild()
 end
 
-function MyChat.Config_GUI(open)
-    local themeName = MyChat.tempSettings.LoadTheme or 'notheme'
+function Module.Config_GUI(open)
+    local themeName = Module.tempSettings.LoadTheme or 'notheme'
     if themeName ~= 'notheme' then useTheme = true end
     -- Push Theme Colors
     if useTheme then
-        local themeName = MyChat.tempSettings.LoadTheme
+        local themeName = Module.tempSettings.LoadTheme
         ColorCountConf, StyleCountConf = DrawTheme(themeName)
     end
     local show = false
     open, show = ImGui.Begin("Event Configuration", open, bit32.bor(ImGuiWindowFlags.None))
-    if not open then MyChat.openConfigGUI = false end
+    if not open then Module.openConfigGUI = false end
     if show then
-        ImGui.SetWindowFontScale(MyChat.Settings.Scale)
+        ImGui.SetWindowFontScale(Module.Settings.Scale)
         -- Add a button to add a new row
         if ImGui.Button("Add Channel") then
-            editChanID = getNextID(MyChat.Settings.Channels)
+            editChanID = getNextID(Module.Settings.Channels)
             addChannel = true
             fromConf = true
-            MyChat.tempSettings = MyChat.Settings
-            MyChat.openEditGUI = true
-            MyChat.openConfigGUI = false
+            Module.tempSettings = Module.Settings
+            Module.openEditGUI = true
+            Module.openConfigGUI = false
         end
 
         ImGui.SameLine()
@@ -1945,10 +1945,10 @@ function MyChat.Config_GUI(open)
         ImGui.SameLine()
         -- Close Button
         if ImGui.Button('Close') then
-            MyChat.openConfigGUI = false
+            Module.openConfigGUI = false
             editChanID = 0
             editEventID = 0
-            MyChat.Settings = MyChat.tempSettings
+            Module.Settings = Module.tempSettings
             ResetEvents()
         end
 
@@ -1967,26 +1967,26 @@ function MyChat.Config_GUI(open)
 
                 -- print(date)
                 local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, MyUI_CharLoaded, date)
-                mq.pickle(backup, MyChat.Settings)
+                mq.pickle(backup, Module.Settings)
                 local newSettings = {}
-                local newID = getNextID(MyChat.tempSettings.Channels)
+                local newID = getNextID(Module.tempSettings.Channels)
 
                 newSettings = dofile(tmp)
                 -- print(tostring(cleanImport))
                 if not cleanImport and lastImport ~= tmp then
                     for cID, cData in pairs(newSettings.Channels) do
-                        for existingCID, existingCData in pairs(MyChat.tempSettings.Channels) do
+                        for existingCID, existingCData in pairs(Module.tempSettings.Channels) do
                             if existingCData.Name == cData.Name then
                                 local newName = cData.Name .. '_NEW'
                                 cData.Name = newName
                             end
                         end
-                        MyChat.tempSettings.Channels[newID] = cData
+                        Module.tempSettings.Channels[newID] = cData
                         newID = newID + 1
                     end
                 else
-                    MyChat.tempSettings = {}
-                    MyChat.tempSettings = newSettings
+                    Module.tempSettings = {}
+                    Module.tempSettings = newSettings
                 end
                 lastImport = tmp
                 ResetEvents()
@@ -1998,13 +1998,13 @@ function MyChat.Config_GUI(open)
             ImGui.Text("Cur Theme: %s", themeName)
             -- Combo Box Load Theme
             if ImGui.BeginCombo("Load Theme", themeName) then
-                for k, data in pairs(MyChat.theme.Theme) do
+                for k, data in pairs(Module.theme.Theme) do
                     local isSelected = data['Name'] == themeName
                     if ImGui.Selectable(data['Name'], isSelected) then
-                        MyChat.tempSettings['LoadTheme'] = data['Name']
-                        themeName = MyChat.tempSettings['LoadTheme']
-                        MyChat.Settings = MyChat.tempSettings
-                        writeSettings(MyChat.SettingsFile, MyChat.Settings)
+                        Module.tempSettings['LoadTheme'] = data['Name']
+                        themeName = Module.tempSettings['LoadTheme']
+                        Module.Settings = Module.tempSettings
+                        writeSettings(Module.SettingsFile, Module.Settings)
                     end
                 end
                 ImGui.EndCombo()
@@ -2012,32 +2012,32 @@ function MyChat.Config_GUI(open)
         end
         ImGui.SeparatorText('Main Tab Zoom')
         -- Slider for adjusting zoom level
-        local tmpZoom = MyChat.Settings.Scale
-        if MyChat.Settings.Scale then
+        local tmpZoom = Module.Settings.Scale
+        if Module.Settings.Scale then
             tmpZoom = ImGui.SliderFloat("Zoom Level##MyBuffs", tmpZoom, 0.5, 2.0)
         end
 
-        if MyChat.Settings.Scale ~= tmpZoom then
-            MyChat.Settings.Scale = tmpZoom
-            MyChat.tempSettings.Scale = tmpZoom
+        if Module.Settings.Scale ~= tmpZoom then
+            Module.Settings.Scale = tmpZoom
+            Module.tempSettings.Scale = tmpZoom
         end
 
-        local tmpRefLink = (doRefresh and MyChat.Settings.refreshLinkDB >= 5) and MyChat.Settings.refreshLinkDB or 0
+        local tmpRefLink = (doRefresh and Module.Settings.refreshLinkDB >= 5) and Module.Settings.refreshLinkDB or 0
         tmpRefLink = ImGui.InputInt("Refresh Delay##LinkRefresh", tmpRefLink, 5, 5)
         if tmpRefLink < 0 then tmpRefLink = 0 end
-        if tmpRefLink ~= MyChat.Settings.refreshLinkDB then
+        if tmpRefLink ~= Module.Settings.refreshLinkDB then
             -- ChatWin.Settings.refreshLinkDB = tmpRefLink
-            MyChat.tempSettings.refreshLinkDB = tmpRefLink
+            Module.tempSettings.refreshLinkDB = tmpRefLink
             doRefresh = tmpRefLink >= 5 or false
         end
         ImGui.SameLine()
         local txtOnOff = doRefresh and 'ON' or 'OFF'
         ImGui.Text(txtOnOff)
         eChan = ImGui.InputText("Main Channel Echo##Echo", eChan, 256)
-        if eChan ~= MyChat.Settings.mainEcho then
-            MyChat.Settings.mainEcho = eChan
-            MyChat.tempSettings.mainEcho = eChan
-            writeSettings(MyChat.SettingsFile, MyChat.Settings)
+        if eChan ~= Module.Settings.mainEcho then
+            Module.Settings.mainEcho = eChan
+            Module.tempSettings.mainEcho = eChan
+            writeSettings(Module.SettingsFile, Module.Settings)
         end
         ImGui.SeparatorText('Channels and Events Overview')
         buildConfig()
@@ -2048,22 +2048,22 @@ function MyChat.Config_GUI(open)
     ImGui.End()
 end
 
-function MyChat.Edit_GUI(open)
-    if not MyChat.openEditGUI then return end
+function Module.Edit_GUI(open)
+    if not Module.openEditGUI then return end
     if useTheme then
-        local themeName = MyChat.Settings.LoadTheme
+        local themeName = Module.Settings.LoadTheme
         ColorCountEdit, StyleCountEdit = DrawTheme(themeName)
     end
     local showEdit
     open, showEdit = ImGui.Begin("Channel Editor", open, bit32.bor(ImGuiWindowFlags.None))
-    if not open then MyChat.openEditGUI = false end
+    if not open then Module.openEditGUI = false end
     if showEdit then
-        ImGui.SetWindowFontScale(MyChat.Settings.Scale)
-        MyChat.AddChannel(editChanID, addChannel)
+        ImGui.SetWindowFontScale(Module.Settings.Scale)
+        Module.AddChannel(editChanID, addChannel)
         ImGui.SameLine()
         -- Close Button
         if ImGui.Button('Close') then
-            MyChat.openEditGUI = false
+            Module.openEditGUI = false
             addChannel = false
             editChanID = 0
             editEventID = 0
@@ -2075,25 +2075,25 @@ function MyChat.Edit_GUI(open)
     ImGui.End()
 end
 
-function MyChat.StringTrim(s)
+function Module.StringTrim(s)
     return s:gsub("^%s*(.-)%s*$", "%1")
 end
 
 ---comments
 ---@param text string -- the incomming line of text from the command prompt
-function MyChat.ExecCommand(text)
+function Module.ExecCommand(text)
     if LocalEcho then
-        MyChat.console:AppendText(IM_COL32(128, 128, 128), "> %s", text)
+        Module.console:AppendText(IM_COL32(128, 128, 128), "> %s", text)
     end
 
     -- todo: implement history
     if string.len(text) > 0 then
-        text = MyChat.StringTrim(text)
+        text = Module.StringTrim(text)
         if text == 'clear' then
-            MyChat.console:Clear()
+            Module.console:Clear()
         elseif string.sub(text, 1, 1) ~= '/' then
             if activeID > 0 then
-                eChan = MyChat.Settings.Channels[activeID].Echo or '/say'
+                eChan = Module.Settings.Channels[activeID].Echo or '/say'
             end
             if string.find(eChan, '_') then
                 eChan = string.gsub(eChan, '_', '')
@@ -2105,27 +2105,27 @@ function MyChat.ExecCommand(text)
         if string.sub(text, 1, 1) == '/' then
             mq.cmdf("%s", text)
         else
-            MyChat.console:AppendText(IM_COL32(255, 0, 0), "Unknown command: '%s'", text)
+            Module.console:AppendText(IM_COL32(255, 0, 0), "Unknown command: '%s'", text)
         end
     end
 end
 
 ---comments
 ---@param text string -- the incomming line of text from the command prompt
-function MyChat.ChannelExecCommand(text, channelID)
+function Module.ChannelExecCommand(text, channelID)
     if LocalEcho then
-        MyChat.console:AppendText(IM_COL32(128, 128, 128), "> %s", text)
+        Module.console:AppendText(IM_COL32(128, 128, 128), "> %s", text)
     end
 
     local eChan = '/say'
     -- todo: implement history
     if string.len(text) > 0 then
-        text = MyChat.StringTrim(text)
+        text = Module.StringTrim(text)
         if text == 'clear' then
-            MyChat.console:Clear()
+            Module.console:Clear()
         elseif string.sub(text, 1, 1) ~= '/' then
             if channelID > 0 then
-                eChan = MyChat.Settings.Channels[channelID].Echo or '/say'
+                eChan = Module.Settings.Channels[channelID].Echo or '/say'
             end
             if string.find(eChan, '_') then
                 eChan = string.gsub(eChan, '_', '')
@@ -2137,21 +2137,21 @@ function MyChat.ChannelExecCommand(text, channelID)
         if string.sub(text, 1, 1) == '/' then
             mq.cmdf("%s", text)
         else
-            MyChat.console:AppendText(IM_COL32(255, 0, 0), "Unknown command: '%s'", text)
+            Module.console:AppendText(IM_COL32(255, 0, 0), "Unknown command: '%s'", text)
         end
     end
 end
 
-function MyChat.createExternConsole(name)
-    for k, v in pairs(MyChat.Settings.Channels) do
+function Module.createExternConsole(name)
+    for k, v in pairs(Module.Settings.Channels) do
         local tmpName = v.Name:gsub("^%d+%s*", "")
         if tmpName == name then
-            MyChat.TLOConsoles[name] = k
+            Module.TLOConsoles[name] = k
             return
         end
     end
-    local newID = getNextID(MyChat.Settings.Channels)
-    MyChat.Settings.Channels[newID] = {
+    local newID = getNextID(Module.Settings.Channels)
+    Module.Settings.Channels[newID] = {
         ['enabled'] = true,
         ['Name'] = name,
         ['Scale'] = 1.0,
@@ -2175,34 +2175,34 @@ function MyChat.createExternConsole(name)
             },
         },
     }
-    MyChat.TLOConsoles[name] = newID
+    Module.TLOConsoles[name] = newID
     ResetEvents()
 end
 
 -- TLO Handler
-function MyChat.MyChatHandler(consoleName, message)
+function Module.MyChatHandler(consoleName, message)
     -- if console specified is main then just print to main console
     if consoleName:lower() == 'main' then
-        MyUI_Utils.AppendColoredTimestamp(MyChat.console, mq.TLO.Time.Time24(), message, nil, true)
+        MyUI_Utils.AppendColoredTimestamp(Module.console, mq.TLO.Time.Time24(), message, nil, true)
         return
     end
 
     -- create console if it doesn't exist
-    MyChat.createExternConsole(consoleName)
-    local consoleID = MyChat.TLOConsoles[consoleName]
+    Module.createExternConsole(consoleName)
+    local consoleID = Module.TLOConsoles[consoleName]
 
     -- main console if enabled
-    if MyChat.Settings.Channels[consoleID].MainEnable ~= false then
-        MyUI_Utils.AppendColoredTimestamp(MyChat.console, mq.TLO.Time.Time24(), message, nil, true)
+    if Module.Settings.Channels[consoleID].MainEnable ~= false then
+        MyUI_Utils.AppendColoredTimestamp(Module.console, mq.TLO.Time.Time24(), message, nil, true)
     end
 
     -- our console
-    MyUI_Utils.AppendColoredTimestamp(MyChat.Consoles[consoleID].console, mq.TLO.Time.Time24(), message, nil, true)
+    MyUI_Utils.AppendColoredTimestamp(Module.Consoles[consoleID].console, mq.TLO.Time.Time24(), message, nil, true)
 end
 
-function MyChat.SortChannels()
+function Module.SortChannels()
     sortedChannels = {}
-    for k, v in pairs(MyChat.Settings.Channels) do
+    for k, v in pairs(Module.Settings.Channels) do
         table.insert(sortedChannels, { k, v.Name, })
     end
 
@@ -2230,8 +2230,8 @@ function MyChat.SortChannels()
     end)
 end
 
-function MyChat.Unload()
-    for eventName, _ in pairs(MyChat.eventNames) do
+function Module.Unload()
+    for eventName, _ in pairs(Module.eventNames) do
         mq.unevent(eventName)
     end
     MyUI_MyChatLoaded = false
@@ -2239,14 +2239,13 @@ function MyChat.Unload()
 end
 
 local function init()
-    running = true
     loadSettings()
     BuildEvents()
 
 
     -- initialize the console
-    if MyChat.console == nil then
-        MyChat.console = ImGui.ConsoleWidget.new("Chat##Console")
+    if Module.console == nil then
+        Module.console = ImGui.ConsoleWidget.new("Chat##Console")
         mainBuffer = {
             [1] = {
                 color = { [1] = 1, [2] = 1, [3] = 1, [4] = 1, },
@@ -2254,25 +2253,28 @@ local function init()
             },
         }
     end
-    MyChat.console:AppendText("\ay[\aw%s\ay]\at Welcome to \agMyChat!", mq.TLO.Time())
-    MyChat.SortChannels()
+    Module.console:AppendText("\ay[\aw%s\ay]\at Welcome to \agMyChat!", mq.TLO.Time())
+    Module.SortChannels()
+    Module.IsRunning = true
 end
 
-function MyChat.MainLoop()
+function Module.MainLoop()
+    if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+
     local lastTime = os.clock()
 
     if resetConsoles then
         ResetConsoles()
-        MyChat.SortChannels()
+        Module.SortChannels()
         resetConsoles = false
     end
     if resetEvnts then
         ResetEvents()
-        MyChat.SortChannels()
+        Module.SortChannels()
         resetEvnts = false
     end
     if os.clock() - lastTime > 5 then
-        MyChat.SortChannels()
+        Module.SortChannels()
         lastTime = os.clock()
     end
     mq.doevents()
@@ -2280,6 +2282,6 @@ end
 
 init()
 MyUI_MyChatLoaded = true
-MyUI_MyChatHandler = MyChat.MyChatHandler
+MyUI_MyChatHandler = Module.MyChatHandler
 
-return MyChat
+return Module

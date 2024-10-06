@@ -4,10 +4,14 @@
     Description: Guild Chat Relay over Actors.
 ]]
 
-local mq                                = require('mq')
-local ImGui                             = require 'ImGui'
-local ChatRelay                         = {}
-ChatRelay.ActorMailBox                  = 'chat_relay'
+local mq            = require('mq')
+local ImGui         = require 'ImGui'
+local Module        = {}
+Module.ActorMailBox = 'chat_relay'
+Module.IsRunning    = false
+Module.Name         = 'ChatRelay'
+
+
 local winFlags                          = bit32.bor(ImGuiWindowFlags.None)
 local currZone, lastZone, configFile, mode
 local guildChat                         = {}
@@ -85,7 +89,7 @@ end
 
 --create mailbox for actors to send messages to
 local function RegisterRelayActor()
-    RelayActor = MyUI_Actor.register(ChatRelay.ActorMailBox, function(message)
+    RelayActor = MyUI_Actor.register(Module.ActorMailBox, function(message)
         local tStamp = mq.TLO.Time.Time24()
         local MemberEntry = message()
         if MemberEntry == nil then return end
@@ -243,7 +247,7 @@ local function getTellChat(line, who)
     end
 end
 
-function ChatRelay.RenderGUI()
+function Module.RenderGUI()
     if showMain then
         Minimized = false
         NewMessage = false
@@ -448,7 +452,7 @@ function SetSetting(setting, value)
     mq.pickle(configFile, settings)
 end
 
-function ChatRelay.CheckMode()
+function Module.CheckMode()
     if MyUI_Mode == 'driver' then
         Minimized = settings[script].EscapeToMin
         showMain = not Minimized
@@ -474,8 +478,9 @@ local function processCommand(...)
                 MyUI_Utils.PrintOutput('MyUI', nil, '\ayChat Relay:\ao Toggling GUI \atClosed\ax.')
             end
         elseif args[1] == 'exit' or args[1] == 'quit' then
+            Module.IsRunning = false
             MyUI_Utils.PrintOutput('MyUI', nil, '\ayChat Relay:\ao Exiting.')
-            RUNNING = false
+            Module.IsRunning = false
         elseif args[1] == 'tells' then
             settings[script].RelayTells = not settings[script].RelayTells
             RelayTells = settings[script].RelayTells
@@ -500,7 +505,7 @@ local function processCommand(...)
     end
 end
 
-function ChatRelay.Unload()
+function Module.Unload()
     mq.unevent("guild_chat_relay")
     mq.unevent("guild_out_chat_relay")
     mq.unevent("tell_chat_relay")
@@ -515,14 +520,14 @@ local function init()
     lastZone = currZone
     mq.bind('/chatrelay', processCommand)
     LoadSettings()
-    ChatRelay.CheckMode()
+    Module.CheckMode()
     RegisterRelayActor()
     -- mq.delay(250)
     mq.event('guild_chat_relay', '#*# tells the guild, #*#', getGuildChat, { keepLinks = true, })
     mq.event('guild_out_chat_relay', 'You say to your guild, #*#', sendGuildChat, { keepLinks = true, })
     mq.event('tell_chat_relay', "#1# tells you, '#*#", getTellChat, { keepLinks = true, })
     mq.event('out_chat_relay', "You told #1#, '#*#", getTellChat, { keepLinks = true, })
-    RUNNING = true
+    Module.IsRunning = true
     guildChat[MyUI_Guild] = ImGui.ConsoleWidget.new("chat_relay_Console" .. MyUI_Guild .. "##chat_relayConsole")
     tellChat[MyUI_CharLoaded] = ImGui.ConsoleWidget.new("chat_relay_Console" .. MyUI_CharLoaded .. "##chat_relayConsole")
     MyUI_Utils.AppendColoredTimestamp(guildChat[MyUI_Guild], tStamp, "Welcome to Chat Relay")
@@ -530,11 +535,14 @@ local function init()
     charBufferCount[MyUI_CharLoaded] = { Current = 1, Last = 1, }
     guildBufferCount[MyUI_Guild] = { Current = 1, Last = 1, }
     lastAnnounce = os.time()
+    Module.IsRunning = true
 end
 
 local clockTimer = mq.gettime()
 
-function ChatRelay.MainLoop()
+function Module.MainLoop()
+    if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+
     mq.doevents()
     local elapsedTime = mq.gettime() - clockTimer
     if elapsedTime >= 50 then
@@ -548,4 +556,4 @@ end
 
 init()
 
-return ChatRelay
+return Module

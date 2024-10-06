@@ -2,17 +2,17 @@ local mq = require('mq')
 local ImGui = require('ImGui')
 local actors = require('actors')
 local LoadTheme = require('lib.theme_loader')
-local MyDPS = {}
-MyDPS.ActorMailBox = 'my_dps'
+local Module = {}
+Module.ActorMailBox = 'my_dps'
+Module.Name = 'MyDPS'
+Module.IsRunning = false
+
 local ActorDPS = nil
 local script = 'MyDPS'
 local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, script, MyUI_Server, MyUI_CharLoaded)
 local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
-
-local RUNNING = true
 local damTable, settings, theme = {}, {}, {}
-local winFlags = bit32.bor(ImGuiWindowFlags.None,
-	ImGuiWindowFlags.NoTitleBar)
+local winFlags = bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoTitleBar)
 local started = false
 local clickThrough = false
 local tableSize = 0
@@ -781,8 +781,8 @@ local function DrawTheme(tName)
 	return ColorCounter, StyleCounter
 end
 
-function MyDPS.RenderGUI()
-	if not RUNNING then return end
+function Module.RenderGUI()
+	if not Module.IsRunning then return end
 	if tempSettings.showCombatWindow then
 		ImGui.SetNextWindowSize(400, 200, ImGuiCond.FirstUseEver)
 		local bgColor = tempSettings.bgColor
@@ -793,7 +793,7 @@ function MyDPS.RenderGUI()
 		end
 		local isWindowOpen, showWin = ImGui.Begin(script .. "##" .. MyUI_CharLoaded, true, winFlags)
 		if not isWindowOpen then
-			RUNNING = false
+			Module.IsRunning = false
 		end
 		if showWin then
 			ImGui.SetWindowFontScale(tempSettings.spamFontScale)
@@ -1064,7 +1064,7 @@ local function processCommand(...)
 	local cmd = args[1]
 	cmd = cmd:lower()
 	if cmd == "exit" then
-		RUNNING = false
+		Module.IsRunning = false
 	elseif cmd == "ui" then
 		started = false
 		tempSettings.showCombatWindow = true
@@ -1259,7 +1259,7 @@ end
 
 --create mailbox for actors to send messages to
 local function RegisterActor()
-	ActorDPS = MyUI_Actor.register(MyDPS.ActorMailBox, function(message)
+	ActorDPS = MyUI_Actor.register(Module.ActorMailBox, function(message)
 		local MemberEntry  = message()
 		local who          = MemberEntry.Name
 		local timeSpan     = MemberEntry.TimeSpan or 0
@@ -1303,7 +1303,7 @@ local function RegisterActor()
 	end)
 end
 
-function MyDPS.Unload()
+function Module.Unload()
 	mq.unevent("melee_crit")
 	mq.unevent("melee_crit2")
 	mq.unevent("melee_crit3")
@@ -1361,12 +1361,14 @@ local function Init()
 
 	started = settings.Options.autoStart
 	clickThrough = started
+	Module.IsRunning = true
 end
 
 local clockTimer = mq.gettime()
 
-function MyDPS.MainLoop()
+function Module.MainLoop()
 	-- Main Loop
+	if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
 
 	if tempSettings.doActors ~= settings.Options.announceActors then
 		if settings.Options.announceActors then
@@ -1437,4 +1439,4 @@ function MyDPS.MainLoop()
 end
 
 Init()
-return MyDPS
+return Module

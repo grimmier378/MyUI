@@ -1,26 +1,26 @@
 local mq = require('mq')
 local ImGui = require('ImGui')
-local DialogDB = {}
-DialogDB.ActorMailBox = nil
+local Module = {}
+Module.theme = {}
+Module.ActorMailBox = nil
+Module.ShowDialog, Module.ConfUI, Module.editGUI, Module.themeGUI = false, false, false, false
+Module.themeName = 'Default'
+Module.IsRunning = false
+Module.Name = "DialogDB"
+
 local LoadTheme = require('lib.theme_loader')
 local themeID = 1
-DialogDB.theme = {}
 local themeFileOld = string.format('%s/MyThemeZ.lua', mq.configDir)
 local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
-
-DialogDB.themeName = 'Default'
 local gIcon = MyUI_Icons.MD_SETTINGS
-local Running = false
 local hasDialog = false
 local Dialog = require('defaults.npc_dialog')
 local lastZone
-DialogDB.ShowDialog, DialogDB.ConfUI, DialogDB.editGUI, DialogDB.themeGUI = false, false, false, false
 local cmdGroup = '/dgge'
 local cmdZone = '/dgza'
 local cmdChar = '/dex'
 local cmdSelf = '/say'
 local tmpDesc = ''
-
 local autoAdd = false
 local DEBUG, newTarget = false, false
 local tmpTarget = 'None'
@@ -38,13 +38,13 @@ local inputText = ""
 local currZoneShort = mq.TLO.Zone.ShortName() or 'None'
 local msgPref = "\aw[\atDialogDB\aw] "
 
-DialogDB.Config = {
+Module.Config = {
 	cmdGroup = cmdGroup,
 	cmdZone = cmdZone,
 	cmdChar = cmdChar,
 	cmdSelf = cmdSelf,
 	autoAdd = false,
-	themeName = DialogDB.themeName,
+	themeName = Module.themeName,
 }
 
 local winFlags = bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.AlwaysAutoResize)
@@ -63,18 +63,18 @@ end
 
 local function loadTheme()
 	if MyUI_Utils.File.Exists(themeFile) then
-		DialogDB.theme = dofile(themeFile)
+		Module.theme = dofile(themeFile)
 	else
 		if MyUI_Utils.File.Exists(themeFileOld) then
-			DialogDB.theme = dofile(themeFileOld)
+			Module.theme = dofile(themeFileOld)
 		else
-			DialogDB.theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
+			Module.theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
 		end
-		mq.pickle(themeFile, DialogDB.theme)
+		mq.pickle(themeFile, Module.theme)
 	end
-	if DialogDB.theme and DialogDB.theme.Theme then
-		for tID, tData in pairs(DialogDB.theme.Theme) do
-			if tData['Name'] == DialogDB.themeName then
+	if Module.theme and Module.theme.Theme then
+		for tID, tData in pairs(Module.theme.Theme) do
+			if tData['Name'] == Module.themeName then
 				themeID = tID
 			end
 		end
@@ -84,15 +84,15 @@ end
 local function DrawTheme(tName)
 	local StyleCounter = 0
 	local ColorCounter = 0
-	for tID, tData in pairs(DialogDB.theme.Theme) do
+	for tID, tData in pairs(Module.theme.Theme) do
 		if tData.Name == tName then
-			for pID, cData in pairs(DialogDB.theme.Theme[tID].Color) do
+			for pID, cData in pairs(Module.theme.Theme[tID].Color) do
 				ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
 				ColorCounter = ColorCounter + 1
 			end
 			if tData['Style'] ~= nil then
 				if next(tData['Style']) ~= nil then
-					for sID, sData in pairs(DialogDB.theme.Theme[tID].Style) do
+					for sID, sData in pairs(Module.theme.Theme[tID].Style) do
 						if sData.Size ~= nil then
 							ImGui.PushStyleVar(sID, sData.Size)
 							StyleCounter = StyleCounter + 1
@@ -137,21 +137,21 @@ local function loadSettings()
 	end
 	if not MyUI_Utils.File.Exists(dialogConfig) then
 		if MyUI_Utils.File.Exists(dialogConfigOld) then
-			DialogDB.Config = dofile(dialogConfigOld)
+			Module.Config = dofile(dialogConfigOld)
 		else
-			DialogDB.ConFig = { cmdGroup = cmdGroup, cmdZone = cmdZone, cmdChar = cmdChar, autoAdd = autoAdd, cmdSelf = cmdSelf, themeName = DialogDB.themeName, }
+			Module.ConFig = { cmdGroup = cmdGroup, cmdZone = cmdZone, cmdChar = cmdChar, autoAdd = autoAdd, cmdSelf = cmdSelf, themeName = Module.themeName, }
 		end
-		DialogDB.ConfUI = true
+		Module.ConfUI = true
 		tmpTarget = 'None'
-		mq.pickle(dialogConfig, DialogDB.Config)
+		mq.pickle(dialogConfig, Module.Config)
 	else
-		DialogDB.Config = dofile(dialogConfig)
-		cmdGroup = DialogDB.Config.cmdGroup
-		cmdZone = DialogDB.Config.cmdZone
-		cmdChar = DialogDB.Config.cmdChar
-		cmdSelf = DialogDB.Config.cmdSelf
-		autoAdd = DialogDB.Config.autoAdd
-		DialogDB.themeName = DialogDB.Config.themeName or 'Default'
+		Module.Config = dofile(dialogConfig)
+		cmdGroup = Module.Config.cmdGroup
+		cmdZone = Module.Config.cmdZone
+		cmdChar = Module.Config.cmdChar
+		cmdSelf = Module.Config.cmdSelf
+		autoAdd = Module.Config.autoAdd
+		Module.themeName = Module.Config.themeName or 'Default'
 	end
 	loadTheme()
 
@@ -218,7 +218,7 @@ local function eventNPC(line, who)
 		end
 	end
 	if found then
-		if DialogDB.ConfUI then newTarget = false end
+		if Module.ConfUI then newTarget = false end
 		mq.pickle(dialogData, Dialog)
 		loadSettings()
 	end
@@ -236,7 +236,7 @@ local function setEvents()
 	end
 end
 
-function DialogDB.Unload()
+function Module.Unload()
 	mq.unevent("npc_emotes3")
 	mq.unbind("/dialogdb")
 end
@@ -275,7 +275,7 @@ local function bind(...)
 	local valueChanged = false
 	if #args == 1 then
 		if args[1] == 'config' then
-			DialogDB.ConfUI = not DialogDB.ConfUI
+			Module.ConfUI = not Module.ConfUI
 			return
 		elseif args[1] == 'debug' then
 			DEBUG = not DEBUG
@@ -288,6 +288,9 @@ local function bind(...)
 		elseif args[1] == 'help' then
 			showHelp = not showHelp
 			printHelp()
+			return
+		elseif args[1] == 'quit' or args[1] == 'exit' then
+			Module.IsRunning = false
 			return
 		else
 			showHelp = true
@@ -377,10 +380,10 @@ local function handleCombinedDialog()
 end
 
 local function DrawEditWin(server, target, zone, desc, cmd)
-	local ColorCountEdit, StyleCountEdit = DrawTheme(DialogDB.themeName)
+	local ColorCountEdit, StyleCountEdit = DrawTheme(Module.themeName)
 	local openE, showE = ImGui.Begin("Edit Dialog##Dialog_Edit_" .. MyUI_CharLoaded, true, ImGuiWindowFlags.NoCollapse)
 	if not openE then
-		DialogDB.editGUI = false
+		Module.editGUI = false
 		entries = {}
 	end
 	if not showE then
@@ -416,7 +419,7 @@ local function DrawEditWin(server, target, zone, desc, cmd)
 		end
 		mq.pickle(dialogData, Dialog)
 		newTarget = false
-		DialogDB.editGUI = false
+		Module.editGUI = false
 	end
 	ImGui.SameLine()
 	if ImGui.Button("Add Row##AddRowButton") then
@@ -456,14 +459,14 @@ local function DrawConfigWin()
 		tmpTarget = CurrTarget
 	end
 	ImGui.SetNextWindowSize(580, 350, ImGuiCond.Appearing)
-	local ColorCountConf, StyleCountConf = DrawTheme(DialogDB.themeName)
+	local ColorCountConf, StyleCountConf = DrawTheme(Module.themeName)
 	local openC, showC = ImGui.Begin("NPC Dialog Config##Dialog_Config_" .. MyUI_CharLoaded, true, ImGuiWindowFlags.NoCollapse)
 	if not openC then
 		if newTarget then
 			Dialog[MyUI_Server][tmpTarget] = nil
 			newTarget = false
 		end
-		DialogDB.ConfUI = false
+		Module.ConfUI = false
 		tmpTarget = 'None'
 	end
 	if not showC then
@@ -489,8 +492,8 @@ local function DrawConfigWin()
 	end
 	ImGui.TableNextColumn()
 	if ImGui.Button("Set Group Command##DialogConfig") then
-		DialogDB.Config.cmdGroup = tmpGpCmd:gsub(" $", "")
-		mq.pickle(dialogConfig, DialogDB.Config)
+		Module.Config.cmdGroup = tmpGpCmd:gsub(" $", "")
+		mq.pickle(dialogConfig, Module.Config)
 	end
 	ImGui.TableNextRow()
 	ImGui.TableNextColumn()
@@ -500,8 +503,8 @@ local function DrawConfigWin()
 	end
 	ImGui.TableNextColumn()
 	if ImGui.Button("Set Zone Command##DialogConfig") then
-		DialogDB.Config.cmdZone = tmpZnCmd:gsub(" $", "")
-		mq.pickle(dialogConfig, DialogDB.Config)
+		Module.Config.cmdZone = tmpZnCmd:gsub(" $", "")
+		mq.pickle(dialogConfig, Module.Config)
 	end
 	ImGui.TableNextRow()
 	ImGui.TableNextColumn()
@@ -511,12 +514,12 @@ local function DrawConfigWin()
 	end
 	ImGui.TableNextColumn()
 	if ImGui.Button("Set Character Command##DialogConfig") then
-		DialogDB.Config.cmdChar = tmpChCmd:gsub(" $", "")
-		mq.pickle(dialogConfig, DialogDB.Config)
+		Module.Config.cmdChar = tmpChCmd:gsub(" $", "")
+		mq.pickle(dialogConfig, Module.Config)
 	end
 	ImGui.EndTable()
 	if ImGui.Button("Select Theme##DialogConfig") then
-		DialogDB.themeGUI = not DialogDB.themeGUI
+		Module.themeGUI = not Module.themeGUI
 	end
 	ImGui.Separator()
 	--- Dialog Config Table
@@ -560,7 +563,7 @@ local function DrawConfigWin()
 						eCmd = c
 						newCmd = c
 						newDesc = d
-						DialogDB.editGUI = true
+						Module.editGUI = true
 					end
 					ImGui.SameLine()
 					if ImGui.Button("Delete##DialogDB_Config_" .. id) then
@@ -575,15 +578,15 @@ local function DrawConfigWin()
 		if ImGui.Button("Delete NPC##DialogConfig") then
 			Dialog[MyUI_Server][tmpTarget] = nil
 			mq.pickle(dialogData, Dialog)
-			DialogDB.ConfUI = false
+			Module.ConfUI = false
 		end
 		-- ImGui.EndChild()
 	end
 	local tmpTxtAuto = autoAdd and "Disable Auto Add" or "Enable Auto Add"
 	if ImGui.Button(tmpTxtAuto .. "##DialogConfigAutoAdd") then
 		autoAdd = not autoAdd
-		DialogDB.Config.autoAdd = autoAdd
-		mq.pickle(dialogConfig, DialogDB.Config)
+		Module.Config.autoAdd = autoAdd
+		mq.pickle(dialogConfig, Module.Config)
 		setEvents()
 	end
 	ImGui.SameLine()
@@ -597,7 +600,7 @@ local function DrawConfigWin()
 		eCmd = "NEW"
 		newCmd = "NEW"
 		newDesc = "NEW"
-		DialogDB.editGUI = true
+		Module.editGUI = true
 	end
 	ImGui.SameLine()
 	if ImGui.Button("Refresh Target##DialogConf_Refresh") then
@@ -609,21 +612,21 @@ local function DrawConfigWin()
 			Dialog[MyUI_Server][tmpTarget] = nil
 			newTarget = false
 		end
-		DialogDB.ConfUI = false
+		Module.ConfUI = false
 	end
 	ImGui.SameLine()
 	if ImGui.Button("Close##DialogConf_Close") then
-		DialogDB.ConfUI = false
+		Module.ConfUI = false
 	end
 	LoadTheme.EndTheme(ColorCountConf, StyleCountConf)
 	ImGui.End()
 end
 
 local function DrawThemeWin()
-	local ColorCountTheme, StyleCountTheme = DrawTheme(DialogDB.themeName)
+	local ColorCountTheme, StyleCountTheme = DrawTheme(Module.themeName)
 	local openTheme, showTheme = ImGui.Begin('Theme Selector##DialogDB_' .. MyUI_CharLoaded, true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
 	if not openTheme then
-		DialogDB.themeGUI = false
+		Module.themeGUI = false
 	end
 	if not showTheme then
 		LoadTheme.EndTheme(ColorCountTheme, StyleCountTheme)
@@ -632,18 +635,18 @@ local function DrawThemeWin()
 	end
 	ImGui.SeparatorText("Theme##DialogDB")
 
-	ImGui.Text("Cur Theme: %s", DialogDB.themeName)
+	ImGui.Text("Cur Theme: %s", Module.themeName)
 	-- Combo Box Load Theme
-	if ImGui.BeginCombo("Load Theme##DialogDB", DialogDB.themeName) then
-		for k, data in pairs(DialogDB.theme.Theme) do
-			local isSelected = data.Name == DialogDB.themeName
+	if ImGui.BeginCombo("Load Theme##DialogDB", Module.themeName) then
+		for k, data in pairs(Module.theme.Theme) do
+			local isSelected = data.Name == Module.themeName
 			if ImGui.Selectable(data.Name, isSelected) then
-				DialogDB.Config.themeName = data.Name
+				Module.Config.themeName = data.Name
 				themeID = k
-				if DialogDB.themeName ~= DialogDB.Config.themeName then
-					mq.pickle(dialogConfig, DialogDB.Config)
+				if Module.themeName ~= Module.Config.themeName then
+					mq.pickle(dialogConfig, Module.Config)
 				end
-				DialogDB.themeName = DialogDB.Config.themeName
+				Module.themeName = Module.Config.themeName
 			end
 		end
 		ImGui.EndCombo()
@@ -713,10 +716,10 @@ local function DrawHelpWin()
 end
 
 local function DrawMainWin()
-	local ColorCount, StyleCount = DrawTheme(DialogDB.themeName)
+	local ColorCount, StyleCount = DrawTheme(Module.themeName)
 	local openMain, showMain = ImGui.Begin("NPC Dialog##DialogDB_Main_" .. MyUI_CharLoaded, true, winFlags)
 	if not openMain then
-		DialogDB.ShowDialog = false
+		Module.ShowDialog = false
 	end
 	if not showMain then
 		LoadTheme.EndTheme(ColorCount, StyleCount)
@@ -729,11 +732,11 @@ local function DrawMainWin()
 		ImGui.PopID()
 		if ImGui.IsItemHovered() then
 			if ImGui.IsMouseReleased(0) then
-				DialogDB.ConfUI = not DialogDB.ConfUI
+				Module.ConfUI = not Module.ConfUI
 				tmpTarget = CurrTarget
 			end
 			if ImGui.IsMouseReleased(1) then
-				DialogDB.themeGUI = not DialogDB.themeGUI
+				Module.themeGUI = not Module.themeGUI
 			end
 		end
 		ImGui.SameLine()
@@ -849,25 +852,25 @@ local function DrawMainWin()
 	ImGui.End()
 end
 
-function DialogDB.RenderGUI()
+function Module.RenderGUI()
 	if currZoneShort ~= lastZone then return end
 	--- Dialog Main Window
-	if DialogDB.ShowDialog then
+	if Module.ShowDialog then
 		DrawMainWin()
 	end
 
 	--- Dialog Config Window
-	if DialogDB.ConfUI then
+	if Module.ConfUI then
 		DrawConfigWin()
 	end
 
 	--- Dialog Edit Window
-	if DialogDB.editGUI then
+	if Module.editGUI then
 		DrawEditWin(MyUI_Server, eTar, eZone, eDes, eCmd)
 	end
 
 	--- Theme Selector Window
-	if DialogDB.themeGUI then
+	if Module.themeGUI then
 		DrawThemeWin()
 	end
 
@@ -887,10 +890,12 @@ local function init()
 	currZoneShort = mq.TLO.Zone.ShortName() or 'None'
 	lastZone = currZoneShort
 	MyUI_Utils.PrintOutput('MyUI', nil, "%s\agDialog DB \aoLoaded... \at/dialogdb help \aoDisplay Help", msgPref)
+	Module.IsRunning = true
 end
 
 local clockTimer = mq.gettime()
-function DialogDB.MainLoop()
+function Module.MainLoop()
+	if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
 	local elapsedTime = mq.gettime() - clockTimer
 	if elapsedTime >= 50 then
 		currZoneShort = mq.TLO.Zone.ShortName() or 'None'
@@ -898,16 +903,16 @@ function DialogDB.MainLoop()
 			tmpDesc = ''
 			CurrTarget = 'None'
 			hasDialog = false
-			DialogDB.ShowDialog = false
-			DialogDB.ConfUI = false
-			DialogDB.editGUI = false
+			Module.ShowDialog = false
+			Module.ConfUI = false
+			Module.editGUI = false
 			lastZone = currZoneShort
 			searchString = ""
 		end
 		if checkDialog() then
-			DialogDB.ShowDialog = true
+			Module.ShowDialog = true
 		else
-			DialogDB.ShowDialog = false
+			Module.ShowDialog = false
 			if CurrTarget ~= mq.TLO.Target.DisplayName() then tmpDesc = '' end
 		end
 	end
@@ -915,4 +920,4 @@ function DialogDB.MainLoop()
 end
 
 init()
-return DialogDB
+return Module

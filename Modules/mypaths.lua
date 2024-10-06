@@ -7,9 +7,13 @@
 ]]
 
 -- Load Libraries
-local mq                                                         = require('mq')
-local ImGui                                                      = require('ImGui')
-local MyPaths                                                    = {}
+local mq         = require('mq')
+local ImGui      = require('ImGui')
+local Module     = {}
+Module.Name      = 'MyPaths'
+Module.IsRunning = false
+
+
 -- Variables
 local script                                                     = 'MyPaths' -- Change this to the name of your script
 local themeName                                                  = 'Default'
@@ -81,7 +85,7 @@ local InterruptSet                                               = {
 
 -- GUI Settings
 local winFlags                                                   = bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.MenuBar)
-local RUNNING, DEBUG                                             = true, false
+local DEBUG                                                      = false
 local showMainGUI, showConfigGUI, showDebugTab, showHUD, hudLock = true, false, true, false, false
 local scale                                                      = 1
 local aSize, locked, hasThemeZ                                   = false, false, false
@@ -1208,7 +1212,7 @@ end
 
 local sFlag = false
 
-function MyPaths.RenderGUI()
+function Module.RenderGUI()
     -- Main Window
     if showMainGUI then
         if currZone ~= lastZone then return end
@@ -1278,7 +1282,7 @@ function MyPaths.RenderGUI()
                 ImGui.SameLine(ImGui.GetWindowWidth() - 30)
 
                 if ImGui.MenuItem(MyUI_Icons.FA_WINDOW_CLOSE) then
-                    RUNNING = false
+                    Module.IsRunning = false
                 end
                 if ImGui.IsItemHovered() then
                     ImGui.SetTooltip("Exit\nThe Window Close button will only close the window.\nThis will exit the script completely.\nThe same as typing '/mypaths quit'.")
@@ -2476,7 +2480,7 @@ local function bind(...)
             mq.TLO.Me.Stand()
             mq.delay(1)
             NavSet.doNav = false
-            RUNNING = false
+            Module.IsRunning = false
         elseif key == 'list' then
             MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agZones: ", script)
             for name, data in pairs(Paths) do
@@ -2669,7 +2673,7 @@ local function processArgs()
     end
 end
 
-function MyPaths.Unload()
+function Module.Unload()
     mq.unbind('/mypaths')
 end
 
@@ -2689,10 +2693,12 @@ local function Init()
     currZone = mq.TLO.Zone.ShortName()
     lastZone = currZone
     displayHelp()
+    Module.IsRunning = true
 end
 
-function MyPaths.MainLoop()
-    -- Main Loop
+function Module.MainLoop()
+    if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+
     local justZoned = false
     local cTime = os.time()
     currZone = mq.TLO.Zone.ShortName()
@@ -3038,4 +3044,4 @@ end
 
 Init()
 
-return MyPaths
+return Module

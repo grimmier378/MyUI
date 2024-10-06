@@ -7,7 +7,9 @@
 ]]
 local mq = require('mq')
 local ImGui = require('ImGui')
-local PlayerTarg = {}
+local Module = {}
+Module.Name = 'PlayerTarg'
+Module.IsRunning = false
 
 local gIcon = MyUI_Icons.MD_SETTINGS
 -- set variables
@@ -15,7 +17,7 @@ local pulse = true
 local iconSize, progressSize = 26, 10
 local flashAlpha, FontScale, cAlpha = 1, 1, 255
 local ShowGUI, locked, flashBorder, rise, cRise = true, false, true, true, false
-local openConfigGUI, openGUI, running = false, true, false
+local openConfigGUI, openGUI = false, true
 local themeFile = mq.configDir .. '/MyThemeZ.lua'
 local configFileOld = mq.configDir .. '/MyUI_Configs.lua'
 local configFile = string.format('%s/MyUI/PlayerTarg/%s/%s.lua', mq.configDir, MyUI_Server, MyUI_CharLoaded)
@@ -686,7 +688,7 @@ local function drawTarget()
     end
 end
 
-function PlayerTarg.RenderGUI()
+function Module.RenderGUI()
     ColorCount = 0
     StyleCount = 0
     local flags = winFlag
@@ -734,7 +736,7 @@ function PlayerTarg.RenderGUI()
                 end
                 ImGui.SetCursorPosX(ImGui.GetWindowContentRegionWidth() - 10)
                 if ImGui.MenuItem('X##Close' .. script) then
-                    running = false
+                    Module.IsRunning = false
                 end
                 ImGui.EndMenuBar()
             end
@@ -1014,18 +1016,20 @@ function PlayerTarg.RenderGUI()
 end
 
 --Setup and Loop
-function PlayerTarg.Unload()
-
+function Module.Unload()
+    return
 end
 
 local function init()
-    running = true
+    Module.IsRunning = true
     loadSettings()
 end
 
 local clockTimer = mq.gettime()
 
-function PlayerTarg.MainLoop()
+function Module.MainLoop()
+    if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+
     local timeDiff = mq.gettime() - clockTimer
     if timeDiff > 10 then
         pulseIcon(pulseSpeed)
@@ -1042,4 +1046,4 @@ function PlayerTarg.MainLoop()
 end
 
 init()
-return PlayerTarg
+return Module

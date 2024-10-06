@@ -106,6 +106,20 @@ local function LoadSettings()
 	end
 end
 
+local function HelpDocumentation()
+	local prefix = '\aw[\atMyUI\aw] '
+	MyUI_Utils.PrintOutput('MyUI', true, '%s\agtWelcome to \atMyUI', prefix)
+	MyUI_Utils.PrintOutput('MyUI', true, '%s\ayCommands:', prefix)
+	MyUI_Utils.PrintOutput('MyUI', true, '%s\ao/myui \agshow\aw - Toggle the Main UI', prefix)
+	MyUI_Utils.PrintOutput('MyUI', true, '%s\ao/myui \agexit\aw - Exit the script', prefix)
+	MyUI_Utils.PrintOutput('MyUI', true, '%s\ao/myui \agload \at[\aymoduleName\at]\aw - Load a module', prefix)
+	MyUI_Utils.PrintOutput('MyUI', true, '%s\ao/myui \agunload \at[\aymoduleName\at]\aw - Unload a module', prefix)
+	MyUI_Utils.PrintOutput('MyUI', true, '%s\ao/myui \agnew \at[\aymoduleName\at]\aw - Add a new module', prefix)
+	MyUI_Utils.PrintOutput('MyUI', true, '%s\ayStartup:', prefix)
+	MyUI_Utils.PrintOutput('MyUI', true, '%s\ao/lua run myui \aw[\ayclient\aw|\aydriver\aw]\aw - Start the Sctipt in either Driver or Client Mode, Default(Driver) if not specified',
+		prefix)
+end
+
 local function GetSortedModuleNames()
 	local sorted_names = {}
 	for _, data in ipairs(MyUI_Settings.mods_list) do
@@ -294,10 +308,10 @@ local function MyUI_Render()
 					if v:lower() == MyUI_TempSettings.AddModule:lower() then
 						found = true
 						MyUI_TempSettings.AddModule = ''
-						break
+						goto found_one
 					end
 				end
-
+				::found_one::
 				if not found then
 					ImGui.SameLine()
 					if ImGui.Button("Remove") then
@@ -369,12 +383,54 @@ end
 
 local function CommandHandler(...)
 	args = { ..., }
-	if args[1] == 'show' then
-		MyUI_Settings.ShowMain = not MyUI_Settings.ShowMain
-		mq.pickle(MyUI_SettingsFile, MyUI_Settings)
-	elseif args[1] == 'exit' or args[1] == 'quit' then
-		MyUI_IsRunning = false
+
+	if #args > 1 then
+		local module_name = args[2]:lower()
+		if args[1] == 'unload' then
+			for k, _ in pairs(MyUI_Modules) do
+				if k:lower() == module_name then
+					MyUI_LoadModules.CheckRunning(false, k)
+					MyUI_Utils.PrintOutput('MyUI', true, "\ay%s \awis \arExiting\aw...", k)
+					goto finished_cmd
+				end
+			end
+		elseif args[1] == 'load' then
+			for _, data in ipairs(MyUI_Settings.mods_list) do
+				local tmpName = data.name:lower()
+				if tmpName == module_name then
+					if MyUI_Modules[data.name] ~= nil then
+						if MyUI_Modules[data.name].IsRunning then
+							MyUI_Utils.PrintOutput('MyUI', true, "\ay%s \awis \agAlready Loaded\aw...", data.name)
+							goto finished_cmd
+						end
+					else
+						MyUI_TempSettings.ModuleChanged = true
+						MyUI_TempSettings.ModuleName = data.name
+						MyUI_TempSettings.ModuleEnabled = true
+						MyUI_Utils.PrintOutput('MyUI', true, "\ay%s \awis \agLoaded\aw...", data.name)
+						goto finished_cmd
+					end
+				end
+			end
+		elseif args[1] == 'new' then
+			MyUI_TempSettings.AddModule = module_name
+			MyUI_TempSettings.AddCustomModule = true
+			MyUI_Utils.PrintOutput('MyUI', true, "\ay%s \awis \agAdded\aw...", module_name)
+			goto finished_cmd
+		end
+		MyUI_Utils.PrintOutput('MyUI', true, "\aoModule Named: \ay%s was \arNot Found\aw...", module_name)
+	else
+		if args[1] == 'show' then
+			MyUI_Settings.ShowMain = not MyUI_Settings.ShowMain
+			mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+		elseif args[1] == 'exit' or args[1] == 'quit' then
+			MyUI_IsRunning = false
+			MyUI_Utils.PrintOutput('MyUI', true, "\ay%s \awis \arExiting\aw...", MyUI_ScriptName)
+		else
+			HelpDocumentation()
+		end
 	end
+	::finished_cmd::
 end
 
 local function StartUp()
@@ -394,6 +450,7 @@ local function StartUp()
 
 	MyUI_IsRunning = true
 	mq.imgui.init(MyUI_ScriptName .. "##" .. MyUI_CharLoaded, MyUI_Render)
+	HelpDocumentation()
 end
 
 StartUp()

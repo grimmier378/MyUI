@@ -31,4 +31,15 @@ function Module.load(module_name)
 	return nil
 end
 
+function Module.CheckRunning(is_running, module_name)
+	if is_running == nil then return false end
+	if not is_running then
+		MyUI_TempSettings.ModuleChanged = true
+		MyUI_TempSettings.ModuleName = module_name
+		MyUI_TempSettings.ModuleEnabled = false
+		return false
+	end
+	return true
+end
+
 return Module

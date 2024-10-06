@@ -6,14 +6,16 @@
 
 local mq = require('mq')
 local ImGui = require('ImGui')
-local MyGroup = {}
+local Module = {}
+Module.Name = 'MyGroup'
+Module.IsRunning = false
+
 
 local gIcon = MyUI_Icons.MD_SETTINGS
 -- set variables
 local winFlag = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.MenuBar)
 local iconSize = 15
 local mimicMe, followMe = false, false
-local ShowGUI, openConfigGUI = true, false
 local Scale = 1
 local serverName = MyUI_Server
 serverName = serverName:gsub(" ", "_")
@@ -623,9 +625,9 @@ local function DrawSelf()
     end
 end
 
-function MyGroup.RenderGUI()
+function Module.RenderGUI()
     ------- Main Window --------
-    if ShowGUI then
+    if Module.IsRunning then
         ColorCount = 0
         StyleCount = 0
 
@@ -638,7 +640,7 @@ function MyGroup.RenderGUI()
         ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
         ColorCount, StyleCount = DrawTheme(themeName)
         local openGUI, showMain = ImGui.Begin("My Group##MyGroup" .. mq.TLO.Me.DisplayName(), true, flags)
-        if not openGUI then ShowGUI = false end
+        if not openGUI then Module.IsRunning = false end
         if showMain then
             mouseHover = ImGui.IsWindowHovered(ImGuiHoveredFlags.ChildWindows)
             if ImGui.BeginMenuBar() then
@@ -858,18 +860,21 @@ function MyGroup.RenderGUI()
     end
 end
 
-function MyGroup.Unload()
+function Module.Unload()
 end
 
 local function init()
     loadSettings()
     currZone = mq.TLO.Zone.ID()
     lastZone = currZone
+    Module.IsRunning = true
 end
 
 local clockTimer = mq.gettime()
 
-function MyGroup.MainLoop()
+function Module.MainLoop()
+    if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+
     meID = mq.TLO.Me.ID()
     if mq.TLO.Window('CharacterListWnd').Open() then return false end
     currZone = mq.TLO.Zone.ID()
@@ -892,4 +897,4 @@ function MyGroup.MainLoop()
 end
 
 init()
-return MyGroup
+return Module

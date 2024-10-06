@@ -9,14 +9,16 @@
 local mq = require('mq')
 local ImGui = require('ImGui')
 local LoadTheme = require('lib.theme_loader')
-local MyPet = {}
+local Module = {}
+Module.IsRunning = true
+Module.TempSettings = {}
+Module.Name = 'MyPet'
 
 -- Variables
 local script = 'MyPet' -- Change this to the name of your script
 local themeName = 'Default'
 local themeID = 1
 local theme, defaults, settings, btnInfo = {}, {}, {}, {}
-local RUNNING = true
 local showMainGUI, showConfigGUI = true, false
 local scale = 1
 local locked, hasThemeZ = false, false
@@ -161,7 +163,7 @@ local function loadSettings()
 	locked = settings[script].locked
 	scale = settings[script].Scale
 	themeName = settings[script].LoadTheme
-	MyPet.TempSettings = settings[script]
+	Module.TempSettings = settings[script]
 	-- Save the settings if new settings were added
 	if newSetting then mq.pickle(configFile, settings) end
 end
@@ -257,7 +259,7 @@ local function sortButtons()
 	table.sort(btnKeys)
 end
 
-function MyPet.RenderGUI()
+function Module.RenderGUI()
 	if showMainGUI then
 		-- Sort the buttons before displaying them
 		sortButtons()
@@ -294,6 +296,10 @@ function MyPet.RenderGUI()
 						showTitleBar = not showTitleBar
 						settings[script].ShowTitlebar = showTitleBar
 						mq.pickle(configFile, settings)
+					end
+
+					if ImGui.MenuItem('Exit') then
+						Module.IsRunning = false
 					end
 					ImGui.EndPopup()
 				end
@@ -505,31 +511,31 @@ function MyPet.RenderGUI()
 
 				-- Configure Dynamic Color for Porgress Bars --
 				ImGui.SetNextItemWidth(60)
-				MyPet.TempSettings.ColorHPMin = ImGui.ColorEdit4("Pet HP Min##" .. script, MyPet.TempSettings.ColorHPMin, ImGuiColorEditFlags.NoInputs)
+				Module.TempSettings.ColorHPMin = ImGui.ColorEdit4("Pet HP Min##" .. script, Module.TempSettings.ColorHPMin, ImGuiColorEditFlags.NoInputs)
 				ImGui.TableNextColumn()
 
 				ImGui.SetNextItemWidth(60)
-				MyPet.TempSettings.ColorHPMax = ImGui.ColorEdit4("Pet HP Max##" .. script, MyPet.TempSettings.ColorHPMax, ImGuiColorEditFlags.NoInputs)
+				Module.TempSettings.ColorHPMax = ImGui.ColorEdit4("Pet HP Max##" .. script, Module.TempSettings.ColorHPMax, ImGuiColorEditFlags.NoInputs)
 				ImGui.TableNextColumn()
 
 				ImGui.SetNextItemWidth(60)
-				MyPet.TempSettings.ColorTargMin = ImGui.ColorEdit4("Target HP Min##" .. script, MyPet.TempSettings.ColorTargMin, ImGuiColorEditFlags.NoInputs)
+				Module.TempSettings.ColorTargMin = ImGui.ColorEdit4("Target HP Min##" .. script, Module.TempSettings.ColorTargMin, ImGuiColorEditFlags.NoInputs)
 				ImGui.TableNextColumn()
 
 				ImGui.SetNextItemWidth(60)
-				MyPet.TempSettings.ColorTargMax = ImGui.ColorEdit4("Target HP Max##" .. script, MyPet.TempSettings.ColorTargMax, ImGuiColorEditFlags.NoInputs)
+				Module.TempSettings.ColorTargMax = ImGui.ColorEdit4("Target HP Max##" .. script, Module.TempSettings.ColorTargMax, ImGuiColorEditFlags.NoInputs)
 				ImGui.EndTable()
 			end
 			local testVal = ImGui.SliderInt("Test Slider##" .. script, 100, 0, 100)
 
 			-- draw 2 test bars
 			ImGui.SetNextItemWidth(100)
-			ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(MyPet.TempSettings.ColorHPMin, MyPet.TempSettings.ColorHPMax, testVal, nil, 0))
+			ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(Module.TempSettings.ColorHPMin, Module.TempSettings.ColorHPMax, testVal, nil, 0))
 			ImGui.ProgressBar(testVal / 100, -1, 15, 'Pet HP')
 			ImGui.PopStyleColor()
 
 			ImGui.SetNextItemWidth(100)
-			ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(MyPet.TempSettings.ColorTargMin, MyPet.TempSettings.ColorTargMax, testVal, nil, 0))
+			ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(Module.TempSettings.ColorTargMin, Module.TempSettings.ColorTargMax, testVal, nil, 0))
 			ImGui.ProgressBar(testVal / 100, -1, 15, 'Target HP')
 			ImGui.PopStyleColor()
 
@@ -670,10 +676,10 @@ function MyPet.RenderGUI()
 				settings[script].IconSize = iconSize
 				settings[script].LoadTheme = themeName
 				settings[script].AutoHide = autoHide
-				settings[script].ColorHPMax = MyPet.TempSettings.ColorHPMax
-				settings[script].ColorHPMin = MyPet.TempSettings.ColorHPMin
-				settings[script].ColorTargMax = MyPet.TempSettings.ColorTargMax
-				settings[script].ColorTargMin = MyPet.TempSettings.ColorTargMin
+				settings[script].ColorHPMax = Module.TempSettings.ColorHPMax
+				settings[script].ColorHPMin = Module.TempSettings.ColorHPMin
+				settings[script].ColorTargMax = Module.TempSettings.ColorTargMax
+				settings[script].ColorTargMin = Module.TempSettings.ColorTargMin
 				mq.pickle(configFile, settings)
 				showConfigGUI = false
 			end
@@ -683,7 +689,7 @@ function MyPet.RenderGUI()
 	end
 end
 
-function MyPet.Unload()
+function Module.Unload()
 
 end
 
@@ -699,11 +705,12 @@ local function Init()
 	-- Initialize ImGui	getPetData()
 	lastCheck = os.time()
 	GetButtonStates()
+	Module.IsRunning = true
 end
 
 local clockTimer = mq.gettime()
-function MyPet.MainLoop()
-	-- Main Loop
+function Module.MainLoop()
+	if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
 	local timeDiff = mq.gettime() - clockTimer
 	if timeDiff > 33 then
 		petName = mq.TLO.Pet.DisplayName() or 'No Pet'
@@ -729,4 +736,4 @@ end
 
 Init()
 
-return MyPet
+return Module

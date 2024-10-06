@@ -289,7 +289,7 @@ end
 local function loadSettings()
     local newSetting = false -- Check if we need to save the settings file
 
-    -- Check Settings File_Exists
+    -- Check Settings
     if not MyUI_Utils.File.Exists(configFile) then
         if MyUI_Utils.File.Exists(configFileOld) then
             settings = dofile(configFileOld)
@@ -312,24 +312,8 @@ local function loadSettings()
     end
 
     -- Check if the settings are missing and use defaults if they are
-    for k, v in pairs(defaults) do
-        if settings[script][k] == nil then
-            settings[script][k] = v
-            newSetting = true
-        end
-    end
-
-    if settings[script].Interrupts == nil then
-        settings[script].Interrupts = InterruptSet
-        newSetting = true
-    end
-
-    for k, v in pairs(InterruptSet) do
-        if settings[script].Interrupts[k] == nil then
-            settings[script].Interrupts[k] = v
-            newSetting = true
-        end
-    end
+    newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings[script])
+    newSetting = MyUI_Utils.CheckDefaultSettings(InterruptSet, settings[script].Interrupts) or newSetting
 
     -- Load the theme
     loadTheme()

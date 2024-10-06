@@ -121,7 +121,7 @@ end
 local function loadSettings()
 	local newSetting = false -- Check if we need to save the settings file
 
-	-- Check Settings File_Exists
+	-- Check Settings
 	if not MyUI_Utils.File.Exists(configFile) then
 		if MyUI_Utils.File.Exists(configFileOld) then
 			-- Load the old settings file
@@ -144,35 +144,9 @@ local function loadSettings()
 		end
 	end
 
-	for k, v in pairs(defaults) do
-		if settings[script][k] == nil then
-			settings[script][k] = v
-			newSetting = true
-		end
-	end
-
-	-- Check if the settings are missing and use defaults if they are
-	if settings[script].Buttons == nil then
-		settings[script].Buttons = defaults.Buttons
-		newSetting = true
-	end
-
-	for k, v in pairs(defaults.Buttons) do
-		if settings[script].Buttons[k] == nil then
-			settings[script].Buttons[k] = {}
-			settings[script].Buttons[k] = v
-			newSetting = true
-		end
-	end
-
-	if settings[script].ConColors == nil then
-		settings[script].ConColors = {}
-		for k, v in pairs(defaults.ConColors) do
-			settings[script].ConColors[k] = {}
-			settings[script].ConColors[k] = v
-		end
-		newSetting = true
-	end
+	newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings[script])
+	newSetting = MyUI_Utils.CheckDefaultSettings(defaults.Buttons, settings[script].Buttons) or newSetting
+	newSetting = MyUI_Utils.CheckDefaultSettings(defaults.ConColors, settings[script].ConColors) or newSetting
 
 	-- Load the theme
 	loadTheme()
@@ -364,7 +338,7 @@ function MyPet.RenderGUI()
 							if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
 								mq.cmdf("/target %s", petName)
 								if mq.TLO.Cursor() then
-									mq.cmdf('/multiline ; /tar id %s; /face; /if (${Cursor.ID}) /click left target', mq.TLO.Me.Pet.ID())
+									MyUI_Utils.GiveItem(mq.TLO.Me.Pet.ID())
 								end
 							end
 						end

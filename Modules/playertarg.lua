@@ -128,17 +128,14 @@ local function loadSettings()
 
     local newSetting = false
 
-    for k, v in pairs(defaults) do
-        if settings[script][k] == nil then
-            settings[script][k] = v
-            newSetting = true
-        end
-    end
+    newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings[script]) or newSetting
+
     if settings[script].iconSize ~= nil then
         settings[script].IconSize = settings[script].iconSize
         settings[script].iconSize = nil
         newSetting = true
     end
+
     colorBreathMin = settings[script].ColorBreathMin
     colorBreathMax = settings[script].ColorBreathMax
     showTitleBreath = settings[script].ShowTitleBreath
@@ -270,35 +267,6 @@ local function DrawTheme(tName, window)
     return ColorCounter, StyleCounter
 end
 
-local function getDuration(i)
-    local remaining = mq.TLO.Target.Buff(i).Duration() or 0
-    remaining = remaining / 1000 -- convert to seconds
-    -- Calculate hours, minutes, and seconds
-    local h = math.floor(remaining / 3600) or 0
-    remaining = remaining % 3600 -- remaining seconds after removing hours
-    local m = math.floor(remaining / 60) or 0
-    local s = remaining % 60     -- remaining seconds after removing minutes
-    -- Format the time string as H : M : S
-    local sRemaining = string.format("%02d:%02d:%02d", h, m, s)
-    return sRemaining
-end
-
-local function CalculateColor(minColor, maxColor, value)
-    -- Ensure value is within the range of 0 to 100
-    value = math.max(0, math.min(100, value))
-
-    -- Calculate the proportion of the value within the range
-    local proportion = value / 100
-
-    -- Interpolate between minColor and maxColor based on the proportion
-    local r = minColor[1] + proportion * (maxColor[1] - minColor[1])
-    local g = minColor[2] + proportion * (maxColor[2] - minColor[2])
-    local b = minColor[3] + proportion * (maxColor[3] - minColor[3])
-    local a = minColor[4] + proportion * (maxColor[4] - minColor[4])
-
-    return r, g, b, a
-end
-
 --[[
     Borrowed from rgmercs
     ~Thanks Derple
@@ -342,7 +310,7 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
         end
         if ImGui.BeginTooltip() then
             ImGui.TextColored(MyUI_Colors.color('yellow'), '%s', sName)
-            ImGui.TextColored(MyUI_Colors.color('green'), '%s', getDuration(i))
+            ImGui.TextColored(MyUI_Colors.color('green'), '%s', MyUI_Utils.GetTargetBuffDuration(i))
             ImGui.Text('Cast By: ')
             ImGui.SameLine()
             ImGui.TextColored(MyUI_Colors.color('light blue'), '%s', caster)
@@ -350,25 +318,6 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
         end
     end
     ImGui.PopID()
-end
-
----@param type string
----@param txt string
-local function DrawStatusIcon(iconID, type, txt)
-    MyUI_Utils.Animation_Spell:SetTextureCell(iconID or 0)
-    MyUI_Utils.Animation_Item:SetTextureCell(iconID or 3996)
-    if type == 'item' then
-        ImGui.DrawTextureAnimation(MyUI_Utils.Animation_Item, iconSize - 9, iconSize - 9)
-    elseif type == 'pwcs' then
-        local animPWCS = mq.FindTextureAnimation(iconID)
-        animPWCS:SetTextureCell(iconID)
-        ImGui.DrawTextureAnimation(animPWCS, iconSize - 9, iconSize - 9)
-    else
-        ImGui.DrawTextureAnimation(MyUI_Utils.Animation_Spell, iconSize - 9, iconSize - 9)
-    end
-    if ImGui.IsItemHovered() then
-        ImGui.SetTooltip(txt)
-    end
 end
 
 local function targetBuffs(count)
@@ -408,12 +357,6 @@ local function targetBuffs(count)
     end
     ImGui.PopStyleVar()
     ImGui.EndGroup()
-end
-
----@param spawn MQSpawn
-local function getConLevel(spawn)
-    local conColor = string.lower(spawn.ConColor()) or 'WHITE'
-    return conColor
 end
 
 -- GUI
@@ -535,7 +478,7 @@ local function PlayerTargConf_GUI()
             colorHpMax = ImGui.ColorEdit4("HP Max Color##" .. script, colorHpMax, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
 
             testValue = ImGui.SliderInt("Test HP##" .. script, testValue, 0, 100)
-            local r, g, b, a = CalculateColor(colorHpMin, colorHpMax, testValue)
+            local r, g, b, a = MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, testValue)
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r, g, b, a))
             ImGui.ProgressBar((testValue / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test')
             ImGui.PopStyleColor()
@@ -549,7 +492,7 @@ local function PlayerTargConf_GUI()
             colorMpMax = ImGui.ColorEdit4("Mana Max Color##" .. script, colorMpMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
 
             testValue2 = ImGui.SliderInt("Test MP##" .. script, testValue2, 0, 100)
-            local r2, g2, b2, a2 = CalculateColor(colorMpMin, colorMpMax, testValue2)
+            local r2, g2, b2, a2 = MyUI_Utils.CalculateColor(colorMpMin, colorMpMax, testValue2)
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r2, g2, b2, a2))
             ImGui.ProgressBar((testValue2 / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test2')
             ImGui.PopStyleColor()
@@ -571,7 +514,7 @@ local function PlayerTargConf_GUI()
             colorBreathMax = ImGui.ColorEdit4("Breath Max Color##" .. script, colorBreathMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
             local testValue3 = 100
             testValue3 = ImGui.SliderInt("Test Breath##" .. script, testValue3, 0, 100)
-            local r3, g3, b3, a3 = CalculateColor(colorBreathMin, colorBreathMax, testValue3)
+            local r3, g3, b3, a3 = MyUI_Utils.CalculateColor(colorBreathMin, colorBreathMax, testValue3)
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r3, g3, b3, a3))
             ImGui.ProgressBar((testValue3 / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test3')
             ImGui.PopStyleColor()
@@ -619,7 +562,7 @@ local function drawTarget()
         ImGui.SetWindowFontScale(FontScale)
         local targetName = mq.TLO.Target.CleanName() or '?'
         local xSlot = findXTarSlot(mq.TLO.Target.ID()) or 0
-        local tC = getConLevel(mq.TLO.Target) or "WHITE"
+        local tC = MyUI_Utils.GetConColor(mq.TLO.Target) or "WHITE"
         if tC == 'red' then tC = 'pink' end
         local tClass = mq.TLO.Target.Class.ShortName() == 'UNKNOWN CLASS' and MyUI_Icons.MD_HELP_OUTLINE or
             mq.TLO.Target.Class.ShortName()
@@ -628,7 +571,7 @@ local function drawTarget()
         --Target Health Bar
         ImGui.BeginGroup()
         if settings[script].DynamicHP then
-            local tr, tg, tb, ta = CalculateColor(colorHpMin, colorHpMax, mq.TLO.Target.PctHPs())
+            local tr, tg, tb, ta = MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, mq.TLO.Target.PctHPs())
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(tr, tg, tb, ta))
         else
             if mq.TLO.Target.PctHPs() < 25 then
@@ -729,7 +672,7 @@ local function drawTarget()
         ImGui.EndGroup()
         if ImGui.IsItemHovered() and ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
             if mq.TLO.Cursor() then
-                mq.cmdf('/multiline ; /if (${Cursor.ID}) /click left target')
+                MyUI_Utils.GiveItem(mq.TLO.Target.ID() or 0)
             end
         end
         --Target Buffs
@@ -849,36 +792,36 @@ function PlayerTarg.RenderGUI()
                 local combatState = mq.TLO.Me.CombatState()
                 if mq.TLO.Me.Poisoned() and mq.TLO.Me.Diseased() then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
-                    DrawStatusIcon(2579, 'item', 'Diseased and Posioned')
+                    MyUI_Utils.DrawStatusIcon(2579, 'item', 'Diseased and Posioned', iconSize)
                 elseif mq.TLO.Me.Poisoned() then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
-                    DrawStatusIcon(42, 'spell', 'Posioned')
+                    MyUI_Utils.DrawStatusIcon(42, 'spell', 'Posioned', iconSize)
                 elseif mq.TLO.Me.Diseased() then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
-                    DrawStatusIcon(41, 'spell', 'Diseased')
+                    MyUI_Utils.DrawStatusIcon(41, 'spell', 'Diseased', iconSize)
                 elseif mq.TLO.Me.Dotted() then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
-                    DrawStatusIcon(5987, 'item', 'Dotted')
+                    MyUI_Utils.DrawStatusIcon(5987, 'item', 'Dotted', iconSize)
                 elseif mq.TLO.Me.Cursed() then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
-                    DrawStatusIcon(5759, 'item', 'Cursed')
+                    MyUI_Utils.DrawStatusIcon(5759, 'item', 'Cursed', iconSize)
                 elseif mq.TLO.Me.Corrupted() then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
-                    DrawStatusIcon(5758, 'item', 'Corrupted')
+                    MyUI_Utils.DrawStatusIcon(5758, 'item', 'Corrupted', iconSize)
                 end
                 ImGui.SameLine(ImGui.GetColumnWidth() - 25)
                 if combatState == 'DEBUFFED' then
-                    DrawStatusIcon('A_PWCSDebuff', 'pwcs', 'You are Debuffed and need a cure before resting.')
+                    MyUI_Utils.DrawStatusIcon('A_PWCSDebuff', 'pwcs', 'You are Debuffed and need a cure before resting.', iconSize)
                 elseif combatState == 'ACTIVE' then
-                    DrawStatusIcon('A_PWCSStanding', 'pwcs', 'You are not in combat and may rest at any time.')
+                    MyUI_Utils.DrawStatusIcon('A_PWCSStanding', 'pwcs', 'You are not in combat and may rest at any time.', iconSize)
                 elseif combatState == 'COOLDOWN' then
-                    DrawStatusIcon('A_PWCSTimer', 'pwcs', 'You are recovering from combat and can not reset yet')
+                    MyUI_Utils.DrawStatusIcon('A_PWCSTimer', 'pwcs', 'You are recovering from combat and can not reset yet', iconSize)
                 elseif combatState == 'RESTING' then
-                    DrawStatusIcon('A_PWCSRegen', 'pwcs', 'You are Resting.')
+                    MyUI_Utils.DrawStatusIcon('A_PWCSRegen', 'pwcs', 'You are Resting.', iconSize)
                 elseif combatState == 'COMBAT' then
-                    DrawStatusIcon('A_PWCSInCombat', 'pwcs', 'You are in Combat.')
+                    MyUI_Utils.DrawStatusIcon('A_PWCSInCombat', 'pwcs', 'You are in Combat.', iconSize)
                 else
-                    DrawStatusIcon(3996, 'item', ' ')
+                    MyUI_Utils.DrawStatusIcon(3996, 'item', ' ', iconSize)
                 end
                 -- Visiblity
                 ImGui.TableSetColumnIndex(1)
@@ -898,15 +841,15 @@ function PlayerTarg.RenderGUI()
                 ImGui.Text('')
                 if mq.TLO.Group.MainTank.ID() == mq.TLO.Me.ID() then
                     ImGui.SameLine()
-                    DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank')
+                    MyUI_Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
                 end
                 if mq.TLO.Group.MainAssist.ID() == mq.TLO.Me.ID() then
                     ImGui.SameLine()
-                    DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist')
+                    MyUI_Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
                 end
                 if mq.TLO.Group.Puller.ID() == mq.TLO.Me.ID() then
                     ImGui.SameLine()
-                    DrawStatusIcon('A_Puller', 'pwcs', 'Puller')
+                    MyUI_Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
                 end
                 ImGui.SameLine()
                 --  ImGui.SameLine()
@@ -938,7 +881,7 @@ function PlayerTarg.RenderGUI()
             local yPos = ImGui.GetCursorPosY()
 
             if settings[script].DynamicHP then
-                local hr, hg, hb, ha = CalculateColor(colorHpMin, colorHpMax, mq.TLO.Me.PctHPs())
+                local hr, hg, hb, ha = MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, mq.TLO.Me.PctHPs())
                 ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(hr, hg, hb, ha))
             else
                 if mq.TLO.Me.PctHPs() <= 0 then
@@ -966,7 +909,7 @@ function PlayerTarg.RenderGUI()
             --My Mana Bar
             if (tonumber(mq.TLO.Me.MaxMana()) > 0) then
                 if settings[script].DynamicMP then
-                    local mr, mg, mb, ma = CalculateColor(colorMpMin, colorMpMax, mq.TLO.Me.PctMana())
+                    local mr, mg, mb, ma = MyUI_Utils.CalculateColor(colorMpMin, colorMpMax, mq.TLO.Me.PctMana())
                     ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(mr, mg, mb, ma))
                 else
                     ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('light blue2')))
@@ -1050,7 +993,7 @@ function PlayerTarg.RenderGUI()
             ImGui.SetWindowFontScale(FontScale)
 
             local yPos = ImGui.GetCursorPosY()
-            local red, green, blu, alpha = CalculateColor(colorBreathMin, colorBreathMax, breathPct)
+            local red, green, blu, alpha = MyUI_Utils.CalculateColor(colorBreathMin, colorBreathMax, breathPct)
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(red, green, blu, alpha))
             ImGui.ProgressBar((breathPct / 100), ImGui.GetContentRegionAvail(), progressSize, '##pctBreath')
             ImGui.PopStyleColor()

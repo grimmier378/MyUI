@@ -52,6 +52,7 @@ local defaults = {
 		sortParty              = false,
 		showCombatWindow       = true,
 		useTheme               = 'Default',
+		autoStart              = false,
 	},
 	MeleeColors = {
 		["crush"] = { 1, 1, 1, 1, },
@@ -85,18 +86,8 @@ local function printOutput(msg, ...)
 	end
 end
 
-local function File_Exists(name)
-	local f = io.open(name, "r")
-	if f ~= nil then
-		io.close(f)
-		return true
-	else
-		return false
-	end
-end
-
 local function loadThemeTable()
-	if File_Exists(themeFile) then
+	if MyUI_Utils.File.Exists(themeFile) then
 		theme = dofile(themeFile)
 	else
 		theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
@@ -112,20 +103,8 @@ local function loadThemeTable()
 	end
 end
 
-local function CheckRemovedSettings(def, settings)
-	local newSetting = false
-	for setting, value in pairs(settings or {}) do
-		if def[setting] == nil then
-			printOutput("\ayFound Depreciated Setting: \ao%s \ayRemoving it from the Settings File.", setting)
-			settings[setting] = nil
-			newSetting = true
-		end
-	end
-	return newSetting
-end
-
 local function loadSettings()
-	if not File_Exists(configFile) then
+	if not MyUI_Utils.File.Exists(configFile) then
 		settings = defaults
 		mq.pickle(configFile, settings)
 	else
@@ -141,22 +120,12 @@ local function loadSettings()
 	local newSetting = false
 
 	-- check for new settings
-	for k, v in pairs(defaults.MeleeColors) do
-		if settings.MeleeColors[k] == nil then
-			settings.MeleeColors[k] = v
-			newSetting = true
-		end
-	end
+	newSetting = MyUI_Utils.CheckRemovedSettings(defaults.MeleeColors, settings.MeleeColors) or newSetting
+	newSetting = MyUI_Utils.CheckRemovedSettings(defaults.Options, settings.Options) or newSetting
 
-	for k, v in pairs(defaults.Options) do
-		if settings.Options[k] == nil then
-			settings.Options[k] = v
-			newSetting = true
-		end
-	end
 	-- check for removed settings
-	newSetting = CheckRemovedSettings(defaults.Options, settings.Options) and true or newSetting
-	newSetting = CheckRemovedSettings(defaults.MeleeColors, settings.MeleeColors) and true or newSetting
+	newSetting = MyUI_Utils.CheckRemovedSettings(defaults.Options, settings.Options) or newSetting
+	newSetting = MyUI_Utils.CheckRemovedSettings(defaults.MeleeColors, settings.MeleeColors) or newSetting
 
 	-- set local settings
 	for k, v in pairs(settings.Options or {}) do
@@ -233,7 +202,7 @@ local function parseCurrentBattle(dur)
 				})
 		end
 		battlesHistory = sortTable(battlesHistory, 'history')
-		if settings.Options.announceActors then
+		if settings.Options.announceActors and ActorDPS ~= nil then
 			local msgSend = {
 				Name = MyName,
 				Subject = 'CURRENT',
@@ -610,6 +579,8 @@ local function DrawHistory(tbl)
 end
 
 local function DrawButtons()
+	local changedSettings = false
+
 	local btnLabel = started and "Stop" or "Start"
 	if ImGui.Button(btnLabel) then
 		if started then
@@ -619,22 +590,24 @@ local function DrawButtons()
 			clickThrough = true
 			started = true
 		end
-		settings.Options.fontScale = tempSettings.fontScale
-		mq.pickle(configFile, settings)
+		tempSettings.autoStart = started
+		changedSettings = true
 	end
 	if ImGui.IsItemHovered() then
 		ImGui.SetTooltip("%s the DPS Window.", btnLabel)
 	end
+
 	ImGui.SameLine()
+
 	local btnLabel2 = tempSettings.showCombatWindow and "Hide" or "Show"
 	if ImGui.Button(btnLabel2) then
-		mq.pickle(configFile, settings)
 		tempSettings.showCombatWindow = not tempSettings.showCombatWindow
+		changedSettings = true
 	end
 	if ImGui.IsItemHovered() then
 		ImGui.SetTooltip("%s the DPS Window.", btnLabel2)
 	end
-	local changedSettings = false
+
 	for k, v in pairs(tempSettings or {}) do
 		if settings.Options[k] ~= nil then
 			settings.Options[k] = v
@@ -1043,7 +1016,7 @@ local function pDPS(dur, rType)
 			if settings.Options.announceDNET then
 				announceDanNet(msg)
 			end
-			if settings.Options.announceActors then
+			if settings.Options.announceActors and ActorDPS ~= nil then
 				local msgSend = {
 					Name = MyName,
 					Subject = 'Update',
@@ -1396,6 +1369,8 @@ local function Init()
 		winFlags = bit32.bor(ImGuiWindowFlags.NoMouseInputs, ImGuiWindowFlags.NoDecoration)
 		printOutput("\aw[\at%s\ax] \ayStarted\ax", script)
 	end
+
+	started = settings.Options.autoStart
 end
 
 local clockTimer = mq.gettime()

@@ -20,8 +20,7 @@ function Module.unload(module_name)
 	if MyUI_Modules[module_name] and MyUI_Modules[module_name].ActorMailBox then
 		MyUI_Modules[module_name].ActorMailBox = nil
 	end
-	-- Remove the module from package.loaded
-	package.loaded["modules." .. module_name:lower()] = nil
+
 	MyUI_Modules[module_name] = nil
 end
 

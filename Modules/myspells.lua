@@ -36,14 +36,14 @@ local script = 'MySpells'
 local casting = false
 local spellBar = {}
 local numGems = 8
-local redGem = mq.CreateTexture(mq.luaDir .. '/myui/images/red_gem.png')
-local greenGem = mq.CreateTexture(mq.luaDir .. '/myui/images/green_gem.png')
-local purpleGem = mq.CreateTexture(mq.luaDir .. '/myui/images/purple_gem.png')
-local blueGem = mq.CreateTexture(mq.luaDir .. '/myui/images/blue_gem.png')
-local orangeGem = mq.CreateTexture(mq.luaDir .. '/myui/images/orange_gem.png')
-local yellowGem = mq.CreateTexture(mq.luaDir .. '/myui/images/yellow_gem.png')
-local openBook = mq.CreateTexture(mq.luaDir .. '/myui/images/open_book.png')
-local closedBook = mq.CreateTexture(mq.luaDir .. '/myui/images/closed_book.png')
+local redGem = MyUI_Utils.SetImage(mq.luaDir .. '/myui/images/red_gem.png')
+local greenGem = MyUI_Utils.SetImage(mq.luaDir .. '/myui/images/green_gem.png')
+local purpleGem = MyUI_Utils.SetImage(mq.luaDir .. '/myui/images/purple_gem.png')
+local blueGem = MyUI_Utils.SetImage(mq.luaDir .. '/myui/images/blue_gem.png')
+local orangeGem = MyUI_Utils.SetImage(mq.luaDir .. '/myui/images/orange_gem.png')
+local yellowGem = MyUI_Utils.SetImage(mq.luaDir .. '/myui/images/yellow_gem.png')
+local openBook = MyUI_Utils.SetImage(mq.luaDir .. '/myui/images/open_book.png')
+local closedBook = MyUI_Utils.SetImage(mq.luaDir .. '/myui/images/closed_book.png')
 local memSpell = -1
 local currentTime = os.time()
 local maxRow, rowCount, iconSize, scale = 1, 0, 30, 1
@@ -182,12 +182,8 @@ local function loadSettings()
 	end
 
 	-- check for new settings and add them to the settings file
-	for k, v in pairs(defaults) do
-		if settings[script][k] == nil then
-			settings[script][k] = v
-			newSetting = true
-		end
-	end
+
+	newSetting = MyUI_Utils.CheckRemovedSettings(defaults, settings[script])
 
 	if settings[script][meName] == nil then
 		settings[script][meName] = {}
@@ -254,22 +250,6 @@ local function CheckCasting()
 		startedCast = false
 		startCastTime = 0
 	end
-end
-
-function CalculateColor(minColor, maxColor, value)
-	-- Ensure value is within the range of 0 to 100
-	value = math.max(0, math.min(100, value))
-
-	-- Calculate the proportion of the value within the range
-	local proportion = value / 100
-
-	-- Interpolate between minColor and maxColor based on the proportion
-	local r = minColor[1] + proportion * (maxColor[1] - minColor[1])
-	local g = minColor[2] + proportion * (maxColor[2] - minColor[2])
-	local b = minColor[3] + proportion * (maxColor[3] - minColor[3])
-	local a = minColor[4] + proportion * (maxColor[4] - minColor[4])
-
-	return r, g, b, a
 end
 
 local function GetSpells(slot)
@@ -878,7 +858,7 @@ function MySpells.RenderGUI()
 				-- if remaining < 0 then remaining = 0 end
 				local colorHpMin = { 0.0, 1.0, 0.0, 1.0, }
 				local colorHpMax = { 1.0, 0.0, 0.0, 1.0, }
-				local hr, hg, hb, ha = CalculateColor(colorHpMin, colorHpMax, (remaining / castTime * 100))
+				local hr, hg, hb, ha = MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, (remaining / castTime * 100))
 				ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(hr, hg, hb, ha))
 				ImGui.ProgressBar(remaining / castTime, ImVec2(ImGui.GetWindowWidth(), 15), '')
 				ImGui.PopStyleColor()

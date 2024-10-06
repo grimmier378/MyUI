@@ -14,7 +14,7 @@ local animSpell = mq.FindTextureAnimation('A_SpellIcons')
 local animItem = mq.FindTextureAnimation('A_DragItem')
 local TLO = mq.TLO
 local winFlag = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.MenuBar)
-local iconWidth, iconHeight = 26, 26
+local iconSize = 26
 local mimicMe, followMe = false, false
 local ShowGUI, openConfigGUI = true, false
 local Scale = 1
@@ -75,21 +75,8 @@ defaults = {
     },
 }
 
----comment Check to see if the file we want to work on exists.
----@param fileName string -- Full Path to file
----@return boolean -- returns true if the file exists and false otherwise
-local function File_Exists(fileName)
-    local f = io.open(fileName, "r")
-    if f ~= nil then
-        io.close(f)
-        return true
-    else
-        return false
-    end
-end
-
 local function loadTheme()
-    if File_Exists(themeFile) then
+    if MyUI_Utils.File.Exists(themeFile) then
         theme = dofile(themeFile)
     else
         theme = require('defaults.themes')
@@ -107,13 +94,13 @@ end
 
 local function loadSettings()
     local newSetting = false
-    if not File_Exists(configFile) then
+    if not MyUI_Utils.File.Exists(configFile) then
         --check for old file and convert to new format
-        if File_Exists(configFileold2) then
+        if MyUI_Utils.File.Exists(configFileold2) then
             settings = dofile(configFileold2)
             writeSettings(configFile, settings)
         else
-            if File_Exists(configFileOld) then
+            if MyUI_Utils.File.Exists(configFileOld) then
                 settings = dofile(configFileOld)
                 writeSettings(configFile, settings)
             else
@@ -133,12 +120,7 @@ local function loadSettings()
 
     loadTheme()
 
-    for k, v in pairs(defaults[script]) do
-        if settings[script][k] == nil then
-            settings[script][k] = v
-            newSetting = true
-        end
-    end
+    newSetting = MyUI_Utils.CheckDefaultSettings(settings[script], defaults[script])
 
     showSelf = settings[script].ShowSelf
     hideTitle = settings[script].HideTitleBar
@@ -196,43 +178,6 @@ local function DrawTheme(tName)
     return ColorCounter, StyleCounter
 end
 
-local function giveItem(id, name)
-    local iconID = TLO.Cursor.Icon() or 0
-    if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
-        mq.cmdf("/target id %s", id)
-        if TLO.Cursor() then
-            mq.cmdf('/multiline ; /tar id %s; /face; /if (${Cursor.ID}) /click left target', id)
-        end
-    elseif ImGui.IsMouseReleased(ImGuiMouseButton.Right) and ImGui.IsKeyDown(ImGuiMod.Ctrl) then
-        if useEQBC then
-            mq.cmdf("/bct %s //foreground", name)
-        else
-            mq.cmdf("/dex %s /foreground", name)
-        end
-    end
-end
-
----@param type string
----@param txt string
-local function DrawStatusIcon(iconID, type, txt)
-    animSpell:SetTextureCell(iconID or 0)
-    animItem:SetTextureCell(iconID or 3996)
-
-    if type == 'item' then
-        ImGui.DrawTextureAnimation(animItem, iconWidth - 11, iconHeight - 11)
-    elseif type == 'pwcs' then
-        local animPWCS = mq.FindTextureAnimation(iconID)
-        animPWCS:SetTextureCell(iconID)
-        ImGui.DrawTextureAnimation(animPWCS, iconWidth - 11, iconHeight - 11)
-    else
-        ImGui.DrawTextureAnimation(animSpell, iconWidth - 11, iconHeight - 11)
-    end
-
-    if ImGui.IsItemHovered() then
-        ImGui.SetTooltip(txt)
-    end
-end
-
 local function DrawGroupMember(id)
     local member = TLO.Group.Member(id)
     local memberName = member.Name()
@@ -252,17 +197,17 @@ local function DrawGroupMember(id)
             ImGui.Text(pInfoToolTip)
             if TLO.Group.MainTank.ID() == member.ID() then
                 ImGui.SameLine()
-                DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank')
+                MyUI_Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
             end
 
             if TLO.Group.MainAssist.ID() == member.ID() then
                 ImGui.SameLine()
-                DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist')
+                MyUI_Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist')
             end
 
             if TLO.Group.Puller.ID() == member.ID() then
                 ImGui.SameLine()
-                DrawStatusIcon('A_Puller', 'pwcs', 'Puller')
+                MyUI_Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
             end
         end
     end
@@ -305,17 +250,17 @@ local function DrawGroupMember(id)
         if settings[script].ShowRoleIcons then
             if TLO.Group.MainTank.ID() == member.ID() then
                 ImGui.SameLine()
-                DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank')
+                MyUI_Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
             end
 
             if TLO.Group.MainAssist.ID() == member.ID() then
                 ImGui.SameLine()
-                DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist')
+                MyUI_Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
             end
 
             if TLO.Group.Puller.ID() == member.ID() then
                 ImGui.SameLine()
-                DrawStatusIcon('A_Puller', 'pwcs', 'Puller')
+                MyUI_Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
             end
 
             ImGui.SameLine()
@@ -454,7 +399,7 @@ local function DrawGroupMember(id)
 
     ImGui.EndGroup()
     if ImGui.IsItemHovered() and member.Present() then
-        giveItem(member.ID() or 0, memberName)
+        MyUI_Utils.GiveItem(member.ID() or 0)
     end
     -- Pet Health
 
@@ -466,7 +411,7 @@ local function DrawGroupMember(id)
             ImGui.PopStyleColor()
             if ImGui.IsItemHovered() then
                 ImGui.SetTooltip('%s\n%d%% health', member.Pet.DisplayName(), member.Pet.PctHPs())
-                giveItem(member.Pet.ID() or 0, member.Pet.DisplayName())
+                MyUI_Utils.GiveItem(member.Pet.ID() or 0)
             end
         end
         ImGui.EndGroup()
@@ -491,17 +436,17 @@ local function DrawSelf()
         ImGui.Text(pInfoToolTip)
         if TLO.Group.MainAssist.ID() == mySelf.ID() then
             ImGui.SameLine()
-            DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist')
+            MyUI_Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
         end
 
         if TLO.Group.Puller.ID() == mySelf.ID() then
             ImGui.SameLine()
-            DrawStatusIcon('A_Puller', 'pwcs', 'Puller')
+            MyUI_Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
         end
 
         if TLO.Group.MainTank.ID() == mySelf.ID() then
             ImGui.SameLine()
-            DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank')
+            MyUI_Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank')
         end
     end
 
@@ -527,7 +472,7 @@ local function DrawSelf()
         if settings[script].ShowRoleIcons then
             if TLO.Group.MainTank.ID() == mySelf.ID() then
                 ImGui.SameLine()
-                DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank')
+                MyUI_Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank')
             end
 
             ImGui.TableSetColumnIndex(2)
@@ -536,12 +481,12 @@ local function DrawSelf()
 
             if TLO.Group.MainAssist.ID() == mySelf.ID() then
                 ImGui.SameLine()
-                DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist')
+                MyUI_Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist')
             end
 
             if TLO.Group.Puller.ID() == mySelf.ID() then
                 ImGui.SameLine()
-                DrawStatusIcon('A_Puller', 'pwcs', 'Puller')
+                MyUI_Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller')
             end
 
             ImGui.SameLine()

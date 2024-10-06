@@ -23,10 +23,11 @@ MyUI_Server          = mq.TLO.EverQuest.Server()
 MyUI_Build           = mq.TLO.MacroQuest.BuildName()
 
 local MyActor        = MyUI_Actor.register('myui', function(message) end)
-MyUI_Modules         = {}
-MyUI_Mode            = 'driver'
 local mods           = {}
 local Minimized      = false
+
+MyUI_Modules         = {}
+MyUI_Mode            = 'driver'
 MyUI_SettingsFile    = mq.configDir .. '/MyUI/' .. MyUI_Server:gsub(" ", "_") .. '/' .. MyUI_CharLoaded .. '.lua'
 MyUI_MyChatLoaded    = false
 MyUI_MyChatHandler   = nil
@@ -89,20 +90,15 @@ local function LoadSettings()
 		MyUI_Settings = MyUI_DefaultConfig
 	end
 
-	for k, v in pairs(MyUI_DefaultConfig) do
-		if MyUI_Settings[k] == nil then
-			MyUI_Settings[k] = v
-		end
-	end
-
-	for k, v in pairs(MyUI_DefaultConfig.mods_list) do
-		if MyUI_Settings.mods_list[k] == nil then
-			MyUI_Settings.mods_list[k] = v
-		end
-	end
+	local newSetting = MyUI_Utils.CheckDefaultSettings(MyUI_DefaultConfig, MyUI_Settings)
+	newSetting = MyUI_Utils.CheckDefaultSettings(MyUI_DefaultConfig.mods_list, MyUI_Settings.mods_list) or newSetting
 
 	Minimized = not MyUI_Settings.ShowMain
 	LoadTheme()
+
+	if newSetting then
+		mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+	end
 end
 
 local function GetSortedModuleNames()
@@ -113,7 +109,6 @@ local function GetSortedModuleNames()
 	table.sort(sorted_names)
 	return sorted_names
 end
-
 
 local function InitModules()
 	for idx, data in ipairs(MyUI_Settings.mods_list) do
@@ -210,7 +205,6 @@ local function ProcessModuleChanges()
 	end
 end
 
-
 local function MyUI_Render()
 	if MyUI_Settings.ShowMain then
 		Minimized = false
@@ -305,8 +299,6 @@ local function MyUI_Render()
 	RenderModules()
 end
 
-
-
 local function MyUI_Main()
 	while MyUI_IsRunning do
 		mq.doevents()
@@ -320,9 +312,7 @@ local function MyUI_Main()
 	end
 end
 
-
 local args = { ..., }
-
 local function CheckMode(value)
 	if value == nil then
 		MyUI_Mode = 'driver'

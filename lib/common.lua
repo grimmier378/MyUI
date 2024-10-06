@@ -5,6 +5,9 @@ local CommonUtils = require('mq.Utils')
 CommonUtils.Animation_Item = mq.FindTextureAnimation('A_DragItem')
 CommonUtils.Animation_Spell = mq.FindTextureAnimation('A_SpellIcons')
 
+---comment Get the current time in a formatted string
+---@param slot integer @ the slot of the buff to get the duration of
+---@return string @ returns the formatted time string
 function CommonUtils.GetTargetBuffDuration(slot)
 	local remaining = mq.TLO.Target.Buff(slot).Duration() or 0
 	remaining = remaining / 1000 -- convert to seconds
@@ -18,6 +21,12 @@ function CommonUtils.GetTargetBuffDuration(slot)
 	return sRemaining
 end
 
+---comment Caclulate a Dynamic color within a Range based on a value between 0 and 100
+---Useful for Progress Bar Colors
+---@param minColor any @ the minimum color in the Range
+---@param maxColor any @ the maximum color in the Range
+---@param value any @ Current Value
+---@return any @ returns new Color between the min and max color based on the value
 function CommonUtils.CalculateColor(minColor, maxColor, value)
 	-- Ensure value is within the range of 0 to 100
 	value = math.max(0, math.min(100, value))
@@ -34,63 +43,12 @@ function CommonUtils.CalculateColor(minColor, maxColor, value)
 	return r, g, b, a
 end
 
----@param iconID integer
----@param spell MQSpell -- Spell Userdata
----@param slot integer -- the slot of the spell
----@param iconSize integer|nil	-- default 32
----@param pulse boolean|nil
-function CommonUtils.DrawInspectableSpellIcon(iconID, spell, slot, iconSize, pulse, flashAlpha)
-	local cursor_x, cursor_y = ImGui.GetCursorPos()
-	local beniColor = IM_COL32(0, 20, 180, 190) -- blue benificial default color
-	CommonUtils.Animation_Spell:SetTextureCell(iconID or 0)
-	---@diagnostic disable-next-line: undefined-global
-	local caster = spell.Caster() or '?' -- the caster of the Spell
-	if not spell.Beneficial() then
-		beniColor = IM_COL32(255, 0, 0, 190) --red detrimental
-	end
-	if caster == MyUI_CharLoaded and not spell.Beneficial() then
-		beniColor = IM_COL32(190, 190, 20, 255) -- detrimental cast by me (yellow)
-	end
-	ImGui.GetWindowDrawList():AddRectFilled(ImGui.GetCursorScreenPosVec() + 1,
-		ImGui.GetCursorScreenPosVec() + iconSize, beniColor)
-	ImGui.SetCursorPos(cursor_x + 3, cursor_y + 3)
-	if caster == MyUI_CharLoaded and spell.Beneficial() then
-		ImGui.DrawTextureAnimation(CommonUtils.Animation_Spell, iconSize - 6, iconSize - 6, true)
-	else
-		ImGui.DrawTextureAnimation(CommonUtils.Animation_Spell, iconSize - 5, iconSize - 5)
-	end
-	ImGui.SetCursorPos(cursor_x + 2, cursor_y + 2)
-	local sName = spell.Name() or '??'
-	local sDur = spell.Duration.TotalSeconds() or 0
-	ImGui.PushID(tostring(iconID) .. sName .. "_invis_btn")
-	if sDur < 18 and sDur > 0 and pulse then
-		local flashColor = IM_COL32(0, 0, 0, flashAlpha)
-		ImGui.GetWindowDrawList():AddRectFilled(ImGui.GetCursorScreenPosVec() + 1,
-			ImGui.GetCursorScreenPosVec() + iconSize - 4, flashColor)
-	end
-	ImGui.SetCursorPos(cursor_x, cursor_y)
-	ImGui.InvisibleButton(sName, ImVec2(iconSize, iconSize), bit32.bor(ImGuiButtonFlags.MouseButtonRight))
-	if ImGui.IsItemHovered() then
-		if (ImGui.IsMouseReleased(1)) then
-			spell.Inspect()
-		end
-		if ImGui.BeginTooltip() then
-			ImGui.TextColored(MyUI_Colors.color('yellow'), '%s', sName)
-			ImGui.TextColored(MyUI_Colors.color('green'), '%s', CommonUtils.GetTargetBuffDuration(slot))
-			ImGui.Text('Cast By: ')
-			ImGui.SameLine()
-			ImGui.TextColored(MyUI_Colors.color('light blue'), '%s', caster)
-			ImGui.EndTooltip()
-		end
-	end
-	ImGui.PopID()
-end
-
 ---@param type string @ 'item' or 'pwcs' or 'spell' type of icon to draw
 ---@param txt string @ the tooltip text
 ---@param iconID integer|string @ the icon id to draw
----@param iconSize integer @ the size of the icon to draw
+---@param iconSize integer|nil @ the size of the icon to draw
 function CommonUtils.DrawStatusIcon(iconID, type, txt, iconSize)
+	iconSize = iconSize or 26
 	CommonUtils.Animation_Spell:SetTextureCell(iconID or 0)
 	CommonUtils.Animation_Item:SetTextureCell(iconID or 3996)
 	if type == 'item' then
@@ -107,47 +65,8 @@ function CommonUtils.DrawStatusIcon(iconID, type, txt, iconSize)
 	end
 end
 
-function CommonUtils.DrawTargetBuffs(count, flashAlpha, rise, iconSize)
-	local iconsDrawn = 0
-	-- Width and height of each texture
-	local windowWidth = ImGui.GetWindowContentRegionWidth()
-	-- Calculate max icons per row based on the window width
-	local maxIconsRow = (windowWidth / iconSize) - 0.75
-	if rise == true then
-		flashAlpha = flashAlpha + 5
-	elseif rise == false then
-		flashAlpha = flashAlpha - 5
-	end
-	if flashAlpha == 128 then rise = false end
-	if flashAlpha == 25 then rise = true end
-	ImGui.BeginGroup()
-	ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 0, 0)
-	if mq.TLO.Me.BuffCount() ~= nil then
-		for i = 1, count do
-			local sIcon = mq.TLO.Target.Buff(i).SpellIcon() or 0
-			if mq.TLO.Target.Buff(i) ~= nil then
-				CommonUtils.DrawInspectableSpellIcon(sIcon, mq.TLO.Target.Buff(i), i, iconSize, true, flashAlpha)
-				iconsDrawn = iconsDrawn + 1
-			end
-			-- Check if we've reached the max icons for the row, if so reset counter and new line
-			if iconsDrawn >= maxIconsRow then
-				iconsDrawn = 0 -- Reset counter
-			else
-				-- Use SameLine to keep drawing items on the same line, except for when a new line is needed
-				if i < count then
-					ImGui.SameLine()
-				else
-					ImGui.SetCursorPosX(1)
-				end
-			end
-		end
-	end
-	ImGui.PopStyleVar()
-	ImGui.EndGroup()
-end
-
 ---@param spawn MQSpawn
-function CommonUtils.CetConLevel(spawn)
+function CommonUtils.GetConColor(spawn)
 	local conColor = string.lower(spawn.ConColor()) or 'WHITE'
 	return conColor
 end
@@ -180,6 +99,25 @@ function CommonUtils.CheckRemovedSettings(default_settings, loaded_settings)
 	return newSetting
 end
 
+---comment
+--- Takes in a table of default settings and a table of loaded settings and checks for any New default settings
+--- If a new setting is found it will add it to the loaded settings table
+--- Returns true if a new setting was found so you know to save the settings file
+---@param default_settings table @ the default settings table
+---@param loaded_settings table @ the loaded settings table
+---@return boolean @ returns true if a new setting was found
+function CommonUtils.CheckDefaultSettings(default_settings, loaded_settings)
+	local newSetting = false
+	for setting, value in pairs(default_settings or {}) do
+		if loaded_settings[setting] == nil then
+			CommonUtils.PrintOutput("\ayNew Default Setting: \ao%s \ayAdding it from the Settings File.", setting)
+			loaded_settings[setting] = value
+			newSetting = true
+		end
+	end
+	return newSetting
+end
+
 -- Function to append colored text segments
 ---@param console any @ the console we are writing to
 ---@param timestamp string @ the timestamp for the line
@@ -187,6 +125,7 @@ end
 ---@param textColor table|nil @ the color we are writing the text in
 ---@param timeStamps boolean|nil @ are we writing timestamps?
 function CommonUtils.AppendColoredTimestamp(console, timestamp, text, textColor, timeStamps)
+	if timeStamps == nil then timeStamps = true end
 	text = text:gsub("%[%d%d:%d%d:%d%d%] ", "")
 	if timeStamps then
 		-- Define TimeStamp colors
@@ -196,8 +135,12 @@ function CommonUtils.AppendColoredTimestamp(console, timestamp, text, textColor,
 		console:AppendTextUnformatted(whiteColor, timestamp)
 		console:AppendTextUnformatted(yellowColor, "] ")
 	end
-
-	console:AppendText(text)
+	if textColor ~= nil then
+		console:AppendTextUnformatted(textColor, text)
+		console:AppendText("") -- Move to the next line after the entry
+	else
+		console:AppendText(text)
+	end
 end
 
 function CommonUtils.GiveItem(target_id)

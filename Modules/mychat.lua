@@ -144,18 +144,6 @@ local function GetColorVal(colorString)
     return { 1, 1, 1, 1, }
 end
 
----Check to see if the file we want to work on exists.
----@param name string -- Full Path to file
----@return boolean -- returns true if the file exists and false otherwise
-local function File_Exists(name)
-    local f = io.open(name, "r")
-    if f ~= nil then
-        io.close(f)
-        return true
-    else
-        return false
-    end
-end
 
 ---Checks for the last ID number in the table passed. returns the NextID
 ---@param table table -- the table we want to look up ID's in
@@ -310,9 +298,9 @@ local function writeSettings(file, table)
 end
 
 local function loadSettings()
-    if not File_Exists(MyChat.SettingsFile) then
+    if not MyUI_Utils.File.Exists(MyChat.SettingsFile) then
         settingsOld = string.format('%s/MyChat_%s_%s.lua', mq.configDir, serverName, myName)
-        if File_Exists(settingsOld) then
+        if MyUI_Utils.File.Exists(settingsOld) then
             MyChat.Settings = dofile(settingsOld)
             mq.pickle(MyChat.SettingsFile, MyChat.Settings)
         else
@@ -326,7 +314,7 @@ local function loadSettings()
         if firstPass then
             local date = os.date("%m_%d_%Y_%H_%M")
             local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, myName, date)
-            if not File_Exists(backup) then mq.pickle(backup, MyChat.Settings) end
+            if not MyUI_Utils.File.Exists(backup) then mq.pickle(backup, MyChat.Settings) end
             reIndexSettings(MyChat.SettingsFile, MyChat.Settings)
             firstPass = false
         end
@@ -436,7 +424,7 @@ local function loadSettings()
     end
 
     useThemeName = MyChat.Settings.LoadTheme
-    if not File_Exists(MyChat.ThemesFile) then
+    if not MyUI_Utils.File.Exists(MyChat.ThemesFile) then
         local defaultThemes = MyUI_Utils.Library.Include('defaults.themes')
         MyChat.theme = defaultThemes
     else
@@ -604,29 +592,6 @@ local function CheckNPC(line)
     return false, name
 end
 
--- Function to append colored text segments
----@param console any @ the console we are writing to
----@param timestamp string @ the timestamp for the line
----@param text string @ the text we are writing
----@param textColor table|nil @ the color we are writing the text in
----@param tlo boolean|nil @ are we writing to a TLO created console?
-local function appendColoredTimestamp(console, timestamp, text, textColor, tlo)
-    text = text:gsub("%[%d%d:%d%d:%d%d%] ", "")
-    if timeStamps then
-        -- Define TimeStamp colors
-        local yellowColor = ImVec4(1, 1, 0, 1)
-        local whiteColor = ImVec4(1, 1, 1, 1)
-        console:AppendTextUnformatted(yellowColor, "[")
-        console:AppendTextUnformatted(whiteColor, timestamp)
-        console:AppendTextUnformatted(yellowColor, "] ")
-    end
-    if not tlo then
-        console:AppendTextUnformatted(textColor, text)
-        console:AppendText("") -- Move to the next line after the entry
-    else
-        console:AppendText(text)
-    end
-end
 
 --[[ Reads in the line, channelID and eventName of the triggered events. Parses the line against the Events and Filters for that channel.
     adjusts coloring for the line based on settings for the matching event / filter and writes to the corresponding console.
@@ -746,18 +711,19 @@ function MyChat.EventChat(channelID, eventName, line, spam)
                 local colorCode = ImVec4(colorVec[1], colorVec[2], colorVec[3], colorVec[4])
 
                 if MyChat.Consoles[channelID].console then
-                    appendColoredTimestamp(MyChat.Consoles[channelID].console, tStamp, conLine, colorCode)
+                    MyUI_Utils.AppendColoredTimestamp(MyChat.Consoles[channelID].console, tStamp, conLine, colorCode, timeStamps)
                 end
 
                 -- -- write channel console
-                if timeStamps then
-                    tStamp = mq.TLO.Time.Time24()
-                    line = string.format("[%s] %s", tStamp, line) -- fake zome use drawn text
-                end
                 local i = getNextID(txtBuffer)
+
+                if timeStamps then
+                    line = string.format("%s %s", tStamp, line)
+                end
+
                 -- write main console
                 if MyChat.tempSettings.Channels[channelID].MainEnable then
-                    appendColoredTimestamp(MyChat.console, tStamp, conLine, colorCode)
+                    MyUI_Utils.AppendColoredTimestamp(MyChat.console, tStamp, conLine, colorCode, timeStamps)
                     -- ChatWin.console:AppendText(colorCode,conLine)
                     local z = getNextID(mainBuffer)
 
@@ -853,7 +819,7 @@ function MyChat.EventChatSpam(channelID, line)
             end
             -- write channel console
             if MyChat.Consoles[channelID].console then
-                appendColoredTimestamp(MyChat.Consoles[channelID].console, tStamp, conLine, colorCode)
+                MyUI_Utils.AppendColoredTimestamp(MyChat.Consoles[channelID].console, tStamp, conLine, colorCode, timeStamps)
                 -- ChatWin.Consoles[channelID].console:AppendText(colorCode, conLine)
             end
 
@@ -1994,7 +1960,7 @@ function MyChat.Config_GUI(open)
 
         if ImGui.Button('Import Channels') then
             local tmp = mq.configDir .. '/MyUI/MyChat/' .. importFile
-            if not File_Exists(tmp) then
+            if not MyUI_Utils.File.Exists(tmp) then
                 mq.cmd("/msgbox 'No File Found!")
             else
                 -- Load settings from the Lua config file
@@ -2218,7 +2184,7 @@ end
 function MyChat.MyChatHandler(consoleName, message)
     -- if console specified is main then just print to main console
     if consoleName:lower() == 'main' then
-        appendColoredTimestamp(MyChat.console, mq.TLO.Time.Time24(), message, nil, true)
+        MyUI_Utils.AppendColoredTimestamp(MyChat.console, mq.TLO.Time.Time24(), message, nil, true)
         return
     end
 
@@ -2228,11 +2194,11 @@ function MyChat.MyChatHandler(consoleName, message)
 
     -- main console if enabled
     if MyChat.Settings.Channels[consoleID].MainEnable ~= false then
-        appendColoredTimestamp(MyChat.console, mq.TLO.Time.Time24(), message, nil, true)
+        MyUI_Utils.AppendColoredTimestamp(MyChat.console, mq.TLO.Time.Time24(), message, nil, true)
     end
 
     -- our console
-    appendColoredTimestamp(MyChat.Consoles[consoleID].console, mq.TLO.Time.Time24(), message, nil, true)
+    MyUI_Utils.AppendColoredTimestamp(MyChat.Consoles[consoleID].console, mq.TLO.Time.Time24(), message, nil, true)
 end
 
 function MyChat.SortChannels()

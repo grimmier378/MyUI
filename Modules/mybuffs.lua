@@ -145,7 +145,7 @@ local function GenerateContent(subject, songsTable, buffsTable, doWho, doWhat)
     end
 
     local content = {
-        Who = mq.TLO.Me.DisplayName(),
+        Name = mq.TLO.Me.DisplayName(),
         Buffs = buffsTable,
         Songs = songsTable,
         DoWho = dWho,
@@ -380,14 +380,14 @@ local function GetBuffs()
         subject = 'CheckIn'
     end
     if firstRun then subject = 'Hello' end
-    if not solo then
+    if not solo and MyBuffs_Actor ~= nil then
         if changed or firstRun then
             MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'myui', }, GenerateContent(subject, MyBuffs.songTable, MyBuffs.buffTable))
             MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, GenerateContent(subject, MyBuffs.songTable, MyBuffs.buffTable))
             changed = false
         else
             for i = 1, #MyBuffs.boxes do
-                if MyBuffs.boxes[i].Who == mq.TLO.Me.DisplayName() then
+                if MyBuffs.boxes[i].Name == mq.TLO.Me.DisplayName() then
                     MyBuffs.boxes[i].Buffs = MyBuffs.buffTable
                     MyBuffs.boxes[i].Songs = MyBuffs.songTable
                     MyBuffs.boxes[i].SongCount = mq.TLO.Me.CountSongs() or 0
@@ -406,7 +406,7 @@ local function GetBuffs()
     else
         if MyBuffs.boxes[1] == nil then
             table.insert(MyBuffs.boxes, {
-                Who = mq.TLO.Me.DisplayName(),
+                Name = mq.TLO.Me.DisplayName(),
                 Buffs = MyBuffs.buffTable,
                 Songs = MyBuffs.songTable,
                 Check = os.time(),
@@ -421,7 +421,7 @@ local function GetBuffs()
         else
             MyBuffs.boxes[1].Buffs = MyBuffs.buffTable
             MyBuffs.boxes[1].Songs = MyBuffs.songTable
-            MyBuffs.boxes[1].Who = mq.TLO.Me.DisplayName()
+            MyBuffs.boxes[1].Name = mq.TLO.Me.DisplayName()
             MyBuffs.boxes[1].BuffCount = mq.TLO.Me.BuffCount() or 0
             MyBuffs.boxes[1].SongCount = mq.TLO.Me.CountSongs() or 0
             MyBuffs.boxes[1].BuffSlots = numSlots
@@ -438,7 +438,7 @@ end
 local function MessageHandler()
     MyBuffs_Actor = MyUI_Actor.register(MyBuffs.ActorMailBox, function(message)
         local MemberEntry    = message()
-        local who            = MemberEntry.Who or 'Unknown'
+        local who            = MemberEntry.Name or 'Unknown'
         local charBuffs      = MemberEntry.Buffs or {}
         local charSongs      = MemberEntry.Songs or {}
         local charSlots      = MemberEntry.BuffSlots or 0
@@ -485,7 +485,7 @@ local function MessageHandler()
         --New member connected if Hello is true. Lets send them our data so they have it.
         if MemberEntry.Subject == 'Hello' then
             check = os.time()
-            if who ~= mq.TLO.Me.DisplayName() and who ~= 'Unknown' then
+            if who ~= mq.TLO.Me.DisplayName() and who ~= 'Unknown' and MyBuffs_Actor ~= nil then
                 MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, GenerateContent('Welcome', MyBuffs.songTable, MyBuffs.buffTable))
                 MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'myui', }, GenerateContent('Welcome', MyBuffs.songTable, MyBuffs.buffTable))
             end
@@ -497,7 +497,7 @@ local function MessageHandler()
         -- Process the rest of the message into the groupData table.
         if MemberEntry.Subject ~= 'Action' and who ~= 'Unknown' then
             for i = 1, #MyBuffs.boxes do
-                if MyBuffs.boxes[i].Who == who then
+                if MyBuffs.boxes[i].Name == who then
                     MyBuffs.boxes[i].Buffs = charBuffs
                     MyBuffs.boxes[i].Songs = charSongs
                     MyBuffs.boxes[i].Check = check
@@ -515,7 +515,7 @@ local function MessageHandler()
             end
             if not found then
                 table.insert(MyBuffs.boxes, {
-                    Who          = who,
+                    Name         = who,
                     Buffs        = charBuffs,
                     Songs        = charSongs,
                     Check        = check,
@@ -537,11 +537,13 @@ end
 local function SayGoodBye()
     local message = {
         Subject = 'Goodbye',
-        Who = mq.TLO.Me.DisplayName(),
+        Name = mq.TLO.Me.DisplayName(),
         Check = 0,
     }
-    MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, message)
-    MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'myui', }, message)
+    if MyBuffs_Actor ~= nil then
+        MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, message)
+        MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'myui', }, message)
+    end
 end
 
 local function loadTheme()
@@ -578,37 +580,10 @@ local function loadSettings()
     end
 
     loadTheme()
+    newSetting = MyUI_Utils.CheckDefaultSettings(MyBuffs.defaults, MyBuffs.settings[script])
+    newSetting = MyUI_Utils.CheckDefaultSettings(MyBuffs.defaults.WindowPositions, MyBuffs.settings[script].WindowPositions) or newSetting
+    newSetting = MyUI_Utils.CheckDefaultSettings(MyBuffs.defaults.WindowSizes, MyBuffs.settings[script].WindowSizes) or newSetting
 
-    if MyBuffs.settings[script].WindowPositions == nil then
-        MyBuffs.settings[script].WindowPositions = {}
-        newSetting = true
-    end
-    if MyBuffs.settings[script].WindowSizes == nil then
-        MyBuffs.settings[script].WindowSizes = {}
-    end
-    for k, v in pairs(MyBuffs.defaults.WindowPositions) do
-        if MyBuffs.settings[script].WindowPositions[k] == nil then
-            MyBuffs.settings[script].WindowPositions[k] = v
-            newSetting = true
-        end
-    end
-    for k, v in pairs(MyBuffs.defaults.WindowSizes) do
-        if MyBuffs.settings[script].WindowSizes == nil then
-            MyBuffs.settings[script].WindowSizes = {}
-        end
-        if MyBuffs.settings[script].WindowSizes[k] == nil then
-            MyBuffs.settings[script].WindowSizes[k] = v
-            newSetting = true
-        end
-    end
-    for k, v in pairs(MyBuffs.defaults) do
-        if k ~= 'WindowPositions' and k ~= 'WindowSizes' then
-            if MyBuffs.settings[script][k] == nil then
-                MyBuffs.settings[script][k] = v
-                newSetting = true
-            end
-        end
-    end
     MyBuffs.showTitleBar = MyBuffs.settings[script].ShowTitleBar
     showTableView = MyBuffs.settings[script].TableView
     PulseSpeed = MyBuffs.settings[script].PulseSpeed
@@ -710,7 +685,7 @@ end
 local function BoxBuffs(id, sorted, view)
     if view == nil then view = 'column' end
     if sorted == nil then sorted = 'none' end
-    local boxChar = MyBuffs.boxes[id].Who or '?'
+    local boxChar = MyBuffs.boxes[id].Name or '?'
     local boxBuffs = (sorted == 'alpha' and MyBuffs.boxes[id].SortedBuffsA) or (sorted == 'dur' and MyBuffs.boxes[id].SortedBuffsD) or MyBuffs.boxes[id].Buffs
     local buffSlots = MyBuffs.boxes[id].BuffSlots or 0
     local sizeX, sizeY = ImGui.GetContentRegionAvail()
@@ -802,7 +777,7 @@ local function BoxBuffs(id, sorted, view)
 
             if ImGui.MenuItem("Block##" .. i) then
                 local what = string.format('blockbuff%s', boxBuffs[i].Name)
-                if not solo then
+                if not solo and MyBuffs_Actor ~= nil then
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'myui', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                 else
@@ -812,7 +787,7 @@ local function BoxBuffs(id, sorted, view)
 
             if ImGui.MenuItem("Remove##" .. i) then
                 local what = string.format('buff%s', boxBuffs[i].Name)
-                if not solo then
+                if not solo and MyBuffs_Actor ~= nil then
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'myui', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                 else
@@ -824,7 +799,7 @@ local function BoxBuffs(id, sorted, view)
         if ImGui.IsItemHovered() then
             if ImGui.IsMouseDoubleClicked(0) then
                 local what = string.format('buff%s', boxBuffs[i].Name)
-                if not solo then
+                if not solo and MyBuffs_Actor ~= nil then
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'myui', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                 else
@@ -867,7 +842,7 @@ local function BoxSongs(id, sorted, view)
     if view == nil then view = 'column' end
     if #MyBuffs.boxes == 0 then return end
     if sorted == nil then sorted = 'none' end
-    local boxChar = MyBuffs.boxes[id].Who or '?'
+    local boxChar = MyBuffs.boxes[id].Name or '?'
     local boxSongs = (sorted == 'alpha' and MyBuffs.boxes[id].SortedSongsA) or (sorted == 'dur' and MyBuffs.boxes[id].SortedSongsD) or MyBuffs.boxes[id].Songs
     local sCount = MyBuffs.boxes[id].SongCount or 0
     local sizeX, sizeY = ImGui.GetContentRegionAvail()
@@ -940,7 +915,7 @@ local function BoxSongs(id, sorted, view)
             end
             if ImGui.MenuItem("Block##" .. i) then
                 local what = string.format('blocksong%s', boxSongs[i].Name)
-                if not solo then
+                if not solo and MyBuffs_Actor ~= nil then
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'myui', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                 else
@@ -949,7 +924,7 @@ local function BoxSongs(id, sorted, view)
             end
             if ImGui.MenuItem("Remove##" .. i) then
                 local what = string.format('song%s', boxSongs[i].Name)
-                if not solo then
+                if not solo and MyBuffs_Actor ~= nil then
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'myui', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, what))
                 else
@@ -960,7 +935,7 @@ local function BoxSongs(id, sorted, view)
         end
         if ImGui.IsItemHovered() then
             if ImGui.IsMouseDoubleClicked(0) then
-                if not solo then
+                if not solo and MyBuffs_Actor ~= nil then
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', },
                         GenerateContent('Action', MyBuffs.songTable, MyBuffs.buffTable, boxChar, 'song' .. boxSongs[i].Name))
                     MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'myui', },
@@ -1003,7 +978,7 @@ end
 
 local function sortedBoxes(boxes)
     table.sort(boxes, function(a, b)
-        return a.Who < b.Who
+        return a.Name < b.Name
     end)
     return boxes
 end
@@ -1114,14 +1089,14 @@ function MyBuffs.RenderGUI()
                 ImGui.SetWindowFontScale(Scale)
                 if not solo then
                     if #MyBuffs.boxes > 0 then
-                        -- Sort boxes by the 'Who' attribute
+                        -- Sort boxes by the 'Name' attribute
                         local sorted_boxes = sortedBoxes(MyBuffs.boxes)
                         ImGui.SetNextItemWidth(ImGui.GetWindowWidth() - 15)
                         if ImGui.BeginCombo("##CharacterCombo", activeButton) then
                             for i = 1, #sorted_boxes do
                                 local box = sorted_boxes[i]
-                                if ImGui.Selectable(box.Who, activeButton == box.Who) then
-                                    activeButton = box.Who
+                                if ImGui.Selectable(box.Name, activeButton == box.Name) then
+                                    activeButton = box.Name
                                 end
                             end
                             ImGui.EndCombo()
@@ -1129,7 +1104,7 @@ function MyBuffs.RenderGUI()
 
                         -- Draw the content of the active button
                         for i = 1, #sorted_boxes do
-                            if sorted_boxes[i].Who == activeButton then
+                            if sorted_boxes[i].Name == activeButton then
                                 ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 0, 0)
                                 BoxBuffs(i, sortType)
                                 if not MyBuffs.SplitWin then BoxSongs(i, sortType) end
@@ -1160,7 +1135,7 @@ function MyBuffs.RenderGUI()
                 )
                 if ImGui.BeginTable("Group Table##1", 3, tFlags) then
                     ImGui.TableSetupScrollFreeze(0, 1)
-                    ImGui.TableSetupColumn("Who")
+                    ImGui.TableSetupColumn("Name")
                     ImGui.TableSetupColumn("Buffs")
                     ImGui.TableSetupColumn("Songs")
                     ImGui.TableHeadersRow()
@@ -1169,10 +1144,10 @@ function MyBuffs.RenderGUI()
                         for i = 1, #MyBuffs.boxes do
                             ImGui.TableNextColumn()
                             ImGui.SetWindowFontScale(Scale)
-                            if MyBuffs.boxes[i].Who == mq.TLO.Me.CleanName() then
-                                ImGui.TextColored(ImVec4(0, 1, 1, 1), MyBuffs.boxes[i].Who)
+                            if MyBuffs.boxes[i].Name == mq.TLO.Me.CleanName() then
+                                ImGui.TextColored(ImVec4(0, 1, 1, 1), MyBuffs.boxes[i].Name)
                             else
-                                ImGui.Text(MyBuffs.boxes[i].Who)
+                                ImGui.Text(MyBuffs.boxes[i].Name)
                             end
                             ImGui.TableNextColumn()
                             ImGui.SetWindowFontScale(Scale)
@@ -1275,7 +1250,7 @@ function MyBuffs.RenderGUI()
         if show then
             if #MyBuffs.boxes > 0 then
                 for i = 1, #MyBuffs.boxes do
-                    if MyBuffs.boxes[i].Who == activeButton then
+                    if MyBuffs.boxes[i].Name == activeButton then
                         BoxSongs(i, sortType)
                     end
                 end
@@ -1533,8 +1508,8 @@ function MyBuffs.RenderGUI()
                 for i = 1, #MyBuffs.boxes do
                     if #MyBuffs.boxes[i].Debuffs > 1 then
                         local sizeX, sizeY = ImGui.GetContentRegionAvail()
-                        if ImGui.BeginChild(MyBuffs.boxes[i].Who .. "##Debuffs_" .. MyBuffs.boxes[i].Who, ImVec2(sizeX, 60), bit32.bor(ImGuiChildFlags.Border), bit32.bor(ImGuiWindowFlags.NoScrollbar)) then
-                            ImGui.Text(MyBuffs.boxes[i].Who)
+                        if ImGui.BeginChild(MyBuffs.boxes[i].Name .. "##Debuffs_" .. MyBuffs.boxes[i].Name, ImVec2(sizeX, 60), bit32.bor(ImGuiChildFlags.Border), bit32.bor(ImGuiWindowFlags.NoScrollbar)) then
+                            ImGui.Text(MyBuffs.boxes[i].Name)
                             for k, v in pairs(MyBuffs.boxes[i].Debuffs) do
                                 if v.ID > 0 then
                                     DrawInspectableSpellIcon(v.Icon, v, k)

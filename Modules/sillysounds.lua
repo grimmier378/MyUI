@@ -148,24 +148,18 @@ local function loadSettings()
     end
     tmpTheme = settings.theme or 'default'
     local newSetting = false
-    for k, v in pairs(defaults) do
-        if settings[k] == nil then
-            settings[k] = v
-            newSetting = true
-        end
-    end
-    for k, v in pairs(defaults.Sounds.default) do
-        if settings.Sounds[settings.theme][k] == nil then
-            settings.Sounds[settings.theme][k] = v
-            newSetting = true
-        end
-    end
+
+    newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings) or newSetting
+    newSetting = MyUI_Utils.CheckDefaultSettings(defaults.Sounds.default, settings.Sounds[settings.theme]) or newSetting
+
+    -- check for missing sound files
     for k, v in pairs(settings.Sounds[settings.theme]) do
         if not MyUI_Utils.File.Exists(string.format("%s%s/%s", path, settings.theme, v.file)) then
             settings[k] = false
             printf("\aySound file %s missing!!\n\tTurning %s \arOFF", string.format("%s%s/%s", path, settings.theme, v.file), k)
         end
     end
+
     if settings.ItemWatch ~= '' then
         local eStr = string.format("#*#%s#*#", settings.ItemWatch)
         mq.event("item_added", eStr, eventItem)

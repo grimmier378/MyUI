@@ -16,6 +16,8 @@ function COLOR.color(c)
     if (c == 'green2') then return ImVec4(0.01, 0.56, 0.001, 1) end
     if (c == 'grey') then return ImVec4(0.6, 0.6, 0.6, 1) end
     if (c == 'purple') then return ImVec4(0.8, 0.0, 1.0, 1.0) end
+    if (c == 'btn_red') then return ImVec4(1.0, 0.4, 0.4, 0.4) end
+    if (c == 'btn_green') then return ImVec4(0.4, 1.0, 0.4, 0.4) end
 end
 
 return COLOR

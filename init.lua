@@ -46,6 +46,7 @@ local default_list   = {
 	'PlayerTarg',
 	'SAST',
 	'SillySounds',
+	"AlertMaster",
 }
 
 MyUI_DefaultConfig   = {
@@ -65,6 +66,7 @@ MyUI_DefaultConfig   = {
 		[7]  = { name = 'PlayerTarg', enabled = false, },
 		[8]  = { name = 'SAST', enabled = false, },
 		[9]  = { name = 'SillySounds', enabled = false, },
+		[14] = { name = 'AlertMaster', enabled = false, },
 	},
 }
 MyUI_Settings        = {}

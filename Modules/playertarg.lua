@@ -478,8 +478,8 @@ local function PlayerTargConf_GUI()
             colorHpMax = ImGui.ColorEdit4("HP Max Color##" .. script, colorHpMax, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
 
             testValue = ImGui.SliderInt("Test HP##" .. script, testValue, 0, 100)
-            local r, g, b, a = MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, testValue)
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r, g, b, a))
+
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, testValue))
             ImGui.ProgressBar((testValue / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test')
             ImGui.PopStyleColor()
 
@@ -492,8 +492,7 @@ local function PlayerTargConf_GUI()
             colorMpMax = ImGui.ColorEdit4("Mana Max Color##" .. script, colorMpMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
 
             testValue2 = ImGui.SliderInt("Test MP##" .. script, testValue2, 0, 100)
-            local r2, g2, b2, a2 = MyUI_Utils.CalculateColor(colorMpMin, colorMpMax, testValue2)
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r2, g2, b2, a2))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(colorMpMin, colorMpMax, testValue2))
             ImGui.ProgressBar((testValue2 / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test2')
             ImGui.PopStyleColor()
         end
@@ -514,8 +513,7 @@ local function PlayerTargConf_GUI()
             colorBreathMax = ImGui.ColorEdit4("Breath Max Color##" .. script, colorBreathMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
             local testValue3 = 100
             testValue3 = ImGui.SliderInt("Test Breath##" .. script, testValue3, 0, 100)
-            local r3, g3, b3, a3 = MyUI_Utils.CalculateColor(colorBreathMin, colorBreathMax, testValue3)
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r3, g3, b3, a3))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(colorBreathMin, colorBreathMax, testValue3))
             ImGui.ProgressBar((testValue3 / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test3')
             ImGui.PopStyleColor()
         end
@@ -571,8 +569,7 @@ local function drawTarget()
         --Target Health Bar
         ImGui.BeginGroup()
         if settings[script].DynamicHP then
-            local tr, tg, tb, ta = MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, mq.TLO.Target.PctHPs())
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(tr, tg, tb, ta))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, mq.TLO.Target.PctHPs()))
         else
             if mq.TLO.Target.PctHPs() < 25 then
                 ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('orange')))
@@ -881,8 +878,7 @@ function PlayerTarg.RenderGUI()
             local yPos = ImGui.GetCursorPosY()
 
             if settings[script].DynamicHP then
-                local hr, hg, hb, ha = MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, mq.TLO.Me.PctHPs())
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(hr, hg, hb, ha))
+                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, mq.TLO.Me.PctHPs())))
             else
                 if mq.TLO.Me.PctHPs() <= 0 then
                     ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('purple')))
@@ -909,8 +905,7 @@ function PlayerTarg.RenderGUI()
             --My Mana Bar
             if (tonumber(mq.TLO.Me.MaxMana()) > 0) then
                 if settings[script].DynamicMP then
-                    local mr, mg, mb, ma = MyUI_Utils.CalculateColor(colorMpMin, colorMpMax, mq.TLO.Me.PctMana())
-                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(mr, mg, mb, ma))
+                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(colorMpMin, colorMpMax, mq.TLO.Me.PctMana()))
                 else
                     ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('light blue2')))
                 end
@@ -993,8 +988,7 @@ function PlayerTarg.RenderGUI()
             ImGui.SetWindowFontScale(FontScale)
 
             local yPos = ImGui.GetCursorPosY()
-            local red, green, blu, alpha = MyUI_Utils.CalculateColor(colorBreathMin, colorBreathMax, breathPct)
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(red, green, blu, alpha))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(colorBreathMin, colorBreathMax, breathPct))
             ImGui.ProgressBar((breathPct / 100), ImGui.GetContentRegionAvail(), progressSize, '##pctBreath')
             ImGui.PopStyleColor()
             if ImGui.BeginPopupContextItem("##MySpells_CastWin") then

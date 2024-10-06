@@ -855,8 +855,7 @@ function MySpells.RenderGUI()
 				-- if remaining < 0 then remaining = 0 end
 				local colorHpMin = { 0.0, 1.0, 0.0, 1.0, }
 				local colorHpMax = { 1.0, 0.0, 0.0, 1.0, }
-				local hr, hg, hb, ha = MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, (remaining / castTime * 100))
-				ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(hr, hg, hb, ha))
+				ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, (remaining / castTime * 100))))
 				ImGui.ProgressBar(remaining / castTime, ImVec2(ImGui.GetWindowWidth(), 15), '')
 				ImGui.PopStyleColor()
 				local lbl = remaining > 0 and string.format("%.1f", (remaining / 1000)) or '0'

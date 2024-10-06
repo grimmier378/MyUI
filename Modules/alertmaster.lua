@@ -260,41 +260,33 @@ local function setVolume(volume)
 	winmm.waveOutSetVolume(nil, leftRightVolume)
 end
 -- helpers
-local MsgPrefix = function() return string.format('\aw[%s] [\a-tAlert Master\aw] ::\ax ', mq.TLO.Time()) end
+local MsgPrefix = function() return string.format('\aw[\a-tAlert Master\aw] ::\ax ') end
 
 local GetCharZone = function()
 	return '\aw[\ao' .. MyUI_CharLoaded .. '\aw] [\at' .. Zone.ShortName() .. '\aw] '
 end
 
--- local print_ts = function(msg) print(MsgPrefix()..msg) end
-local function print_ts(msg, ...)
-	local formatted_msg = string.format(msg, ...)
-	formatted_msg = MsgPrefix() .. formatted_msg
-
-	print(formatted_msg)
-end
-
 local function print_status()
-	print_ts('\ayAlert Status: ' .. tostring(active and 'on' or 'off'))
-	print_ts('\a-tPCs: \a-y' ..
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayAlert Status: ' .. tostring(active and 'on' or 'off'))
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-tPCs: \a-y' ..
 		tostring(pcs) ..
 		'\ax radius: \a-y' .. tostring(radius) .. '\ax zradius: \a-y' .. tostring(zradius) .. '\ax delay: \a-y' .. tostring(delay) ..
 		's\ax remind: \a-y' .. tostring(remind) .. ' seconds\ax')
-	print_ts('\a-tremindNPC: \a-y' .. tostring(remindNPC) .. '\at minutes\ax')
-	print_ts('\agClose Range\a-t Below: \a-g' .. tostring(DistColorRanges.orange) .. '\ax')
-	print_ts('\aoMid Range\a-t Between: \a-g' .. tostring(DistColorRanges.orange) .. '\a-t and \a-r' .. tostring(DistColorRanges.red) .. '\ax')
-	print_ts('\arLong Rage\a-t Greater than: \a-r' .. tostring(DistColorRanges.red) .. '\ax')
-	print_ts('\a-tAnnounce PCs: \a-y' .. tostring(announce) .. '\ax')
-	print_ts('\a-tSpawns (zone wide): \a-y' .. tostring(spawns) .. '\ax')
-	print_ts('\a-tGMs (zone wide): \a-y' .. tostring(gms) .. '\ax')
-	print_ts('\a-tPopup Alerts: \a-y' .. tostring(doAlert) .. '\ax')
-	print_ts('\a-tBeep: \a-y' .. tostring(doBeep) .. '\ax')
-	print_ts('\a-tSound PC Alerts: \a-y' .. tostring(doSoundPC) .. '\ax')
-	print_ts('\a-tSound NPC Alerts: \a-y' .. tostring(doSoundNPC) .. '\ax')
-	print_ts('\a-tSound GM Alerts: \a-y' .. tostring(doSoundGM) .. '\ax')
-	print_ts('\a-tVolume PC Alerts: \a-y' .. tostring(volPC) .. '\ax')
-	print_ts('\a-tVolume NPC Alerts: \a-y' .. tostring(volNPC) .. '\ax')
-	print_ts('\a-tVolume GM Alerts: \a-y' .. tostring(volGM) .. '\ax')
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-tremindNPC: \a-y' .. tostring(remindNPC) .. '\at minutes\ax')
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\agClose Range\a-t Below: \a-g' .. tostring(DistColorRanges.orange) .. '\ax')
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\aoMid Range\a-t Between: \a-g' .. tostring(DistColorRanges.orange) .. '\a-t and \a-r' .. tostring(DistColorRanges.red) .. '\ax')
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\arLong Rage\a-t Greater than: \a-r' .. tostring(DistColorRanges.red) .. '\ax')
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-tAnnounce PCs: \a-y' .. tostring(announce) .. '\ax')
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-tSpawns (zone wide): \a-y' .. tostring(spawns) .. '\ax')
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-tGMs (zone wide): \a-y' .. tostring(gms) .. '\ax')
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-tPopup Alerts: \a-y' .. tostring(doAlert) .. '\ax')
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-tBeep: \a-y' .. tostring(doBeep) .. '\ax')
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-tSound PC Alerts: \a-y' .. tostring(doSoundPC) .. '\ax')
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-tSound NPC Alerts: \a-y' .. tostring(doSoundNPC) .. '\ax')
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-tSound GM Alerts: \a-y' .. tostring(doSoundGM) .. '\ax')
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-tVolume PC Alerts: \a-y' .. tostring(volPC) .. '\ax')
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-tVolume NPC Alerts: \a-y' .. tostring(volNPC) .. '\ax')
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-tVolume GM Alerts: \a-y' .. tostring(volGM) .. '\ax')
 end
 
 local save_settings = function()
@@ -696,7 +688,7 @@ local run_char_commands = function()
 	if settings[CharCommands] ~= nil then
 		for k, cmd in pairs(settings[CharCommands]) do
 			mq.cmdf(cmd)
-			print_ts(string.format('Ran command: "%s"', cmd))
+			MyUI_Utils.PrintOutput('AlertMaster', nil, string.format('Ran command: "%s"', cmd))
 		end
 	end
 end
@@ -753,7 +745,7 @@ local check_for_gms = function()
 			for name, v in pairs(tmp) do
 				if tGMs[name] == nil then
 					tGMs[name] = v
-					print_ts(GetCharZone() .. v.name .. ' ' .. v.guild .. ' entered the zone. ' .. v.distance .. ' units away.')
+					MyUI_Utils.PrintOutput('AlertMaster', nil, GetCharZone() .. v.name .. ' ' .. v.guild .. ' entered the zone. ' .. v.distance .. ' units away.')
 					if doSoundGM then
 						setVolume(volGM)
 						playSound(soundGM)
@@ -764,14 +756,14 @@ local check_for_gms = function()
 						setVolume(volGM)
 						playSound(soundGM)
 					end
-					print_ts(GetCharZone() .. v.name .. ' loitering ' .. v.distance .. ' units away.')
+					MyUI_Utils.PrintOutput('AlertMaster', nil, GetCharZone() .. v.name .. ' loitering ' .. v.distance .. ' units away.')
 				end
 			end
 			if tGMs ~= nil then
 				for name, v in pairs(tGMs) do
 					if tmp[name] == nil then
 						tGMs[name] = nil
-						print_ts(GetCharZone() .. v.name .. ' left the zone.')
+						MyUI_Utils.PrintOutput('AlertMaster', nil, GetCharZone() .. v.name .. ' left the zone.')
 					end
 				end
 			end
@@ -787,7 +779,7 @@ local check_for_pcs = function()
 			for name, v in pairs(tmp) do
 				if tPlayers[name] == nil then
 					tPlayers[name] = v
-					print_ts(GetCharZone() .. v.name .. ' ' .. v.guild .. ' entered the alert radius. ' .. v.distance .. ' units away.')
+					MyUI_Utils.PrintOutput('AlertMaster', nil, GetCharZone() .. v.name .. ' ' .. v.guild .. ' entered the alert radius. ' .. v.distance .. ' units away.')
 					if doSoundPC then
 						setVolume(volPC)
 						playSound(soundPC)
@@ -799,7 +791,7 @@ local check_for_pcs = function()
 						setVolume(volPC)
 						playSound(soundPC)
 					end
-					print_ts(GetCharZone() .. v.name .. ' loitering ' .. v.distance .. ' units away.')
+					MyUI_Utils.PrintOutput('AlertMaster', nil, GetCharZone() .. v.name .. ' loitering ' .. v.distance .. ' units away.')
 					run_char_commands()
 				end
 			end
@@ -807,7 +799,7 @@ local check_for_pcs = function()
 				for name, v in pairs(tPlayers) do
 					if tmp[name] == nil then
 						tPlayers[name] = nil
-						print_ts(GetCharZone() .. v.name .. ' left the alert radius.')
+						MyUI_Utils.PrintOutput('AlertMaster', nil, GetCharZone() .. v.name .. ' left the alert radius.')
 					end
 				end
 			end
@@ -846,7 +838,7 @@ local check_for_spawns = function()
 				importZone = false
 				forceImport = false
 				mq.pickle(smImportList, importedZones)
-				print_ts(string.format('\aw[\atAlert Master\aw] \agImported \aw[\ay%d\aw]\ag Spawn Master Spawns...', counter))
+				MyUI_Utils.PrintOutput('AlertMaster', nil, string.format('\aw[\atAlert Master\aw] \agImported \aw[\ay%d\aw]\ag Spawn Master Spawns...', counter))
 			end
 		end
 		local tmp = spawn_search_npcs()
@@ -854,7 +846,8 @@ local check_for_spawns = function()
 			for id, v in pairs(tmp) do
 				if tSpawns[id] == nil then
 					if check_safe_zone() ~= true then
-						print_ts(GetCharZone() .. '\ag' .. tostring(v.DisplayName()) .. '\ax spawn alert! ' .. tostring(math.floor(v.Distance() or 0)) .. ' units away.')
+						MyUI_Utils.PrintOutput('AlertMaster', nil,
+							GetCharZone() .. '\ag' .. tostring(v.DisplayName()) .. '\ax spawn alert! ' .. tostring(math.floor(v.Distance() or 0)) .. ' units away.')
 						spawnAlertsUpdated = true
 					end
 					tableUpdate = true
@@ -868,7 +861,7 @@ local check_for_spawns = function()
 					if tmp[id] == nil then
 						if check_safe_zone() ~= true then
 							if v.DisplayName ~= nil then
-								print_ts(GetCharZone() .. '\ag' .. tostring(v.DisplayName) .. '\ax was killed or despawned.')
+								MyUI_Utils.PrintOutput('AlertMaster', nil, GetCharZone() .. '\ag' .. tostring(v.DisplayName) .. '\ax was killed or despawned.')
 							end
 							spawnAlertsUpdated = false
 						end
@@ -917,7 +910,7 @@ local check_for_announce = function()
 			for name, v in pairs(tmp) do
 				if tAnnounce[name] == nil then
 					tAnnounce[name] = v
-					print_ts(GetCharZone() .. v.name .. ' ' .. v.guild .. ' entered the zone.')
+					MyUI_Utils.PrintOutput('AlertMaster', nil, GetCharZone() .. v.name .. ' ' .. v.guild .. ' entered the zone.')
 					if doSoundPCEntered then
 						setVolume(volPCEntered)
 						playSound(soundPCEntered)
@@ -928,7 +921,7 @@ local check_for_announce = function()
 				for name, v in pairs(tAnnounce) do
 					if tmp[name] == nil then
 						tAnnounce[name] = nil
-						print_ts(GetCharZone() .. v.name .. ' left the zone.')
+						MyUI_Utils.PrintOutput('AlertMaster', nil, GetCharZone() .. v.name .. ' left the zone.')
 						if doSoundPCLeft then
 							setVolume(volPCLeft)
 							playSound(soundPCLeft)
@@ -1213,7 +1206,7 @@ local function addSpawnToList(name)
 	-- if the zone does exist in the ini, spin over entries and make sure we aren't duplicating
 	for k, v in pairs(settings[zone]) do
 		if settings[zone][k] == name then
-			print_ts("\aySpawn alert \"" .. name .. "\" already exists.")
+			MyUI_Utils.PrintOutput('AlertMaster', nil, "\aySpawn alert \"" .. name .. "\" already exists.")
 			return
 		end
 		sCount = sCount + 1
@@ -1221,7 +1214,7 @@ local function addSpawnToList(name)
 	-- if we made it this far, the spawn isn't tracked -- add it to the table and store to ini
 	settings[zone]['Spawn' .. sCount + 1] = name
 	save_settings()
-	print_ts('\ayAdded spawn alert for ' .. name .. ' in ' .. zone)
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayAdded spawn alert for ' .. name .. ' in ' .. zone)
 end
 
 local function DrawRuleRow(entry)
@@ -1898,22 +1891,22 @@ local load_binds = function()
 		-- enable/disable
 		if cmd == 'on' then
 			active = true
-			print_ts('\ayAlert Master enabled.')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayAlert Master enabled.')
 		elseif cmd == 'off' then
 			active = false
 			tGMs, tAnnounce, tPlayers, tSpawns = {}, {}, {}, {}
-			print_ts('\ayAlert Master disabled.')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayAlert Master disabled.')
 		end
 		-- Alert Show / Hide
 		if cmd == 'popup' then
 			if AlertWindowOpen then
 				AlertWindowOpen = false
 				AlertWindow_Show = false
-				print_ts('\ayClosing Alert Window.')
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayClosing Alert Window.')
 			else
 				AlertWindowOpen = true
 				AlertWindow_Show = true
-				print_ts('\ayShowing Alert Window.')
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayShowing Alert Window.')
 			end
 		end
 		-- Search Gui Show / Hide
@@ -1921,12 +1914,12 @@ local load_binds = function()
 			if SearchWindowOpen then
 				SearchWindow_Show = false
 				SearchWindowOpen = false
-				print_ts('\ayClosing Search UI.')
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayClosing Search UI.')
 			else
 				RefreshZone()
 				SearchWindow_Show = true
 				SearchWindowOpen = true
-				print_ts('\ayShowing Search UI.')
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayShowing Search UI.')
 			end
 		end
 		-- Alert Popup On/Off Toggle
@@ -1935,12 +1928,12 @@ local load_binds = function()
 				doAlert = false
 				settings[CharConfig]['popup'] = doAlert
 				save_settings()
-				print_ts('\ayAlert PopUp Disabled.')
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayAlert PopUp Disabled.')
 			else
 				doAlert = true
 				settings[CharConfig]['popup'] = doAlert
 				save_settings()
-				print_ts('\ayAlert PopUp Enabled.')
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayAlert PopUp Enabled.')
 			end
 		end
 		-- Aggro Display On/Off Toggle
@@ -1949,12 +1942,12 @@ local load_binds = function()
 				showAggro = false
 				settings[CharConfig]['aggro'] = showAggro
 				save_settings()
-				print_ts('\ayShow Aggro Disabled.')
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayShow Aggro Disabled.')
 			else
 				showAggro = true
 				settings[CharConfig]['aggro'] = showAggro
 				save_settings()
-				print_ts('\ayShow Aggro Enabled.')
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayShow Aggro Enabled.')
 			end
 		end
 		-- Beep On/Off Toggle
@@ -1963,12 +1956,12 @@ local load_binds = function()
 				doBeep = false
 				settings[CharConfig]['beep'] = doBeep
 				save_settings()
-				print_ts('\ayBeep Alerts Disabled.')
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayBeep Alerts Disabled.')
 			else
 				doBeep = true
 				settings[CharConfig]['beep'] = doBeep
 				save_settings()
-				print_ts('\ayBeep Alerts Enabled.')
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayBeep Alerts Enabled.')
 			end
 		end
 		-- radius
@@ -1976,21 +1969,21 @@ local load_binds = function()
 			settings[CharConfig]['radius'] = val_num
 			radius = val_num
 			save_settings()
-			print_ts('\ayUpdated radius = ' .. radius)
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayUpdated radius = ' .. radius)
 		end
 		-- zradius
 		if cmd == 'zradius' and val_num > 0 then
 			settings[CharConfig]['zradius'] = val_num
 			zradius = val_num
 			save_settings()
-			print_ts('\ayUpdated zradius = ' .. zradius)
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayUpdated zradius = ' .. zradius)
 		end
 		-- delay
 		if cmd == 'delay' and val_num > 0 then
 			settings[CharConfig]['delay'] = val_num
 			delay = val_num
 			save_settings()
-			print_ts('\ayDelay interval = ' .. delay)
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayDelay interval = ' .. delay)
 		end
 		---- Volumes ----
 		if cmd == 'volnpc' and val_num > 0 then
@@ -1999,7 +1992,7 @@ local load_binds = function()
 			save_settings()
 			setVolume(volNPC)
 			playSound(soundNPC)
-			print_ts('\ayNPC Volume = ' .. volNPC)
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayNPC Volume = ' .. volNPC)
 		end
 		if cmd == 'volpc' and val_num > 0 then
 			settings[CharConfig]['volPC'] = val_num
@@ -2007,7 +2000,7 @@ local load_binds = function()
 			save_settings()
 			setVolume(volPC)
 			playSound(soundPC)
-			print_ts('\ayPC Volume = ' .. volPC)
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayPC Volume = ' .. volPC)
 		end
 		if cmd == 'volgm' and val_num > 0 then
 			settings[CharConfig]['volGM'] = val_num
@@ -2015,22 +2008,22 @@ local load_binds = function()
 			save_settings()
 			setVolume(volGM)
 			playSound(soundGM)
-			print_ts('\ayGM Volume = ' .. volGM)
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayGM Volume = ' .. volGM)
 		end
 		----- Sounds -----
 		if cmd == 'dosound' and val_str ~= nil then
 			if val_str == 'npc' then
 				doSoundNPC = not doSoundNPC
 				settings[CharConfig]['doSoundNPC'] = doSoundNPC
-				print_ts('\aySetting doSoundNPC = ' .. tostring(doSoundNPC))
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\aySetting doSoundNPC = ' .. tostring(doSoundNPC))
 			elseif val_str == 'pc' then
 				doSoundPC = not doSoundPC
 				settings[CharConfig]['doSoundPC'] = doSoundPC
-				print_ts('\aySetting doSoundPC = ' .. tostring(doSoundPC))
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\aySetting doSoundPC = ' .. tostring(doSoundPC))
 			elseif val_str == 'gm' then
 				doSoundGM = not doSoundGM
 				settings[CharConfig]['doSoundGM'] = doSoundGM
-				print_ts('\aySetting doSoundGM = ' .. tostring(doSoundGM))
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\aySetting doSoundGM = ' .. tostring(doSoundGM))
 			end
 			save_settings()
 		end
@@ -2039,60 +2032,60 @@ local load_binds = function()
 			settings[CharConfig]['distfar'] = val_num
 			DistColorRanges.red = val_num
 			save_settings()
-			print_ts('\arFar Range\a-t Greater than:\a-r' .. DistColorRanges.red .. '\ax')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\arFar Range\a-t Greater than:\a-r' .. DistColorRanges.red .. '\ax')
 		end
 		-- distmid Color Distance
 		if cmd == 'distmid' and val_num > 0 then
 			settings[CharConfig]['distmid'] = val_num
 			DistColorRanges.orange = val_num
 			save_settings()
-			print_ts('\aoMid Range\a-t Between: \a-g' .. DistColorRanges.orange .. ' \a-tand \a-r' .. DistColorRanges.red .. '\ax')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\aoMid Range\a-t Between: \a-g' .. DistColorRanges.orange .. ' \a-tand \a-r' .. DistColorRanges.red .. '\ax')
 		end
 		-- remind
 		if cmd == 'remind' and val_num >= 0 then
 			settings[CharConfig]['remind'] = val_num
 			remind = val_num
 			save_settings()
-			print_ts('\ayRemind interval = ' .. remind)
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayRemind interval = ' .. remind)
 		end
 		if cmd == 'reload' then
 			load_settings()
-			print_ts("\ayReloading Settings from File!")
+			MyUI_Utils.PrintOutput('AlertMaster', nil, "\ayReloading Settings from File!")
 		end
 		if cmd == 'remindnpc' and val_num >= 0 then
 			settings[CharConfig]['remindNPC'] = val_num
 			remindNPC = val_num
 			save_settings()
-			print_ts('\ayRemind NPC interval = ' .. remindNPC .. 'minutes')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayRemind NPC interval = ' .. remindNPC .. 'minutes')
 		end
 		-- enabling/disabling spawn alerts
 		if cmd == 'spawns' and val_str == 'on' then
 			settings[CharConfig]['spawns'] = true
 			save_settings()
 			spawns = true
-			print_ts('\aySpawn alerting enabled.')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\aySpawn alerting enabled.')
 		elseif cmd == 'spawns' and val_str == 'off' then
 			settings[CharConfig]['spawns'] = false
 			save_settings()
 			spawns = false
-			print_ts('\aySpawn alerting disabled.')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\aySpawn alerting disabled.')
 		end
 		-- enabling/disabling pcs alerts
 		if cmd == 'pcs' and val_str == 'on' then
 			settings[CharConfig]['pcs'] = true
 			save_settings()
 			pcs = true
-			print_ts('\ayPC alerting enabled.')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayPC alerting enabled.')
 		elseif cmd == 'pcs' and val_str == 'off' then
 			settings[CharConfig]['pcs'] = false
 			save_settings()
 			pcs = false
-			print_ts('\ayPC alerting disabled.')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayPC alerting disabled.')
 		end
 		-- enabling/disabling pcs alerts
 		if cmd == 'reload' then
 			load_settings()
-			print_ts("\ayReloading Settings from File!")
+			MyUI_Utils.PrintOutput('AlertMaster', nil, "\ayReloading Settings from File!")
 		end
 		local sCount = #tSpawns or 0
 		-- adding/removing/listing spawn alerts for current zone
@@ -2102,7 +2095,7 @@ local load_binds = function()
 			elseif mq.TLO.Target() ~= nil and mq.TLO.Target.Type() == 'NPC' then
 				val_str = mq.TLO.Target.DisplayName()
 			else
-				print("\arNO \aoSpawn supplied\aw or \agTarget")
+				MyUI_Utils.PrintOutput('AlertMaster', true, "\arNO \aoSpawn supplied\aw or \agTarget")
 				return
 			end
 			addSpawnToList(val_str)
@@ -2112,7 +2105,7 @@ local load_binds = function()
 			-- -- if the zone does exist in the ini, spin over entries and make sure we aren't duplicating
 			-- for k, v in pairs(settings[zone]) do
 			-- 	if settings[zone][k] == val_str then
-			-- 		print_ts("\aySpawn alert \""..val_str.."\" already exists.")
+			-- 		MyUI_Utils.PrintOutput('AlertMaster',nil,"\aySpawn alert \""..val_str.."\" already exists.")
 			-- 		return
 			-- 	end
 			-- 	sCount = sCount + 1
@@ -2120,7 +2113,7 @@ local load_binds = function()
 			-- -- if we made it this far, the spawn isn't tracked -- add it to the table and store to ini
 			-- settings[zone]['Spawn'..sCount+1] = val_str
 			-- save_settings()
-			-- print_ts('\ayAdded spawn alert for '..val_str..' in '..zone)
+			-- MyUI_Utils.PrintOutput('AlertMaster',nil,'\ayAdded spawn alert for '..val_str..' in '..zone)
 		elseif cmd == 'spawndel' and val_str:len() > 0 then
 			-- Identify and remove the spawn from the ini
 			local found = false
@@ -2146,13 +2139,13 @@ local load_binds = function()
 					settings[zone]['Spawn' .. i] = v
 				end
 				save_settings()
-				print_ts('\ayRemoved spawn alert for ' .. val_str .. ' in ' .. zone)
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayRemoved spawn alert for ' .. val_str .. ' in ' .. zone)
 			else
-				print_ts('\aySpawn alert for ' .. val_str .. ' not found in ' .. zone)
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\aySpawn alert for ' .. val_str .. ' not found in ' .. zone)
 			end
 		elseif cmd == 'spawnlist' then
 			-- if sCount > 0 then
-			print_ts('\aySpawn Alerts (\a-t' .. zone .. '\ax): ')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\aySpawn Alerts (\a-t' .. zone .. '\ax): ')
 			local tmp = {}
 			for k, v in pairs(settings[zone]) do table.insert(tmp, v) end
 			for k, v in ipairs(tmp) do
@@ -2168,13 +2161,13 @@ local load_binds = function()
 					end
 				end
 				if up then
-					print_ts(string.format('\ag[Live] %s ("%s")\ax', name, v))
+					MyUI_Utils.PrintOutput('AlertMaster', nil, string.format('\ag[Live] %s ("%s")\ax', name, v))
 				else
-					print_ts(string.format('\a-t[Dead] %s\ax', v))
+					MyUI_Utils.PrintOutput('AlertMaster', nil, string.format('\a-t[Dead] %s\ax', v))
 				end
 			end
 			-- else
-			-- 	print_ts('\aySpawn Alerts (\a-t' .. zone .. '\ax): No alerts found')
+			-- 	MyUI_Utils.PrintOutput('AlertMaster',nil,'\aySpawn Alerts (\a-t' .. zone .. '\ax): No alerts found')
 			-- end
 		end
 
@@ -2189,7 +2182,7 @@ local load_binds = function()
 			-- if the section does exist in the ini, spin over entries and make sure we aren't duplicating
 			for k, v in pairs(settings[CharCommands]) do
 				if settings[CharCommands][k] == val_str then
-					print_ts("\ayCommand \"" .. val_str .. "\" already exists.")
+					MyUI_Utils.PrintOutput('AlertMaster', nil, "\ayCommand \"" .. val_str .. "\" already exists.")
 					return
 				end
 				cmdCount = cmdCount + 1
@@ -2197,7 +2190,7 @@ local load_binds = function()
 			-- if we made it this far, the command is new -- add it to the table and store to ini
 			settings[CharCommands]['Cmd' .. cmdCount + 1] = val_str
 			save_settings()
-			print_ts('\ayAdded Command \"' .. val_str .. '\"')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayAdded Command \"' .. val_str .. '\"')
 		elseif cmd == 'cmddel' and val_str:len() > 0 then
 			-- remove from the ini
 			for k, v in pairs(settings[CharCommands]) do
@@ -2211,15 +2204,15 @@ local load_binds = function()
 				end
 			end
 			save_settings()
-			print_ts('\ayRemoved Command \"' .. val_str .. '\"')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayRemoved Command \"' .. val_str .. '\"')
 		elseif cmd == 'cmdlist' then
 			if cmdCount > 0 then
-				print_ts('\ayCommands (\a-t' .. MyUI_CharLoaded .. '\ax): ')
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayCommands (\a-t' .. MyUI_CharLoaded .. '\ax): ')
 				for k, v in pairs(settings[CharCommands]) do
-					print_ts('\t\a-t' .. k .. ' - ' .. v)
+					MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\a-t' .. k .. ' - ' .. v)
 				end
 			else
-				print_ts('\ayCommands (\a-t' .. MyUI_CharLoaded .. '\ax): No commands configured.')
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayCommands (\a-t' .. MyUI_CharLoaded .. '\ax): No commands configured.')
 			end
 		end
 		-- adding/removing/listing ignored pcs
@@ -2230,7 +2223,7 @@ local load_binds = function()
 			-- if the section does exist in the ini, spin over entries and make sure we aren't duplicating
 			for k, v in pairs(settings['Ignore']) do
 				if settings['Ignore'][k] == val_str then
-					print_ts('\ayAlready ignoring \"' .. val_str .. '\".')
+					MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayAlready ignoring \"' .. val_str .. '\".')
 					return
 				end
 				ignoreCount = ignoreCount + 1
@@ -2238,22 +2231,22 @@ local load_binds = function()
 			-- if we made it this far, the command is new -- add it to the table and store to ini
 			settings['Ignore']['Ignore' .. ignoreCount + 1] = val_str
 			save_settings()
-			print_ts('\ayNow ignoring \"' .. val_str .. '\"')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayNow ignoring \"' .. val_str .. '\"')
 		elseif cmd == 'ignoredel' and val_str:len() > 0 then
 			-- remove from the ini
 			for k, v in pairs(settings['Ignore']) do
 				if settings['Ignore'][k] == val_str then settings['Ignore'][k] = nil end
 			end
 			save_settings()
-			print_ts('\ayNo longer ignoring \"' .. val_str .. '\"')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayNo longer ignoring \"' .. val_str .. '\"')
 		elseif cmd == 'ignorelist' then
 			if ignoreCount > 0 then
-				print_ts('\ayIgnore List (\a-t' .. MyUI_CharLoaded .. '\ax): ')
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayIgnore List (\a-t' .. MyUI_CharLoaded .. '\ax): ')
 				for k, v in pairs(settings['Ignore']) do
-					print_ts('\t\a-t' .. k .. ' - ' .. v)
+					MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\a-t' .. k .. ' - ' .. v)
 				end
 			else
-				print_ts('\ayIgnore List (\a-t' .. MyUI_CharLoaded .. '\ax): No ignore list configured.')
+				MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayIgnore List (\a-t' .. MyUI_CharLoaded .. '\ax): No ignore list configured.')
 			end
 		end
 		-- Announce Alerts
@@ -2261,70 +2254,70 @@ local load_binds = function()
 			announce = true
 			settings[CharConfig]['announce'] = announce
 			save_settings()
-			print_ts('\ayNow announcing players entering/exiting the zone.')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayNow announcing players entering/exiting the zone.')
 		elseif cmd == 'announce' and val_str == 'off' then
 			announce = false
 			settings[CharConfig]['announce'] = announce
 			save_settings()
-			print_ts('\ayNo longer announcing players entering/exiting the zone.')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayNo longer announcing players entering/exiting the zone.')
 		end
 		-- GM Checks
 		if cmd == 'gm' and val_str == 'on' then
 			gms = true
 			settings[CharConfig]['gms'] = gms
 			save_settings()
-			print_ts('\ayGM Alerts enabled.')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayGM Alerts enabled.')
 		elseif cmd == 'gm' and val_str == 'off' then
 			gms = false
 			settings[CharConfig]['gms'] = gms
 			save_settings()
-			print_ts('\ayGM Alerts disabled.')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayGM Alerts disabled.')
 		end
 		-- Status
 		if cmd == 'status' then print_status() end
 		if cmd == nil or cmd == 'help' then
-			print_ts('\ayAlert Master Usage:')
-			print_ts('\a-y- General -')
-			print_ts('\t\ay/am status\a-t -- print current alerting status/settings')
-			print_ts('\t\ay/am help\a-t -- print help/usage')
-			print_ts('\t\ay/am on|off\a-t -- toggle alerts')
-			print_ts('\t\ay/am gm on|off\a-t -- toggle GM alerts')
-			print_ts('\t\ay/am pcs on|off\a-t -- toggle PC alerts')
-			print_ts('\t\ay/am spawns on|off\a-t -- toggle spawn alerts')
-			print_ts('\t\ay/am beep on|off\a-t -- toggle Audible Beep alerts')
-			print_ts('\t\ay/am doalert \a-t -- toggle Popup alerts')
-			print_ts('\t\ay/am announce on|off\a-t -- toggle announcing PCs entering/exiting the zone')
-			print_ts('\t\ay/am radius #\a-t -- configure alert radius (integer)')
-			print_ts('\t\ay/am reload #\a-t -- reload the Config File')
-			print_ts('\t\ay/am zradius #\a-t -- configure alert z-radius (integer)')
-			print_ts('\t\ay/am delay #\a-t -- configure alert check delay (seconds)')
-			print_ts('\t\ay/am remind #\a-t -- configure Player and GM alert reminder interval (seconds)')
-			print_ts('\t\ay/am remindnpc #\a-t -- configure NPC alert reminder interval (Minutes)')
-			print_ts('\t\ay/am popup\a-t -- Toggles Display of Alert Window')
-			print_ts('\t\ay/am reload\a-t -- Reload the ini file')
-			print_ts('\t\ay/am distmid\a-t -- Sets distance the color changes from \a-gGreen \a-tto \a-oOrange')
-			print_ts('\t\ay/am distfar\a-t -- Sets the distnace the color changes from \a-oOrange \a-tto \a-rRed')
-			print_ts('\a-y- Sounds -')
-			print_ts('\t\ay/am dosound pc\a-t -- toggle PC custom sound alerts')
-			print_ts('\t\ay/am dosound npc\a-t -- toggle NPC custom sound alerts')
-			print_ts('\t\ay/am dosound gm\a-t -- toggle GM custom sound alerts')
-			print_ts('\t\ay/am volpc 1-100\a-t -- Set PC custom sound Volume 1-100')
-			print_ts('\t\ay/am volnpc 1-100\a-t -- Set NPC custom sound Volume 1-100')
-			print_ts('\t\ay/am volgm 1-100\a-t -- Set GM custom sound Volume 1-100')
-			print_ts('\a-y- Ignore List -')
-			print_ts('\t\ay/am ignoreadd pcname\a-t -- add pc to the ignore list')
-			print_ts('\t\ay/am ignoredel pcname\a-t -- delete pc from the ignore list')
-			print_ts('\t\ay/am ignorelist\a-t -- display ignore list')
-			print_ts('\a-y- Spawns -')
-			print_ts('\t\ay/am spawnadd npc\a-t -- add monster to the list of tracked spawns')
-			print_ts('\t\ay/am spawndel npc\a-t -- delete monster from the list of tracked spawns')
-			print_ts('\t\ay/am spawnlist\a-t -- display monsters being tracked for the current zone')
-			print_ts('\t\ay/am show\a-t -- Toggles display of Search Window and Spawns for the current zone')
-			print_ts('\t\ay/am aggro\a-t -- Toggles display of Aggro status bars in the search window.')
-			print_ts('\a-y- Commands - executed when players remain in the alert radius for the reminder interval')
-			print_ts('\t\ay/am cmdadd command\a-t -- add command to run when someone enters your alert radius')
-			print_ts('\t\ay/am cmddel command\a-t -- delete command to run when someone enters your alert radius')
-			print_ts('\t\ay/am cmdlist\a-t -- display command(s) to run when someone enters your alert radius')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayAlert Master Usage:')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-y- General -')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am status\a-t -- print current alerting status/settings')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am help\a-t -- print help/usage')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am on|off\a-t -- toggle alerts')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am gm on|off\a-t -- toggle GM alerts')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am pcs on|off\a-t -- toggle PC alerts')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am spawns on|off\a-t -- toggle spawn alerts')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am beep on|off\a-t -- toggle Audible Beep alerts')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am doalert \a-t -- toggle Popup alerts')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am announce on|off\a-t -- toggle announcing PCs entering/exiting the zone')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am radius #\a-t -- configure alert radius (integer)')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am reload #\a-t -- reload the Config File')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am zradius #\a-t -- configure alert z-radius (integer)')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am delay #\a-t -- configure alert check delay (seconds)')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am remind #\a-t -- configure Player and GM alert reminder interval (seconds)')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am remindnpc #\a-t -- configure NPC alert reminder interval (Minutes)')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am popup\a-t -- Toggles Display of Alert Window')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am reload\a-t -- Reload the ini file')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am distmid\a-t -- Sets distance the color changes from \a-gGreen \a-tto \a-oOrange')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am distfar\a-t -- Sets the distnace the color changes from \a-oOrange \a-tto \a-rRed')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-y- Sounds -')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am dosound pc\a-t -- toggle PC custom sound alerts')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am dosound npc\a-t -- toggle NPC custom sound alerts')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am dosound gm\a-t -- toggle GM custom sound alerts')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am volpc 1-100\a-t -- Set PC custom sound Volume 1-100')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am volnpc 1-100\a-t -- Set NPC custom sound Volume 1-100')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am volgm 1-100\a-t -- Set GM custom sound Volume 1-100')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-y- Ignore List -')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am ignoreadd pcname\a-t -- add pc to the ignore list')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am ignoredel pcname\a-t -- delete pc from the ignore list')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am ignorelist\a-t -- display ignore list')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-y- Spawns -')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am spawnadd npc\a-t -- add monster to the list of tracked spawns')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am spawndel npc\a-t -- delete monster from the list of tracked spawns')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am spawnlist\a-t -- display monsters being tracked for the current zone')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am show\a-t -- Toggles display of Search Window and Spawns for the current zone')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am aggro\a-t -- Toggles display of Aggro status bars in the search window.')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\a-y- Commands - executed when players remain in the alert radius for the reminder interval')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am cmdadd command\a-t -- add command to run when someone enters your alert radius')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am cmddel command\a-t -- delete command to run when someone enters your alert radius')
+			MyUI_Utils.PrintOutput('AlertMaster', nil, '\t\ay/am cmdlist\a-t -- display command(s) to run when someone enters your alert radius')
 		end
 	end
 	mq.bind('/alertmaster', bind_alertmaster)
@@ -2350,10 +2343,10 @@ local setup = function()
 	AlertMaster.GUI_Main.Refresh.Table.Rules = true
 	AlertMaster.GUI_Main.Refresh.Table.Filtered = true
 	AlertMaster.GUI_Main.Refresh.Table.Unhandled = true
-	print_ts('\ayAlert Master version:\a-g' ..
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\ayAlert Master version:\a-g' ..
 		amVer .. '\n' .. MsgPrefix() .. '\ayOriginal by (\a-to_O\ay) Special.Ed (\a-tO_o\ay)\n' .. MsgPrefix() .. '\ayUpdated by (\a-tO_o\ay) Grimmier (\a-to_O\ay)')
-	print_ts('\atLoaded ' .. settings_file)
-	print_ts('\ay/am help for usage')
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\atLoaded ' .. settings_file)
+	MyUI_Utils.PrintOutput('AlertMaster', nil, '\ay/am help for usage')
 	print_status()
 	RefreshZone()
 end
@@ -2385,7 +2378,7 @@ AlertMaster.MainLoop = function()
 					if v ~= nil then
 						local cleanName = v.CleanName() ~= nil and v.CleanName() or 'Unknown'
 						local distance = math.floor(v.Distance() or 0)
-						print_ts(GetCharZone() .. '\ag' .. cleanName .. '\ax spawn alert! ' .. distance .. ' units away.')
+						MyUI_Utils.PrintOutput('AlertMaster', nil, GetCharZone() .. '\ag' .. cleanName .. '\ax spawn alert! ' .. distance .. ' units away.')
 					end
 				end
 				--do beep alerts
@@ -2414,7 +2407,6 @@ AlertMaster.MainLoop = function()
 			local cTime = os.time()
 			if cTime - playTime > 2 then
 				resetVolume()
-				mq.delay(1)
 			end
 		end
 		if not playing and playTime == 0 then

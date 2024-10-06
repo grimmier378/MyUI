@@ -21,26 +21,47 @@ function CommonUtils.GetTargetBuffDuration(slot)
 	return sRemaining
 end
 
----comment Caclulate a Dynamic color within a Range based on a value between 0 and 100
----Useful for Progress Bar Colors
----@param minColor any @ the minimum color in the Range
----@param maxColor any @ the maximum color in the Range
----@param value any @ Current Value
----@return any @ returns new Color between the min and max color based on the value
-function CommonUtils.CalculateColor(minColor, maxColor, value)
+---Calcluate the color between two colors based on a value between 0 and 100.
+---
+--- If a midColor is provided, the color will transition from minColor (0 value ) to midColor (midVal) to maxColor (100 value) or vice versa depending on the value
+---@param minColor table -- Color in the format {r, g, b, a}
+---@param maxColor table -- Color in the format {r, g, b, a}
+---@param value number -- Value between 0 and 100
+---@param midColor table|nil -- Optional mid range color
+---@param midValue number|nil -- Optional mid range value, where we switch from minColor to midColor and midColor to maxColor
+---@return ImVec4 -- Returns the color as an ImVec4
+function CommonUtils.CalculateColor(minColor, maxColor, value, midColor, midValue)
 	-- Ensure value is within the range of 0 to 100
 	value = math.max(0, math.min(100, value))
+	midValue = midValue or 50
 
-	-- Calculate the proportion of the value within the range
-	local proportion = value / 100
+	local r, g, b, a
 
-	-- Interpolate between minColor and maxColor based on the proportion
-	local r = minColor[1] + proportion * (maxColor[1] - minColor[1])
-	local g = minColor[2] + proportion * (maxColor[2] - minColor[2])
-	local b = minColor[3] + proportion * (maxColor[3] - minColor[3])
-	local a = minColor[4] + proportion * (maxColor[4] - minColor[4])
-
-	return r, g, b, a
+	if midColor then
+		-- If midColor is provided, calculate in two segments
+		if value > midValue then
+			local proportion = (value - midValue) / (100 - midValue)
+			r = midColor[1] + proportion * (maxColor[1] - midColor[1])
+			g = midColor[2] + proportion * (maxColor[2] - midColor[2])
+			b = midColor[3] + proportion * (maxColor[3] - midColor[3])
+			a = midColor[4] + proportion * (maxColor[4] - midColor[4])
+		else
+			local proportion = value / midValue
+			r = minColor[1] + proportion * (midColor[1] - minColor[1])
+			g = minColor[2] + proportion * (midColor[2] - minColor[2])
+			b = minColor[3] + proportion * (midColor[3] - minColor[3])
+			a = minColor[4] + proportion * (midColor[4] - minColor[4])
+		end
+	else
+		-- If midColor is not provided, calculate between minColor and maxColor
+		local proportion = value / 100
+		r = minColor[1] + proportion * (maxColor[1] - minColor[1])
+		g = minColor[2] + proportion * (maxColor[2] - minColor[2])
+		b = minColor[3] + proportion * (maxColor[3] - minColor[3])
+		a = minColor[4] + proportion * (maxColor[4] - minColor[4])
+	end
+	-- changed to return as an ImVec4. keeping input as is since the color picker returns the table not an ImVec4
+	return ImVec4(r, g, b, a)
 end
 
 ---@param type string @ 'item' or 'pwcs' or 'spell' type of icon to draw

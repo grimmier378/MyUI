@@ -17,17 +17,27 @@ local Template = {} -- Module Name Here Returns the table of functions and any v
 
 	-- General MQ Build, Char Name, Server Name
 	MyUI_CharLoaded      = mq.TLO.Me.DisplayName()
-	MyUI_Server          = MyUI_Server
+	MyUI_Server          = mq.TLO.EverQuest.Server()
 	MyUI_Build           = mq.TLO.MacroQuest.BuildName()
+	MyUI_Guild           = mq.TLO.Me.Guild()
 
 	MyUI_Modules         = {} -- table to hold all loaded modules you can interact with any of their exposed functions here.
 	MyUI_Mode            = 'driver' -- set to 'driver' or 'client' depending on the mode you are running in. can be checked when loading your module if you need to run different code for each mode.
 	MyUI_SettingsFile    = mq.configDir .. '/MyUI/' .. MyUI_Server:gsub(" ", "_") .. '/' .. MyUI_CharLoaded .. '.lua'
 	MyUI_MyChatLoaded    = false -- set to true if MyChat is loaded Check this before trying to use the MyChatHandler
 	MyUI_MyChatHandler = nil -- function to take in messages and output them to a specific tab in MyChat
-									this will create the tab if it does not exist and output the message to it.
-									Usage: MyUI_MyChatHandler('TabName', 'Message')
-									you can use 'main' for the main tab.
+							this will create the tab if it does not exist and output the message to it.
+						Usage: MyUI_MyChatHandler('TabName', 'Message')
+							you can use 'main' for the main tab.
+
+	To output to MyChat without directly accessing the handler you can use MyUI_Utils.PrintOutput()
+	MyUI_Utils.PrintOutput will process the output and send it to the correct console(s) based on the parameters and status of MyChaat
+
+	usage: MyUI_Utils.PrintOutput('TabName', outputMainAlso, 'Message %s', 'with formatting')
+		-- This will output to the specified tab and the main console if outputMainAlso is true.
+		-- Leaving the TabName nil will output to the main console only.
+
+
 ]]
 
 -- Exposed Variables
@@ -40,6 +50,7 @@ Template.ShowGui = true
 -- You can keep your functions local to the module the ones here are the only ones we care about from the main script.
 local function Init()
 	-- your Init code here
+	MyUI_Utils.PrintOutput('main', true, "\ayModule \a-w[\at%s\a-w] \agLoaded\aw!", Template.Name)
 end
 
 -- Exposed Functions

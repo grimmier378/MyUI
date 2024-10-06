@@ -11,7 +11,6 @@ local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
 
 local RUNNING = true
 local damTable, settings, theme = {}, {}, {}
-local MyName = mq.TLO.Me.CleanName()
 local winFlags = bit32.bor(ImGuiWindowFlags.None,
 	ImGuiWindowFlags.NoTitleBar)
 local started = false
@@ -192,7 +191,7 @@ local function parseCurrentBattle(dur)
 		battlesHistory = sortTable(battlesHistory, 'history')
 		if settings.Options.announceActors and ActorDPS ~= nil then
 			local msgSend = {
-				Name = MyName,
+				Name = MyUI_CharLoaded,
 				Subject = 'CURRENT',
 				BattleNum = -2,
 				DPS = dps,
@@ -207,8 +206,8 @@ local function parseCurrentBattle(dur)
 			ActorDPS:send({ mailbox = 'my_dps', script = 'myui', }, (msgSend))
 			local found = false
 			for k, v in pairs(actorsTable) do
-				if v.name == MyName then
-					v.name      = MyName
+				if v.name == MyUI_CharLoaded then
+					v.name      = MyUI_CharLoaded
 					v.sequence  = -2
 					v.dps       = dps
 					v.dur       = dur
@@ -222,7 +221,7 @@ local function parseCurrentBattle(dur)
 			end
 			if not found then
 				table.insert(actorsTable, {
-					name      = MyName,
+					name      = MyUI_CharLoaded,
 					sequence  = -2,
 					dps       = dps,
 					dur       = dur,
@@ -543,8 +542,8 @@ local function DrawHistory(tbl)
 				local textColor = color.white
 				ImGui.TableNextRow()
 				ImGui.TableNextColumn()
-				textColor = data.name == MyName and color.teal or color.white
-				ImGui.TextColored(textColor, "%s", data.name ~= nil and data.name or MyName)
+				textColor = data.name == MyUI_CharLoaded and color.teal or color.white
+				ImGui.TextColored(textColor, "%s", data.name ~= nil and data.name or MyUI_CharLoaded)
 				ImGui.TableNextColumn()
 				textColor = seq == "Current" and color.yellow or color.orange
 				ImGui.TextColored(textColor, "%s", seq)
@@ -999,14 +998,14 @@ local function pDPS(dur, rType)
 		if settings.Options.dpsBattleReport then
 			local msg = string.format(
 				"\aw[\at%s\ax] \ayChar:\ax\ao %s\ax, \ayDPS \ax(\aoBATTLE\ax): \at%s\ax, \ayTimeSpan:\ax\ao %.0f sec\ax, \ayTotal Damage: \ax\ao%s\ax, \ayAvg. Damage: \ax\ao%s\ax",
-				script, MyName, cleanNumber(dps, 1, true), dur, cleanNumber(dmgTotalBattle, 2), cleanNumber(avgDmg, 1, true))
+				script, MyUI_CharLoaded, cleanNumber(dps, 1, true), dur, cleanNumber(dmgTotalBattle, 2), cleanNumber(avgDmg, 1, true))
 			MyUI_Utils.PrintOutput('MyDPS', nil, msg)
 			if settings.Options.announceDNET then
 				announceDanNet(msg)
 			end
 			if settings.Options.announceActors and ActorDPS ~= nil then
 				local msgSend = {
-					Name = MyName,
+					Name = MyUI_CharLoaded,
 					Subject = 'Update',
 					BattleNum = -3,
 					DPS = dps,
@@ -1021,8 +1020,8 @@ local function pDPS(dur, rType)
 				ActorDPS:send({ mailbox = 'my_dps', script = 'mydps', }, (msgSend))
 				ActorDPS:send({ mailbox = 'my_dps', script = 'myui', }, (msgSend))
 				for k, v in ipairs(actorsTable) do
-					if v.name == MyName then
-						v.name      = MyName
+					if v.name == MyUI_CharLoaded then
+						v.name      = MyUI_CharLoaded
 						v.sequence  = -3
 						v.dps       = dps
 						v.dur       = dur
@@ -1048,7 +1047,7 @@ local function pBattleHistory()
 	for i, v in ipairs(battlesHistory) do
 		local msg = string.format(
 			"\aw[\at%s\ax] \ayChar:\ax\ao %s\ax, \ayBattle: \ax\ao%d\ax, \ayDPS: \ax\at%s\ax, \ayDuration: \ax\ao%s sec\ax, \ayTotal Damage: \ax\ao%s\ax, \ayAvg. Damage: \ax\ao%s\ax",
-			script, MyName, v.sequence, cleanNumber(v.dps, 1, true), v.dur, cleanNumber(v.dmg, 2), cleanNumber(v.avg, 1, true))
+			script, MyUI_CharLoaded, v.sequence, cleanNumber(v.dps, 1, true), v.dur, cleanNumber(v.dmg, 2), cleanNumber(v.avg, 1, true))
 		MyUI_Utils.PrintOutput('MyDPS', nil, msg)
 		if settings.Options.announceDNET then
 			announceDanNet(msg)
@@ -1271,7 +1270,7 @@ local function RegisterActor()
 		local critDmg      = MemberEntry.Crit or 0
 		local critHealsAmt = MemberEntry.CritHeals or 0
 		local report       = MemberEntry.Report or ''
-		if who == MyName then return end
+		if who == MyUI_CharLoaded then return end
 		if #actorsTable == 0 then
 			table.insert(actorsTable, { name = who, dps = dps, avg = avgDmg, dmg = totalDmg, dur = timeSpan, sequence = battleNum, crit = critDmg, critHeals = critHealsAmt, })
 		else
@@ -1324,17 +1323,15 @@ local args = { ..., }
 local function Init()
 	loadSettings()
 
-	MyName = mq.TLO.Me.CleanName()
-
 	-- Register Events
-	local str = string.format("#*#%s scores a critical hit! #*#(#1#)", MyName)
+	local str = string.format("#*#%s scores a critical hit! #*#(#1#)", MyUI_CharLoaded)
 
 	mq.event("melee_crit", "#*#You score a critical hit! #*#(#1#)", critCallBack)
 	mq.event("melee_crit2", "#*#You deliver a critical blast! #*#(#1#)", critCallBack)
 	mq.event("melee_crit3", str, critCallBack)
-	str = string.format("#*#%s scores a Deadly Strike! #*#(#1#)", MyName)
+	str = string.format("#*#%s scores a Deadly Strike! #*#(#1#)", MyUI_CharLoaded)
 	mq.event("melee_deadly_strike", str, critCallBack)
-	str = string.format("#*#%s hit #1# for #2# points of non-melee damage#*#", MyName)
+	str = string.format("#*#%s hit #1# for #2# points of non-melee damage#*#", MyUI_CharLoaded)
 	mq.event("melee_non_melee", str, nonMeleeClallBack)
 	mq.event("melee_damage_shield", "#*# was hit by non-melee for #2# points of damage#*#", nonMeleeClallBack)
 	mq.event("melee_you_hit_non-melee", "#*#You were hit by non-melee for #2# damage#*#", nonMeleeClallBack)

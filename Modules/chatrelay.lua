@@ -9,7 +9,7 @@ local ImGui                             = require 'ImGui'
 local ChatRelay                         = {}
 ChatRelay.ActorMailBox                  = 'chat_relay'
 local winFlags                          = bit32.bor(ImGuiWindowFlags.None)
-local currZone, lastZone, guildName, configFile, mode
+local currZone, lastZone, MyUI_Guild, configFile, mode
 local guildChat                         = {}
 local tellChat                          = {}
 local lastMessages                      = {}
@@ -77,7 +77,7 @@ local function GenerateContent(sub, message)
     return {
         Subject = sub,
         Name = MyUI_CharLoaded,
-        Guild = guildName,
+        Guild = MyUI_Guild,
         Message = message or '',
         Tell = '',
     }
@@ -116,7 +116,7 @@ local function RegisterRelayActor()
             else
                 mq.cmdf("/tell %s %s", MemberEntry.Tell, MemberEntry.Message)
             end
-        elseif MemberEntry.Subject == 'GuildReply' and string.lower(MemberEntry.Name) == string.lower(MyUI_CharLoaded) and MemberEntry.Guild == guildName then
+        elseif MemberEntry.Subject == 'GuildReply' and string.lower(MemberEntry.Name) == string.lower(MyUI_CharLoaded) and MemberEntry.Guild == MyUI_Guild then
             mq.cmdf("/gu %s", MemberEntry.Message)
         elseif MemberEntry.Subject == 'Hello' then
             if MemberEntry.Name ~= MyUI_CharLoaded then
@@ -225,8 +225,8 @@ end
 local function sendGuildChat(line)
     if not settings[script].RelayGuild then return end
     local repaceString = string.format('%s tells the guild,', MyUI_CharLoaded)
-    lastMessages[guildName] = string.gsub(line, 'You say to your guild,', repaceString)
-    guildChat[guildName]:AppendText(line)
+    lastMessages[MyUI_Guild] = string.gsub(line, 'You say to your guild,', repaceString)
+    guildChat[MyUI_Guild]:AppendText(line)
 end
 
 local function getTellChat(line, who)
@@ -510,7 +510,6 @@ end
 
 local function init()
     local tStamp = mq.TLO.Time.Time24()
-    guildName = mq.TLO.Me.Guild()
     configFile = string.format("%s/MyUI/ChatRelay/%s/%s.lua", mq.configDir, MyUI_Server, MyUI_CharLoaded)
     currZone = mq.TLO.Zone.ID()
     lastZone = currZone
@@ -524,12 +523,12 @@ local function init()
     mq.event('tell_chat_relay', "#1# tells you, '#*#", getTellChat, { keepLinks = true, })
     mq.event('out_chat_relay', "You told #1#, '#*#", getTellChat, { keepLinks = true, })
     RUNNING = true
-    guildChat[guildName] = ImGui.ConsoleWidget.new("chat_relay_Console" .. guildName .. "##chat_relayConsole")
+    guildChat[MyUI_Guild] = ImGui.ConsoleWidget.new("chat_relay_Console" .. MyUI_Guild .. "##chat_relayConsole")
     tellChat[MyUI_CharLoaded] = ImGui.ConsoleWidget.new("chat_relay_Console" .. MyUI_CharLoaded .. "##chat_relayConsole")
-    MyUI_Utils.AppendColoredTimestamp(guildChat[guildName], tStamp, "Welcome to Chat Relay")
+    MyUI_Utils.AppendColoredTimestamp(guildChat[MyUI_Guild], tStamp, "Welcome to Chat Relay")
     MyUI_Utils.AppendColoredTimestamp(tellChat[MyUI_CharLoaded], tStamp, "Welcome to Chat Relay")
     charBufferCount[MyUI_CharLoaded] = { Current = 1, Last = 1, }
-    guildBufferCount[guildName] = { Current = 1, Last = 1, }
+    guildBufferCount[MyUI_Guild] = { Current = 1, Last = 1, }
     lastAnnounce = os.time()
 end
 

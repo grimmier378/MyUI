@@ -15,13 +15,12 @@ local iconSize = 15
 local mimicMe, followMe = false, false
 local ShowGUI, openConfigGUI = true, false
 local Scale = 1
-local myName = MyUI_CharLoaded
 local serverName = MyUI_Server
 serverName = serverName:gsub(" ", "_")
-local configFileold2 = string.format("%s/MyUI/MyGroup/%s_%s_Config.lua", mq.configDir, serverName, myName)
+local configFileold2 = string.format("%s/MyUI/MyGroup/%s_%s_Config.lua", mq.configDir, serverName, MyUI_CharLoaded)
 local themeFile = mq.configDir .. '/MyThemeZ.lua'
 local configFileOld = mq.configDir .. '/MyUI_Configs.lua'
-local configFile = string.format("%s/MyUI/MyGroup/%s/%s.lua", mq.configDir, serverName, myName)
+local configFile = string.format("%s/MyUI/MyGroup/%s/%s.lua", mq.configDir, serverName, MyUI_CharLoaded)
 local ColorCount, ColorCountConf, StyleCount, StyleCountConf = 0, 0, 0, 0
 local lastTar = mq.TLO.Target.ID() or 0
 local themeName = 'Default'
@@ -308,9 +307,9 @@ local function DrawGroupMember(id)
         end
         if ImGui.Selectable('Come to Me') then
             if useEQBC then
-                mq.cmdf("/bct %s //nav spawn %s", memberName, myName)
+                mq.cmdf("/bct %s //nav spawn %s", memberName, MyUI_CharLoaded)
             else
-                mq.cmdf("/dex %s /nav spawn %s", memberName, myName)
+                mq.cmdf("/dex %s /nav spawn %s", memberName, MyUI_CharLoaded)
             end
         end
         if ImGui.Selectable('Go To ' .. memberName) then
@@ -331,7 +330,7 @@ local function DrawGroupMember(id)
                 mq.cmdf("/makeleader %s", memberName)
             end
             if mq.TLO.Group.Leader.ID() == member.ID() and ImGui.Selectable('Make Me Leader') then
-                mq.cmdf("/dex %s /makeleader %s", member.Name(), myName)
+                mq.cmdf("/dex %s /makeleader %s", member.Name(), MyUI_CharLoaded)
             end
             ImGui.EndMenu()
         end
@@ -711,9 +710,9 @@ function MyGroup.RenderGUI()
 
             if ImGui.SmallButton('Come') then
                 if useEQBC then
-                    mq.cmdf("/bcaa //nav spawn %s", myName)
+                    mq.cmdf("/bcaa //nav spawn %s", MyUI_CharLoaded)
                 else
-                    mq.cmdf("/dgge /nav spawn %s", myName)
+                    mq.cmdf("/dgge /nav spawn %s", MyUI_CharLoaded)
                 end
             end
 

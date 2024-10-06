@@ -48,7 +48,7 @@ local memSpell = -1
 local currentTime = os.time()
 local maxRow, rowCount, iconSize, scale = 1, 0, 30, 1
 local aSize, locked, castLocked, hasThemeZ, configWindowShow, loadSet, clearAll, CastTextColorByType = false, false, false, false, false, false, false, false
-local meName
+local MyUI_CharLoaded
 local setName = 'None'
 local tmpName = ''
 local showTitle, showTitleCasting = true, false
@@ -182,9 +182,9 @@ local function loadSettings()
 	newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings)
 	newSetting = MyUI_Utils.CheckRemovedSettings(defaults, settings) or newSetting
 
-	if settings[script][meName] == nil then
-		settings[script][meName] = {}
-		settings[script][meName].Sets = {}
+	if settings[script][MyUI_CharLoaded] == nil then
+		settings[script][MyUI_CharLoaded] = {}
+		settings[script][MyUI_CharLoaded].Sets = {}
 		newSetting = true
 	end
 
@@ -417,10 +417,10 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 end
 
 local function SaveSet(SetName)
-	if settings[script][meName].Sets[SetName] == nil then
-		settings[script][meName].Sets[SetName] = {}
+	if settings[script][MyUI_CharLoaded].Sets[SetName] == nil then
+		settings[script][MyUI_CharLoaded].Sets[SetName] = {}
 	end
-	settings[script][meName].Sets[SetName] = spellBar
+	settings[script][MyUI_CharLoaded].Sets[SetName] = spellBar
 	mq.pickle(configFile, settings)
 	settings = dofile(configFile)
 	tmpName = ''
@@ -429,7 +429,7 @@ end
 local function LoadSet(set)
 	loadSet      = false
 	local setBar = {}
-	for i, t in pairs(settings[script][meName].Sets[set]) do
+	for i, t in pairs(settings[script][MyUI_CharLoaded].Sets[set]) do
 		setBar[i] = {}
 		for k, v in pairs(t) do
 			setBar[i][k] = v
@@ -781,7 +781,7 @@ function MySpells.RenderGUI()
 			ImGui.SeparatorText("Load Set")
 			ImGui.SetNextItemWidth(150)
 			if ImGui.BeginCombo("##LoadSet", setName) then
-				for k, data in pairs(settings[script][meName].Sets) do
+				for k, data in pairs(settings[script][MyUI_CharLoaded].Sets) do
 					local isSelected = k == setName
 					if ImGui.Selectable(k, isSelected) then
 						setName = k
@@ -799,7 +799,7 @@ function MySpells.RenderGUI()
 
 			if setName ~= 'None' then
 				if ImGui.Button("Delete Set") then
-					settings[script][meName].Sets[setName] = nil
+					settings[script][MyUI_CharLoaded].Sets[setName] = nil
 					mq.pickle(configFile, settings)
 					setName = 'None'
 					tmpName = ''
@@ -895,14 +895,13 @@ function MySpells.Unload()
 end
 
 local function Init()
-	meName = mq.TLO.Me.Name()
 	if mq.TLO.Me.MaxMana() == 0 then
 		MyUI_Utils.PrintOutput(nil, true, "You are not a caster!")
 		RUNNING = false
 		return
 	end
-	configFileOld2 = string.format('%s/myui/MySpells/MySpells_%s_Configs.lua', mq.configDir, meName)
-	configFile = string.format('%s/myui/MySpells/%s/MySpells_%s.lua', mq.configDir, MyUI_Server, meName)
+	configFileOld2 = string.format('%s/myui/MySpells/MySpells_%s_Configs.lua', mq.configDir, MyUI_CharLoaded)
+	configFile = string.format('%s/myui/MySpells/%s/MySpells_%s.lua', mq.configDir, MyUI_Server, MyUI_CharLoaded)
 	loadSettings()
 	if MyUI_Utils.File.Exists(themezDir) then
 		hasThemeZ = true

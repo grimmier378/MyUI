@@ -1,23 +1,28 @@
--- colors.lua
-local COLOR = {}
-function COLOR.color(c)
-    c = c:lower()
-    if (c == 'red') then return ImVec4(0.9, 0.1, 0.1, 1) end
-    if (c == 'pink') then return ImVec4(0.9, 0.4, 0.4, 0.8) end
-    if (c == 'orange') then return ImVec4(0.78, 0.20, 0.05, 0.8) end
-    if (c == 'yellow') then return ImVec4(1, 1, 0, 1) end
-    if (c == 'yellow2') then return ImVec4(0.7, 0.6, 0.1, 0.7) end
-    if (c == 'white') then return ImVec4(1, 1, 1, 1) end
-    if (c == 'blue') then return ImVec4(0, 0, 1, 1) end
-    if (c == 'softblue') then return ImVec4(0, 0, 1, 0.5) end
-    if (c == 'light blue2') then return ImVec4(0.2, 0.9, 0.9, 0.5) end
-    if (c == 'light blue') then return ImVec4(0, 1, 1, 1) end
-    if (c == 'green') then return ImVec4(0, 1, 0, 1) end
-    if (c == 'green2') then return ImVec4(0.01, 0.56, 0.001, 1) end
-    if (c == 'grey') then return ImVec4(0.6, 0.6, 0.6, 1) end
-    if (c == 'purple') then return ImVec4(0.8, 0.0, 1.0, 1.0) end
-    if (c == 'btn_red') then return ImVec4(1.0, 0.4, 0.4, 0.4) end
-    if (c == 'btn_green') then return ImVec4(0.4, 1.0, 0.4, 0.4) end
+local ColorList = {}
+
+---comment Color table for GUI returns ImVec4
+---Valud colors are:
+---(red, pink, orange, yellow, yellow2, white, blue, softblue, light blue2, light blue, green, green2, grey, purple, btn_red, btn_green)
+---@param color_name string @ the name of the color you want to return
+---@return ImVec4 @ returns color as an ImVec4 vector
+function ColorList.color(color_name)
+    color_name = color_name:lower()
+    if (color_name == 'red') then return ImVec4(0.9, 0.1, 0.1, 1) end
+    if (color_name == 'pink') then return ImVec4(0.9, 0.4, 0.4, 0.8) end
+    if (color_name == 'orange') then return ImVec4(0.78, 0.20, 0.05, 0.8) end
+    if (color_name == 'yellow') then return ImVec4(1, 1, 0, 1) end
+    if (color_name == 'yellow2') then return ImVec4(0.7, 0.6, 0.1, 0.7) end
+    if (color_name == 'white') then return ImVec4(1, 1, 1, 1) end
+    if (color_name == 'blue') then return ImVec4(0, 0, 1, 1) end
+    if (color_name == 'softblue') then return ImVec4(0, 0, 1, 0.5) end
+    if (color_name == 'light blue2') then return ImVec4(0.2, 0.9, 0.9, 0.5) end
+    if (color_name == 'light blue') then return ImVec4(0, 1, 1, 1) end
+    if (color_name == 'green') then return ImVec4(0, 1, 0, 1) end
+    if (color_name == 'green2') then return ImVec4(0.01, 0.56, 0.001, 1) end
+    if (color_name == 'grey') then return ImVec4(0.6, 0.6, 0.6, 1) end
+    if (color_name == 'purple') then return ImVec4(0.8, 0.0, 1.0, 1.0) end
+    if (color_name == 'btn_red') then return ImVec4(1.0, 0.4, 0.4, 0.4) end
+    if (color_name == 'btn_green') then return ImVec4(0.4, 1.0, 0.4, 0.4) end
 end
 
-return COLOR
+return ColorList

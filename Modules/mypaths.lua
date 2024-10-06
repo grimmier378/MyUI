@@ -12,7 +12,6 @@ local ImGui                                                      = require('ImGu
 local MyPaths                                                    = {}
 -- Variables
 local script                                                     = 'MyPaths' -- Change this to the name of your script
-local meName                                                                 -- Character Name
 local themeName                                                  = 'Default'
 local themeID                                                    = 1
 local theme, defaults, settings, debugMessages                   = {}, {}, {}, {}
@@ -1215,7 +1214,7 @@ function MyPaths.RenderGUI()
         if currZone ~= lastZone then return end
         -- local currZone = mq.TLO.Zone.ShortName()
         -- Set Window Name
-        local winName = string.format('%s##Main_%s', script, meName)
+        local winName = string.format('%s##Main_%s', script, MyUI_CharLoaded)
         -- Load Theme
         local ColorCount, StyleCount = DrawTheme(themeName)
         -- Create Main Window
@@ -2126,7 +2125,7 @@ function MyPaths.RenderGUI()
 
     if showConfigGUI then
         if currZone ~= lastZone then return end
-        local winName = string.format('%s Config##Config_%s', script, meName)
+        local winName = string.format('%s Config##Config_%s', script, MyUI_CharLoaded)
         local ColCntConf, StyCntConf = DrawTheme(themeName)
 
         local openConfig, showConfig = ImGui.Begin(winName, true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
@@ -2677,8 +2676,7 @@ end
 local function Init()
     processArgs()
     -- Get Character Name
-    meName = mq.TLO.Me.Name()
-    configFile = string.format('%s/MyUI/%s/%s/%s_Configs.lua', mq.configDir, script, MyUI_Server, meName)
+    configFile = string.format('%s/MyUI/%s/%s/%s_Configs.lua', mq.configDir, script, MyUI_Server, MyUI_CharLoaded)
     -- Load Settings
     loadSettings()
     loadPaths()

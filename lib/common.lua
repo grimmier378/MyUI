@@ -123,7 +123,9 @@ function CommonUtils.PrintOutput(mychat_tab, main_console, msg, ...)
 	end
 end
 
----comments Takes in a table and returns a sorted table of keys based on the number of columns Sorted by Columns
+---comments Takes in a table or sorted index,key pairs and returns a sorted table of keys based on the number of columns to sorty by.
+---
+---This will keep your table sorted by columns instead of rows.
 ---@param input_table table|nil @ the table to sort (optional) You can send a set of sorted keys if you have already custom sorted it.
 ---@param sorted_keys table|nil @ the sorted keys table (optional) if you have already sorted the keys
 ---@param num_columns integer @ the number of column groups to sort the keys into
@@ -159,7 +161,9 @@ end
 
 ---comment
 --- Takes in a table of default settings and a table of loaded settings and checks for depreciated settings
+---
 --- If a depreciated setting is found it will remove it from the loaded settings table
+---
 --- Returns true if a new setting was found so you know to save the settings file
 ---@param default_settings table @ the default settings table
 ---@param loaded_settings table @ the loaded settings table
@@ -178,7 +182,9 @@ end
 
 ---comment
 --- Takes in a table of default settings and a table of loaded settings and checks for any New default settings
+---
 --- If a new setting is found it will add it to the loaded settings table
+---
 --- Returns true if a new setting was found so you know to save the settings file
 ---@param default_settings table @ the default settings table
 ---@param loaded_settings table @ the loaded settings table
@@ -187,7 +193,7 @@ function CommonUtils.CheckDefaultSettings(default_settings, loaded_settings)
 	local newSetting = false
 	for setting, value in pairs(default_settings or {}) do
 		if loaded_settings[setting] == nil then
-			CommonUtils.PrintOutput('MyUI', nil, "\ayNew Default Setting: \ao%s \ayAdding it from the Settings File.", setting)
+			CommonUtils.PrintOutput('MyUI', nil, "\ayNew Default Setting: \ao%s \ayAdding it to the Settings File.", setting)
 			loaded_settings[setting] = value
 			newSetting = true
 		end

@@ -6,7 +6,6 @@ local commandBuffer                              = ''
 
 -- local var's
 local serverName                                 = string.gsub(MyUI_Server, ' ', '_') or ''
-local myName                                     = mq.TLO.Me.Name() or ''
 local addChannel                                 = false -- Are we adding a new channel or editing an old one
 local sortedChannels                             = {}
 local useTheme, timeStamps, newEvent, newFilter  = false, true, false, false
@@ -28,7 +27,7 @@ local doRefresh                                  = false
 -- local timeA = os.time()
 local mainBuffer                                 = {}
 local importFile                                 = 'Server_Name/CharName.lua'
-local settingsOld                                = string.format('%s/MyChat_%s_%s.lua', mq.configDir, serverName, myName)
+local settingsOld                                = string.format('%s/MyChat_%s_%s.lua', mq.configDir, serverName, MyUI_CharLoaded)
 local cleanImport                                = false
 -- local Tokens = {} -- may use this later to hold the tokens and remove a long string of if elseif.
 local enableSpam, resetConsoles                  = false, false
@@ -86,8 +85,8 @@ local MyChat                                     = {
     refreshLinkDB = 10,
     mainEcho = '/say',
     doRefresh = false,
-    SettingsFile = string.format('%s/MyUI/MyChat/%s/%s.lua', mq.configDir, serverName, myName),
-    ThemesFile = string.format('%s/MyThemeZ.lua', mq.configDir, serverName, myName),
+    SettingsFile = string.format('%s/MyUI/MyChat/%s/%s.lua', mq.configDir, serverName, MyUI_CharLoaded),
+    ThemesFile = string.format('%s/MyThemeZ.lua', mq.configDir, serverName, MyUI_CharLoaded),
     KeyFocus = false,
     KeyName = 'RightShift',
     Settings = {
@@ -299,7 +298,7 @@ end
 
 local function loadSettings()
     if not MyUI_Utils.File.Exists(MyChat.SettingsFile) then
-        settingsOld = string.format('%s/MyChat_%s_%s.lua', mq.configDir, serverName, myName)
+        settingsOld = string.format('%s/MyChat_%s_%s.lua', mq.configDir, serverName, MyUI_CharLoaded)
         if MyUI_Utils.File.Exists(settingsOld) then
             MyChat.Settings = dofile(settingsOld)
             mq.pickle(MyChat.SettingsFile, MyChat.Settings)
@@ -313,7 +312,7 @@ local function loadSettings()
         MyChat.Settings = dofile(MyChat.SettingsFile)
         if firstPass then
             local date = os.date("%m_%d_%Y_%H_%M")
-            local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, myName, date)
+            local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, MyUI_CharLoaded, date)
             if not MyUI_Utils.File.Exists(backup) then mq.pickle(backup, MyChat.Settings) end
             reIndexSettings(MyChat.SettingsFile, MyChat.Settings)
             firstPass = false
@@ -630,7 +629,7 @@ function MyChat.EventChat(channelID, eventName, line, spam)
                             --print(fString)
                         end
                         if string.find(fString, 'M3') then
-                            fString = string.gsub(fString, 'M3', myName)
+                            fString = string.gsub(fString, 'M3', MyUI_CharLoaded)
                         elseif string.find(fString, 'PT1') then
                             fString = string.gsub(fString, 'PT1', mq.TLO.Me.Pet.DisplayName() or 'NO PET')
                         elseif string.find(fString, 'PT3') then
@@ -1411,7 +1410,7 @@ end
 function MyChat.RenderGUI()
     if not running then return end
 
-    local windowName = 'My Chat - Main##' .. myName .. '_' .. windowNum
+    local windowName = 'My Chat - Main##' .. MyUI_CharLoaded .. '_' .. windowNum
     ImGui.SetWindowPos(windowName, ImVec2(20, 20), ImGuiCond.FirstUseEver)
     ImGui.SetNextWindowSize(ImVec2(640, 480), ImGuiCond.FirstUseEver)
     if useTheme then
@@ -1630,7 +1629,7 @@ function MyChat.AddChannel(editChanID, isNewChannel)
     ImGui.SameLine()
     if ImGui.Button('Save Settings') then
         local date = os.date("%m_%d_%Y_%H_%M")
-        local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, myName, date)
+        local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, MyUI_CharLoaded, date)
         mq.pickle(backup, MyChat.Settings)
         MyChat.tempSettings.Channels[editChanID] = MyChat.tempSettings.Channels[editChanID] or { Events = {}, Name = "New Channel", enabled = true, }
         MyChat.tempSettings.Channels[editChanID].Name = MyChat.tempEventStrings[editChanID].Name or "New Channel"
@@ -1673,7 +1672,7 @@ function MyChat.AddChannel(editChanID, isNewChannel)
         -- Delete the event
         local date = os.date("%m_%d_%Y_%H_%M")
 
-        local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, myName, date)
+        local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, MyUI_CharLoaded, date)
         mq.pickle(backup, MyChat.Settings)
         MyChat.tempSettings.Channels[editChanID] = nil
         MyChat.tempEventStrings[editChanID] = nil
@@ -1967,7 +1966,7 @@ function MyChat.Config_GUI(open)
                 local date = os.date("%m_%d_%Y_%H_%M")
 
                 -- print(date)
-                local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, myName, date)
+                local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, MyUI_CharLoaded, date)
                 mq.pickle(backup, MyChat.Settings)
                 local newSettings = {}
                 local newID = getNextID(MyChat.tempSettings.Channels)

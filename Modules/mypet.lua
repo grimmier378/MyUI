@@ -38,7 +38,7 @@ local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
 local configFileOld = string.format('%s/MyUI/%s/%s_Configs.lua', mq.configDir, script, script)
 local configFile = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, script, MyUI_Server, MyUI_CharLoaded)
 local themezDir = mq.luaDir .. '/themez/init.lua'
-MyPet.TempSettings = {}
+Module.TempSettings = {}
 
 -- Default Settings
 defaults = {

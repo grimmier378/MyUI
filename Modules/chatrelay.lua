@@ -511,7 +511,7 @@ end
 local function init()
     local tStamp = mq.TLO.Time.Time24()
     guildName = mq.TLO.Me.Guild()
-    configFile = string.format("%s/MyUI/ChatRelay/%s/%s.lua", mq.configDir, mq.TLO.EverQuest.Server(), MyUI_CharLoaded)
+    configFile = string.format("%s/MyUI/ChatRelay/%s/%s.lua", mq.configDir, MyUI_Server, MyUI_CharLoaded)
     currZone = mq.TLO.Zone.ID()
     lastZone = currZone
     mq.bind('/chatrelay', processCommand)

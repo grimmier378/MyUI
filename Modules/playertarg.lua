@@ -18,7 +18,7 @@ local ShowGUI, locked, flashBorder, rise, cRise = true, false, true, true, false
 local openConfigGUI, openGUI, running = false, true, false
 local themeFile = mq.configDir .. '/MyThemeZ.lua'
 local configFileOld = mq.configDir .. '/MyUI_Configs.lua'
-local configFile = string.format('%s/MyUI/PlayerTarg/%s/%s.lua', mq.configDir, mq.TLO.EverQuest.Server(), mq.TLO.Me.Name())
+local configFile = string.format('%s/MyUI/PlayerTarg/%s/%s.lua', mq.configDir, MyUI_Server, MyUI_CharLoaded)
 local ColorCount, ColorCountConf, StyleCount, StyleCountConf = 0, 0, 0, 0
 local themeName = 'Default'
 local script = 'PlayerTarg'
@@ -479,7 +479,7 @@ local function PlayerTargConf_GUI()
 
             testValue = ImGui.SliderInt("Test HP##" .. script, testValue, 0, 100)
 
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, testValue))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, testValue)))
             ImGui.ProgressBar((testValue / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test')
             ImGui.PopStyleColor()
 
@@ -492,7 +492,7 @@ local function PlayerTargConf_GUI()
             colorMpMax = ImGui.ColorEdit4("Mana Max Color##" .. script, colorMpMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
 
             testValue2 = ImGui.SliderInt("Test MP##" .. script, testValue2, 0, 100)
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(colorMpMin, colorMpMax, testValue2))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorMpMin, colorMpMax, testValue2)))
             ImGui.ProgressBar((testValue2 / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test2')
             ImGui.PopStyleColor()
         end
@@ -513,7 +513,7 @@ local function PlayerTargConf_GUI()
             colorBreathMax = ImGui.ColorEdit4("Breath Max Color##" .. script, colorBreathMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
             local testValue3 = 100
             testValue3 = ImGui.SliderInt("Test Breath##" .. script, testValue3, 0, 100)
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(colorBreathMin, colorBreathMax, testValue3))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorBreathMin, colorBreathMax, testValue3)))
             ImGui.ProgressBar((testValue3 / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test3')
             ImGui.PopStyleColor()
         end
@@ -569,7 +569,7 @@ local function drawTarget()
         --Target Health Bar
         ImGui.BeginGroup()
         if settings[script].DynamicHP then
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, mq.TLO.Target.PctHPs()))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, mq.TLO.Target.PctHPs())))
         else
             if mq.TLO.Target.PctHPs() < 25 then
                 ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('orange')))
@@ -905,7 +905,7 @@ function PlayerTarg.RenderGUI()
             --My Mana Bar
             if (tonumber(mq.TLO.Me.MaxMana()) > 0) then
                 if settings[script].DynamicMP then
-                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(colorMpMin, colorMpMax, mq.TLO.Me.PctMana()))
+                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorMpMin, colorMpMax, mq.TLO.Me.PctMana())))
                 else
                     ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('light blue2')))
                 end
@@ -952,7 +952,7 @@ function PlayerTarg.RenderGUI()
         local colorCountTarget, styleCountTarget = DrawTheme(themeName, 'targ')
         local tmpFlag = targFlag
         if locked then tmpFlag = bit32.bor(targFlag, ImGuiWindowFlags.NoMove) end
-        local openT, showT = ImGui.Begin("Target##TargetPopout" .. mq.TLO.Me.Name(), true, tmpFlag)
+        local openT, showT = ImGui.Begin("Target##TargetPopout" .. MyUI_CharLoaded, true, tmpFlag)
         if showT then
             if ImGui.IsWindowHovered(ImGuiHoveredFlags.ChildWindows) then
                 mouseHudTarg = true
@@ -980,7 +980,7 @@ function PlayerTarg.RenderGUI()
         local ColorCountBreath, StyleCountBreath = DrawTheme(themeName, 'breath')
         ImGui.SetNextWindowSize(ImVec2(150, 55), ImGuiCond.FirstUseEver)
         ImGui.SetNextWindowPos(ImGui.GetMousePosVec(), ImGuiCond.FirstUseEver)
-        local openBreath, showBreath = ImGui.Begin('Breath##MyBreathWin_' .. mq.TLO.Me.Name(), true, bFlags)
+        local openBreath, showBreath = ImGui.Begin('Breath##MyBreathWin_' .. MyUI_CharLoaded, true, bFlags)
         if not openBreath then
             breathBarShow = false
         end
@@ -988,7 +988,7 @@ function PlayerTarg.RenderGUI()
             ImGui.SetWindowFontScale(FontScale)
 
             local yPos = ImGui.GetCursorPosY()
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(colorBreathMin, colorBreathMax, breathPct))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorBreathMin, colorBreathMax, breathPct)))
             ImGui.ProgressBar((breathPct / 100), ImGui.GetContentRegionAvail(), progressSize, '##pctBreath')
             ImGui.PopStyleColor()
             if ImGui.BeginPopupContextItem("##MySpells_CastWin") then

@@ -2678,7 +2678,7 @@ local function Init()
     processArgs()
     -- Get Character Name
     meName = mq.TLO.Me.Name()
-    configFile = string.format('%s/MyUI/%s/%s/%s_Configs.lua', mq.configDir, script, mq.TLO.EverQuest.Server(), meName)
+    configFile = string.format('%s/MyUI/%s/%s/%s_Configs.lua', mq.configDir, script, MyUI_Server, meName)
     -- Load Settings
     loadSettings()
     loadPaths()

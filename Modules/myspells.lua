@@ -565,7 +565,7 @@ function MySpells.RenderGUI()
 	if locked then winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoMove) end
 	if not showTitle then winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoTitleBar) end
 	local ColorCount, StyleCount = DrawTheme(themeName, theme.Theme)
-	local open, show = ImGui.Begin(bIcon .. '##MySpells_' .. mq.TLO.Me.Name(), true, winFlags)
+	local open, show = ImGui.Begin(bIcon .. '##MySpells_' .. MyUI_CharLoaded, true, winFlags)
 	if not open then
 		RUNNING = false
 	end
@@ -835,7 +835,7 @@ function MySpells.RenderGUI()
 		ImGui.SetNextWindowSize(ImVec2(150, 55), ImGuiCond.FirstUseEver)
 		ImGui.SetNextWindowPos(ImGui.GetMousePosVec(), ImGuiCond.FirstUseEver)
 
-		local openCast, showCast = ImGui.Begin('Casting##MyCastingWin_' .. mq.TLO.Me.Name(), true, castFlags)
+		local openCast, showCast = ImGui.Begin('Casting##MyCastingWin_' .. MyUI_CharLoaded, true, castFlags)
 		if not openCast then
 			castBarShow = false
 		end
@@ -902,7 +902,7 @@ local function Init()
 		return
 	end
 	configFileOld2 = string.format('%s/myui/MySpells/MySpells_%s_Configs.lua', mq.configDir, meName)
-	configFile = string.format('%s/myui/MySpells/%s/MySpells_%s.lua', mq.configDir, mq.TLO.EverQuest.Server(), meName)
+	configFile = string.format('%s/myui/MySpells/%s/MySpells_%s.lua', mq.configDir, MyUI_Server, meName)
 	loadSettings()
 	if MyUI_Utils.File.Exists(themezDir) then
 		hasThemeZ = true

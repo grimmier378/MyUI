@@ -12,8 +12,7 @@ local LoadTheme = require('lib.theme_loader')
 local MyPet = {}
 
 -- Variables
-local script = 'MyPet'                    -- Change this to the name of your script
-local meName = mq.TLO.Me.Name() or 'none' -- Character Name
+local script = 'MyPet' -- Change this to the name of your script
 local themeName = 'Default'
 local themeID = 1
 local theme, defaults, settings, btnInfo = {}, {}, {}, {}
@@ -35,7 +34,7 @@ local showTitleBar = true
 -- File Paths
 local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
 local configFileOld = string.format('%s/MyUI/%s/%s_Configs.lua', mq.configDir, script, script)
-local configFile = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, script, mq.TLO.EverQuest.Server(), meName)
+local configFile = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, script, MyUI_Server, MyUI_CharLoaded)
 local themezDir = mq.luaDir .. '/themez/init.lua'
 
 -- Default Settings
@@ -228,7 +227,7 @@ local function DrawInspectableSpellIcon(iconID, bene, name, i)
 	if ImGui.BeginPopupContextItem() then
 		if ImGui.MenuItem("Inspect##PetBuff" .. i) then
 			spell.Inspect()
-			if mq.TLO.MacroQuest.BuildName() == 'Emu' then
+			if MyUI_Build == 'Emu' then
 				mq.cmdf("/nomodkey /altkey /notify PetInfoWindow PetBuff%s leftmouseup", i - 1)
 			end
 		end
@@ -260,7 +259,7 @@ function MyPet.RenderGUI()
 		if (autoHide and petName ~= 'No Pet') or not autoHide then
 			ImGui.SetNextWindowSize(ImVec2(275, 255), ImGuiCond.FirstUseEver)
 			-- Set Window Name
-			local winName = string.format('%s##Main_%s', script, meName)
+			local winName = string.format('%s##Main_%s', script, MyUI_CharLoaded)
 			-- Load Theme
 			local ColorCount, StyleCount = DrawTheme(themeName)
 			-- Create Main Window
@@ -431,7 +430,7 @@ function MyPet.RenderGUI()
 	end
 
 	if showConfigGUI then
-		local winName = string.format('%s Config##Config_%s', script, meName)
+		local winName = string.format('%s Config##Config_%s', script, MyUI_CharLoaded)
 		local ColCntConf, StyCntConf = DrawTheme(themeName)
 		local openConfig, showConfig = ImGui.Begin(winName, true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
 		if not openConfig then
@@ -658,8 +657,7 @@ local function Init()
 	-- Load Settings
 	loadSettings()
 	-- Get Character Name
-	meName = mq.TLO.Me.Name()
-	configFile = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, script, mq.TLO.EverQuest.Server(), meName)
+	configFile = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, script, MyUI_Server, MyUI_CharLoaded)
 	-- Check if ThemeZ exists
 	if MyUI_Utils.File.Exists(themezDir) then
 		hasThemeZ = true

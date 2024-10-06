@@ -679,7 +679,7 @@ local should_include_player = function(spawn)
 	-- if pc is in group, raid or (optionally) guild, skip
 	local in_group = Group.Members() ~= nil and Group.Member(name).Index() ~= nil
 	local in_raid = Raid.Members() > 0 and Raid.Member(name)() ~= nil
-	local in_guild = ignoreguild and mq.TLO.Me.Guild() ~= nil and mq.TLO.Me.Guild() == guild
+	local in_guild = ignoreguild and MyUI_Guild ~= nil and MyUI_Guild == guild
 	if in_group or in_raid or in_guild then return false end
 	return true
 end

@@ -1145,7 +1145,7 @@ function MyBuffs.RenderGUI()
                         for i = 1, #MyBuffs.boxes do
                             ImGui.TableNextColumn()
                             ImGui.SetWindowFontScale(Scale)
-                            if MyBuffs.boxes[i].Name == mq.TLO.Me.CleanName() then
+                            if MyBuffs.boxes[i].Name == MyUI_CharLoaded then
                                 ImGui.TextColored(ImVec4(0, 1, 1, 1), MyBuffs.boxes[i].Name)
                             else
                                 ImGui.Text(MyBuffs.boxes[i].Name)
@@ -1552,7 +1552,7 @@ function MyBuffs.RenderGUI()
             ImGui.SetNextWindowPos(ImVec2(winPosX, winPosY), ImGuiCond.Appearing)
             ImGui.SetNextWindowSize(ImVec2(winSizeX, winSizeY), ImGuiCond.Appearing)
         end
-        local openMail, showMail = ImGui.Begin("MyBuffs MailBox##MailBox_MyBuffs_" .. mq.TLO.Me.Name(), true, ImGuiWindowFlags.NoFocusOnAppearing)
+        local openMail, showMail = ImGui.Begin("MyBuffs MailBox##MailBox_MyBuffs_" .. MyUI_CharLoaded, true, ImGuiWindowFlags.NoFocusOnAppearing)
         if not openMail then
             MyBuffs.MailBoxShow = false
             mailBox = {}

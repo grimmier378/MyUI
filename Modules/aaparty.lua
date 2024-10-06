@@ -234,7 +234,7 @@ local function MessageHandler()
         end
         --New member connected if Hello is true. Lets send them our data so they have it.
         if subject == 'Hello' then
-            -- if who ~= mq.TLO.Me.Name() then
+            -- if who ~= MyUI_CharLoaded then
             if aaActor ~= nil then
                 aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(nil, 'Welcome'))
                 aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(nil, 'Welcome'))

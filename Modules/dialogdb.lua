@@ -878,8 +878,7 @@ function DialogDB.RenderGUI()
 end
 
 local function init()
-	MyUI_CharLoaded = mq.TLO.Me.Name()
-	if mq.TLO.MacroQuest.BuildName() ~= 'Emu' then MyUI_Server = 'Live' end -- really only care about server name for EMU as the dialogs may vary from serever to server to server
+	if MyUI_Build ~= 'Emu' then MyUI_Server = 'Live' end -- really only care about server name for EMU as the dialogs may vary from serever to server to server
 	loadSettings()
 	MyUI_Utils.PrintOutput('MyUI', nil, "Dialog Data Loaded for %s", MyUI_Server)
 	Running = true

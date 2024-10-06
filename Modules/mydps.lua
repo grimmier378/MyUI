@@ -6,7 +6,7 @@ local MyDPS = {}
 MyDPS.ActorMailBox = 'my_dps'
 local ActorDPS = nil
 local script = 'MyDPS'
-local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, script, mq.TLO.EverQuest.Server(), mq.TLO.Me.Name())
+local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, script, MyUI_Server, MyUI_CharLoaded)
 local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
 
 local RUNNING = true
@@ -792,7 +792,7 @@ function MyDPS.RenderGUI()
 		else
 			ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(0.1, 0.1, 0.1, 0.9))
 		end
-		local isWindowOpen, showWin = ImGui.Begin(script .. "##" .. mq.TLO.Me.Name(), true, winFlags)
+		local isWindowOpen, showWin = ImGui.Begin(script .. "##" .. MyUI_CharLoaded, true, winFlags)
 		if not isWindowOpen then
 			RUNNING = false
 		end
@@ -842,7 +842,7 @@ function MyDPS.RenderGUI()
 	if tempSettings.showHistory then
 		local ColorCount, StyleCount = DrawTheme(themeName)
 		ImGui.SetNextWindowSize(400, 200, ImGuiCond.FirstUseEver)
-		local openReport, showReport = ImGui.Begin("DPS Report##" .. mq.TLO.Me.Name(), true, ImGuiWindowFlags.None)
+		local openReport, showReport = ImGui.Begin("DPS Report##" .. MyUI_CharLoaded, true, ImGuiWindowFlags.None)
 		if not openReport then
 			tempSettings.showHistory = false
 			settings.Options.showHistory = false

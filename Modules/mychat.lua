@@ -5,7 +5,7 @@ local setFocus                                   = false
 local commandBuffer                              = ''
 
 -- local var's
-local serverName                                 = string.gsub(mq.TLO.EverQuest.Server(), ' ', '_') or ''
+local serverName                                 = string.gsub(MyUI_Server, ' ', '_') or ''
 local myName                                     = mq.TLO.Me.Name() or ''
 local addChannel                                 = false -- Are we adding a new channel or editing an old one
 local sortedChannels                             = {}

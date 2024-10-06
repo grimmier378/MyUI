@@ -25,7 +25,7 @@ local playing = false
 -- Main Settings
 local RUNNING = true
 local path = string.format("%s/%s/sounds/", mq.TLO.Lua.Dir(), script)
-local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, script, mq.TLO.EverQuest.Server(), mq.TLO.Me.Name())
+local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, script, MyUI_Server, MyUI_CharLoaded)
 local settings, defaults = {}, {}
 local timerA, timerB = os.time(), os.time()
 local openConfigGUI = false

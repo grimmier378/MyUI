@@ -17,7 +17,7 @@ local Template = {} -- Module Name Here Returns the table of functions and any v
 
 	-- General MQ Build, Char Name, Server Name
 	MyUI_CharLoaded      = mq.TLO.Me.DisplayName()
-	MyUI_Server          = mq.TLO.EverQuest.Server()
+	MyUI_Server          = MyUI_Server
 	MyUI_Build           = mq.TLO.MacroQuest.BuildName()
 
 	MyUI_Modules         = {} -- table to hold all loaded modules you can interact with any of their exposed functions here.

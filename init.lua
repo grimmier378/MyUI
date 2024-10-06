@@ -21,6 +21,7 @@ MyUI_Grimmier_Img    = MyUI_Utils.SetImage(mq.TLO.Lua.Dir() .. "/myui/images/Gri
 MyUI_CharLoaded      = mq.TLO.Me.DisplayName()
 MyUI_Server          = mq.TLO.EverQuest.Server()
 MyUI_Build           = mq.TLO.MacroQuest.BuildName()
+MyUI_Guild           = mq.TLO.Me.Guild()
 
 local MyActor        = MyUI_Actor.register('myui', function(message) end)
 local mods           = {}
@@ -121,7 +122,7 @@ local function InitModules()
 				Subject = 'Hello',
 				Message = 'Hello',
 				Name = MyUI_CharLoaded,
-				Guild = mq.TLO.Me.Guild(),
+				Guild = MyUI_Guild,
 				Tell = '',
 				Check = os.time,
 			}
@@ -246,29 +247,40 @@ local function MyUI_Render()
 				DrawContextMenu()
 				ImGui.EndPopup()
 			end
-			if ImGui.BeginTable("Modules", 2, ImGuiWindowFlags.None) then
-				local sorted_names = GetSortedModuleNames()
 
-				for _, name in ipairs(sorted_names) do
-					local module_data = nil
-					for _, data in ipairs(MyUI_Settings.mods_list) do
-						if data.name == name then
-							module_data = data
-							goto continue
-						end
-					end
-					::continue::
+			local sizeX, sizeY = ImGui.GetContentRegionAvail()
+			local col = math.floor(sizeX / 125) or 1
+			local sorted_names = GetSortedModuleNames()
+			local total_items = #sorted_names
+			local rows = math.ceil(total_items / col)
 
-					if module_data then
-						local pressed = false
-						ImGui.TableNextColumn()
-						local new_state = ImGui.Checkbox(module_data.name, module_data.enabled)
+			if ImGui.BeginTable("Modules", col, ImGuiWindowFlags.None) then
+				for row = 1, rows do
+					for column = 1, col do
+						local index = (row - 1) + (column - 1) * rows + 1
+						if index <= total_items then
+							local name = sorted_names[index]
+							local module_data = nil
 
-						-- If checkbox changed, set flags for processing
-						if new_state ~= module_data.enabled then
-							MyUI_TempSettings.ModuleChanged = true
-							MyUI_TempSettings.ModuleName = module_data.name
-							MyUI_TempSettings.ModuleEnabled = new_state
+							for _, data in ipairs(MyUI_Settings.mods_list) do
+								if data.name == name then
+									module_data = data
+									break
+								end
+							end
+
+							if module_data then
+								ImGui.TableNextColumn()
+								ImGui.SetNextItemWidth(120)
+								local new_state = ImGui.Checkbox(module_data.name, module_data.enabled)
+
+								-- If checkbox changed, set flags for processing
+								if new_state ~= module_data.enabled then
+									MyUI_TempSettings.ModuleChanged = true
+									MyUI_TempSettings.ModuleName = module_data.name
+									MyUI_TempSettings.ModuleEnabled = new_state
+								end
+							end
 						end
 					end
 				end
@@ -301,6 +313,7 @@ local function MyUI_Render()
 				end
 			end
 		end
+
 		if ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows) then
 			if ImGui.IsKeyPressed(ImGuiKey.Escape) then
 				MyUI_Settings.ShowMain = false
@@ -308,8 +321,10 @@ local function MyUI_Render()
 				mq.pickle(MyUI_SettingsFile, MyUI_Settings)
 			end
 		end
+
 		ImGui.End()
 	end
+
 
 	if Minimized then
 		local open_gui, show_gui = ImGui.Begin(MyUI_ScriptName .. "##Mini" .. MyUI_CharLoaded, true,

@@ -453,13 +453,13 @@ function ChatRelay.CheckMode()
         Minimized = settings[script].EscapeToMin
         showMain = not Minimized
         mode = 'driver'
-        MyUI_Utils.PrintOutput('MyUI', '\ayChat Relay:\ao Setting \atDriver\ax Mode. UI will be displayed.')
-        MyUI_Utils.PrintOutput('MyUI', '\ayChat Relay:\ao Type \at/chatrelay show\ax. to Toggle the UI')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayChat Relay:\ao Setting \atDriver\ax Mode. UI will be displayed.')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayChat Relay:\ao Type \at/chatrelay show\ax. to Toggle the UI')
     elseif MyUI_Mode == 'client' then
         showMain = false
         mode = 'client'
-        MyUI_Utils.PrintOutput('MyUI', '\ayChat Relay:\ao Setting \atClient\ax Mode. UI will not be displayed.')
-        MyUI_Utils.PrintOutput('MyUI', '\ayChat Relay:\ao Type \at/chatrelay show\ax. to Toggle the UI')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayChat Relay:\ao Setting \atClient\ax Mode. UI will not be displayed.')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayChat Relay:\ao Type \at/chatrelay show\ax. to Toggle the UI')
     end
 end
 
@@ -469,12 +469,12 @@ local function processCommand(...)
         if args[1] == 'gui' or args[1] == 'show' or args[1] == 'open' then
             showMain = not showMain
             if showMain then
-                MyUI_Utils.PrintOutput('MyUI', '\ayChat Relay:\ao Toggling GUI \atOpen\ax.')
+                MyUI_Utils.PrintOutput('MyUI', nil, '\ayChat Relay:\ao Toggling GUI \atOpen\ax.')
             else
-                MyUI_Utils.PrintOutput('MyUI', '\ayChat Relay:\ao Toggling GUI \atClosed\ax.')
+                MyUI_Utils.PrintOutput('MyUI', nil, '\ayChat Relay:\ao Toggling GUI \atClosed\ax.')
             end
         elseif args[1] == 'exit' or args[1] == 'quit' then
-            MyUI_Utils.PrintOutput('MyUI', '\ayChat Relay:\ao Exiting.')
+            MyUI_Utils.PrintOutput('MyUI', nil, '\ayChat Relay:\ao Exiting.')
             RUNNING = false
         elseif args[1] == 'tells' then
             settings[script].RelayTells = not settings[script].RelayTells
@@ -488,15 +488,15 @@ local function processCommand(...)
             settings[script].ShowOnNewMessage = not settings[script].ShowOnNewMessage
             mq.pickle(configFile, settings)
         else
-            MyUI_Utils.PrintOutput('MyUI', '\ayChat Relay:\ao Invalid command given.')
+            MyUI_Utils.PrintOutput('MyUI', nil, '\ayChat Relay:\ao Invalid command given.')
         end
     else
-        MyUI_Utils.PrintOutput('MyUI', '\ayChat Relay:\ao No command given.')
-        MyUI_Utils.PrintOutput('MyUI', '\ayChat Relay:\ag /chatrelay gui \ao- Toggles the GUI on and off.')
-        MyUI_Utils.PrintOutput('MyUI', '\ayChat Relay:\ag /chatrelay tells \ao- Toggles the Relay of Tells.')
-        MyUI_Utils.PrintOutput('MyUI', '\ayChat Relay:\ag /chatrelay guild \ao- Toggles the Relay of Guild Chat.')
-        MyUI_Utils.PrintOutput('MyUI', '\ayChat Relay:\ag /chatrelay autoshow \ao- Toggles the Show on New Message.')
-        MyUI_Utils.PrintOutput('MyUI', '\ayChat Relay:\ag /chatrelay exit \ao- Exits the plugin.')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayChat Relay:\ao No command given.')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayChat Relay:\ag /chatrelay gui \ao- Toggles the GUI on and off.')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayChat Relay:\ag /chatrelay tells \ao- Toggles the Relay of Tells.')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayChat Relay:\ag /chatrelay guild \ao- Toggles the Relay of Guild Chat.')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayChat Relay:\ag /chatrelay autoshow \ao- Toggles the Show on New Message.')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayChat Relay:\ag /chatrelay exit \ao- Exits the plugin.')
     end
 end
 

@@ -75,16 +75,30 @@ function CommonUtils.SetImage(file_path)
 	return mq.CreateTexture(file_path)
 end
 
----comment Print Output to the Console or MyChat
----@param mychat_tab any @ the MyChat Tab to output to or Pass nil to output to the main console
----@param msg any @ the message to output
+---comment Handles Printing output.
+---
+---If MyChat is not loaded it will just print to the main console or the mychat_tab is nil
+---
+---Options mainconsole only, mychat only, or both
+---
+---Note: MyChatHandler is a global function that is set by the MyChat mod if it is not loaded we will default to printing to the main console
+---
+---@param mychat_tab string|nil @ the MyChat tab name if nil we will just print to main console
+---@param main_console boolean|nil @ the main console if true we will print to the main console as well as the MyChat tab if it is loaded
+---@param msg string @ the message to output
 ---@param ... unknown @ any additional arguments to format the message
-function CommonUtils.PrintOutput(mychat_tab, msg, ...)
+function CommonUtils.PrintOutput(mychat_tab, main_console, msg, ...)
+	if main_console == nil then main_console = false end
+
 	msg = string.format(msg, ...)
-	if MyUI_MyChatHandler ~= nil and mychat_tab ~= nil then
-		MyUI_MyChatHandler(mychat_tab, msg)
-	else
+
+	if mychat_tab == nil then
 		print(msg)
+	elseif MyUI_MyChatHandler ~= nil and main_console then
+		MyUI_MyChatHandler(mychat_tab, msg)
+		print(msg)
+	elseif MyUI_MyChatHandler ~= nil then
+		MyUI_MyChatHandler(mychat_tab, msg)
 	end
 end
 
@@ -99,7 +113,7 @@ function CommonUtils.CheckRemovedSettings(default_settings, loaded_settings)
 	local newSetting = false
 	for setting, value in pairs(loaded_settings or {}) do
 		if default_settings[setting] == nil then
-			CommonUtils.PrintOutput('MyUI', "\ayFound Depreciated Setting: \ao%s \ayRemoving it from the Settings File.", setting)
+			CommonUtils.PrintOutput('MyUI', nil, "\ayFound Depreciated Setting: \ao%s \ayRemoving it from the Settings File.", setting)
 			loaded_settings[setting] = nil
 			newSetting = true
 		end
@@ -118,7 +132,7 @@ function CommonUtils.CheckDefaultSettings(default_settings, loaded_settings)
 	local newSetting = false
 	for setting, value in pairs(default_settings or {}) do
 		if loaded_settings[setting] == nil then
-			CommonUtils.PrintOutput('MyUI', "\ayNew Default Setting: \ao%s \ayAdding it from the Settings File.", setting)
+			CommonUtils.PrintOutput('MyUI', nil, "\ayNew Default Setting: \ao%s \ayAdding it from the Settings File.", setting)
 			loaded_settings[setting] = value
 			newSetting = true
 		end

@@ -898,7 +898,7 @@ end
 local function Init()
 	meName = mq.TLO.Me.Name()
 	if mq.TLO.Me.MaxMana() == 0 then
-		MyUI_Utils.PrintOutput(nil, "You are not a caster!")
+		MyUI_Utils.PrintOutput(nil, true, "You are not a caster!")
 		RUNNING = false
 		return
 	end

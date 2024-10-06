@@ -185,7 +185,7 @@ local function GetBuff(slot)
     -- Calculate total minutes and total seconds
     totalMin = duration.TotalMinutes() or 0
     totalSec = duration.TotalSeconds() or 0
-    -- MyUI_Utils.PrintOutput('MyUI',totalSec)
+    -- MyUI_Utils.PrintOutput('MyUI',nil,totalSec)
     buffDurHMS = duration.TimeHMS() or ''
 
     -- format tooltip
@@ -1617,18 +1617,18 @@ function MyBuffs.CheckMode()
     if MyUI_Mode == 'driver' then
         MyBuffs.ShowGUI = true
         solo = false
-        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Setting \atDriver\ax Mode. Actors [\agEnabled\ax] UI [\agOn\ax].')
-        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Setting \atDriver\ax Mode. Actors [\agEnabled\ax] UI [\agOn\ax].')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
     elseif MyUI_Mode == 'client' then
         MyBuffs.ShowGUI = false
         solo = false
-        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Setting \atClient\ax Mode.Actors [\agEnabled\ax] UI [\arOff\ax].')
-        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Setting \atClient\ax Mode.Actors [\agEnabled\ax] UI [\arOff\ax].')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
     else
         MyBuffs.ShowGUI = true
         solo = true
-        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Setting \atSolo\ax Mode. Actors [\arDisabled\ax] UI [\agOn\ax].')
-        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Setting \atSolo\ax Mode. Actors [\arDisabled\ax] UI [\agOn\ax].')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
     end
 end
 
@@ -1638,21 +1638,21 @@ local function processCommand(...)
         if args[1] == 'gui' or args[1] == 'show' or args[1] == 'open' then
             MyBuffs.ShowGUI = not MyBuffs.ShowGUI
             if MyBuffs.ShowGUI then
-                MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Toggling GUI \atOpen\ax.')
+                MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Toggling GUI \atOpen\ax.')
             else
-                MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Toggling GUI \atClosed\ax.')
+                MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Toggling GUI \atClosed\ax.')
             end
         elseif args[1] == 'exit' or args[1] == 'quit' then
-            MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao Exiting.')
+            MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Exiting.')
             if not solo then SayGoodBye() end
             RUNNING = false
         elseif args[1] == 'mailbox' then
             MyBuffs.MailBoxShow = not MyBuffs.MailBoxShow
         end
     else
-        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ao No command given.')
-        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ag /mybuffs gui \ao- Toggles the GUI on and off.')
-        MyUI_Utils.PrintOutput('MyUI', '\ayMyBuffs.\ag /mybuffs exit \ao- Exits the plugin.')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao No command given.')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ag /mybuffs gui \ao- Toggles the GUI on and off.')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ag /mybuffs exit \ao- Exits the plugin.')
     end
 end
 

@@ -220,7 +220,7 @@ local function SavePaths()
         stmt:finalize()
         db:close()
     else
-        MyUI_Utils.PrintOutput('MyUI', "Failed to open the database.")
+        MyUI_Utils.PrintOutput('MyUI', nil, "Failed to open the database.")
     end
 
     -- Optionally, save paths to a Lua file as a backup
@@ -231,7 +231,7 @@ local function loadPaths()
     -- Check if the SQLite3 database file exists
     if not MyUI_Utils.File.Exists(PathDB) then
         -- Create the database and its table if it doesn't exist
-        MyUI_Utils.PrintOutput('MyUI', "Creating the MyPaths Database")
+        MyUI_Utils.PrintOutput('MyUI', nil, "Creating the MyPaths Database")
         local db = MyUI_SQLite3.open(PathDB)
         db:exec [[
             CREATE TABLE IF NOT EXISTS Paths_Table (
@@ -275,13 +275,13 @@ local function loadPaths()
         stmt:finalize()
         db:close()
     else
-        MyUI_Utils.PrintOutput('MyUI', "Failed to open the database.")
+        MyUI_Utils.PrintOutput('MyUI', nil, "Failed to open the database.")
     end
 
     -- Fallback to load from Lua file if the database is empty
     if next(Paths) == nil and MyUI_Utils.File.Exists(pathsFile) then
         Paths = dofile(pathsFile)
-        MyUI_Utils.PrintOutput('MyUI', "Populating MyPaths DB from Lua file! Depending on size, This may take some time...")
+        MyUI_Utils.PrintOutput('MyUI', nil, "Populating MyPaths DB from Lua file! Depending on size, This may take some time...")
         SavePaths() -- Save to the SQLite database after loading from Lua file
     end
 end
@@ -498,14 +498,14 @@ end
 
 local function UpdatePath(zone, pathName)
     if not Paths[zone] or not Paths[zone][pathName] then
-        MyUI_Utils.PrintOutput('MyUI', "Path %s in zone %s does not exist.", pathName, zone)
+        MyUI_Utils.PrintOutput('MyUI', nil, "Path %s in zone %s does not exist.", pathName, zone)
         return
     end
 
     -- Open the SQLite database
     local db = MyUI_SQLite3.open(PathDB)
     if not db then
-        MyUI_Utils.PrintOutput('MyUI', "Failed to open the database.")
+        MyUI_Utils.PrintOutput('MyUI', nil, "Failed to open the database.")
         return
     end
 
@@ -1039,13 +1039,13 @@ local function import_paths(import_string)
     if not decoded or decoded == '' then return end
     local ok, imported_paths = pcall(load(decoded))
     if not ok or type(imported_paths) ~= 'table' then
-        MyUI_Utils.PrintOutput('MyUI', '\arERROR: Failed to import paths\ax')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\arERROR: Failed to import paths\ax')
         return
     end
 
     local db = MyUI_SQLite3.open(PathDB)
     if not db then
-        MyUI_Utils.PrintOutput('MyUI', '\arERROR: Failed to open database\ax')
+        MyUI_Utils.PrintOutput('MyUI', nil, '\arERROR: Failed to open database\ax')
         return
     end
 
@@ -1494,7 +1494,7 @@ function MyPaths.RenderGUI()
                                     ImGui.LogToClipboard()
                                     ImGui.LogText(exportData)
                                     ImGui.LogFinish()
-                                    MyUI_Utils.PrintOutput('MyUI', '\ayPath data copied to clipboard!\ax')
+                                    MyUI_Utils.PrintOutput('MyUI', nil, '\ayPath data copied to clipboard!\ax')
                                 end
                                 ImGui.PopStyleColor()
                             else
@@ -1571,7 +1571,7 @@ function MyPaths.RenderGUI()
                                         ImGui.LogToClipboard()
                                         ImGui.LogText(exportData)
                                         ImGui.LogFinish()
-                                        MyUI_Utils.PrintOutput('MyUI', '\ayPath data copied to clipboard!\ax')
+                                        MyUI_Utils.PrintOutput('MyUI', nil, '\ayPath data copied to clipboard!\ax')
                                     end
                                     ImGui.PopStyleColor()
                                 else
@@ -2408,31 +2408,31 @@ local function displayHelp()
     Example: /mypaths go loop "Loop A"
     Example: /mypaths stop
     Commands: /mypaths [combat|xtarg] [on|off] - Toggle Combat or Xtarget.]]
-    MyUI_Utils.PrintOutput('MyUI',
+    MyUI_Utils.PrintOutput('MyUI', nil,
         "\ay[\at%s\ax] \agCommands: \ay/mypaths [go|stop|list|chainadd|chainclear|chainloop|show|quit|save|reload|help] [loop|rloop|start|reverse|pingpong|closest|rclosest] [path]",
         script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agOptions: \aygo \aw= \atREQUIRES arguments and Path name see below for Arguments.", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agOptions: \aystop \aw= \atStops the current Navigation.", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agOptions: \ayshow \aw= \atToggles Main GUI.", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agOptions: \aychainclear \aw= \atClears the Current Chain.", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agOptions: \aychainloop \aw= \atToggle Loop the Current Chain.", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agOptions: \aychainadd [normal|reverse|loop|pingpong] [path] \aw= \atadds path to chain in current zone", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agOptions: \aychainadd [normal|reverse|loop|pingpong] [zone] [path] \aw= \atadds zone/path to chain", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agOptions: \aylist \aw= \atLists all Paths in the current Zone.", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agOptions: \aylist zone \aw= \atlist all zones that have paths", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agOptions: \aylist [zone] \aw= \atlist all paths in specified zone", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agOptions: \ayquit or exit \aw= \atExits the script.", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agOptions: \aysave \aw= \atSave the current Paths to lua file.", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agOptions: \ayreload \aw= \atReload Paths File.", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agOptions: \ayhelp \aw= \atPrints out this help list.", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agArguments: \ayloop \aw= \atLoops the path, \ayrloop \aw= \atLoop in reverse.", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agArguments: \ayclosest \aw= \atstart at closest wp, \ayrclosest \aw= \atstart at closest wp and go in reverse.", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agArguments: \aystart \aw= \atstarts the path normally, \ayreverse \aw= \atrun the path backwards.", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agArguments: \aypingpong \aw= \atstart in ping pong mode.", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agExample: \ay/mypaths \aogo \ayloop \am\"Loop A\"", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agExample: \ay/mypaths \aostop", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agCommands: \ay/mypaths [\atcombat\ax|\atxtarg\ax] [\aton\ax|\atoff\ax] \ay- \atToggle Combat or Xtarget.", script)
-    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agCommands: \ay/mypaths [\atdointerrupts\ax] [\aton\ax|\atoff\ax] \ay- \atToggle Interrupts.", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agOptions: \aygo \aw= \atREQUIRES arguments and Path name see below for Arguments.", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agOptions: \aystop \aw= \atStops the current Navigation.", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agOptions: \ayshow \aw= \atToggles Main GUI.", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agOptions: \aychainclear \aw= \atClears the Current Chain.", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agOptions: \aychainloop \aw= \atToggle Loop the Current Chain.", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agOptions: \aychainadd [normal|reverse|loop|pingpong] [path] \aw= \atadds path to chain in current zone", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agOptions: \aychainadd [normal|reverse|loop|pingpong] [zone] [path] \aw= \atadds zone/path to chain", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agOptions: \aylist \aw= \atLists all Paths in the current Zone.", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agOptions: \aylist zone \aw= \atlist all zones that have paths", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agOptions: \aylist [zone] \aw= \atlist all paths in specified zone", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agOptions: \ayquit or exit \aw= \atExits the script.", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agOptions: \aysave \aw= \atSave the current Paths to lua file.", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agOptions: \ayreload \aw= \atReload Paths File.", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agOptions: \ayhelp \aw= \atPrints out this help list.", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agArguments: \ayloop \aw= \atLoops the path, \ayrloop \aw= \atLoop in reverse.", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agArguments: \ayclosest \aw= \atstart at closest wp, \ayrclosest \aw= \atstart at closest wp and go in reverse.", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agArguments: \aystart \aw= \atstarts the path normally, \ayreverse \aw= \atrun the path backwards.", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agArguments: \aypingpong \aw= \atstart in ping pong mode.", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agExample: \ay/mypaths \aogo \ayloop \am\"Loop A\"", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agExample: \ay/mypaths \aostop", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agCommands: \ay/mypaths [\atcombat\ax|\atxtarg\ax] [\aton\ax|\atoff\ax] \ay- \atToggle Combat or Xtarget.", script)
+    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agCommands: \ay/mypaths [\atdointerrupts\ax] [\aton\ax|\atoff\ax] \ay- \atToggle Interrupts.", script)
 end
 
 local function bind(...)
@@ -2479,9 +2479,9 @@ local function bind(...)
             NavSet.doNav = false
             RUNNING = false
         elseif key == 'list' then
-            MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agZones: ", script)
+            MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agZones: ", script)
             for name, data in pairs(Paths) do
-                MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \ay%s", script, name)
+                MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \ay%s", script, name)
             end
         elseif key == 'chainclear' then
             ChainedPaths = {}
@@ -2494,7 +2494,7 @@ local function bind(...)
         elseif key == 'save' then
             mq.pickle(pathsFile, Paths)
         else
-            MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \arInvalid Command!", script)
+            MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \arInvalid Command!", script)
         end
     elseif #args == 2 then
         if key == 'resume' then
@@ -2522,25 +2522,25 @@ local function bind(...)
         elseif key == 'dointerrupts' then
             if action == 'on' then
                 InterruptSet.interruptsOn = true
-                MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agPausing for Interrupts: \atON", script)
+                MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agPausing for Interrupts: \atON", script)
             elseif action == 'off' then
                 InterruptSet.interruptsOn = false
-                MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agPausing for Interrupts: \arOFF", script)
+                MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agPausing for Interrupts: \arOFF", script)
             end
         elseif key == 'list' then
             if action == 'zones' then
-                MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agZone: \atZones With Paths: ", script)
+                MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agZone: \atZones With Paths: ", script)
                 for name, data in pairs(Paths) do
-                    if name ~= nil and name ~= '' then MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \ay%s", script, name) end
+                    if name ~= nil and name ~= '' then MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \ay%s", script, name) end
                 end
             else
                 if Paths[action] == nil then
-                    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \arNo Paths Found!", script)
+                    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \arNo Paths Found!", script)
                     return
                 end
-                MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agZone: \at%s \agPaths: ", script, action)
+                MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agZone: \at%s \agPaths: ", script, action)
                 for name, data in pairs(Paths[action]) do
-                    MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \ay%s", script, name)
+                    MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \ay%s", script, name)
                 end
             end
         elseif key == "gpause" and tonumber(action) ~= nil then
@@ -2550,7 +2550,7 @@ local function bind(...)
         end
     elseif #args == 3 then
         if Paths[zone]["'" .. path .. "'"] ~= nil then
-            MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \arInvalid Path!", script)
+            MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \arInvalid Path!", script)
             return
         end
         if key == 'go' then
@@ -2643,7 +2643,7 @@ local function bind(...)
             end
         end
     else
-        MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \arInvalid Arguments!", script)
+        MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \arInvalid Arguments!", script)
     end
 end
 
@@ -2707,7 +2707,7 @@ function MyPaths.MainLoop()
     end
 
     if currZone ~= lastZone then
-        MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \agZone Changed Last: \at%s Current: \ay%s", script, lastZone, currZone)
+        MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agZone Changed Last: \at%s Current: \ay%s", script, lastZone, currZone)
         lastZone = currZone
         NavSet.SelectedPath = 'None'
         NavSet.doNav = false
@@ -2751,7 +2751,7 @@ function MyPaths.MainLoop()
                     NavSet.doNav = true
                     PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
                     status = 'Navigating'
-                    MyUI_Utils.PrintOutput('MyUI', '\ay[\at%s\ax] \agStarting navigation for path: \ay%s \agin zone: \ay%s', script, NavSet.SelectedPath, currZone)
+                    MyUI_Utils.PrintOutput('MyUI', nil, '\ay[\at%s\ax] \agStarting navigation for path: \ay%s \agin zone: \ay%s', script, NavSet.SelectedPath, currZone)
                 end
             else
                 ChainedPaths = {}
@@ -2841,12 +2841,12 @@ function MyPaths.MainLoop()
         mq.delay(1)
         cTime = os.time()
         local checkTime = InterruptSet.interruptCheck
-        -- MyUI_Utils.PrintOutput('MyUI',"interrupt Checked: %s", checkTime)
+        -- MyUI_Utils.PrintOutput('MyUI',nil,"interrupt Checked: %s", checkTime)
         -- if cTime - checkTime >= 1 then
         InterruptSet.interruptFound = CheckInterrupts()
         InterruptSet.interruptCheck = os.time()
         if mq.TLO.SpawnCount('gm')() > 0 and InterruptSet.stopForGM and not NavSet.PausedActiveGN then
-            MyUI_Utils.PrintOutput('MyUI', "\ay[\at%s\ax] \arGM Detected, \ayPausing Navigation...", script)
+            MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \arGM Detected, \ayPausing Navigation...", script)
             NavSet.doNav = false
             mq.cmdf("/nav stop log=off")
             NavSet.ChainStart = false
@@ -2882,12 +2882,12 @@ function MyPaths.MainLoop()
                 if diff > intPauseTime then
                     -- Time is up, resume the coroutine and reset the timer values
 
-                    -- MyUI_Utils.PrintOutput('MyUI',"Pause time: %s Start Time %s Current Time: %s Difference: %s", pauseTime, InterruptSet.PauseStart, curTime, diff)
+                    -- MyUI_Utils.PrintOutput('MyUI',nil,"Pause time: %s Start Time %s Current Time: %s Difference: %s", pauseTime, InterruptSet.PauseStart, curTime, diff)
                     intPauseTime = 0
                     InterruptSet.PauseStart = 0
                     local success, message = coroutine.resume(co, NavSet.SelectedPath)
                     if not success then
-                        MyUI_Utils.PrintOutput('MyUI', "Error: " .. message)
+                        MyUI_Utils.PrintOutput('MyUI', nil, "Error: " .. message)
                         -- Reset coroutine on error
                         co = coroutine.create(NavigatePath)
                     end
@@ -2908,12 +2908,12 @@ function MyPaths.MainLoop()
                 local diff = curTime - NavSet.PauseStart
                 if diff > curWpPauseTime then
                     -- Time is up, resume the coroutine and reset the timer values
-                    -- MyUI_Utils.PrintOutput('MyUI',"Pause time: %s Start Time %s Current Time: %s Difference: %s", pauseTime, InterruptSet.PauseStart, curTime, diff)
+                    -- MyUI_Utils.PrintOutput('MyUI',nil,"Pause time: %s Start Time %s Current Time: %s Difference: %s", pauseTime, InterruptSet.PauseStart, curTime, diff)
                     curWpPauseTime = 0
                     NavSet.PauseStart = 0
                     local success, message = coroutine.resume(co, NavSet.SelectedPath)
                     if not success then
-                        MyUI_Utils.PrintOutput('MyUI', "Error: " .. message)
+                        MyUI_Utils.PrintOutput('MyUI', nil, "Error: " .. message)
                         -- Reset coroutine on error
                         co = coroutine.create(NavigatePath)
                     end
@@ -2922,7 +2922,7 @@ function MyPaths.MainLoop()
                 -- Resume the coroutine we are do not need to pause
                 local success, message = coroutine.resume(co, NavSet.SelectedPath)
                 if not success then
-                    MyUI_Utils.PrintOutput('MyUI', "Error: " .. message)
+                    MyUI_Utils.PrintOutput('MyUI', nil, "Error: " .. message)
                     -- Reset coroutine on error
                     co = coroutine.create(NavigatePath)
                 end

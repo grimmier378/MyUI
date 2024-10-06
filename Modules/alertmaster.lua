@@ -2355,6 +2355,11 @@ local cTime = os.time()
 local firstRun = true
 AlertMaster.MainLoop = function()
 	-- while true do
+	if currZone ~= lastZone then
+		numAlerts = 0
+		RefreshZone()
+		lastZone = currZone
+	end
 	if os.time() - cTime > delay or firstRun then
 		if mq.TLO.Window('CharacterListWnd').Open() then return false end
 		currZone = mq.TLO.Zone.ID()
@@ -2364,14 +2369,7 @@ AlertMaster.MainLoop = function()
 			check_for_gms()
 			check_for_announce()
 			check_for_pcs()
-		end
-		if currZone ~= lastZone then
-			numAlerts = 0
-			RefreshZone()
-			lastZone = currZone
-		end
-		--CMD('/echo '..numAlerts)
-		if check_safe_zone() ~= true then
+
 			if ((os.time() - alertTime) > (remindNPC * 60) and numAlerts > 0) then -- if we're past the alert remindnpc time and we have alerts to give
 				-- do text alerts
 				for _, v in pairs(tSpawns) do
@@ -2403,22 +2401,26 @@ AlertMaster.MainLoop = function()
 			end
 		end
 
-		if playing and playTime > 0 then
-			local cTime = os.time()
-			if cTime - playTime > 2 then
-				resetVolume()
-			end
-		end
-		if not playing and playTime == 0 then
-			-- we aren't playing anything so we can double check the original voulme wasn't changed by the user.
-			originalVolume = getVolume()
-		end
-		if SearchWindow_Show == true or #Table_Cache.Mobs < 1 then RefreshZone() end
-		if AlertMaster.GUI_Main.Refresh.Table.Unhandled then RefreshUnhandled() end
-		-- mq.delay(delay .. 's')
 		cTime = os.time()
 		firstRun = false
 	end
+
+	if playing and playTime > 0 then
+		local sTime = os.time()
+		if sTime - playTime > 2 then
+			resetVolume()
+		end
+	end
+
+	if not playing and playTime == 0 then
+		-- we aren't playing anything so we can double check the original voulme wasn't changed by the user.
+		originalVolume = getVolume()
+	end
+
+	if AlertMaster.GUI_Main.Refresh.Table.Unhandled then RefreshUnhandled() end
+	if SearchWindow_Show == true or #Table_Cache.Mobs < 1 then RefreshZone() end
+
+	-- mq.delay(delay .. 's')
 end
 
 setup()

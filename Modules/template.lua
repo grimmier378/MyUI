@@ -40,15 +40,37 @@ GLOBAL MyUI_ variables and functions.
 
 local mq = require('mq')
 local ImGui = require 'ImGui'
-local drawTimerMS = mq.gettime()
-local drawTimerS = os.time()
--- Exposed Variables
+local drawTimerMS = mq.gettime() -- get the current time in milliseconds
+local drawTimerS = os.time()     -- get the current time in seconds
 local Module = {}
+
 Module.Name = "Template" -- Name of the module used when loading and unloaing the modules.
 Module.IsRunning = false -- Keep track of running state. if not running we can unload it.
 Module.ShowGui = true
 
--- Local Variables
+-- check if the script is being loaded as a Module (externally) or as a Standalone script.
+---@diagnostic disable-next-line:undefined-global
+local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+if not loadedExeternally then
+	-- for local standalone use we will need to load in the global MyUI_ variables and functions. and make sure to include the files as needed inside of the scripts folder.
+	-- Comment/Uncomment the items below as needed
+	MyUI_Utils       = require('lib.common') -- common functions for use in other scripts
+	MyUI_Icons       = require('mq.ICONS')  -- FAWESOME ICONS
+	-- MyUI_Actor         = require('actors') -- Actors if needed
+	-- MyUI_Base64        = require('lib.base64') -- Ensure you have a base64 module available
+	-- MyUI_PackageMan    = require('mq.PackageMan')
+	-- MyUI_SQLite3       = MyUI_PackageMan.Require('lsqlite3')
+	MyUI_Colors      = require('lib.colors')      -- color table for GUI returns ImVec4
+	MyUI_ThemeLoader = require('lib.theme_loader') -- Load the theme loader
+	-- MyUI_AbilityPicker = require('lib.AbilityPicker') -- Ability Picker
+
+	-- build, char, server info
+	MyUI_CharLoaded  = mq.TLO.Me.DisplayName()
+	MyUI_Server      = mq.TLO.EverQuest.Server()
+	MyUI_Build       = mq.TLO.MacroQuest.BuildName()
+	MyUI_Guild       = mq.TLO.Me.Guild()
+end
+
 
 --Helpers
 -- You can keep your functions local to the module the ones here are the only ones we care about from the main script.
@@ -69,6 +91,12 @@ local function Init()
 	mq.bind('/template', CommandHandler)
 	Module.IsRunning = true
 	MyUI_Utils.PrintOutput('main', true, "\ayModule \a-w[\at%s\a-w] \agLoaded\aw!", Module.Name)
+
+	-- for standalone mode we need to init the GUI and use a real loop
+	if not loadedExeternally then
+		mq.imgui.init(Module.Name, Module.RenderGUI)
+		Module.LocalLoop()
+	end
 end
 
 -- Exposed Functions
@@ -101,33 +129,38 @@ function Module.MainLoop()
 	-- This will unload the module gracefully if IsRunning state changes.
 	if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
 
-	if os.time() - drawTimerS < 5 then
+	-- This will only allow the MainLoop to run every 500ms (half a secon)
+	if mq.gettime() - drawTimerMS < 500 then
 		return
-		-- your code here
 	else
-		-- drawTimerMS = mq.gettime()
-		drawTimerS = os.time()
+		-- your code here
+		drawTimerMS = mq.gettime()
+		-- drawTimerS = os.time()
 	end
 	--[[
 	your MainLoop code here without the loop.
 	
 	DO NOT USE WHILE loops here.
-
-	If you need to specify a delay you cah set a timer variable and check it in the MainLoop
-	to execute code every x seconds, use os.time() for the compare.
-	to execute code every x milliseconds, use mq.gettime() for the compare.
-
-	Exapmle:
-	outside the MainLoop: local timer = os.time()
-	in the MainLoop:
-	if os.time() - timer >= 1 then
-		-- your code here
-		timer = os.time()
-	end
+	The real loop for standalone mode is
+	Module.LocalLoop()
+	which will call this function in a loop.
+	
+	For Module use in MyUI the MainLoop will be called by the main script as needed.
 	]]
 end
 
--- Init the module
+function Module.LocalLoop()
+	while Module.IsRunning do
+		Module.MainLoop()
+		mq.delay(1)
+	end
+end
 
+if mq.TLO.EverQuest.GameState() ~= "INGAME" then
+	printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", Module.Name)
+	mq.exit()
+end
+
+-- Init the module
 Init()
 return Module

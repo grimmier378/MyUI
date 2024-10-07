@@ -1,12 +1,22 @@
 local mq = require('mq')
 local ImGui = require('ImGui')
-local actors = require('actors')
-local LoadTheme = require('lib.theme_loader')
 local Module = {}
 Module.ActorMailBox = 'my_dps'
 Module.Name = 'MyDPS'
 Module.IsRunning = false
+---@diagnostic disable-next-line:undefined-global
+local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
+if not loadedExeternally then
+	MyUI_Utils = require('lib.common')
+	MyUI_ThemeLoader = require('lib.theme_loader')
+	MyUI_Actor = require('actors')
+	MyUI_CharLoaded = mq.TLO.Me.DisplayName()
+	MyUI_Server = mq.TLO.MacroQuest.Server()
+	Module.ImgPath = mq.TLO.Lua.Dir() .. "/chatrelay/images/phone.png"
+end
+
+local LoadTheme = MyUI_ThemeLoader
 local ActorDPS = nil
 local script = 'MyDPS'
 local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, script, MyUI_Server, MyUI_CharLoaded)
@@ -1319,7 +1329,20 @@ function Module.Unload()
 	mq.unbind("/mydps")
 end
 
-local args = { ..., }
+local Arguments = { ..., }
+
+local function CheckArgs(args)
+	if args[1] ~= nil and args[1] == "start" then
+		if #args == 2 and args[2] == 'hide' then
+			tempSettings.showCombatWindow = false
+		end
+		started = true
+		clickThrough = true
+		winFlags = bit32.bor(ImGuiWindowFlags.NoMouseInputs, ImGuiWindowFlags.NoDecoration)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayStarted\ax", script)
+	end
+end
+
 local function Init()
 	loadSettings()
 
@@ -1349,26 +1372,28 @@ local function Init()
 	pHelp()
 
 	-- Check for arguments
-	if args[1] ~= nil and args[1] == "start" then
-		if #args == 2 and args[2] == 'hide' then
-			tempSettings.showCombatWindow = false
-		end
-		started = true
-		clickThrough = true
-		winFlags = bit32.bor(ImGuiWindowFlags.NoMouseInputs, ImGuiWindowFlags.NoDecoration)
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayStarted\ax", script)
+	if not loadedExeternally then
+		CheckArgs(Arguments)
+	else
+		started = settings.Options.autoStart
+		clickThrough = started
 	end
 
-	started = settings.Options.autoStart
-	clickThrough = started
 	Module.IsRunning = true
+	if not loadedExeternally then
+		mq.imgui.init(script, Module.RenderGUI)
+		Module.LocalLoop()
+	end
 end
 
 local clockTimer = mq.gettime()
 
 function Module.MainLoop()
 	-- Main Loop
-	if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+	if loadedExeternally then
+		---@diagnostic disable-next-line: undefined-global
+		if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+	end
 
 	if tempSettings.doActors ~= settings.Options.announceActors then
 		if settings.Options.announceActors then
@@ -1436,6 +1461,18 @@ function Module.MainLoop()
 	-- 		uiTime = 0
 	-- 	end
 	-- end
+end
+
+function Module.LocalLoop()
+	while Module.IsRunning do
+		Module.MainLoop()
+		mq.delay(1)
+	end
+end
+
+if mq.TLO.EverQuest.GameState() ~= "INGAME" then
+	printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
+	mq.exit()
 end
 
 Init()

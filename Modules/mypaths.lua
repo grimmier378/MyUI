@@ -7,12 +7,24 @@
 ]]
 
 -- Load Libraries
-local mq         = require('mq')
-local ImGui      = require('ImGui')
-local Module     = {}
-Module.Name      = 'MyPaths'
-Module.IsRunning = false
+local mq                = require('mq')
+local ImGui             = require('ImGui')
+local Module            = {}
+Module.Name             = 'MyPaths'
+Module.IsRunning        = false
+---@diagnostic disable-next-line:undefined-global
+local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
+if not loadedExeternally then
+    MyUI_Utils       = require('lib.common')
+    MyUI_ThemeLoader = require('lib.theme_loader')
+    MyUI_Icons       = require('mq.ICONS')
+    MyUI_CharLoaded  = mq.TLO.Me.DisplayName()
+    MyUI_Server      = mq.TLO.MacroQuest.Server()
+    MyUI_Base64      = require('lib.base64')
+    MyUI_PackageMan  = require('mq.PackageMan')
+    MyUI_SQLite3     = MyUI_PackageMan.Require('lsqlite3')
+end
 
 -- Variables
 local script                                                     = 'MyPaths' -- Change this to the name of your script
@@ -2694,10 +2706,17 @@ local function Init()
     lastZone = currZone
     displayHelp()
     Module.IsRunning = true
+    if not loadedExeternally then
+        mq.imgui.init(script, Module.RenderGUI)
+        Module.LocalLoop()
+    end
 end
 
 function Module.MainLoop()
-    if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+    if loadedExeternally then
+        ---@diagnostic disable-next-line: undefined-global
+        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+    end
 
     local justZoned = false
     local cTime = os.time()
@@ -3040,6 +3059,18 @@ function Module.MainLoop()
     -- Process ImGui Window Flag Changes
     winFlags = locked and bit32.bor(ImGuiWindowFlags.NoMove, ImGuiWindowFlags.MenuBar) or bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.MenuBar)
     winFlags = aSize and bit32.bor(winFlags, ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.MenuBar) or winFlags
+end
+
+function Module.LocalLoop()
+    while Module.IsRunning do
+        Module.MainLoop()
+        mq.delay(1)
+    end
+end
+
+if mq.TLO.EverQuest.GameState() ~= "INGAME" then
+    printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
+    mq.exit()
 end
 
 Init()

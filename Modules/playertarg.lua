@@ -11,6 +11,17 @@ local Module = {}
 Module.Name = 'PlayerTarg'
 Module.IsRunning = false
 
+---@diagnostic disable-next-line:undefined-global
+local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+
+if not loadedExeternally then
+    MyUI_Utils = require('lib.common')
+    MyUI_Icons = require('mq.ICONS')
+    MyUI_Colors = require('lib.colors')
+    MyUI_CharLoaded = mq.TLO.Me.DisplayName()
+    MyUI_Server = mq.TLO.MacroQuest.Server()
+end
+
 local gIcon = MyUI_Icons.MD_SETTINGS
 -- set variables
 local pulse = true
@@ -1023,12 +1034,19 @@ end
 local function init()
     Module.IsRunning = true
     loadSettings()
+    if not loadedExeternally then
+        mq.imgui.init('GUI_Target', Module.RenderGUI)
+        Module.LocalLoop()
+    end
 end
 
 local clockTimer = mq.gettime()
 
 function Module.MainLoop()
-    if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+    if loadedExeternally then
+        ---@diagnostic disable-next-line: undefined-global
+        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+    end
 
     local timeDiff = mq.gettime() - clockTimer
     if timeDiff > 10 then
@@ -1043,6 +1061,18 @@ function Module.MainLoop()
             breathBarShow = false
         end
     end
+end
+
+function Module.LocalLoop()
+    while Module.IsRunning do
+        Module.MainLoop()
+        mq.delay(1)
+    end
+end
+
+if mq.TLO.EverQuest.GameState() ~= "INGAME" then
+    printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
+    mq.exit()
 end
 
 init()

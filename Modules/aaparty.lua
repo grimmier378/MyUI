@@ -1,11 +1,20 @@
-local mq            = require('mq')
-local imgui         = require 'ImGui'
+local mq                = require('mq')
+local imgui             = require 'ImGui'
 
-local Module        = {}
-Module.ActorMailBox = 'aa_party'
-Module.IsRunning    = false
-Module.Name         = 'AAParty'
+local Module            = {}
+Module.ActorMailBox     = 'aa_party'
+Module.IsRunning        = false
+Module.Name             = 'AAParty'
 
+---@diagnostic disable-next-line:undefined-global
+local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+if not loadedExeternally then
+    MyUI_Utils = require('lib.common')
+    MyUI_ThemeLoader = require('lib.theme_loader')
+    MyUI_Actor = require('actors')
+    MyUI_CharLoaded = mq.TLO.Me.DisplayName()
+    MyUI_Mode = 'driver'
+end
 
 local themeID                                                           = 1
 local expand, compact                                                   = {}, {}
@@ -669,6 +678,32 @@ function Module.CheckMode()
     end
 end
 
+local args = { ..., }
+function Module.CheckArgsar(args)
+    if #args > 0 then
+        if args[1] == 'driver' then
+            AAPartyShow = true
+            AAPartyMode = 'driver'
+            if args[2] ~= nil and args[2] == 'mailbox' then
+                MailBoxShow = true
+            end
+            print('\ayAA Party:\ao Setting \atDriver\ax Mode. UI will be displayed.')
+            print('\ayAA Party:\ao Type \at/aaparty show\ax. to Toggle the UI')
+        elseif args[1] == 'client' then
+            AAPartyMode = 'client'
+            AAPartyShow = false
+            print('\ayAA Party:\ao Setting \atClient\ax Mode. UI will not be displayed.')
+            print('\ayAA Party:\ao Type \at/aaparty show\ax. to Toggle the UI')
+        end
+    else
+        AAPartyShow = true
+        AAPartyMode = 'driver'
+        print('\ayAA Party: \aoNo arguments passed, defaulting to \atDriver\ax Mode. UI will be displayed.')
+        print('\ayAA Party: \aoUse \at/lua run aaparty client\ax To start with the UI Off.')
+        print('\ayAA Party:\ao Type \at/aaparty show\ax. to Toggle the UI')
+    end
+end
+
 function Module.Unload()
     SayGoodBye()
     mq.unbind("/aaparty")
@@ -711,7 +746,12 @@ local function init()
     currZone = mq.TLO.Zone.ID()
     lastZone = currZone
     firstRun = true
-    Module.CheckMode()
+    if not loadedExeternally then
+        Module.CheckArgsar(args)
+        mq.imgui.init(script .. "##" .. MyUI_CharLoaded, Module.RenderGUI)
+    else
+        Module.CheckMode()
+    end
     mq.bind('/aaparty', processCommand)
     PtsAA = mq.TLO.Me.AAPoints()
     loadSettings()
@@ -726,14 +766,20 @@ local function init()
         aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(nil, 'Hello'))
     end
     Module.IsRunning = true
+    if not loadedExeternally then
+        Module.LocalLoop()
+    end
 end
 
 local clockTimer = mq.gettime()
 
 function Module.MainLoop()
-    if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+    if loadedExeternally then
+        ---@diagnostic disable-next-line: undefined-global
+        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+    end
     local elapsedTime = mq.gettime() - clockTimer
-    if elapsedTime >= 50 then
+    if not loadedExeternally or elapsedTime >= 50 then
         currZone = mq.TLO.Zone.ID()
         if currZone ~= lastZone then
             lastZone = currZone
@@ -746,6 +792,18 @@ function Module.MainLoop()
         end
         clockTimer = mq.gettime()
     end
+end
+
+function Module.LocalLoop()
+    while Module.IsRunning do
+        Module.MainLoop()
+        mq.delay(50)
+    end
+end
+
+if mq.TLO.EverQuest.GameState() ~= "INGAME" then
+    printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
+    mq.exit()
 end
 
 MessageHandler()

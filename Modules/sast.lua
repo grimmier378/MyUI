@@ -4,6 +4,15 @@ local Module = {}
 Module.Name = 'SAST'
 Module.IsRunning = false
 
+---@diagnostic disable-next-line:undefined-global
+local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+
+if not loadedExeternally then
+	MyUI_Utils = require('lib.common')
+	MyUI_Icons = require('mq.ICONS')
+	MyUI_CharLoaded = mq.TLO.Me.DisplayName()
+	MyUI_Server = mq.TLO.MacroQuest.Server()
+end
 
 -- Variables
 local AdvWIN = mq.TLO.Window('AdventureRequestWnd')
@@ -18,6 +27,7 @@ local delayTime
 local currZone, lastZone
 local winFlags = bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoFocusOnAppearing)
 local locked, showAdv, forcedOpen, refreshStats = false, false, false, false
+local script = 'SAST'
 --Helpers
 local function checkAdv()
 	-- check for active adventure timers.Either time to enter dungeon or time to complete.
@@ -295,12 +305,19 @@ local function startup()
 	currZone = mq.TLO.Zone.ID()
 	lastZone = currZone
 	Module.IsRunning = true
+	if not loadedExeternally then
+		mq.imgui.init('Adventure Status', Module.RenderGUI)
+		Module.LocalLoop()
+	end
 end
 
 local clockTimer = mq.gettime()
 local refreshTimer = 0
 function Module.MainLoop()
-	if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+	if loadedExeternally then
+		---@diagnostic disable-next-line: undefined-global
+		if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+	end
 
 	if refreshStats and refreshTimer == 0 then
 		refreshTimer = mq.gettime()
@@ -345,6 +362,18 @@ function Module.MainLoop()
 		end
 		clockTimer = mq.gettime()
 	end
+end
+
+function Module.LocalLoop()
+	while Module.IsRunning do
+		Module.MainLoop()
+		mq.delay(1)
+	end
+end
+
+if mq.TLO.EverQuest.GameState() ~= "INGAME" then
+	printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
+	mq.exit()
 end
 
 startup()

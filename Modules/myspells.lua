@@ -18,13 +18,23 @@ local ImGui = require('ImGui')
 local Module = {}
 Module.IsRunning = false
 Module.Name = "MySpells"
+---@diagnostic disable-next-line:undefined-global
+local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
+if not loadedExeternally then
+	MyUI_Utils = require('lib.common')
+	MyUI_Icons = require('mq.ICONS')
+	MyUI_CharLoaded = mq.TLO.Me.DisplayName()
+	MyUI_Server = mq.TLO.MacroQuest.Server()
+	MyUI_AbilityPicker = require('lib.AbilityPicker')
+	MyUI_ThemeLoader = require('lib.theme_loader')
+end
 
 local picker = MyUI_AbilityPicker.new()
 local pickerOpen = false
 local bIcon = MyUI_Icons.FA_BOOK
 local gIcon = MyUI_Icons.MD_SETTINGS
-local LoadTheme = require('lib.theme_loader')
+local LoadTheme = MyUI_ThemeLoader
 local themeID = 1
 local theme, castTheme, defaults, settings, timerColor = {}, {}, {}, {}, {}
 local themeFileOld = string.format('%s/MyThemeZ.lua', mq.configDir)
@@ -914,12 +924,20 @@ local function Init()
 	mq.event('cast_start', "You begin casting #1#.#*#", CastDetect)
 	GetSpells()
 	Module.IsRunning = true
+	if not loadedExeternally then
+		mq.imgui.init('GUI_MySpells', Module.RenderGUI)
+		Module.LocalLoop()
+	end
 end
 
 function Module.MainLoop()
-	if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+	if loadedExeternally then
+		---@diagnostic disable-next-line: undefined-global
+		if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+	end
 
 	mq.doevents()
+
 	if loadSet then LoadSet(setName) end
 	if clearAll then ClearGems() end
 	if not picker.Draw then pickerOpen = false end
@@ -927,6 +945,18 @@ function Module.MainLoop()
 
 	picker:Reload()
 	GetSpells()
+end
+
+function Module.LocalLoop()
+	while Module.IsRunning do
+		Module.MainLoop()
+		mq.delay(1)
+	end
+end
+
+if mq.TLO.EverQuest.GameState() ~= "INGAME" then
+	printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
+	mq.exit()
 end
 
 Init()

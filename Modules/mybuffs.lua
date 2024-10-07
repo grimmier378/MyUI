@@ -1,12 +1,24 @@
 -- Imports
-local mq                                                                                                        = require('mq')
-local ImGui                                                                                                     = require('ImGui')
+local mq                = require('mq')
+local ImGui             = require('ImGui')
 
-local Module                                                                                                    = {}
-Module.ActorMailBox                                                                                             = 'my_buffs'
+local Module            = {}
+Module.ActorMailBox     = 'my_buffs'
 -- Config Paths
-local themeFile                                                                                                 = mq.configDir .. '/MyThemeZ.lua'
-local configFileOld                                                                                             = mq.configDir .. '/MyUI_Configs.lua'
+local themeFile         = mq.configDir .. '/MyThemeZ.lua'
+local configFileOld     = mq.configDir .. '/MyUI_Configs.lua'
+
+---@diagnostic disable-next-line:undefined-global
+local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+if not loadedExeternally then
+    MyUI_Utils = require('lib.common')
+    MyUI_Actor = require('actors')
+    MyUI_CharLoaded = mq.TLO.Me.DisplayName()
+    MyUI_Mode = 'driver'
+    MyUI_Icons = require('mq.ICONS')
+    MyUI_Server = mq.TLO.EverQuest.Server()
+end
+
 local configFile                                                                                                = string.format("%s/MyUI/MyBuffs/%s/%s.lua", mq.configDir,
     MyUI_Server, MyUI_CharLoaded)
 local MyBuffs_Actor                                                                                             = nil
@@ -148,7 +160,7 @@ local function GenerateContent(subject, songsTable, buffsTable, doWho, doWhat)
     end
 
     local content = {
-        Name = mq.TLO.Me.DisplayName(),
+        Name = MyUI_CharLoaded,
         Buffs = buffsTable,
         Songs = songsTable,
         DoWho = dWho,
@@ -390,7 +402,7 @@ local function GetBuffs()
             changed = false
         else
             for i = 1, #Module.boxes do
-                if Module.boxes[i].Name == mq.TLO.Me.DisplayName() then
+                if Module.boxes[i].Name == MyUI_CharLoaded then
                     Module.boxes[i].Buffs = Module.buffTable
                     Module.boxes[i].Songs = Module.songTable
                     Module.boxes[i].SongCount = mq.TLO.Me.CountSongs() or 0
@@ -409,7 +421,7 @@ local function GetBuffs()
     else
         if Module.boxes[1] == nil then
             table.insert(Module.boxes, {
-                Name = mq.TLO.Me.DisplayName(),
+                Name = MyUI_CharLoaded,
                 Buffs = Module.buffTable,
                 Songs = Module.songTable,
                 Check = os.time(),
@@ -424,7 +436,7 @@ local function GetBuffs()
         else
             Module.boxes[1].Buffs = Module.buffTable
             Module.boxes[1].Songs = Module.songTable
-            Module.boxes[1].Name = mq.TLO.Me.DisplayName()
+            Module.boxes[1].Name = MyUI_CharLoaded
             Module.boxes[1].BuffCount = mq.TLO.Me.BuffCount() or 0
             Module.boxes[1].SongCount = mq.TLO.Me.CountSongs() or 0
             Module.boxes[1].BuffSlots = numSlots
@@ -462,7 +474,7 @@ local function MessageHandler()
         end
         if MemberEntry.Subject == 'Action' and who ~= 'Unknown' then
             if MemberEntry.DoWho ~= nil and MemberEntry.DoWhat ~= nil then
-                if MemberEntry.DoWho == mq.TLO.Me.DisplayName() then
+                if MemberEntry.DoWho == MyUI_CharLoaded then
                     local bName = MemberEntry.DoWhat:sub(5) or 0
                     if MemberEntry.DoWhat:find("^buff") then
                         mq.TLO.Me.Buff(bName).Remove()
@@ -488,7 +500,7 @@ local function MessageHandler()
         --New member connected if Hello is true. Lets send them our data so they have it.
         if MemberEntry.Subject == 'Hello' then
             check = os.time()
-            if who ~= mq.TLO.Me.DisplayName() and who ~= 'Unknown' and MyBuffs_Actor ~= nil then
+            if who ~= MyUI_CharLoaded and who ~= 'Unknown' and MyBuffs_Actor ~= nil then
                 MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, GenerateContent('Welcome', Module.songTable, Module.buffTable))
                 MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'myui', }, GenerateContent('Welcome', Module.songTable, Module.buffTable))
             end
@@ -540,7 +552,7 @@ end
 local function SayGoodBye()
     local message = {
         Subject = 'Goodbye',
-        Name = mq.TLO.Me.DisplayName(),
+        Name = MyUI_CharLoaded,
         Check = 0,
     }
     if MyBuffs_Actor ~= nil then
@@ -726,7 +738,7 @@ local function BoxBuffs(id, sorted, view)
                     DrawInspectableSpellIcon(boxBuffs[i].Icon, boxBuffs[i], slot)
                     ImGui.SameLine()
                 end
-                if boxChar == mq.TLO.Me.DisplayName() then
+                if boxChar == MyUI_CharLoaded then
                     if Module.ShowTimer then
                         local sDur = boxBuffs[i].TotalMinutes or 0
                         if sDur < buffTime then
@@ -772,7 +784,7 @@ local function BoxBuffs(id, sorted, view)
         end
 
         if ImGui.BeginPopupContextItem("##Buff" .. tostring(i)) then
-            if boxChar == mq.TLO.Me.DisplayName() then
+            if boxChar == MyUI_CharLoaded then
                 if ImGui.MenuItem("Inspect##" .. boxBuffs[i].Slot) then
                     mq.TLO.Me.Buff(bName).Inspect()
                 end
@@ -812,7 +824,7 @@ local function BoxBuffs(id, sorted, view)
             ImGui.BeginTooltip()
             if boxBuffs[i] ~= nil then
                 if boxBuffs[i].Icon > 0 then
-                    if boxChar == mq.TLO.Me.DisplayName() then
+                    if boxChar == MyUI_CharLoaded then
                         ImGui.Text(boxBuffs[i].Tooltip)
                     else
                         ImGui.Text(boxBuffs[i].Name)
@@ -879,7 +891,7 @@ local function BoxSongs(id, sorted, view)
 
                     ImGui.SameLine()
                 end
-                if boxChar == mq.TLO.Me.DisplayName() then
+                if boxChar == MyUI_CharLoaded then
                     if Module.ShowTimer then
                         local sngDurS = boxSongs[i].TotalSeconds or 0
                         if sngDurS < songTimer then
@@ -950,7 +962,7 @@ local function BoxSongs(id, sorted, view)
             ImGui.BeginTooltip()
             if boxSongs[i] ~= nil then
                 if boxSongs[i].Icon > 0 then
-                    if boxChar == mq.TLO.Me.DisplayName() then
+                    if boxChar == MyUI_CharLoaded then
                         ImGui.Text(boxSongs[i].Tooltip)
                     else
                         ImGui.Text(boxSongs[i].Name)
@@ -1015,7 +1027,7 @@ function Module.RenderGUI()
         local splitIcon = Module.SplitWin and MyUI_Icons.FA_TOGGLE_ON or MyUI_Icons.FA_TOGGLE_OFF
         local sortIcon = sortType == 'none' and MyUI_Icons.FA_SORT_NUMERIC_ASC or sortType == 'alpha' and MyUI_Icons.FA_SORT_ALPHA_ASC or MyUI_Icons.MD_TIMER
         local lockedIcon = Module.locked and MyUI_Icons.FA_LOCK or MyUI_Icons.FA_UNLOCK
-        local openGUI, showMain = ImGui.Begin("MyBuffs##" .. mq.TLO.Me.DisplayName(), true, flags)
+        local openGUI, showMain = ImGui.Begin("MyBuffs##" .. MyUI_CharLoaded, true, flags)
         if not openGUI then
             Module.ShowGUI = false
         end
@@ -1245,7 +1257,7 @@ function Module.RenderGUI()
         end
         ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
         local ColorCountSongs, StyleCountSongs = DrawTheme(themeName)
-        local songWin, show = ImGui.Begin("MyBuffs Songs##Songs" .. mq.TLO.Me.DisplayName(), true, flags)
+        local songWin, show = ImGui.Begin("MyBuffs Songs##Songs" .. MyUI_CharLoaded, true, flags)
         ImGui.SetWindowFontScale(Scale)
         if not songWin then
             Module.SplitWin = false
@@ -1500,7 +1512,7 @@ function Module.RenderGUI()
         end
         if found then
             ColorCountDebuffs, StyleCountDebuffs = DrawTheme(themeName)
-            local openDebuffs, showDebuffs = ImGui.Begin("MyBuffs Debuffs##" .. mq.TLO.Me.DisplayName(), true,
+            local openDebuffs, showDebuffs = ImGui.Begin("MyBuffs Debuffs##" .. MyUI_CharLoaded, true,
                 bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoFocusOnAppearing))
             ImGui.SetWindowFontScale(Scale)
 
@@ -1634,6 +1646,37 @@ function Module.CheckMode()
     end
 end
 
+function Module.CheckArgs(args)
+    if #args > 0 then
+        if args[1] == 'driver' then
+            ShowGUI = true
+            solo = false
+            if args[2] ~= nil and args[2] == 'mailbox' then
+                MailBoxShow = true
+            end
+            print('\ayMyBuffs:\ao Setting \atDriver\ax Mode. Actors [\agEnabled\ax] UI [\agOn\ax].')
+            print('\ayMyBuffs:\ao Type \at/mybuffs show\ax. to Toggle the UI')
+        elseif args[1] == 'client' then
+            ShowGUI = false
+            solo = false
+            print('\ayMyBuffs:\ao Setting \atClient\ax Mode.Actors [\agEnabled\ax] UI [\arOff\ax].')
+            print('\ayMyBuffs:\ao Type \at/mybuffs show\ax. to Toggle the UI')
+        elseif args[1] == 'solo' then
+            ShowGUI = true
+            solo = true
+            print('\ayMyBuffs:\ao Setting \atSolo\ax Mode. Actors [\arDisabled\ax] UI [\agOn\ax].')
+            print('\ayMyBuffs:\ao Type \at/mybuffs show\ax. to Toggle the UI')
+        end
+    else
+        ShowGUI = true
+        solo = true
+        print('\ayMyBuffs: \aoUse \at/lua run mybuffs client\ax To start with Actors [\agEnabled\ax] UI [\arOff\ax].')
+        print('\ayMyBuffs: \aoUse \at/lua run mybuffs driver\ax To start with the Actors [\agEnabled\ax] UI [\agOn\ax].')
+        print('\ayMyBuffs: \aoType \at/mybuffs show\ax. to Toggle the UI')
+        print('\ayMyBuffs: \aoNo arguments passed, defaulting to \agSolo\ax Mode. Actors [\arDisabled\ax] UI [\agOn\ax].')
+    end
+end
+
 local function processCommand(...)
     local args = { ..., }
     if #args > 0 then
@@ -1664,8 +1707,14 @@ function Module.Unload()
     MyBuffs_Actor = nil
 end
 
+local arguments = { ..., }
+
 local function init()
-    Module.CheckMode()
+    if loadedExeternally then
+        Module.CheckMode()
+    else
+        Module.CheckArgs(arguments)
+    end
     -- check for theme file or load defaults from our themes.lua
     loadSettings()
     currZone = mq.TLO.Zone.ID()
@@ -1679,10 +1728,17 @@ local function init()
 
     mq.bind('/mybuffs', processCommand)
     Module.IsRunning = true
+    if not loadedExeternally then
+        mq.imgui.init('MyBuffs##', Module.RenderGUI)
+        Module.LocalLoop()
+    end
 end
 
 function Module.MainLoop()
-    if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+    if loadedExeternally then
+        ---@diagnostic disable-next-line: undefined-global
+        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+    end
 
     currZone = mq.TLO.Zone.ID()
     local elapsedTime = mq.gettime() - clockTimer
@@ -1692,6 +1748,13 @@ function Module.MainLoop()
         end
         if not solo then CheckStale() end
         GetBuffs()
+    end
+end
+
+function Module.LocalLoop()
+    while Module.IsRunning do
+        Module.MainLoop()
+        mq.delay(1)
     end
 end
 

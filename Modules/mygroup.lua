@@ -9,7 +9,16 @@ local ImGui = require('ImGui')
 local Module = {}
 Module.Name = 'MyGroup'
 Module.IsRunning = false
+---@diagnostic disable-next-line:undefined-global
+local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
+if not loadedExeternally then
+    MyUI_Utils = require('lib.common')
+    MyUI_Colors = require('lib.colors')
+    MyUI_Icons = require('mq.ICONS')
+    MyUI_CharLoaded = mq.TLO.Me.DisplayName()
+    MyUI_Server = mq.TLO.MacroQuest.Server()
+end
 
 local gIcon = MyUI_Icons.MD_SETTINGS
 -- set variables
@@ -31,6 +40,7 @@ local script = 'MyGroup'
 local defaults, settings, theme = {}, {}, {}
 local useEQBC = false
 local meID = mq.TLO.Me.ID()
+local OpenConfigGUI = false
 
 local hideTitle, showSelf = false, false
 local currZone, lastZone
@@ -657,7 +667,7 @@ function Module.RenderGUI()
                     ImGui.SetTooltip("Lock Window")
                 end
                 if ImGui.Button(gIcon .. '##PlayerTarg') then
-                    openConfigGUI = not openConfigGUI
+                    OpenConfigGUI = not OpenConfigGUI
                 end
                 ImGui.EndMenuBar()
             end
@@ -763,12 +773,12 @@ function Module.RenderGUI()
     end
 
     -- Config Window
-    if openConfigGUI then
+    if OpenConfigGUI then
         ColorCountConf = 0
         StyleCountConf = 0
         ColorCountConf, StyleCountConf = DrawTheme(themeName)
         local open, configShow = ImGui.Begin("MyGroup Conf", true, bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
-        if not open then openConfigGUI = false end
+        if not open then OpenConfigGUI = false end
         if configShow then
             ImGui.SetWindowFontScale(Scale)
             ImGui.SeparatorText("Theme##" .. script)
@@ -840,7 +850,7 @@ function Module.RenderGUI()
 
             ImGui.SeparatorText("Save and Close##" .. script)
             if ImGui.Button('Save and Close##' .. script) then
-                openConfigGUI = false
+                OpenConfigGUI = false
                 settings[script].ShowSelf = showSelf
                 settings[script].HideTitleBar = hideTitle
                 settings[script].ShowMana = showMana
@@ -868,12 +878,19 @@ local function init()
     currZone = mq.TLO.Zone.ID()
     lastZone = currZone
     Module.IsRunning = true
+    if not loadedExeternally then
+        mq.imgui.init('GUI_MyGroup', Module.RenderGUI)
+        Module.LocalLoop()
+    end
 end
 
 local clockTimer = mq.gettime()
 
 function Module.MainLoop()
-    if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+    if loadedExeternally then
+        ---@diagnostic disable-next-line: undefined-global
+        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+    end
 
     meID = mq.TLO.Me.ID()
     if mq.TLO.Window('CharacterListWnd').Open() then return false end
@@ -894,6 +911,18 @@ function Module.MainLoop()
         lastTar = mq.TLO.Target.ID()
         mq.cmdf("/dgge /target id %s", mq.TLO.Target.ID())
     end
+end
+
+function Module.LocalLoop()
+    while Module.IsRunning do
+        Module.MainLoop()
+        mq.delay(1)
+    end
+end
+
+if mq.TLO.EverQuest.GameState() ~= "INGAME" then
+    printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
+    mq.exit()
 end
 
 init()

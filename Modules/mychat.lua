@@ -1,5 +1,19 @@
-local mq                                         = MyUI_Utils.Library.Include('mq')
-local ImGui                                      = MyUI_Utils.Library.Include('ImGui')
+local mq                = require('mq')
+local ImGui             = require('ImGui')
+
+---@diagnostic disable-next-line:undefined-global
+local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+
+if not loadedExeternally then
+    MyUI_Utils = require('lib.common')
+    MyUI_ThemeLoader = require('lib.theme_loader')
+    MyUI_Actor = require('actors')
+    MyUI_CharLoaded = mq.TLO.Me.DisplayName()
+    MyUI_Icons = require('mq.ICONS')
+    MyUI_Guild = mq.TLO.Me.Guild()
+    MyUI_Server = mq.TLO.MacroQuest.Server()
+    MyUI_Mode = 'driver'
+end
 
 local setFocus                                   = false
 local commandBuffer                              = ''
@@ -2242,7 +2256,6 @@ local function init()
     loadSettings()
     BuildEvents()
 
-
     -- initialize the console
     if Module.console == nil then
         Module.console = ImGui.ConsoleWidget.new("Chat##Console")
@@ -2253,13 +2266,22 @@ local function init()
             },
         }
     end
+
     Module.console:AppendText("\ay[\aw%s\ay]\at Welcome to \agMyChat!", mq.TLO.Time())
     Module.SortChannels()
     Module.IsRunning = true
+
+    if not loadedExeternally then
+        mq.imgui.init("MyChatGUI", Module.RenderGUI)
+        Module.LocalLoop()
+    end
 end
 
 function Module.MainLoop()
-    if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+    if loadedExeternally then
+        ---@diagnostic disable-next-line: undefined-global
+        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+    end
 
     local lastTime = os.clock()
 
@@ -2280,7 +2302,15 @@ function Module.MainLoop()
     mq.doevents()
 end
 
+function Module.LocalLoop()
+    while Module.IsRunning do
+        Module.MainLoop()
+        mq.delay(1)
+    end
+end
+
 init()
+
 MyUI_MyChatLoaded = true
 MyUI_MyChatHandler = Module.MyChatHandler
 

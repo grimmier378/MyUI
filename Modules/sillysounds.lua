@@ -2,10 +2,23 @@ local mq = require('mq')
 local ffi = require("ffi")
 local ImGui = require('ImGui')
 local Module = {}
+local script = "SillySounds"
+local path = string.format("%s/myui/sounds/", mq.TLO.Lua.Dir())
+
 Module.Name = "SillySounds"
 Module.IsRunning = false
 
-local script = "SillySounds"
+---@diagnostic disable-next-line:undefined-global
+local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+
+if not loadedExeternally then
+    MyUI_Utils = require('lib.common')
+    MyUI_Icons = require('mq.ICONS')
+    MyUI_CharLoaded = mq.TLO.Me.DisplayName()
+    MyUI_Server = mq.TLO.MacroQuest.Server()
+    path = string.format("%s/%s/sounds/", mq.TLO.Lua.Dir(), script)
+end
+
 local itemWatch = false
 
 -- C code definitions for volume control
@@ -25,7 +38,6 @@ local timerPlay = 0
 local playing = false
 
 -- Main Settings
-local path = string.format("%s/%s/sounds/", mq.TLO.Lua.Dir(), script)
 local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, script, MyUI_Server, MyUI_CharLoaded)
 local settings, defaults = {}, {}
 local timerA, timerB = os.time(), os.time()
@@ -407,48 +419,6 @@ function Module.RenderGUI()
 end
 
 local clockTimer = mq.gettime()
--- Main loop
-function Module.MainLoop()
-    if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
-
-    mq.doevents()
-
-    if mq.TLO.Window('ConfirmationDialogBox').Open() then
-        alarmTagged = false
-        checkAlarms()
-    end
-
-    if mq.TLO.Me.PctHPs() <= settings.lowHP and mq.TLO.Me.PctHPs() > 1 and settings.doHP then
-        timerA = os.time()
-        if timerA - timerB > settings.Pulse then
-            originalVolume = getVolume()
-            setVolume(settings.volHP)
-            timerPlay = os.time()
-            soundDuration = settings.Sounds[settings.theme].soundLowHp.duration
-            playSound(string.format("%s%s/%s", path, settings.theme, settings.Sounds[settings.theme].soundLowHp.file))
-            timerB = os.time()
-        end
-    end
-
-    local tnpVol = getVolume()
-    if playing == true and timerPlay > 0 then
-        local curTime = os.time()
-        if curTime - timerPlay > soundDuration then
-            resetVolume()
-            clockTimer = mq.gettime()
-        end
-    end
-
-    if not playing and timerPlay == 0 then
-        if mq.gettime() - clockTimer > 100 then
-            local tmpVol = getVolume()
-            if originalVolume ~= tmpVol then
-                originalVolume = tmpVol
-            end
-            clockTimer = mq.gettime()
-        end
-    end
-end
 
 function Module.Unload()
     mq.unevent("gained_level")
@@ -500,6 +470,68 @@ local function init()
     -- Slash Command Binding
     mq.bind('/sillysounds', bind)
     Module.IsRunning = true
+    if not loadedExeternally then
+        mq.imgui.init(script .. ' Config', Module.RenderGUI)
+        Module.LocalLoop()
+    end
+end
+
+-- Main loop
+function Module.MainLoop()
+    if loadedExeternally then
+        ---@diagnostic disable-next-line: undefined-global
+        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+    end
+
+    mq.doevents()
+
+    if mq.TLO.Window('ConfirmationDialogBox').Open() then
+        alarmTagged = false
+        checkAlarms()
+    end
+
+    if mq.TLO.Me.PctHPs() <= settings.lowHP and mq.TLO.Me.PctHPs() > 1 and settings.doHP then
+        timerA = os.time()
+        if timerA - timerB > settings.Pulse then
+            originalVolume = getVolume()
+            setVolume(settings.volHP)
+            timerPlay = os.time()
+            soundDuration = settings.Sounds[settings.theme].soundLowHp.duration
+            playSound(string.format("%s%s/%s", path, settings.theme, settings.Sounds[settings.theme].soundLowHp.file))
+            timerB = os.time()
+        end
+    end
+
+    local tnpVol = getVolume()
+    if playing == true and timerPlay > 0 then
+        local curTime = os.time()
+        if curTime - timerPlay > soundDuration then
+            resetVolume()
+            clockTimer = mq.gettime()
+        end
+    end
+
+    if not playing and timerPlay == 0 then
+        if mq.gettime() - clockTimer > 100 then
+            local tmpVol = getVolume()
+            if originalVolume ~= tmpVol then
+                originalVolume = tmpVol
+            end
+            clockTimer = mq.gettime()
+        end
+    end
+end
+
+function Module.LocalLoop()
+    while Module.IsRunning do
+        Module.MainLoop()
+        mq.delay(1)
+    end
+end
+
+if mq.TLO.EverQuest.GameState() ~= "INGAME" then
+    printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
+    mq.exit()
 end
 
 init()

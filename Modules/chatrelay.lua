@@ -4,13 +4,26 @@
     Description: Guild Chat Relay over Actors.
 ]]
 
-local mq            = require('mq')
-local ImGui         = require 'ImGui'
-local Module        = {}
-Module.ActorMailBox = 'chat_relay'
-Module.IsRunning    = false
-Module.Name         = 'ChatRelay'
+local mq                = require('mq')
+local ImGui             = require 'ImGui'
+local Module            = {}
+Module.ActorMailBox     = 'chat_relay'
+Module.IsRunning        = false
+Module.Name             = 'ChatRelay'
+Module.ImgPath          = mq.TLO.Lua.Dir() .. "/myui/images/phone.png"
+---@diagnostic disable-next-line:undefined-global
+local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
+if not loadedExeternally then
+    MyUI_Utils = require('lib.common')
+    MyUI_ThemeLoader = require('lib.theme_loader')
+    MyUI_Actor = require('actors')
+    MyUI_CharLoaded = mq.TLO.Me.DisplayName()
+    MyUI_Guild = mq.TLO.Me.Guild()
+    MyUI_Server = mq.TLO.MacroQuest.Server()
+    MyUI_Mode = 'driver'
+    Module.ImgPath = mq.TLO.Lua.Dir() .. "/chatrelay/images/phone.png"
+end
 
 local winFlags                          = bit32.bor(ImGuiWindowFlags.None)
 local currZone, lastZone, configFile, mode
@@ -24,7 +37,7 @@ local RelayGuild                        = false
 local RelayTells                        = false
 local NewMessage                        = false
 
-local minImg                            = MyUI_Utils.SetImage(mq.TLO.Lua.Dir() .. "/myui/images/phone.png")
+local minImg                            = MyUI_Utils.SetImage(Module.ImgPath)
 local Minimized                         = false
 local showMain                          = false
 local showConfig                        = false
@@ -514,6 +527,33 @@ function Module.Unload()
     RelayActor = nil
 end
 
+local arguments = { ..., }
+function Module.CheckArgs(args)
+    if #args > 0 then
+        if args[1] == 'driver' then
+            if args[2] ~= nil then
+                if args[2] == 'mini' then Minimized = true else showMain = true end
+            else
+                showMain = true
+            end
+            mode = 'driver'
+            print('\ayChat Relay:\ao Setting \atDriver\ax Mode. UI will be displayed.')
+            print('\ayChat Relay:\ao Type \at/chatrelay show\ax. to Toggle the UI')
+        elseif args[1] == 'client' then
+            showMain = false
+            mode = 'client'
+            print('\ayChat Relay:\ao Setting \atClient\ax Mode. UI will not be displayed.')
+            print('\ayChat Relay:\ao Type \at/chatrelay show\ax. to Toggle the UI')
+        end
+    else
+        showMain = true
+        mode = 'driver'
+        print('\ayChat Relay: \aoNo arguments passed, defaulting to \atDriver\ax Mode. UI will be displayed.')
+        print('\ayChat Relay: \aoUse \at/lua run chatrelay client\ax To start with the UI Off.')
+        print('\ayChat Relay:\ao Type \at/chatrelay show\ax. to Toggle the UI')
+    end
+end
+
 local function init()
     local tStamp = mq.TLO.Time.Time24()
     configFile = string.format("%s/MyUI/ChatRelay/%s/%s.lua", mq.configDir, MyUI_Server, MyUI_CharLoaded)
@@ -521,7 +561,11 @@ local function init()
     lastZone = currZone
     mq.bind('/chatrelay', processCommand)
     LoadSettings()
-    Module.CheckMode()
+    if loadedExeternally then
+        Module.CheckMode()
+    else
+        Module.CheckArgs(arguments)
+    end
     RegisterRelayActor()
     -- mq.delay(250)
     mq.event('guild_chat_relay', '#*# tells the guild, #*#', getGuildChat, { keepLinks = true, })
@@ -537,13 +581,19 @@ local function init()
     guildBufferCount[MyUI_Guild] = { Current = 1, Last = 1, }
     lastAnnounce = os.time()
     Module.IsRunning = true
+    if not loadedExeternally then
+        mq.imgui.init('Chat_Relay', Module.RenderGUI)
+        Module.LocalLoop()
+    end
 end
 
 local clockTimer = mq.gettime()
 
 function Module.MainLoop()
-    if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
-
+    if loadedExeternally then
+        ---@diagnostic disable-next-line: undefined-global
+        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+    end
     mq.doevents()
     local elapsedTime = mq.gettime() - clockTimer
     if elapsedTime >= 50 then
@@ -553,6 +603,18 @@ function Module.MainLoop()
         end
         if not showMain and mode == 'driver' then Minimized = true end
     end
+end
+
+function Module.LocalLoop()
+    while Module.IsRunning do
+        Module.MainLoop()
+        mq.delay(1)
+    end
+end
+
+if mq.TLO.EverQuest.GameState() ~= "INGAME" then
+    printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
+    mq.exit()
 end
 
 init()

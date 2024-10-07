@@ -24,6 +24,12 @@ If you have **_DanNet_** running you will also have the option with a right clic
 
 **Settings** are saved Per Character in `MQDIR/Config/MyUI/Server_Name/CharName.lua` files. so if you want to duplicate one characters settings it should be easier.
 
+## Loading \ Unloading Modules.
+
+You can load and unload modules either through command line or through the GUI.
+
+When loading a Module we first close any existing versions of the same script running as a standalone.
+
 ## Adding more Modules (scripts)
 
 This is possible and I will add documentation for it soon...

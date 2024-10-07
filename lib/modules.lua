@@ -6,6 +6,7 @@ function Module.loadAll(module_list)
 	local modules = {}
 	for _, module in ipairs(module_list) do
 		local moduleName = mq.luaDir .. "/MyUI/modules/" .. module:lower() .. ".lua"
+		Module.checkExternal(module)
 		modules[module] = dofile(moduleName)
 	end
 
@@ -26,6 +27,7 @@ function Module.unload(module_name)
 end
 
 function Module.load(module_name)
+	Module.checkExternal(module_name)
 	package.loaded["modules." .. module_name:lower()] = nil
 	local modPath = mq.luaDir .. "/MyUI/modules/" .. module_name:lower() .. ".lua"
 	local moduleName = dofile(modPath)
@@ -33,6 +35,14 @@ function Module.load(module_name)
 		return moduleName
 	end
 	return nil
+end
+
+function Module.checkExternal(module_name)
+	local status = mq.TLO.Lua.Script(module_name:lower()).Status() or ''
+	if status == 'RUNNING' then
+		mq.cmdf('/lua stop %s', module_name:lower())
+		mq.delay(5)
+	end
 end
 
 function Module.CheckRunning(is_running, module_name)

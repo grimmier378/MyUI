@@ -120,6 +120,8 @@ function CommonUtils.PrintOutput(mychat_tab, main_console, msg, ...)
 		print(msg)
 	elseif MyUI_MyChatHandler ~= nil then
 		MyUI_MyChatHandler(mychat_tab, msg)
+	else
+		print(msg)
 	end
 end
 
@@ -139,17 +141,19 @@ function CommonUtils.SortTableColums(input_table, sorted_keys, num_columns)
 		for k, _ in pairs(input_table) do
 			table.insert(keys, k)
 		end
-		table.sort(keys) -- Sort keys alphabetically
+		table.sort(keys, function(a, b)
+			return a < b
+		end)
 	end
 
 	local total_items = #keys
 	local num_rows = math.ceil(total_items / num_columns)
 	local column_sorted = {}
 
-	-- Reorganize the keys to fill by columns instead of rows
-	for col = 1, num_columns do
-		for row = 1, num_rows do
-			local index = (row - 1) * num_columns + col
+	-- Reorganize the keys to fill vertically by columns
+	for row = 1, num_rows do
+		for col = 1, num_columns do
+			local index = (col - 1) * num_rows + row
 			if index <= total_items then
 				table.insert(column_sorted, keys[index])
 			end

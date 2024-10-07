@@ -17,7 +17,11 @@ function Module.unload(module_name)
 	if MyUI_Modules[module_name] and MyUI_Modules[module_name].ActorMailBox then
 		MyUI_Modules[module_name].ActorMailBox = nil
 	end
-
+	if module_name:lower() == 'mychat' then
+		MyUI_MyChatLoaded  = false
+		MyUI_MyChatHandler = nil
+		MyUI_Utils.PrintOutput(nil, nil, "\ayMyChat\ao Unloaded\at Defaulting Output to \ayMain Console")
+	end
 	MyUI_Modules[module_name] = nil
 end
 

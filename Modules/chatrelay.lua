@@ -511,6 +511,7 @@ function Module.Unload()
     mq.unevent("tell_chat_relay")
     mq.unevent("out_chat_relay")
     mq.unbind("/chatrelay")
+    RelayActor = nil
 end
 
 local function init()

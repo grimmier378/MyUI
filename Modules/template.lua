@@ -40,7 +40,8 @@ GLOBAL MyUI_ variables and functions.
 
 local mq = require('mq')
 local ImGui = require 'ImGui'
-
+local drawTimerMS = mq.gettime()
+local drawTimerS = os.time()
 -- Exposed Variables
 local Module = {}
 Module.Name = "Template" -- Name of the module used when loading and unloaing the modules.
@@ -82,6 +83,8 @@ function Module.RenderGUI()
 			--GUI
 			-- your code here
 			ImGui.Text("Hello World!")
+
+			ImGui.Text("Timer S: %d", drawTimerS)
 		end
 
 		ImGui.End()
@@ -98,6 +101,13 @@ function Module.MainLoop()
 	-- This will unload the module gracefully if IsRunning state changes.
 	if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
 
+	if os.time() - drawTimerS < 5 then
+		return
+		-- your code here
+	else
+		-- drawTimerMS = mq.gettime()
+		drawTimerS = os.time()
+	end
 	--[[
 	your MainLoop code here without the loop.
 	

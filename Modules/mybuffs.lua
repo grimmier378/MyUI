@@ -1660,6 +1660,7 @@ end
 
 function Module.Unload()
     mq.unbind('/mybuffs')
+    SayGoodBye()
     MyBuffs_Actor = nil
 end
 

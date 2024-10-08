@@ -717,7 +717,7 @@ local function Init()
 	GetButtonStates()
 	Module.IsRunning = true
 	if not loadedExeternally then
-		mq.imgui.init(script, Module.RenderGUI)
+		mq.imgui.init(Module.Name, Module.RenderGUI)
 		Module.LocalLoop()
 	end
 end

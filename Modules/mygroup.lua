@@ -36,7 +36,6 @@ local ColorCount, ColorCountConf, StyleCount, StyleCountConf = 0, 0, 0, 0
 local lastTar = mq.TLO.Target.ID() or 0
 local themeName = 'Default'
 local locked, showMana, showEnd, showPet, mouseHover = false, true, true, true, false
-local script = 'MyGroup'
 local defaults, settings, theme = {}, {}, {}
 local useEQBC = false
 local meID = mq.TLO.Me.ID()
@@ -66,7 +65,7 @@ local manaClass = {
 }
 
 defaults = {
-    [script] = {
+    [Module.Name] = {
         Scale = 1.0,
         LoadTheme = 'Default',
         locked = false,
@@ -121,27 +120,27 @@ local function loadSettings()
     else
         -- Load settings from the Lua config file
         settings = dofile(configFile)
-        if settings[script] == nil then
-            settings[script] = {}
-            settings[script] = defaults
+        if settings[Module.Name] == nil then
+            settings[Module.Name] = {}
+            settings[Module.Name] = defaults
             newSetting = true
         end
     end
 
     loadTheme()
 
-    newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings[script])
+    newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings[Module.Name])
     newSetting = MyUI_Utils.CheckRemovedSettings(defaults, settings) or newSetting
 
-    showSelf = settings[script].ShowSelf
-    hideTitle = settings[script].HideTitleBar
-    showPet = settings[script].ShowPet
-    showEnd = settings[script].ShowEnd
-    showMana = settings[script].ShowMana
-    useEQBC = settings[script].UseEQBC
-    locked = settings[script].locked
-    Scale = settings[script].Scale
-    themeName = settings[script].LoadTheme
+    showSelf = settings[Module.Name].ShowSelf
+    hideTitle = settings[Module.Name].HideTitleBar
+    showPet = settings[Module.Name].ShowPet
+    showEnd = settings[Module.Name].ShowEnd
+    showMana = settings[Module.Name].ShowMana
+    useEQBC = settings[Module.Name].UseEQBC
+    locked = settings[Module.Name].locked
+    Scale = settings[Module.Name].Scale
+    themeName = settings[Module.Name].LoadTheme
 
     if newSetting then writeSettings(configFile, settings) end
 end
@@ -156,14 +155,14 @@ local function DrawTheme(tName)
         if tData.Name == tName then
             for pID, cData in pairs(theme.Theme[tID].Color) do
                 if cData.PropertyName == 'WindowBg' then
-                    if not settings[script].MouseOver then
-                        ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[script].WinTransparency))
+                    if not settings[Module.Name].MouseOver then
+                        ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[Module.Name].WinTransparency))
                         ColorCounter = ColorCounter + 1
-                    elseif settings[script].MouseOver and mouseHover then
+                    elseif settings[Module.Name].MouseOver and mouseHover then
                         ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], 1.0))
                         ColorCounter = ColorCounter + 1
-                    elseif settings[script].MouseOver and not mouseHover then
-                        ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[script].WinTransparency))
+                    elseif settings[Module.Name].MouseOver and not mouseHover then
+                        ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[Module.Name].WinTransparency))
                         ColorCounter = ColorCounter + 1
                     end
                 else
@@ -258,7 +257,7 @@ local function DrawGroupMember(id)
         ImGui.TableSetColumnIndex(2)
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 0, 0)
         ImGui.Text('')
-        if settings[script].ShowRoleIcons then
+        if settings[Module.Name].ShowRoleIcons then
             if mq.TLO.Group.MainTank.ID() == member.ID() then
                 ImGui.SameLine()
                 MyUI_Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
@@ -352,7 +351,7 @@ local function DrawGroupMember(id)
 
     -- Health Bar
     if member.Present() then
-        if settings[script].DynamicHP then
+        if settings[Module.Name].DynamicHP then
             r = 1
             b = b * (100 - member.PctHPs()) / 150
             g = 0.1
@@ -378,7 +377,7 @@ local function DrawGroupMember(id)
         if showMana then
             for i, v in pairs(manaClass) do
                 if string.find(member.Class.ShortName(), v) then
-                    if settings[script].DynamicMP then
+                    if settings[Module.Name].DynamicMP then
                         b = 0.9
                         r = 1 * (100 - member.PctMana()) / 200
                         g = 0.9 * member.PctMana() / 100 > 0.1 and 0.9 * member.PctMana() / 100 or 0.1
@@ -480,7 +479,7 @@ local function DrawSelf()
         -- Icons
 
         ImGui.TableSetColumnIndex(1)
-        if settings[script].ShowRoleIcons then
+        if settings[Module.Name].ShowRoleIcons then
             if mq.TLO.Group.MainTank.ID() == mySelf.ID() then
                 ImGui.SameLine()
                 MyUI_Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
@@ -555,7 +554,7 @@ local function DrawSelf()
     ImGui.Separator()
 
     -- Health Bar
-    if settings[script].DynamicHP then
+    if settings[Module.Name].DynamicHP then
         r = 1
         b = b * (100 - mySelf.PctHPs()) / 150
         g = 0.1
@@ -581,7 +580,7 @@ local function DrawSelf()
     if showMana then
         for i, v in pairs(manaClass) do
             if string.find(mySelf.Class.ShortName(), v) then
-                if settings[script].DynamicMP then
+                if settings[Module.Name].DynamicMP then
                     b = 0.9
                     r = 1 * (100 - mySelf.PctMana()) / 200
                     g = 0.9 * mySelf.PctMana() / 100 > 0.1 and 0.9 * mySelf.PctMana() / 100 or 0.1
@@ -660,7 +659,7 @@ function Module.RenderGUI()
                     --ImGuiWindowFlags.NoMove
                     locked = not locked
                     settings = dofile(configFile)
-                    settings[script].locked = locked
+                    settings[Module.Name].locked = locked
                     writeSettings(configFile, settings)
                 end
                 if ImGui.IsItemHovered() then
@@ -688,7 +687,7 @@ function Module.RenderGUI()
                 end
             end
 
-            if settings[script].ShowDummy then
+            if settings[Module.Name].ShowDummy then
                 if mq.TLO.Me.GroupSize() < 6 then
                     local dummyCount = 6 - mq.TLO.Me.GroupSize()
                     if mq.TLO.Me.GroupSize() == 0 then dummyCount = 5 end
@@ -781,7 +780,7 @@ function Module.RenderGUI()
         if not open then OpenConfigGUI = false end
         if configShow then
             ImGui.SetWindowFontScale(Scale)
-            ImGui.SeparatorText("Theme##" .. script)
+            ImGui.SeparatorText("Theme##" .. Module.Name)
             ImGui.Text("Cur Theme: %s", themeName)
             -- Combo Box Load Theme
             if ImGui.BeginCombo("Load Theme##MyGroup", themeName) then
@@ -790,7 +789,7 @@ function Module.RenderGUI()
                     if ImGui.Selectable(data.Name, isSelected) then
                         theme.LoadTheme = data.Name
                         themeName = theme.LoadTheme
-                        settings[script].LoadTheme = themeName
+                        settings[Module.Name].LoadTheme = themeName
                     end
                 end
                 ImGui.EndCombo()
@@ -799,9 +798,9 @@ function Module.RenderGUI()
             if ImGui.Button('Reload Theme File') then
                 loadTheme()
             end
-            settings[script].MouseOver = ImGui.Checkbox('Mouse Over', settings[script].MouseOver)
-            settings[script].WinTransparency = ImGui.SliderFloat('Window Transparency##' .. script, settings[script].WinTransparency, 0.1, 1.0)
-            ImGui.SeparatorText("Scaling##" .. script)
+            settings[Module.Name].MouseOver = ImGui.Checkbox('Mouse Over', settings[Module.Name].MouseOver)
+            settings[Module.Name].WinTransparency = ImGui.SliderFloat('Window Transparency##' .. Module.Name, settings[Module.Name].WinTransparency, 0.1, 1.0)
+            ImGui.SeparatorText("Scaling##" .. Module.Name)
             -- Slider for adjusting zoom level
             local tmpZoom = Scale
             if Scale then
@@ -809,17 +808,17 @@ function Module.RenderGUI()
             end
             if Scale ~= tmpZoom then
                 Scale = tmpZoom
-                settings[script].Scale = Scale
+                settings[Module.Name].Scale = Scale
             end
-            ImGui.SeparatorText("Toggles##" .. script)
+            ImGui.SeparatorText("Toggles##" .. Module.Name)
             local tmpComms = useEQBC
-            tmpComms = ImGui.Checkbox('Use EQBC##' .. script, tmpComms)
+            tmpComms = ImGui.Checkbox('Use EQBC##' .. Module.Name, tmpComms)
             if tmpComms ~= useEQBC then
                 useEQBC = tmpComms
             end
 
             local tmpMana = showMana
-            tmpMana = ImGui.Checkbox('Mana##' .. script, tmpMana)
+            tmpMana = ImGui.Checkbox('Mana##' .. Module.Name, tmpMana)
             if tmpMana ~= showMana then
                 showMana = tmpMana
             end
@@ -827,7 +826,7 @@ function Module.RenderGUI()
             ImGui.SameLine()
 
             local tmpEnd = showEnd
-            tmpEnd = ImGui.Checkbox('Endurance##' .. script, tmpEnd)
+            tmpEnd = ImGui.Checkbox('Endurance##' .. Module.Name, tmpEnd)
             if tmpEnd ~= showEnd then
                 showEnd = tmpEnd
             end
@@ -835,31 +834,31 @@ function Module.RenderGUI()
             ImGui.SameLine()
 
             local tmpPet = showPet
-            tmpPet = ImGui.Checkbox('Show Pet##' .. script, tmpPet)
+            tmpPet = ImGui.Checkbox('Show Pet##' .. Module.Name, tmpPet)
             if tmpPet ~= showPet then
                 showPet = tmpPet
             end
-            settings[script].ShowDummy = ImGui.Checkbox('Show Dummy##' .. script, settings[script].ShowDummy)
+            settings[Module.Name].ShowDummy = ImGui.Checkbox('Show Dummy##' .. Module.Name, settings[Module.Name].ShowDummy)
             ImGui.SameLine()
-            settings[script].ShowRoleIcons = ImGui.Checkbox('Show Role Icons##' .. script, settings[script].ShowRoleIcons)
-            settings[script].DynamicHP = ImGui.Checkbox('Dynamic HP##' .. script, settings[script].DynamicHP)
-            settings[script].DynamicMP = ImGui.Checkbox('Dynamic MP##' .. script, settings[script].DynamicMP)
-            hideTitle = ImGui.Checkbox('Hide Title Bar##' .. script, hideTitle)
+            settings[Module.Name].ShowRoleIcons = ImGui.Checkbox('Show Role Icons##' .. Module.Name, settings[Module.Name].ShowRoleIcons)
+            settings[Module.Name].DynamicHP = ImGui.Checkbox('Dynamic HP##' .. Module.Name, settings[Module.Name].DynamicHP)
+            settings[Module.Name].DynamicMP = ImGui.Checkbox('Dynamic MP##' .. Module.Name, settings[Module.Name].DynamicMP)
+            hideTitle = ImGui.Checkbox('Hide Title Bar##' .. Module.Name, hideTitle)
             ImGui.SameLine()
-            showSelf = ImGui.Checkbox('Show Self##' .. script, showSelf)
+            showSelf = ImGui.Checkbox('Show Self##' .. Module.Name, showSelf)
 
-            ImGui.SeparatorText("Save and Close##" .. script)
-            if ImGui.Button('Save and Close##' .. script) then
+            ImGui.SeparatorText("Save and Close##" .. Module.Name)
+            if ImGui.Button('Save and Close##' .. Module.Name) then
                 OpenConfigGUI = false
-                settings[script].ShowSelf = showSelf
-                settings[script].HideTitleBar = hideTitle
-                settings[script].ShowMana = showMana
-                settings[script].ShowEnd = showEnd
-                settings[script].ShowPet = showPet
-                settings[script].UseEQBC = useEQBC
-                settings[script].Scale = Scale
-                settings[script].LoadTheme = themeName
-                settings[script].locked = locked
+                settings[Module.Name].ShowSelf = showSelf
+                settings[Module.Name].HideTitleBar = hideTitle
+                settings[Module.Name].ShowMana = showMana
+                settings[Module.Name].ShowEnd = showEnd
+                settings[Module.Name].ShowPet = showPet
+                settings[Module.Name].UseEQBC = useEQBC
+                settings[Module.Name].Scale = Scale
+                settings[Module.Name].LoadTheme = themeName
+                settings[Module.Name].locked = locked
                 writeSettings(configFile, settings)
             end
         end
@@ -879,7 +878,7 @@ local function init()
     lastZone = currZone
     Module.IsRunning = true
     if not loadedExeternally then
-        mq.imgui.init('GUI_MyGroup', Module.RenderGUI)
+        mq.imgui.init(Module.Name, Module.RenderGUI)
         Module.LocalLoop()
     end
 end
@@ -921,7 +920,7 @@ function Module.LocalLoop()
 end
 
 if mq.TLO.EverQuest.GameState() ~= "INGAME" then
-    printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
+    printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", Module.Name)
     mq.exit()
 end
 

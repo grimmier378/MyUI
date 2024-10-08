@@ -34,7 +34,6 @@ local configFileOld = mq.configDir .. '/MyUI_Configs.lua'
 local configFile = string.format('%s/MyUI/PlayerTarg/%s/%s.lua', mq.configDir, MyUI_Server, MyUI_CharLoaded)
 local ColorCount, ColorCountConf, StyleCount, StyleCountConf = 0, 0, 0, 0
 local themeName = 'Default'
-local script = 'PlayerTarg'
 local pulseSpeed = 5
 local combatPulseSpeed = 10
 local colorHpMax = { 0.992, 0.138, 0.138, 1.000, }
@@ -118,22 +117,22 @@ local function loadSettings()
             local tmpOld = {}
             tmpOld = dofile(configFileOld)
             for k, v in pairs(tmpOld) do
-                if k == script then
-                    settings[script] = v
+                if k == Module.Name then
+                    settings[Module.Name] = v
                 end
             end
             mq.pickle(configFile, settings)
         else
-            settings[script] = {}
-            settings[script] = defaults
+            settings[Module.Name] = {}
+            settings[Module.Name] = defaults
             mq.pickle(configFile, settings)
         end
     else
         -- Load settings from the Lua config file
         settings = dofile(configFile)
-        if not settings[script] then
-            settings[script] = {}
-            settings[script] = defaults
+        if not settings[Module.Name] then
+            settings[Module.Name] = {}
+            settings[Module.Name] = defaults
         end
     end
 
@@ -141,34 +140,34 @@ local function loadSettings()
 
     local newSetting = false
 
-    newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings[script]) or newSetting
+    newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings[Module.Name]) or newSetting
 
-    if settings[script].iconSize ~= nil then
-        settings[script].IconSize = settings[script].iconSize
-        settings[script].iconSize = nil
+    if settings[Module.Name].iconSize ~= nil then
+        settings[Module.Name].IconSize = settings[Module.Name].iconSize
+        settings[Module.Name].iconSize = nil
         newSetting = true
     end
 
-    colorBreathMin = settings[script].ColorBreathMin
-    colorBreathMax = settings[script].ColorBreathMax
-    showTitleBreath = settings[script].ShowTitleBreath
-    bLocked = settings[script].BreathLocked
-    enableBreathBar = settings[script].EnableBreathBar
-    splitTarget = settings[script].SplitTarget
-    colorHpMax = settings[script].ColorHPMax
-    colorHpMin = settings[script].ColorHPMin
-    colorMpMax = settings[script].ColorMPMax
-    colorMpMin = settings[script].ColorMPMin
-    combatPulseSpeed = settings[script].combatPulseSpeed
-    pulseSpeed = settings[script].pulseSpeed
-    pulse = settings[script].doPulse
-    flashBorder = settings[script].FlashBorder
-    progressSize = settings[script].ProgressSize
-    iconSize = settings[script].IconSize
-    locked = settings[script].locked
-    FontScale = settings[script].Scale
-    themeName = settings[script].LoadTheme
-    ProgressSizeTarget = settings[script].ProgressSizeTarget
+    colorBreathMin = settings[Module.Name].ColorBreathMin
+    colorBreathMax = settings[Module.Name].ColorBreathMax
+    showTitleBreath = settings[Module.Name].ShowTitleBreath
+    bLocked = settings[Module.Name].BreathLocked
+    enableBreathBar = settings[Module.Name].EnableBreathBar
+    splitTarget = settings[Module.Name].SplitTarget
+    colorHpMax = settings[Module.Name].ColorHPMax
+    colorHpMin = settings[Module.Name].ColorHPMin
+    colorMpMax = settings[Module.Name].ColorMPMax
+    colorMpMin = settings[Module.Name].ColorMPMin
+    combatPulseSpeed = settings[Module.Name].combatPulseSpeed
+    pulseSpeed = settings[Module.Name].pulseSpeed
+    pulse = settings[Module.Name].doPulse
+    flashBorder = settings[Module.Name].FlashBorder
+    progressSize = settings[Module.Name].ProgressSize
+    iconSize = settings[Module.Name].IconSize
+    locked = settings[Module.Name].locked
+    FontScale = settings[Module.Name].Scale
+    themeName = settings[Module.Name].LoadTheme
+    ProgressSizeTarget = settings[Module.Name].ProgressSizeTarget
 
     if newSetting then mq.pickle(configFile, settings) end
 end
@@ -223,14 +222,14 @@ local function DrawTheme(tName, window)
                     elseif cData.PropertyName == 'TableRowBg' then
                         themeRowBG = { cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4], }
                     elseif cData.PropertyName == 'WindowBg' then
-                        if not settings[script].MouseOver then
-                            ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[script].WinTransparency))
+                        if not settings[Module.Name].MouseOver then
+                            ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[Module.Name].WinTransparency))
                             ColorCounter = ColorCounter + 1
-                        elseif settings[script].MouseOver and mouseHud then
+                        elseif settings[Module.Name].MouseOver and mouseHud then
                             ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], 1.0))
                             ColorCounter = ColorCounter + 1
-                        elseif settings[script].MouseOver and not mouseHud then
-                            ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[script].WinTransparency))
+                        elseif settings[Module.Name].MouseOver and not mouseHud then
+                            ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[Module.Name].WinTransparency))
                             ColorCounter = ColorCounter + 1
                         end
                     else
@@ -243,14 +242,14 @@ local function DrawTheme(tName, window)
                     elseif cData.PropertyName == 'TableRowBg' then
                         themeRowBG = { cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4], }
                     elseif cData.PropertyName == 'WindowBg' then
-                        if not settings[script].MouseOver then
-                            ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[script].WinTransparency))
+                        if not settings[Module.Name].MouseOver then
+                            ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[Module.Name].WinTransparency))
                             ColorCounter = ColorCounter + 1
-                        elseif settings[script].MouseOver and mouseHudTarg then
+                        elseif settings[Module.Name].MouseOver and mouseHudTarg then
                             ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], 1.0))
                             ColorCounter = ColorCounter + 1
-                        elseif settings[script].MouseOver and not mouseHudTarg then
-                            ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[script].WinTransparency))
+                        elseif settings[Module.Name].MouseOver and not mouseHudTarg then
+                            ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[Module.Name].WinTransparency))
                             ColorCounter = ColorCounter + 1
                         end
                     else
@@ -323,7 +322,7 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
         end
         if ImGui.BeginTooltip() then
             ImGui.TextColored(MyUI_Colors.color('yellow'), '%s', sName)
-            ImGui.TextColored(MyUI_Colors.color('green'), '%s', MyUI_Utils.GetTargetBuffDuration(i))
+            ImGui.TextColored(MyUI_Colors.color('green'), '%s', mq.TLO.Target.Buff(i).Duration.TimeHMS() or '')
             ImGui.Text('Cast By: ')
             ImGui.SameLine()
             ImGui.TextColored(MyUI_Colors.color('light blue'), '%s', caster)
@@ -378,7 +377,8 @@ local function PlayerTargConf_GUI()
     ColorCountConf = 0
     StyleCountConf = 0
     ColorCountConf, StyleCountConf = DrawTheme(themeName, 'config')
-    local open, showConfigGUI = ImGui.Begin("PlayerTarg Conf##" .. script, true, bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
+    local open, showConfigGUI = ImGui.Begin("PlayerTarg Conf##" .. Module.Name, true,
+        bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
 
     if not open then openConfigGUI = false end
     if showConfigGUI then
@@ -391,24 +391,24 @@ local function PlayerTargConf_GUI()
             FontScale = 1
             iconSize = 26
             themeName = 'Default'
-            settings[script].FlashBorder = flashBorder
-            settings[script].ProgressSize = progressSize
-            settings[script].Scale = FontScale
-            settings[script].IconSize = iconSize
-            settings[script].LoadTheme = themeName
+            settings[Module.Name].FlashBorder = flashBorder
+            settings[Module.Name].ProgressSize = progressSize
+            settings[Module.Name].Scale = FontScale
+            settings[Module.Name].IconSize = iconSize
+            settings[Module.Name].LoadTheme = themeName
         end
         ImGui.PopStyleColor()
 
-        if ImGui.CollapsingHeader("Theme##" .. script) then
+        if ImGui.CollapsingHeader("Theme##" .. Module.Name) then
             ImGui.Text("Cur Theme: %s", themeName)
             -- Combo Box Load Theme
-            if ImGui.BeginCombo("Load Theme##" .. script, themeName) then
+            if ImGui.BeginCombo("Load Theme##" .. Module.Name, themeName) then
                 for k, data in pairs(theme.Theme) do
                     local isSelected = data.Name == themeName
                     if ImGui.Selectable(data.Name, isSelected) then
                         theme.LoadTheme = data.Name
                         themeName = theme.LoadTheme
-                        settings[script].LoadTheme = themeName
+                        settings[Module.Name].LoadTheme = themeName
                     end
                 end
                 ImGui.EndCombo()
@@ -418,15 +418,15 @@ local function PlayerTargConf_GUI()
                 loadTheme()
             end
 
-            settings[script].MouseOver = ImGui.Checkbox('Mouse Over', settings[script].MouseOver)
-            settings[script].WinTransparency = ImGui.SliderFloat('Window Transparency##' .. script, settings[script].WinTransparency, 0.1, 1.0)
+            settings[Module.Name].MouseOver = ImGui.Checkbox('Mouse Over', settings[Module.Name].MouseOver)
+            settings[Module.Name].WinTransparency = ImGui.SliderFloat('Window Transparency##' .. Module.Name, settings[Module.Name].WinTransparency, 0.1, 1.0)
         end
         ImGui.Spacing()
-        if ImGui.CollapsingHeader("Scaling##" .. script) then
+        if ImGui.CollapsingHeader("Scaling##" .. Module.Name) then
             -- Slider for adjusting zoom level
             local tmpZoom = FontScale
             if FontScale then
-                tmpZoom = ImGui.SliderFloat("Text Scale##" .. script, tmpZoom, 0.5, 2.0)
+                tmpZoom = ImGui.SliderFloat("Text Scale##" .. Module.Name, tmpZoom, 0.5, 2.0)
             end
             if FontScale ~= tmpZoom then
                 FontScale = tmpZoom
@@ -434,7 +434,7 @@ local function PlayerTargConf_GUI()
             -- Slider for adjusting Icon Size
             local tmpSize = iconSize
             if iconSize then
-                tmpSize = ImGui.SliderInt("Icon Size##" .. script, tmpSize, 15, 50)
+                tmpSize = ImGui.SliderInt("Icon Size##" .. Module.Name, tmpSize, 15, 50)
             end
             if iconSize ~= tmpSize then
                 iconSize = tmpSize
@@ -443,17 +443,17 @@ local function PlayerTargConf_GUI()
             -- Slider for adjusting Progress Bar Size
             local tmpPrgSz = progressSize
             if progressSize then
-                tmpPrgSz = ImGui.SliderInt("Progress Bar Size##" .. script, tmpPrgSz, 5, 50)
+                tmpPrgSz = ImGui.SliderInt("Progress Bar Size##" .. Module.Name, tmpPrgSz, 5, 50)
             end
             if progressSize ~= tmpPrgSz then
                 progressSize = tmpPrgSz
             end
-            ProgressSizeTarget = ImGui.SliderInt("Target Progress Bar Size##" .. script, ProgressSizeTarget, 5, 150)
-            settings[script].showXtar = ImGui.Checkbox('Show XTarget Number', settings[script].showXtar)
+            ProgressSizeTarget = ImGui.SliderInt("Target Progress Bar Size##" .. Module.Name, ProgressSizeTarget, 5, 150)
+            settings[Module.Name].showXtar = ImGui.Checkbox('Show XTarget Number', settings[Module.Name].showXtar)
         end
         ImGui.Spacing()
 
-        if ImGui.CollapsingHeader("Pulse Settings##" .. script) then
+        if ImGui.CollapsingHeader("Pulse Settings##" .. Module.Name) then
             flashBorder = ImGui.Checkbox('Flash Border', flashBorder)
             ImGui.SameLine()
             local tmpPulse = pulse
@@ -468,43 +468,43 @@ local function PlayerTargConf_GUI()
             end
             if pulse then
                 local tmpSpeed = pulseSpeed
-                tmpSpeed = ImGui.SliderInt('Icon Pulse Speed##' .. script, tmpSpeed, 0, 50)
+                tmpSpeed = ImGui.SliderInt('Icon Pulse Speed##' .. Module.Name, tmpSpeed, 0, 50)
                 if pulseSpeed ~= tmpSpeed then
                     pulseSpeed = tmpSpeed
                 end
             end
             local tmpCmbtSpeed = combatPulseSpeed
-            tmpCmbtSpeed = ImGui.SliderInt('Combat Pulse Speed##' .. script, tmpCmbtSpeed, 0, 50)
+            tmpCmbtSpeed = ImGui.SliderInt('Combat Pulse Speed##' .. Module.Name, tmpCmbtSpeed, 0, 50)
             if combatPulseSpeed ~= tmpCmbtSpeed then
                 combatPulseSpeed = tmpCmbtSpeed
             end
         end
         ImGui.Spacing()
 
-        if ImGui.CollapsingHeader("Dynamic Bar Colors##" .. script) then
-            settings[script].DynamicHP = ImGui.Checkbox('Dynamic HP Bar', settings[script].DynamicHP)
+        if ImGui.CollapsingHeader("Dynamic Bar Colors##" .. Module.Name) then
+            settings[Module.Name].DynamicHP = ImGui.Checkbox('Dynamic HP Bar', settings[Module.Name].DynamicHP)
             ImGui.SameLine()
             ImGui.SetNextItemWidth(60)
-            colorHpMin = ImGui.ColorEdit4("HP Min Color##" .. script, colorHpMin, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
+            colorHpMin = ImGui.ColorEdit4("HP Min Color##" .. Module.Name, colorHpMin, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
             ImGui.SameLine()
             ImGui.SetNextItemWidth(60)
-            colorHpMax = ImGui.ColorEdit4("HP Max Color##" .. script, colorHpMax, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
+            colorHpMax = ImGui.ColorEdit4("HP Max Color##" .. Module.Name, colorHpMax, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
 
-            testValue = ImGui.SliderInt("Test HP##" .. script, testValue, 0, 100)
+            testValue = ImGui.SliderInt("Test HP##" .. Module.Name, testValue, 0, 100)
 
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, testValue)))
             ImGui.ProgressBar((testValue / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test')
             ImGui.PopStyleColor()
 
-            settings[script].DynamicMP = ImGui.Checkbox('Dynamic Mana Bar', settings[script].DynamicMP)
+            settings[Module.Name].DynamicMP = ImGui.Checkbox('Dynamic Mana Bar', settings[Module.Name].DynamicMP)
             ImGui.SameLine()
             ImGui.SetNextItemWidth(60)
-            colorMpMin = ImGui.ColorEdit4("Mana Min Color##" .. script, colorMpMin, bit32.bor(ImGuiColorEditFlags.NoInputs))
+            colorMpMin = ImGui.ColorEdit4("Mana Min Color##" .. Module.Name, colorMpMin, bit32.bor(ImGuiColorEditFlags.NoInputs))
             ImGui.SameLine()
             ImGui.SetNextItemWidth(60)
-            colorMpMax = ImGui.ColorEdit4("Mana Max Color##" .. script, colorMpMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
+            colorMpMax = ImGui.ColorEdit4("Mana Max Color##" .. Module.Name, colorMpMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
 
-            testValue2 = ImGui.SliderInt("Test MP##" .. script, testValue2, 0, 100)
+            testValue2 = ImGui.SliderInt("Test MP##" .. Module.Name, testValue2, 0, 100)
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorMpMin, colorMpMax, testValue2)))
             ImGui.ProgressBar((testValue2 / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test2')
             ImGui.PopStyleColor()
@@ -512,43 +512,43 @@ local function PlayerTargConf_GUI()
         ImGui.Spacing()
 
         -- breath bar settings
-        if ImGui.CollapsingHeader("Breath Meter##" .. script) then
-            local tmpbreath = settings[script].EnableBreathBar
+        if ImGui.CollapsingHeader("Breath Meter##" .. Module.Name) then
+            local tmpbreath = settings[Module.Name].EnableBreathBar
             tmpbreath = ImGui.Checkbox('Enable Breath', tmpbreath)
-            if tmpbreath ~= settings[script].EnableBreathBar then
-                settings[script].EnableBreathBar = tmpbreath
+            if tmpbreath ~= settings[Module.Name].EnableBreathBar then
+                settings[Module.Name].EnableBreathBar = tmpbreath
             end
             ImGui.SameLine()
             ImGui.SetNextItemWidth(60)
-            colorBreathMin = ImGui.ColorEdit4("Breath Min Color##" .. script, colorBreathMin, bit32.bor(ImGuiColorEditFlags.NoInputs))
+            colorBreathMin = ImGui.ColorEdit4("Breath Min Color##" .. Module.Name, colorBreathMin, bit32.bor(ImGuiColorEditFlags.NoInputs))
             ImGui.SameLine()
             ImGui.SetNextItemWidth(60)
-            colorBreathMax = ImGui.ColorEdit4("Breath Max Color##" .. script, colorBreathMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
+            colorBreathMax = ImGui.ColorEdit4("Breath Max Color##" .. Module.Name, colorBreathMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
             local testValue3 = 100
-            testValue3 = ImGui.SliderInt("Test Breath##" .. script, testValue3, 0, 100)
+            testValue3 = ImGui.SliderInt("Test Breath##" .. Module.Name, testValue3, 0, 100)
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorBreathMin, colorBreathMax, testValue3)))
             ImGui.ProgressBar((testValue3 / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test3')
             ImGui.PopStyleColor()
         end
         ImGui.Spacing()
 
-        if ImGui.Button('Save and Close##' .. script) then
+        if ImGui.Button('Save and Close##' .. Module.Name) then
             openConfigGUI = false
-            settings[script].ColorBreathMin = colorBreathMin
-            settings[script].ColorBreathMax = colorBreathMax
-            settings[script].ProgressSizeTarget = ProgressSizeTarget
-            settings[script].ColorHPMax = colorHpMax
-            settings[script].ColorHPMin = colorHpMin
-            settings[script].ColorMPMax = colorMpMax
-            settings[script].ColorMPMin = colorMpMin
-            settings[script].FlashBorder = flashBorder
-            settings[script].ProgressSize = progressSize
-            settings[script].Scale = FontScale
-            settings[script].IconSize = iconSize
-            settings[script].LoadTheme = themeName
-            settings[script].doPulse = pulse
-            settings[script].pulseSpeed = pulseSpeed
-            settings[script].combatPulseSpeed = combatPulseSpeed
+            settings[Module.Name].ColorBreathMin = colorBreathMin
+            settings[Module.Name].ColorBreathMax = colorBreathMax
+            settings[Module.Name].ProgressSizeTarget = ProgressSizeTarget
+            settings[Module.Name].ColorHPMax = colorHpMax
+            settings[Module.Name].ColorHPMin = colorHpMin
+            settings[Module.Name].ColorMPMax = colorMpMax
+            settings[Module.Name].ColorMPMin = colorMpMin
+            settings[Module.Name].FlashBorder = flashBorder
+            settings[Module.Name].ProgressSize = progressSize
+            settings[Module.Name].Scale = FontScale
+            settings[Module.Name].IconSize = iconSize
+            settings[Module.Name].LoadTheme = themeName
+            settings[Module.Name].doPulse = pulse
+            settings[Module.Name].pulseSpeed = pulseSpeed
+            settings[Module.Name].combatPulseSpeed = combatPulseSpeed
             mq.pickle(configFile, settings)
         end
     end
@@ -581,7 +581,7 @@ local function drawTarget()
         local tBodyType = mq.TLO.Target.Body.Name() or '?'
         --Target Health Bar
         ImGui.BeginGroup()
-        if settings[script].DynamicHP then
+        if settings[Module.Name].DynamicHP then
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, mq.TLO.Target.PctHPs())))
         else
             if mq.TLO.Target.PctHPs() < 25 then
@@ -608,7 +608,7 @@ local function drawTarget()
             ImGui.TableSetColumnIndex(0)
             -- Name and CON in the first column
 
-            if xSlot > 0 and settings[script].showXtar then
+            if xSlot > 0 and settings[Module.Name].showXtar then
                 ImGui.Text("X#%s %s", xSlot, targetName)
             else
                 ImGui.Text("%s", targetName)
@@ -726,7 +726,7 @@ function Module.RenderGUI()
                     --ImGuiWindowFlags.NoMove
                     locked = not locked
                     settings = dofile(configFile)
-                    settings[script].locked = locked
+                    settings[Module.Name].locked = locked
                     mq.pickle(configFile, settings)
                 end
                 if ImGui.IsItemHovered() then
@@ -739,14 +739,14 @@ function Module.RenderGUI()
                 if ImGui.Button(splitIcon) then
                     splitTarget = not splitTarget
                     settings = dofile(configFile)
-                    settings[script].SplitTarget = splitTarget
+                    settings[Module.Name].SplitTarget = splitTarget
                     mq.pickle(configFile, settings)
                 end
                 if ImGui.IsItemHovered() then
                     ImGui.SetTooltip("Split Windows")
                 end
                 ImGui.SetCursorPosX(ImGui.GetWindowContentRegionWidth() - 10)
-                if ImGui.MenuItem('X##Close' .. script) then
+                if ImGui.MenuItem('X##Close' .. Module.Name) then
                     Module.IsRunning = false
                 end
                 ImGui.EndMenuBar()
@@ -890,7 +890,7 @@ function Module.RenderGUI()
             -- My Health Bar
             local yPos = ImGui.GetCursorPosY()
 
-            if settings[script].DynamicHP then
+            if settings[Module.Name].DynamicHP then
                 ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, mq.TLO.Me.PctHPs())))
             else
                 if mq.TLO.Me.PctHPs() <= 0 then
@@ -917,7 +917,7 @@ function Module.RenderGUI()
             local yPos = ImGui.GetCursorPosY()
             --My Mana Bar
             if (tonumber(mq.TLO.Me.MaxMana()) > 0) then
-                if settings[script].DynamicMP then
+                if settings[Module.Name].DynamicMP then
                     ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorMpMin, colorMpMax, mq.TLO.Me.PctMana())))
                 else
                     ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('light blue2')))
@@ -1009,7 +1009,7 @@ function Module.RenderGUI()
                 if ImGui.MenuItem(lockLabel .. "##Breath") then
                     bLocked = not bLocked
 
-                    settings[script].BreathLocked = bLocked
+                    settings[Module.Name].BreathLocked = bLocked
                     mq.pickle(configFile, settings)
                 end
                 ImGui.EndPopup()
@@ -1071,7 +1071,7 @@ function Module.LocalLoop()
 end
 
 if mq.TLO.EverQuest.GameState() ~= "INGAME" then
-    printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
+    printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", Module.Name)
     mq.exit()
 end
 

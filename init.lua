@@ -6,6 +6,7 @@ MyUI_Actor           = require('actors')
 
 MyUI_Version         = '1.0.0'
 MyUI_ScriptName      = 'MyUI'
+MyUI_Path            = mq.luaDir .. '/myui/'
 
 MyUI_Icons           = require('mq.ICONS')
 MyUI_Base64          = require('lib.base64') -- Ensure you have a base64 module available
@@ -15,7 +16,7 @@ MyUI_SQLite3         = MyUI_PackageMan.Require('lsqlite3')
 MyUI_Colors          = require('lib.colors')
 MyUI_ThemeLoader     = require('lib.theme_loader')
 MyUI_AbilityPicker   = require('lib.AbilityPicker')
-MyUI_Grimmier_Img    = MyUI_Utils.SetImage(mq.TLO.Lua.Dir() .. "/myui/images/GrimGUI.png")
+MyUI_Grimmier_Img    = MyUI_Utils.SetImage(MyUI_Path .. "images/GrimGUI.png")
 
 -- build, char, server info
 MyUI_CharLoaded      = mq.TLO.Me.DisplayName()
@@ -449,7 +450,7 @@ local function StartUp()
 	InitModules()
 
 	MyUI_IsRunning = true
-	mq.imgui.init(MyUI_ScriptName .. "##" .. MyUI_CharLoaded, MyUI_Render)
+	mq.imgui.init(MyUI_ScriptName, MyUI_Render)
 	HelpDocumentation()
 end
 

@@ -1,27 +1,14 @@
 -- Imports
-local mq                = require('mq')
-local ImGui             = require('ImGui')
+local mq                                                                                                        = require('mq')
+local ImGui                                                                                                     = require('ImGui')
 
-local Module            = {}
-Module.ActorMailBox     = 'my_buffs'
--- Config Paths
-local themeFile         = mq.configDir .. '/MyThemeZ.lua'
-local configFileOld     = mq.configDir .. '/MyUI_Configs.lua'
+local Module                                                                                                    = {}
+Module.ActorMailBox                                                                                             = 'my_buffs'
+Module.Path                                                                                                     = MyUI_Path ~= nil and MyUI_Path or
+    string.format("%s/%s/", mq.luaDir, Module.Mane)
+local themeFile                                                                                                 = mq.configDir .. '/MyThemeZ.lua'
+local configFileOld                                                                                             = mq.configDir .. '/MyUI_Configs.lua'
 
----@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI_ScriptName ~= nil and true or false
-if not loadedExeternally then
-    MyUI_Utils = require('lib.common')
-    MyUI_Actor = require('actors')
-    MyUI_CharLoaded = mq.TLO.Me.DisplayName()
-    MyUI_Mode = 'driver'
-    MyUI_Icons = require('mq.ICONS')
-    MyUI_Server = mq.TLO.EverQuest.Server()
-end
-
-local configFile                                                                                                = string.format("%s/MyUI/MyBuffs/%s/%s.lua", mq.configDir,
-    MyUI_Server, MyUI_CharLoaded)
-local MyBuffs_Actor                                                                                             = nil
 -- Tables
 Module.boxes                                                                                                    = {}
 Module.settings                                                                                                 = {}
@@ -32,12 +19,24 @@ Module.songTable                                                                
 Module.Name                                                                                                     = "MyBuffs"
 Module.IsRunning                                                                                                = false
 
--- local Variables
 Module.ShowGUI, Module.SplitWin, Module.ShowConfig, Module.MailBoxShow, Module.ShowDebuffs, Module.showTitleBar = true, false, false, false, false, true
 Module.locked, Module.ShowIcons, Module.ShowTimer, Module.ShowText, Module.ShowScroll, Module.DoPulse           = false, true, true, true, true, true
 Module.iconSize                                                                                                 = 24
 
+---@diagnostic disable-next-line:undefined-global
+local loadedExeternally                                                                                         = MyUI_ScriptName ~= nil and true or false
+if not loadedExeternally then
+    MyUI_Utils = require('lib.common')
+    MyUI_Actor = require('actors')
+    MyUI_CharLoaded = mq.TLO.Me.DisplayName()
+    MyUI_Mode = 'driver'
+    MyUI_Icons = require('mq.ICONS')
+    MyUI_Server = mq.TLO.EverQuest.Server()
+end
 
+local configFile                       = string.format("%s/MyUI/MyBuffs/%s/%s.lua", mq.configDir,
+    MyUI_Server, MyUI_CharLoaded)
+local MyBuffs_Actor                    = nil
 local winFlag                          = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse, ImGuiWindowFlags.NoFocusOnAppearing)
 local flashAlpha, flashAlphaT          = 1, 255
 local rise, riseT                      = true, true
@@ -50,7 +49,6 @@ local animSpell                        = mq.FindTextureAnimation('A_SpellIcons')
 local gIcon                            = MyUI_Icons.MD_SETTINGS
 local activeButton                     = MyUI_CharLoaded -- Initialize the active button with the first box's name
 local PulseSpeed                       = 5
-local script                           = 'MyBuffs'
 local themeName                        = 'Default'
 local mailBox                          = {}
 local useWinPos                        = false
@@ -576,9 +574,9 @@ local function loadSettings()
     if not MyUI_Utils.File.Exists(configFile) then
         if MyUI_Utils.File.Exists(configFileOld) then
             local tmp = dofile(configFileOld)
-            Module.settings[script] = tmp[script]
+            Module.settings[Module.Name] = tmp[Module.Name]
         else
-            Module.settings[script] = Module.defaults
+            Module.settings[Module.Name] = Module.defaults
         end
         mq.pickle(configFile, Module.settings)
         loadSettings()
@@ -586,41 +584,41 @@ local function loadSettings()
         -- Load settings from the Lua config file
         Module.timerColor = {}
         Module.settings = dofile(configFile)
-        if Module.settings[script] == nil then
-            Module.settings[script] = {}
-            Module.settings[script] = Module.defaults
+        if Module.settings[Module.Name] == nil then
+            Module.settings[Module.Name] = {}
+            Module.settings[Module.Name] = Module.defaults
             newSetting = true
         end
-        Module.timerColor = Module.settings[script]
+        Module.timerColor = Module.settings[Module.Name]
     end
 
     loadTheme()
-    newSetting = MyUI_Utils.CheckDefaultSettings(Module.defaults, Module.settings[script])
-    newSetting = MyUI_Utils.CheckDefaultSettings(Module.defaults.WindowPositions, Module.settings[script].WindowPositions) or newSetting
-    newSetting = MyUI_Utils.CheckDefaultSettings(Module.defaults.WindowSizes, Module.settings[script].WindowSizes) or newSetting
+    newSetting = MyUI_Utils.CheckDefaultSettings(Module.defaults, Module.settings[Module.Name])
+    newSetting = MyUI_Utils.CheckDefaultSettings(Module.defaults.WindowPositions, Module.settings[Module.Name].WindowPositions) or newSetting
+    newSetting = MyUI_Utils.CheckDefaultSettings(Module.defaults.WindowSizes, Module.settings[Module.Name].WindowSizes) or newSetting
 
-    Module.showTitleBar = Module.settings[script].ShowTitleBar
-    showTableView = Module.settings[script].TableView
-    PulseSpeed = Module.settings[script].PulseSpeed
-    Module.DoPulse = Module.settings[script].DoPulse
-    Module.timerColor = Module.settings[script].TimerColor
-    Module.ShowScroll = Module.settings[script].ShowScroll
-    songTimer = Module.settings[script].SongTimer
-    buffTime = Module.settings[script].BuffTimer
-    Module.SplitWin = Module.settings[script].SplitWin
-    Module.ShowTimer = Module.settings[script].ShowTimer
-    Module.ShowText = Module.settings[script].ShowText
-    Module.ShowIcons = Module.settings[script].ShowIcons
-    Module.ShowDebuffs = Module.settings[script].ShowDebuffs
-    ShowMenu = Module.settings[script].ShowMenu
-    Module.iconSize = Module.settings[script].IconSize
-    Module.locked = Module.settings[script].locked
-    Scale = Module.settings[script].Scale
-    themeName = Module.settings[script].LoadTheme
-    winPositions = Module.settings[script].WindowPositions
-    useWinPos = Module.settings[script].UseWindowPositions
+    Module.showTitleBar = Module.settings[Module.Name].ShowTitleBar
+    showTableView = Module.settings[Module.Name].TableView
+    PulseSpeed = Module.settings[Module.Name].PulseSpeed
+    Module.DoPulse = Module.settings[Module.Name].DoPulse
+    Module.timerColor = Module.settings[Module.Name].TimerColor
+    Module.ShowScroll = Module.settings[Module.Name].ShowScroll
+    songTimer = Module.settings[Module.Name].SongTimer
+    buffTime = Module.settings[Module.Name].BuffTimer
+    Module.SplitWin = Module.settings[Module.Name].SplitWin
+    Module.ShowTimer = Module.settings[Module.Name].ShowTimer
+    Module.ShowText = Module.settings[Module.Name].ShowText
+    Module.ShowIcons = Module.settings[Module.Name].ShowIcons
+    Module.ShowDebuffs = Module.settings[Module.Name].ShowDebuffs
+    ShowMenu = Module.settings[Module.Name].ShowMenu
+    Module.iconSize = Module.settings[Module.Name].IconSize
+    Module.locked = Module.settings[Module.Name].locked
+    Scale = Module.settings[Module.Name].Scale
+    themeName = Module.settings[Module.Name].LoadTheme
+    winPositions = Module.settings[Module.Name].WindowPositions
+    useWinPos = Module.settings[Module.Name].UseWindowPositions
 
-    sortType = Module.settings[script].SortBy
+    sortType = Module.settings[Module.Name].SortBy
     if newSetting then mq.pickle(configFile, Module.settings) end
 end
 
@@ -1007,7 +1005,7 @@ function Module.RenderGUI()
         if Module.locked then
             flags = bit32.bor(ImGuiWindowFlags.NoMove, flags)
         end
-        if not Module.settings[script].ShowTitleBar then
+        if not Module.settings[Module.Name].ShowTitleBar then
             flags = bit32.bor(ImGuiWindowFlags.NoTitleBar, flags)
         end
         if not Module.ShowScroll then
@@ -1036,7 +1034,7 @@ function Module.RenderGUI()
                 if ImGui.Button(lockedIcon .. "##lockTabButton_MyBuffs") then
                     Module.locked = not Module.locked
 
-                    Module.settings[script].locked = Module.locked
+                    Module.settings[Module.Name].locked = Module.locked
                     mq.pickle(configFile, Module.settings)
                 end
 
@@ -1052,31 +1050,31 @@ function Module.RenderGUI()
 
                     if ImGui.Selectable(MyUI_Icons.FA_TABLE .. " Show Table") then
                         showTableView = not showTableView
-                        Module.settings[script].TableView = showTableView
+                        Module.settings[Module.Name].TableView = showTableView
                         mq.pickle(configFile, Module.settings)
                     end
 
                     if ImGui.Selectable(splitIcon .. " Split Window") then
                         Module.SplitWin = not Module.SplitWin
 
-                        Module.settings[script].SplitWin = Module.SplitWin
+                        Module.settings[Module.Name].SplitWin = Module.SplitWin
                         mq.pickle(configFile, Module.settings)
                     end
 
                     if ImGui.BeginMenu(sortIcon .. " Sort Menu") then
                         if ImGui.Selectable(MyUI_Icons.FA_SORT_NUMERIC_ASC .. " Sort by Slot") then
                             sortType = 'none'
-                            Module.settings[script].SortBy = sortType
+                            Module.settings[Module.Name].SortBy = sortType
                             mq.pickle(configFile, Module.settings)
                         end
                         if ImGui.Selectable(MyUI_Icons.FA_SORT_ALPHA_ASC .. " Sort by Name") then
                             sortType = 'alpha'
-                            Module.settings[script].SortBy = sortType
+                            Module.settings[Module.Name].SortBy = sortType
                             mq.pickle(configFile, Module.settings)
                         end
                         if ImGui.Selectable(MyUI_Icons.MD_TIMER .. " Sort by Duration") then
                             sortType = 'dur'
-                            Module.settings[script].SortBy = sortType
+                            Module.settings[Module.Name].SortBy = sortType
                         end
                         ImGui.EndMenu()
                     end
@@ -1186,17 +1184,17 @@ function Module.RenderGUI()
             winSizeX, winSizeY = curSizeX, curSizeY
             winSizes.Buffs.x = winSizeX
             winSizes.Buffs.y = winSizeY
-            Module.settings[script].WindowPositions.Buffs.x = curPosX
-            Module.settings[script].WindowPositions.Buffs.y = curPosY
-            Module.settings[script].WindowSizes.Buffs.x = winSizeX
-            Module.settings[script].WindowSizes.Buffs.y = winSizeY
+            Module.settings[Module.Name].WindowPositions.Buffs.x = curPosX
+            Module.settings[Module.Name].WindowPositions.Buffs.y = curPosY
+            Module.settings[Module.Name].WindowSizes.Buffs.x = winSizeX
+            Module.settings[Module.Name].WindowSizes.Buffs.y = winSizeY
             mq.pickle(configFile, Module.settings)
         end
         if ImGui.BeginPopupContextWindow("Options") then
             local lbl = Module.locked and " Un-Lock Window" or " Lock Window"
             if ImGui.MenuItem(lockedIcon .. lbl) then
                 Module.locked = not Module.locked
-                Module.settings[script].locked = Module.locked
+                Module.settings[Module.Name].locked = Module.locked
                 mq.pickle(configFile, Module.settings)
             end
             if ImGui.MenuItem(gIcon .. "Settings") then
@@ -1204,27 +1202,27 @@ function Module.RenderGUI()
             end
             if ImGui.MenuItem("Show Table") then
                 showTableView = not showTableView
-                Module.settings[script].TableView = showTableView
+                Module.settings[Module.Name].TableView = showTableView
                 mq.pickle(configFile, Module.settings)
             end
             if ImGui.MenuItem("Split Window") then
                 Module.SplitWin = not Module.SplitWin
-                Module.settings[script].SplitWin = Module.SplitWin
+                Module.settings[Module.Name].SplitWin = Module.SplitWin
                 mq.pickle(configFile, Module.settings)
             end
             if ImGui.MenuItem(MyUI_Icons.FA_SORT_NUMERIC_ASC .. "Sort by Slot") then
                 sortType = 'none'
-                Module.settings[script].SortBy = sortType
+                Module.settings[Module.Name].SortBy = sortType
                 mq.pickle(configFile, Module.settings)
             end
             if ImGui.MenuItem(MyUI_Icons.FA_SORT_ALPHA_ASC .. "Sort by Name") then
                 sortType = 'alpha'
-                Module.settings[script].SortBy = sortType
+                Module.settings[Module.Name].SortBy = sortType
                 mq.pickle(configFile, Module.settings)
             end
             if ImGui.MenuItem(MyUI_Icons.MD_TIMER .. "Sort by Duration") then
                 sortType = 'dur'
-                Module.settings[script].SortBy = sortType
+                Module.settings[Module.Name].SortBy = sortType
                 mq.pickle(configFile, Module.settings)
             end
             ImGui.EndPopup()
@@ -1242,7 +1240,7 @@ function Module.RenderGUI()
         if Module.locked then
             flags = bit32.bor(ImGuiWindowFlags.NoMove, flags)
         end
-        if not Module.settings[script].ShowTitleBar then
+        if not Module.settings[Module.Name].ShowTitleBar then
             flags = bit32.bor(ImGuiWindowFlags.NoTitleBar, flags)
         end
         if not Module.ShowScroll then
@@ -1280,10 +1278,10 @@ function Module.RenderGUI()
             winPositions.Songs.y = curPosY
             winPositions.Songs.x = curPosX
             winSizeX, winSizeY = curSizeX, curSizeY
-            Module.settings[script].WindowSizes.Songs.x = winSizeX
-            Module.settings[script].WindowSizes.Songs.y = winSizeY
-            Module.settings[script].WindowPositions.Songs.x = curPosX
-            Module.settings[script].WindowPositions.Songs.y = curPosY
+            Module.settings[Module.Name].WindowSizes.Songs.x = winSizeX
+            Module.settings[Module.Name].WindowSizes.Songs.y = winSizeY
+            Module.settings[Module.Name].WindowPositions.Songs.x = curPosX
+            Module.settings[Module.Name].WindowPositions.Songs.y = curPosY
             mq.pickle(configFile, Module.settings)
         end
 
@@ -1310,7 +1308,7 @@ function Module.RenderGUI()
         if showConfigGui then
             ImGui.SameLine()
             ImGui.SeparatorText('Theme')
-            if ImGui.CollapsingHeader('Theme##Coll' .. script) then
+            if ImGui.CollapsingHeader('Theme##Coll' .. Module.Name) then
                 ImGui.Text("Cur Theme: %s", themeName)
                 -- Combo Box Load Theme
 
@@ -1321,7 +1319,7 @@ function Module.RenderGUI()
                         if ImGui.Selectable(data.Name, isSelected) then
                             Module.theme.LoadTheme = data.Name
                             themeName = Module.theme.LoadTheme
-                            Module.settings[script].LoadTheme = themeName
+                            Module.settings[Module.Name].LoadTheme = themeName
                         end
                     end
                     ImGui.EndCombo()
@@ -1333,7 +1331,7 @@ function Module.RenderGUI()
             end
             --------------------- Sliders ----------------------
             ImGui.SeparatorText('Scaling')
-            if ImGui.CollapsingHeader('Scaling##Coll' .. script) then
+            if ImGui.CollapsingHeader('Scaling##Coll' .. Module.Name) then
                 -- Slider for adjusting zoom level
                 local tmpZoom = Scale
                 if Scale then
@@ -1353,7 +1351,7 @@ function Module.RenderGUI()
                 end
             end
             ImGui.SeparatorText('Timers')
-            local vis = ImGui.CollapsingHeader('Timers##Coll' .. script)
+            local vis = ImGui.CollapsingHeader('Timers##Coll' .. Module.Name)
             if vis then
                 Module.timerColor = ImGui.ColorEdit4('Timer Color', Module.timerColor, bit32.bor(ImGuiColorEditFlags.NoInputs))
 
@@ -1382,7 +1380,7 @@ function Module.RenderGUI()
 
             ---------- Checkboxes ---------------------
             ImGui.SeparatorText('Toggles')
-            if ImGui.CollapsingHeader('Toggles##Coll' .. script) then
+            if ImGui.CollapsingHeader('Toggles##Coll' .. Module.Name) then
                 local tmpShowIcons = Module.ShowIcons
                 tmpShowIcons = ImGui.Checkbox('Show Icons', tmpShowIcons)
                 if tmpShowIcons ~= Module.ShowIcons then
@@ -1450,25 +1448,25 @@ function Module.RenderGUI()
             ImGui.SeparatorText('Save and Close')
 
             if ImGui.Button('Save and Close') then
-                Module.settings[script].UseWindowPositions = useWinPos
-                Module.settings[script].ShowTitleBar = Module.showTitleBar
-                Module.settings[script].DoPulse = Module.DoPulse
-                Module.settings[script].PulseSpeed = PulseSpeed
-                Module.settings[script].TimerColor = Module.timerColor
-                Module.settings[script].ShowScroll = Module.ShowScroll
-                Module.settings[script].SongTimer = songTimer
-                Module.settings[script].BuffTimer = buffTime
-                Module.settings[script].IconSize = Module.iconSize
-                Module.settings[script].Scale = Scale
-                Module.settings[script].SplitWin = Module.SplitWin
-                Module.settings[script].LoadTheme = themeName
-                Module.settings[script].ShowIcons = Module.ShowIcons
-                Module.settings[script].ShowText = Module.ShowText
-                Module.settings[script].ShowTimer = Module.ShowTimer
-                Module.settings[script].ShowDebuffs = Module.ShowDebuffs
-                Module.settings[script].ShowMenu = ShowMenu
-                Module.settings[script].ShowMailBox = Module.MailBoxShow
-                Module.settings[script].ShowTableView = showTableView
+                Module.settings[Module.Name].UseWindowPositions = useWinPos
+                Module.settings[Module.Name].ShowTitleBar = Module.showTitleBar
+                Module.settings[Module.Name].DoPulse = Module.DoPulse
+                Module.settings[Module.Name].PulseSpeed = PulseSpeed
+                Module.settings[Module.Name].TimerColor = Module.timerColor
+                Module.settings[Module.Name].ShowScroll = Module.ShowScroll
+                Module.settings[Module.Name].SongTimer = songTimer
+                Module.settings[Module.Name].BuffTimer = buffTime
+                Module.settings[Module.Name].IconSize = Module.iconSize
+                Module.settings[Module.Name].Scale = Scale
+                Module.settings[Module.Name].SplitWin = Module.SplitWin
+                Module.settings[Module.Name].LoadTheme = themeName
+                Module.settings[Module.Name].ShowIcons = Module.ShowIcons
+                Module.settings[Module.Name].ShowText = Module.ShowText
+                Module.settings[Module.Name].ShowTimer = Module.ShowTimer
+                Module.settings[Module.Name].ShowDebuffs = Module.ShowDebuffs
+                Module.settings[Module.Name].ShowMenu = ShowMenu
+                Module.settings[Module.Name].ShowMailBox = Module.MailBoxShow
+                Module.settings[Module.Name].ShowTableView = showTableView
 
                 mq.pickle(configFile, Module.settings)
 
@@ -1483,10 +1481,10 @@ function Module.RenderGUI()
             winPositions.Config.x = curPosX
             winPositions.Config.y = curPosY
             winSizeX, winSizeY = curSizeX, curSizeY
-            Module.settings[script].WindowPositions.Config.x = curPosX
-            Module.settings[script].WindowPositions.Config.y = curPosY
-            Module.settings[script].WindowSizes.Config.x = winSizeX
-            Module.settings[script].WindowSizes.Config.y = winSizeY
+            Module.settings[Module.Name].WindowPositions.Config.x = curPosX
+            Module.settings[Module.Name].WindowPositions.Config.y = curPosY
+            Module.settings[Module.Name].WindowSizes.Config.x = winSizeX
+            Module.settings[Module.Name].WindowSizes.Config.y = winSizeY
             mq.pickle(configFile, Module.settings)
         end
         if StyleCountConf > 0 then ImGui.PopStyleVar(StyleCountConf) end
@@ -1545,10 +1543,10 @@ function Module.RenderGUI()
                 winSizes.Debuffs.y = winSizeY
                 winPositions.Debuffs.x = curPosX
                 winPositions.Debuffs.y = curPosY
-                Module.settings[script].WindowSizes.Debuffs.x = winSizeX
-                Module.settings[script].WindowSizes.Debuffs.y = winSizeY
-                Module.settings[script].WindowPositions.Debuffs.x = curPosX
-                Module.settings[script].WindowPositions.Debuffs.y = curPosY
+                Module.settings[Module.Name].WindowSizes.Debuffs.x = winSizeX
+                Module.settings[Module.Name].WindowSizes.Debuffs.y = winSizeY
+                Module.settings[Module.Name].WindowPositions.Debuffs.x = curPosX
+                Module.settings[Module.Name].WindowPositions.Debuffs.y = curPosY
                 mq.pickle(configFile, Module.settings)
             end
             if StyleCountDebuffs > 0 then ImGui.PopStyleVar(StyleCountDebuffs) end
@@ -1613,10 +1611,10 @@ function Module.RenderGUI()
             winPositions.MailBox.x = curPosX
             winPositions.MailBox.y = curPosY
             winSizeX, winSizeY = curSizeX, curSizeY
-            Module.settings[script].WindowPositions.MailBox.x = curPosX
-            Module.settings[script].WindowPositions.MailBox.y = curPosY
-            Module.settings[script].WindowSizes.MailBox.x = winSizeX
-            Module.settings[script].WindowSizes.MailBox.y = winSizeY
+            Module.settings[Module.Name].WindowPositions.MailBox.x = curPosX
+            Module.settings[Module.Name].WindowPositions.MailBox.y = curPosY
+            Module.settings[Module.Name].WindowSizes.MailBox.x = winSizeX
+            Module.settings[Module.Name].WindowSizes.MailBox.y = winSizeY
             mq.pickle(configFile, Module.settings)
         end
         if StyleCountMail > 0 then ImGui.PopStyleVar(StyleCountMail) end
@@ -1729,7 +1727,7 @@ local function init()
     mq.bind('/mybuffs', processCommand)
     Module.IsRunning = true
     if not loadedExeternally then
-        mq.imgui.init('MyBuffs##', Module.RenderGUI)
+        mq.imgui.init(Module.Nam, Module.RenderGUI)
         Module.LocalLoop()
     end
 end
@@ -1741,13 +1739,13 @@ function Module.MainLoop()
     end
 
     currZone = mq.TLO.Zone.ID()
-    local elapsedTime = mq.gettime() - clockTimer
-    if (not solo and elapsedTime >= 500) or (solo and elapsedTime >= 33) then -- refresh faster if solo, otherwise every half second to report is reasonable
+    if mq.gettime() - clockTimer >= 30 then
         if currZone ~= lastZone then
             lastZone = currZone
         end
         if not solo then CheckStale() end
         GetBuffs()
+        clockTimer = mq.gettime()
     end
 end
 

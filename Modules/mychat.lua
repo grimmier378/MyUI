@@ -2272,7 +2272,7 @@ local function init()
     Module.IsRunning = true
 
     if not loadedExeternally then
-        mq.imgui.init("MyChatGUI", Module.RenderGUI)
+        mq.imgui.init(Module.Name, Module.RenderGUI)
         Module.LocalLoop()
     end
 end

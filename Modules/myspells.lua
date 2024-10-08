@@ -18,6 +18,8 @@ local ImGui = require('ImGui')
 local Module = {}
 Module.IsRunning = false
 Module.Name = "MySpells"
+Module.Path = MyUI_Path ~= nil and MyUI_Path or string.format("%s/%s/", mq.luaDir, Module.Name)
+
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
@@ -44,18 +46,17 @@ local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
 local configFile = ''
 local themezDir = mq.luaDir .. '/themez/init.lua'
 local themeName = 'Default'
-local script = 'MySpells'
 local casting = false
 local spellBar = {}
 local numGems = 8
-local redGem = MyUI_Utils.SetImage(mq.luaDir .. '/myui/images/red_gem.png')
-local greenGem = MyUI_Utils.SetImage(mq.luaDir .. '/myui/images/green_gem.png')
-local purpleGem = MyUI_Utils.SetImage(mq.luaDir .. '/myui/images/purple_gem.png')
-local blueGem = MyUI_Utils.SetImage(mq.luaDir .. '/myui/images/blue_gem.png')
-local orangeGem = MyUI_Utils.SetImage(mq.luaDir .. '/myui/images/orange_gem.png')
-local yellowGem = MyUI_Utils.SetImage(mq.luaDir .. '/myui/images/yellow_gem.png')
-local openBook = MyUI_Utils.SetImage(mq.luaDir .. '/myui/images/open_book.png')
-local closedBook = MyUI_Utils.SetImage(mq.luaDir .. '/myui/images/closed_book.png')
+local redGem = MyUI_Utils.SetImage(Module.Path .. '/images/red_gem.png')
+local greenGem = MyUI_Utils.SetImage(Module.Path .. '/images/green_gem.png')
+local purpleGem = MyUI_Utils.SetImage(Module.Path .. '/images/purple_gem.png')
+local blueGem = MyUI_Utils.SetImage(Module.Path .. '/images/blue_gem.png')
+local orangeGem = MyUI_Utils.SetImage(Module.Path .. '/images/orange_gem.png')
+local yellowGem = MyUI_Utils.SetImage(Module.Path .. '/images/yellow_gem.png')
+local openBook = MyUI_Utils.SetImage(Module.Path .. '/images/open_book.png')
+local closedBook = MyUI_Utils.SetImage(Module.Path .. '/images/closed_book.png')
 local memSpell = -1
 local currentTime = os.time()
 local maxRow, rowCount, iconSize, scale = 1, 0, 30, 1
@@ -70,7 +71,7 @@ local castTransparency = 1.0
 local startedCast, startCastTime, castBarShow = false, 0, false
 
 defaults = {
-	[script] = {
+	[Module.Name] = {
 		Scale = 1.0,
 		LoadTheme = 'Default',
 		locked = false,
@@ -131,7 +132,7 @@ local function loadTheme()
 		end
 		mq.pickle(themeFile, theme)
 	end
-	themeName = settings[script].LoadTheme or 'Default'
+	themeName = settings[Module.Name].LoadTheme or 'Default'
 	if theme and theme.Theme then
 		for tID, tData in pairs(theme.Theme) do
 			if tData['Name'] == themeName then
@@ -179,7 +180,7 @@ local function loadSettings()
 			if MyUI_Utils.File.Exists(configFileOld) then
 				settings = dofile(configFileOld)
 			else
-				settings[script] = defaults
+				settings[Module.Name] = defaults
 			end
 			mq.pickle(configFile, settings)
 		end
@@ -193,28 +194,28 @@ local function loadSettings()
 	newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings)
 	newSetting = MyUI_Utils.CheckRemovedSettings(defaults, settings) or newSetting
 
-	if settings[script][MyUI_CharLoaded] == nil then
-		settings[script][MyUI_CharLoaded] = {}
-		settings[script][MyUI_CharLoaded].Sets = {}
+	if settings[Module.Name][MyUI_CharLoaded] == nil then
+		settings[Module.Name][MyUI_CharLoaded] = {}
+		settings[Module.Name][MyUI_CharLoaded].Sets = {}
 		newSetting = true
 	end
 
 	loadTheme()
 
 	-- Set the settings to the variables
-	CastTextColorByType = settings[script].CastTextColorByType
-	castTransparency = settings[script].CastTransperancy or 1
-	showTitleCasting = settings[script].ShowTitleCasting
-	castLocked = settings[script].CastLocked
-	enableCastBar = settings[script].EnableCastBar
-	showTitle = settings[script].ShowTitleBar
-	maxRow = settings[script].maxRow
-	aSize = settings[script].AutoSize
-	iconSize = settings[script].IconSize
-	locked = settings[script].locked
-	scale = settings[script].Scale
-	themeName = settings[script].LoadTheme
-	timerColor = settings[script].TimerColor
+	CastTextColorByType = settings[Module.Name].CastTextColorByType
+	castTransparency = settings[Module.Name].CastTransperancy or 1
+	showTitleCasting = settings[Module.Name].ShowTitleCasting
+	castLocked = settings[Module.Name].CastLocked
+	enableCastBar = settings[Module.Name].EnableCastBar
+	showTitle = settings[Module.Name].ShowTitleBar
+	maxRow = settings[Module.Name].maxRow
+	aSize = settings[Module.Name].AutoSize
+	iconSize = settings[Module.Name].IconSize
+	locked = settings[Module.Name].locked
+	scale = settings[Module.Name].Scale
+	themeName = settings[Module.Name].LoadTheme
+	timerColor = settings[Module.Name].TimerColor
 	if newSetting then mq.pickle(configFile, settings) end
 end
 
@@ -428,10 +429,10 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 end
 
 local function SaveSet(SetName)
-	if settings[script][MyUI_CharLoaded].Sets[SetName] == nil then
-		settings[script][MyUI_CharLoaded].Sets[SetName] = {}
+	if settings[Module.Name][MyUI_CharLoaded].Sets[SetName] == nil then
+		settings[Module.Name][MyUI_CharLoaded].Sets[SetName] = {}
 	end
-	settings[script][MyUI_CharLoaded].Sets[SetName] = spellBar
+	settings[Module.Name][MyUI_CharLoaded].Sets[SetName] = spellBar
 	mq.pickle(configFile, settings)
 	settings = dofile(configFile)
 	tmpName = ''
@@ -440,7 +441,7 @@ end
 local function LoadSet(set)
 	loadSet      = false
 	local setBar = {}
-	for i, t in pairs(settings[script][MyUI_CharLoaded].Sets[set]) do
+	for i, t in pairs(settings[Module.Name][MyUI_CharLoaded].Sets[set]) do
 		setBar[i] = {}
 		for k, v in pairs(t) do
 			setBar[i][k] = v
@@ -524,7 +525,7 @@ local function DrawConfigWin()
 	end
 
 	scale = ImGui.SliderFloat("Scale##DialogDB", scale, 0.5, 2)
-	if scale ~= settings[script].Scale then
+	if scale ~= settings[Module.Name].Scale then
 		if scale < 0.5 then scale = 0.5 end
 		if scale > 2 then scale = 2 end
 	end
@@ -556,12 +557,12 @@ local function DrawConfigWin()
 	ImGui.SameLine()
 	ImGui.HelpMarker("This will change the color of the timer text on the spell gems.\nThis is also the Text Default color for the Cast Bar.")
 	if ImGui.Button("Save & Close") then
-		settings[script].CastTextColorByType = CastTextColorByType
-		settings[script].CastTransperancy = castTransparency
-		settings[script].EnableCastBar = enableCastBar
-		settings[script].Scale = scale
-		settings[script].TimerColor = timerColor
-		settings[script].LoadTheme = themeName
+		settings[Module.Name].CastTextColorByType = CastTextColorByType
+		settings[Module.Name].CastTransperancy = castTransparency
+		settings[Module.Name].EnableCastBar = enableCastBar
+		settings[Module.Name].Scale = scale
+		settings[Module.Name].TimerColor = timerColor
+		settings[Module.Name].LoadTheme = themeName
 		mq.pickle(configFile, settings)
 		configWindowShow = false
 	end
@@ -585,7 +586,7 @@ function Module.RenderGUI()
 		local windowWidth = ImGui.GetWindowWidth()
 		maxRow = math.floor(windowWidth / (scale * 44))
 		if aSize then
-			maxRow = settings[script].maxRow
+			maxRow = settings[Module.Name].maxRow
 		end
 		currentTime = os.time()
 		rowCount = 0
@@ -598,21 +599,21 @@ function Module.RenderGUI()
 			if ImGui.MenuItem(aLabel) then
 				aSize = not aSize
 				if aSize then
-					settings[script].maxRow = maxRow
+					settings[Module.Name].maxRow = maxRow
 				end
-				settings[script].AutoSize = aSize
+				settings[Module.Name].AutoSize = aSize
 				mq.pickle(configFile, settings)
 			end
 			local lockLabel = locked and 'Unlock' or 'Lock'
 			if ImGui.MenuItem(lockLabel) then
 				locked = not locked
-				settings[script].locked = locked
+				settings[Module.Name].locked = locked
 				mq.pickle(configFile, settings)
 			end
 			local titleBarLabel = showTitle and 'Hide Title Bar' or 'Show Title Bar'
 			if ImGui.MenuItem(titleBarLabel) then
 				showTitle = not showTitle
-				settings[script].ShowTitleBar = showTitle
+				settings[Module.Name].ShowTitleBar = showTitle
 				mq.pickle(configFile, settings)
 			end
 			ImGui.EndPopup()
@@ -744,9 +745,9 @@ function Module.RenderGUI()
 					aSize = not aSize
 
 					if aSize then
-						settings[script].maxRow = maxRow
+						settings[Module.Name].maxRow = maxRow
 					end
-					settings[script].AutoSize = aSize
+					settings[Module.Name].AutoSize = aSize
 					mq.pickle(configFile, settings)
 					ImGui.CloseCurrentPopup()
 				end
@@ -760,7 +761,7 @@ function Module.RenderGUI()
 				if ImGui.IsMouseReleased(0) then
 					locked = not locked
 
-					settings[script].locked = locked
+					settings[Module.Name].locked = locked
 					mq.pickle(configFile, settings)
 					ImGui.CloseCurrentPopup()
 				end
@@ -773,7 +774,7 @@ function Module.RenderGUI()
 				ImGui.SetTooltip(label)
 				if ImGui.IsMouseReleased(0) then
 					showTitle = not showTitle
-					settings[script].ShowTitleBar = showTitle
+					settings[Module.Name].ShowTitleBar = showTitle
 					mq.pickle(configFile, settings)
 					ImGui.CloseCurrentPopup()
 				end
@@ -792,7 +793,7 @@ function Module.RenderGUI()
 			ImGui.SeparatorText("Load Set")
 			ImGui.SetNextItemWidth(150)
 			if ImGui.BeginCombo("##LoadSet", setName) then
-				for k, data in pairs(settings[script][MyUI_CharLoaded].Sets) do
+				for k, data in pairs(settings[Module.Name][MyUI_CharLoaded].Sets) do
 					local isSelected = k == setName
 					if ImGui.Selectable(k, isSelected) then
 						setName = k
@@ -810,7 +811,7 @@ function Module.RenderGUI()
 
 			if setName ~= 'None' then
 				if ImGui.Button("Delete Set") then
-					settings[script][MyUI_CharLoaded].Sets[setName] = nil
+					settings[Module.Name][MyUI_CharLoaded].Sets[setName] = nil
 					mq.pickle(configFile, settings)
 					setName = 'None'
 					tmpName = ''
@@ -881,13 +882,13 @@ function Module.RenderGUI()
 				local lockLabel = castLocked and 'Unlock' or 'Lock'
 				if ImGui.MenuItem(lockLabel .. "##Casting") then
 					castLocked = not castLocked
-					settings[script].CastLocked = castLocked
+					settings[Module.Name].CastLocked = castLocked
 					mq.pickle(configFile, settings)
 				end
 				local titleBarLabel = showTitleCasting and 'Hide Title Bar' or 'Show Title Bar'
 				if ImGui.MenuItem(titleBarLabel .. "##Casting") then
 					showTitleCasting = not showTitleCasting
-					settings[script].ShowTitleCasting = showTitleCasting
+					settings[Module.Name].ShowTitleCasting = showTitleCasting
 					mq.pickle(configFile, settings)
 				end
 				ImGui.EndPopup()
@@ -917,7 +918,7 @@ local function Init()
 	if MyUI_Utils.File.Exists(themezDir) then
 		hasThemeZ = true
 	end
-	picker:InitializeAbilities()
+	picker:InitializeAbilities({ 'spell', })
 	mq.event("mem_spell", "You have finished memorizing #1#.#*#", MemSpell)
 	mq.event("int_spell", "Your spell is interrupted.", InterruptSpell)
 	mq.event("fiz_spell", "Your#*#spell fizzles#*#", InterruptSpell)
@@ -955,7 +956,7 @@ function Module.LocalLoop()
 end
 
 if mq.TLO.EverQuest.GameState() ~= "INGAME" then
-	printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
+	printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", Module.Name)
 	mq.exit()
 end
 

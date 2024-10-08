@@ -402,7 +402,7 @@ function Module.RenderGUI()
             winFlags = bit32.bor(ImGuiWindowFlags.None)
         end
         local ColorCount, StyleCount = DrawTheme(settings[script].LoadTheme or 'Default')
-        local openGUI, showGUI = imgui.Begin("AA Party##AA_Party_" .. MyUI_CharLoaded, true, winFlags)
+        local openGUI, showGUI = imgui.Begin("AA Party##_" .. MyUI_CharLoaded, true, winFlags)
         if not openGUI then
             AAPartyShow = false
         end
@@ -748,7 +748,7 @@ local function init()
     firstRun = true
     if not loadedExeternally then
         Module.CheckArgsar(args)
-        mq.imgui.init(script .. "##" .. MyUI_CharLoaded, Module.RenderGUI)
+        mq.imgui.init(Module.Name, Module.RenderGUI)
     else
         Module.CheckMode()
     end

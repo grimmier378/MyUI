@@ -27,7 +27,6 @@ local delayTime
 local currZone, lastZone
 local winFlags = bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoFocusOnAppearing)
 local locked, showAdv, forcedOpen, refreshStats = false, false, false, false
-local script = 'SAST'
 --Helpers
 local function checkAdv()
 	-- check for active adventure timers.Either time to enter dungeon or time to complete.
@@ -372,7 +371,7 @@ function Module.LocalLoop()
 end
 
 if mq.TLO.EverQuest.GameState() ~= "INGAME" then
-	printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
+	printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", Module.Name)
 	mq.exit()
 end
 

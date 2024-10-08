@@ -1,14 +1,16 @@
-local mq = require('mq')
-local ImGui = require('ImGui')
-local Module = {}
-Module.theme = {}
-Module.ActorMailBox = nil
+local mq                                                          = require('mq')
+local ImGui                                                       = require('ImGui')
+local Module                                                      = {}
+Module.theme                                                      = {}
+Module.ActorMailBox                                               = nil
 Module.ShowDialog, Module.ConfUI, Module.editGUI, Module.themeGUI = false, false, false, false
-Module.themeName = 'Default'
-Module.IsRunning = false
-Module.Name = "DialogDB"
+Module.themeName                                                  = 'Default'
+Module.IsRunning                                                  = false
+Module.Name                                                       = "DialogDB"
+Module.Path                                                       = MyUI_Path ~= nil and MyUI_Path or string.format("%s/%s/", mq.luaDir, Module.Name)
+
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+local loadedExeternally                                           = MyUI_ScriptName ~= nil and true or false
 
 if not loadedExeternally then
 	MyUI_Utils = require('lib.common')
@@ -903,7 +905,7 @@ local function init()
 	MyUI_Utils.PrintOutput('MyUI', nil, "%s\agDialog DB \aoLoaded... \at/dialogdb help \aoDisplay Help", msgPref)
 	Module.IsRunning = true
 	if not loadedExeternally then
-		mq.imgui.init('DialogDB', Module.RenderGUI)
+		mq.imgui.init(Module.Nam, Module.RenderGUI)
 		Module.LocalLoop()
 	end
 end

@@ -13,13 +13,11 @@ if not loadedExeternally then
 	MyUI_Actor = require('actors')
 	MyUI_CharLoaded = mq.TLO.Me.DisplayName()
 	MyUI_Server = mq.TLO.MacroQuest.Server()
-	Module.ImgPath = mq.TLO.Lua.Dir() .. "/chatrelay/images/phone.png"
 end
 
 local LoadTheme = MyUI_ThemeLoader
 local ActorDPS = nil
-local script = 'MyDPS'
-local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, script, MyUI_Server, MyUI_CharLoaded)
+local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, Module.Name, MyUI_Server, MyUI_CharLoaded)
 local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
 local damTable, settings, theme = {}, {}, {}
 local winFlags = bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoTitleBar)
@@ -801,7 +799,7 @@ function Module.RenderGUI()
 		else
 			ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(0.1, 0.1, 0.1, 0.9))
 		end
-		local isWindowOpen, showWin = ImGui.Begin(script .. "##" .. MyUI_CharLoaded, true, winFlags)
+		local isWindowOpen, showWin = ImGui.Begin(Module.Name .. "##" .. MyUI_CharLoaded, true, winFlags)
 		if not isWindowOpen then
 			Module.IsRunning = false
 		end
@@ -856,7 +854,7 @@ function Module.RenderGUI()
 			tempSettings.showHistory = false
 			settings.Options.showHistory = false
 			mq.pickle(configFile, settings)
-			MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayShow Battle History set to %s\ax", script, tempSettings.showHistory)
+			MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayShow Battle History set to %s\ax", Module.Name, tempSettings.showHistory)
 		end
 		if showReport then
 			if ImGui.BeginTabBar("MyDPS##") then
@@ -881,59 +879,59 @@ end
 
 local function pHelp()
 	local help = {
-		[1] = string.format("\aw[\at%s\ax] \ayCommands\ax", script)
+		[1] = string.format("\aw[\at%s\ax] \ayCommands\ax", Module.Name)
 		,
-		[2] = string.format("\aw[\at%s\ax] \ay/lua run mydps\ax - Run the script.", script)
+		[2] = string.format("\aw[\at%s\ax] \ay/lua run mydps\ax - Run the script.", Module.Name)
 		,
-		[3] = string.format("\aw[\at%s\ax] \ay/lua run mydps start\ax - Run and Start, bypassing the Options Display.", script)
+		[3] = string.format("\aw[\at%s\ax] \ay/lua run mydps start\ax - Run and Start, bypassing the Options Display.", Module.Name)
 		,
-		[4] = string.format("\aw[\at%s\ax] \ay/lua run mydps start hide\ax - Run and Start, bypassing the Options Display and Hides the Spam Window.", script)
+		[4] = string.format("\aw[\at%s\ax] \ay/lua run mydps start hide\ax - Run and Start, bypassing the Options Display and Hides the Spam Window.", Module.Name)
 		,
-		[5] = string.format("\aw[\at%s\ax] \ay/mydps start\ax - Start the DPS window.", script)
+		[5] = string.format("\aw[\at%s\ax] \ay/mydps start\ax - Start the DPS window.", Module.Name)
 		,
-		[6] = string.format("\aw[\at%s\ax] \ay/mydps exit\ax - Exit the script.", script)
+		[6] = string.format("\aw[\at%s\ax] \ay/mydps exit\ax - Exit the script.", Module.Name)
 		,
-		[7] = string.format("\aw[\at%s\ax] \ay/mydps ui\ax - Toggle the Options UI.", script)
+		[7] = string.format("\aw[\at%s\ax] \ay/mydps ui\ax - Toggle the Options UI.", Module.Name)
 		,
-		[8] = string.format("\aw[\at%s\ax] \ay/mydps hide\ax - Toggles show|hide of the Damage Spam Window.", script)
+		[8] = string.format("\aw[\at%s\ax] \ay/mydps hide\ax - Toggles show|hide of the Damage Spam Window.", Module.Name)
 		,
-		[9] = string.format("\aw[\at%s\ax] \ay/mydps clear\ax - Clear the data.", script)
+		[9] = string.format("\aw[\at%s\ax] \ay/mydps clear\ax - Clear the data.", Module.Name)
 		,
-		[10] = string.format("\aw[\at%s\ax] \ay/mydps showtype\ax - Toggle Showing the type of attack.", script)
+		[10] = string.format("\aw[\at%s\ax] \ay/mydps showtype\ax - Toggle Showing the type of attack.", Module.Name)
 		,
-		[11] = string.format("\aw[\at%s\ax] \ay/mydps showtarget\ax - Toggle Showing the Target of the attack.", script)
+		[11] = string.format("\aw[\at%s\ax] \ay/mydps showtarget\ax - Toggle Showing the Target of the attack.", Module.Name)
 		,
-		[12] = string.format("\aw[\at%s\ax] \ay/mydps showds\ax - Toggle Showing damage shield.", script)
+		[12] = string.format("\aw[\at%s\ax] \ay/mydps showds\ax - Toggle Showing damage shield.", Module.Name)
 		,
-		[13] = string.format("\aw[\at%s\ax] \ay/mydps history\ax - Toggle the battle history window.", script)
+		[13] = string.format("\aw[\at%s\ax] \ay/mydps history\ax - Toggle the battle history window.", Module.Name)
 		,
-		[14] = string.format("\aw[\at%s\ax] \ay/mydps mymisses\ax - Toggle Showing my misses.", script)
+		[14] = string.format("\aw[\at%s\ax] \ay/mydps mymisses\ax - Toggle Showing my misses.", Module.Name)
 		,
-		[15] = string.format("\aw[\at%s\ax] \ay/mydps missed-me\ax - Toggle Showing NPC missed me.", script)
+		[15] = string.format("\aw[\at%s\ax] \ay/mydps missed-me\ax - Toggle Showing NPC missed me.", Module.Name)
 		,
-		[16] = string.format("\aw[\at%s\ax] \ay/mydps hitme\ax - Toggle Showing NPC hit me.", script)
+		[16] = string.format("\aw[\at%s\ax] \ay/mydps hitme\ax - Toggle Showing NPC hit me.", Module.Name)
 		,
-		[17] = string.format("\aw[\at%s\ax] \ay/mydps sort [new|old]\ax - Sort Toggle newest on top. [new|old] arguments optional so set direction", script)
+		[17] = string.format("\aw[\at%s\ax] \ay/mydps sort [new|old]\ax - Sort Toggle newest on top. [new|old] arguments optional so set direction", Module.Name)
 		,
-		[18] = string.format("\aw[\at%s\ax] \ay/mydps sorthistory [new|old]\ax - Sort history Toggle newest on top. [new|old] arguments optional so set direction", script)
+		[18] = string.format("\aw[\at%s\ax] \ay/mydps sorthistory [new|old]\ax - Sort history Toggle newest on top. [new|old] arguments optional so set direction", Module.Name)
 		,
-		[19] = string.format("\aw[\at%s\ax] \ay/mydps settings\ax - Print current settings to console.", script)
+		[19] = string.format("\aw[\at%s\ax] \ay/mydps settings\ax - Print current settings to console.", Module.Name)
 		,
-		[20] = string.format("\aw[\at%s\ax] \ay/mydps doreporting [all|battle|time]\ax - Toggle DPS Auto DPS reporting on for 'Battles, Time based, or BOTH'.", script)
+		[20] = string.format("\aw[\at%s\ax] \ay/mydps doreporting [all|battle|time]\ax - Toggle DPS Auto DPS reporting on for 'Battles, Time based, or BOTH'.", Module.Name)
 		,
-		[21] = string.format("\aw[\at%s\ax] \ay/mydps report\ax - Report the Time Based DPS since Last Report.", script)
+		[21] = string.format("\aw[\at%s\ax] \ay/mydps report\ax - Report the Time Based DPS since Last Report.", Module.Name)
 		,
-		[22] = string.format("\aw[\at%s\ax] \ay/mydps battlereport\ax - Report the battle history to console.", script)
+		[22] = string.format("\aw[\at%s\ax] \ay/mydps battlereport\ax - Report the battle history to console.", Module.Name)
 		,
-		[23] = string.format("\aw[\at%s\ax] \ay/mydps announce\ax - Toggle Announce to DanNet Group.", script)
+		[23] = string.format("\aw[\at%s\ax] \ay/mydps announce\ax - Toggle Announce to DanNet Group.", Module.Name)
 		,
-		[24] = string.format("\aw[\at%s\ax] \ay/mydps move\ax - Toggle click through, allows moving of window.", script)
+		[24] = string.format("\aw[\at%s\ax] \ay/mydps move\ax - Toggle click through, allows moving of window.", Module.Name)
 		,
-		[25] = string.format("\aw[\at%s\ax] \ay/mydps delay #\ax - Set the combat spam display time in seconds.", script)
+		[25] = string.format("\aw[\at%s\ax] \ay/mydps delay #\ax - Set the combat spam display time in seconds.", Module.Name)
 		,
-		[26] = string.format("\aw[\at%s\ax] \ay/mydps battledelay #\ax - Set the Battle ending Delay time in seconds.", script)
+		[26] = string.format("\aw[\at%s\ax] \ay/mydps battledelay #\ax - Set the Battle ending Delay time in seconds.", Module.Name)
 		,
-		[27] = string.format("\aw[\at%s\ax] \ay/mydps help\ax - Show this help.", script)
+		[27] = string.format("\aw[\at%s\ax] \ay/mydps help\ax - Show this help.", Module.Name)
 		,
 	}
 	for i = 1, #help do
@@ -945,10 +943,10 @@ local function pCurrentSettings()
 	local msg = ''
 	for k, v in pairs(settings.Options) do
 		if k == "bgColor" then
-			msg = string.format("\aw[\at%s\ax] \ay%s\ax = {\ar%s\ax, \ag%s\ax, \at%s\ax,\ao %s\ax}", script, k, v[1], v[2], v[3], v[4])
+			msg = string.format("\aw[\at%s\ax] \ay%s\ax = {\ar%s\ax, \ag%s\ax, \at%s\ax,\ao %s\ax}", Module.Name, k, v[1], v[2], v[3], v[4])
 			MyUI_Utils.PrintOutput('MyDPS', nil, msg)
 		else
-			msg = string.format("\aw[\at%s\ax] \ay%s\ax = \at%s", script, k, v)
+			msg = string.format("\aw[\at%s\ax] \ay%s\ax = \at%s", Module.Name, k, v)
 			MyUI_Utils.PrintOutput('MyDPS', nil, msg)
 		end
 	end
@@ -965,7 +963,7 @@ end
 ---@param rType string @ type of report (ALL, COMBAT)
 local function pDPS(dur, rType)
 	if dur == nil then
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayNothing to Report! Try again later.", script)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayNothing to Report! Try again later.", Module.Name)
 		return
 	end
 	if rType:lower() == "all" then
@@ -978,13 +976,13 @@ local function pDPS(dur, rType)
 		local grandDPS     = dur > 0 and (grandTotal / dur) or 0
 		local msgNoDS      = string.format(
 			"\aw[\at%s\ax] \ayDPS \ax(\aoNO DS\ax): \at%.2f\ax, \ayTimeSpan:\ax\ao %.2f min\ax, \ayTotal Damage: \ax\ao%d\ax, \ayTotal Attempts: \ax\ao%d\ax, \ayAverage: \ax\ao%d\ax",
-			script, dps, (dur / 60), dmgTotal, dmgCounter, avgDmg)
+			Module.Name, dps, (dur / 60), dmgTotal, dmgCounter, avgDmg)
 		local msgDS        = string.format(
 			"\aw[\at%s\ax] \ayDPS \ax(\atDS Dmg\ax): \at%.2f\ax, \ayTimeSpan: \ax\ao%.2f min\ax, \ayTotal Damage: \ax\ao%d\ax, \ayTotal Hits: \ax\ao%d\ax",
-			script, dpsDS, (dur / 60), dmgTotalDS, dsCounter)
+			Module.Name, dpsDS, (dur / 60), dmgTotalDS, dsCounter)
 		local msgALL       = string.format(
 			"\aw[\at%s\ax] \ayDPS \ax(\agALL\ax): \ag%.2f\ax, \ayTimeSpan: \ax\ao%.2f min\ax, \ayTotal Damage: \ax\ao%d\ax, \ayTotal Attempts: \ax\ao%d\ax, \ayAverage:\ax \ao%d\ax",
-			script, grandDPS, (dur / 60), grandTotal, grandCounter, grangAvg)
+			Module.Name, grandDPS, (dur / 60), grandTotal, grandCounter, grangAvg)
 
 		MyUI_Utils.PrintOutput('MyDPS', nil, msgNoDS)
 		MyUI_Utils.PrintOutput('MyDPS', nil, msgDS)
@@ -1008,7 +1006,7 @@ local function pDPS(dur, rType)
 		if settings.Options.dpsBattleReport then
 			local msg = string.format(
 				"\aw[\at%s\ax] \ayChar:\ax\ao %s\ax, \ayDPS \ax(\aoBATTLE\ax): \at%s\ax, \ayTimeSpan:\ax\ao %.0f sec\ax, \ayTotal Damage: \ax\ao%s\ax, \ayAvg. Damage: \ax\ao%s\ax",
-				script, MyUI_CharLoaded, cleanNumber(dps, 1, true), dur, cleanNumber(dmgTotalBattle, 2), cleanNumber(avgDmg, 1, true))
+				Module.Name, MyUI_CharLoaded, cleanNumber(dps, 1, true), dur, cleanNumber(dmgTotalBattle, 2), cleanNumber(avgDmg, 1, true))
 			MyUI_Utils.PrintOutput('MyDPS', nil, msg)
 			if settings.Options.announceDNET then
 				announceDanNet(msg)
@@ -1051,13 +1049,13 @@ end
 
 local function pBattleHistory()
 	if battleCounter == 0 then
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayNo Battle History\ax", script)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayNo Battle History\ax", Module.Name)
 		return
 	end
 	for i, v in ipairs(battlesHistory) do
 		local msg = string.format(
 			"\aw[\at%s\ax] \ayChar:\ax\ao %s\ax, \ayBattle: \ax\ao%d\ax, \ayDPS: \ax\at%s\ax, \ayDuration: \ax\ao%s sec\ax, \ayTotal Damage: \ax\ao%s\ax, \ayAvg. Damage: \ax\ao%s\ax",
-			script, MyUI_CharLoaded, v.sequence, cleanNumber(v.dps, 1, true), v.dur, cleanNumber(v.dmg, 2), cleanNumber(v.avg, 1, true))
+			Module.Name, MyUI_CharLoaded, v.sequence, cleanNumber(v.dps, 1, true), v.dur, cleanNumber(v.dmg, 2), cleanNumber(v.avg, 1, true))
 		MyUI_Utils.PrintOutput('MyDPS', nil, msg)
 		if settings.Options.announceDNET then
 			announceDanNet(msg)
@@ -1068,7 +1066,7 @@ end
 local function processCommand(...)
 	local args = { ..., }
 	if #args == 0 then
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \arInvalid command, \ayType /mydps help for a list of commands.", script)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \arInvalid command, \ayType /mydps help for a list of commands.", Module.Name)
 		return
 	end
 	local cmd = args[1]
@@ -1087,18 +1085,18 @@ local function processCommand(...)
 				tempSettings.showCombatWindow = true
 			end
 		end
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayToggle Combat Spam set to %s\ax", script, tempSettings.showCombatWindow)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayToggle Combat Spam set to %s\ax", Module.Name, tempSettings.showCombatWindow)
 	elseif cmd == "clear" then
 		damTable, battlesHistory             = {}, {}
 		battleStartTime, dpsStartTime        = 0, 0
 		dmgTotal, dmgCounter, dsCounter      = 0, 0, 0
 		dmgTotalDS, battleCounter, tableSize = 0, 0, 0
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayTable Cleared\ax", script)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayTable Cleared\ax", Module.Name)
 	elseif cmd == 'start' then
 		started = true
 		clickThrough = true
 		winFlags = bit32.bor(ImGuiWindowFlags.NoMouseInputs, ImGuiWindowFlags.NoDecoration)
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayStarted\ax", script)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayStarted\ax", Module.Name)
 	elseif cmd == 'showtype' then
 		if #args == 2 then
 			if args[2] == 'on' then
@@ -1109,7 +1107,7 @@ local function processCommand(...)
 		else
 			tempSettings.showType = not tempSettings.showType
 		end
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayShow Type set to %s\ax", script, tempSettings.showType)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayShow Type set to %s\ax", Module.Name, tempSettings.showType)
 	elseif cmd == 'showtarget' then
 		if #args == 2 then
 			if args[2] == 'on' then
@@ -1120,7 +1118,7 @@ local function processCommand(...)
 		else
 			tempSettings.showTarget = not tempSettings.showTarget
 		end
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayShow Target set to %s\ax", script, tempSettings.showTarget)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayShow Target set to %s\ax", Module.Name, tempSettings.showTarget)
 	elseif cmd == 'showds' then
 		if #args == 2 then
 			if args[2] == 'on' then
@@ -1131,7 +1129,7 @@ local function processCommand(...)
 		else
 			tempSettings.showDS = not tempSettings.showDS
 		end
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayShow Damage Shield set to %s\ax", script, tempSettings.showDS)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayShow Damage Shield set to %s\ax", Module.Name, tempSettings.showDS)
 	elseif cmd == 'history' then
 		if #args == 2 then
 			if args[2] == 'on' then
@@ -1143,7 +1141,7 @@ local function processCommand(...)
 			tempSettings.showHistory = not tempSettings.showHistory
 		end
 		tempSettings.showHistory = tempSettings.showHistory
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayShow Battle History set to %s\ax", script, tempSettings.showHistory)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayShow Battle History set to %s\ax", Module.Name, tempSettings.showHistory)
 	elseif cmd == 'mymisses' then
 		if #args == 2 then
 			if args[2] == 'on' then
@@ -1154,7 +1152,7 @@ local function processCommand(...)
 		else
 			tempSettings.showMyMisses = not tempSettings.showMyMisses
 		end
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayShow My Misses set to %s\ax", script, tempSettings.showMyMisses)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayShow My Misses set to %s\ax", Module.Name, tempSettings.showMyMisses)
 	elseif cmd == 'missed-me' then
 		if #args == 2 then
 			if args[2] == 'on' then
@@ -1165,7 +1163,7 @@ local function processCommand(...)
 		else
 			tempSettings.showMissMe = not tempSettings.showMissMe
 		end
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayShow Missed Me set to %s\ax", script, tempSettings.showMissMe)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayShow Missed Me set to %s\ax", Module.Name, tempSettings.showMissMe)
 	elseif cmd == 'hitme' then
 		if #args == 2 then
 			if args[2] == 'on' then
@@ -1176,7 +1174,7 @@ local function processCommand(...)
 		else
 			tempSettings.showHitMe = not tempSettings.showHitMe
 		end
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayShow Hit Me set to %s\ax", script, tempSettings.showHitMe)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayShow Hit Me set to %s\ax", Module.Name, tempSettings.showHitMe)
 	elseif cmd == 'sort' then
 		if #args == 2 then
 			if args[2] == 'new' then
@@ -1188,7 +1186,7 @@ local function processCommand(...)
 			tempSettings.sortNewest = not tempSettings.sortNewest
 		end
 		local dir = tempSettings.sortNewest and "Newest" or "Oldest"
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \aySort Combat Spam\ax \at%s \axOn Top!", script, dir)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \aySort Combat Spam\ax \at%s \axOn Top!", Module.Name, dir)
 	elseif cmd == 'sorthistory' then
 		if #args == 2 then
 			if args[2] == 'new' then
@@ -1201,10 +1199,10 @@ local function processCommand(...)
 		end
 		battlesHistory = sortTable(battlesHistory, 'history')
 		local dir = tempSettings.sortHistory and "Newest" or "Oldest"
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \aySorted Battle History\ax \at%s \axOn Top!", script, dir)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \aySorted Battle History\ax \at%s \axOn Top!", Module.Name, dir)
 	elseif cmd == 'move' then
 		clickThrough = not clickThrough
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayClick Through set to %s\ax", script, clickThrough)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayClick Through set to %s\ax", Module.Name, clickThrough)
 	elseif cmd == 'settings' then
 		pCurrentSettings()
 	elseif cmd == 'report' then
@@ -1222,40 +1220,40 @@ local function processCommand(...)
 		else
 			tempSettings.announceDNET = not tempSettings.announceDNET
 		end
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayAnnounce to DanNet Group set to %s\ax", script, tempSettings.announceDNET)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayAnnounce to DanNet Group set to %s\ax", Module.Name, tempSettings.announceDNET)
 	elseif #args == 2 and cmd == 'doreporting' then
 		if args[2] == 'battle' then
 			tempSettings.dpsBattleReport = not tempSettings.dpsBattleReport
-			MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayDo DPS Battle Reporting set to %s\ax", script, tempSettings.dpsBattleReport)
+			MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayDo DPS Battle Reporting set to %s\ax", Module.Name, tempSettings.dpsBattleReport)
 		elseif args[2] == 'time' then
 			tempSettings.dpsTimeSpanReport = not tempSettings.dpsTimeSpanReport
-			MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayDo DPS Reporting set to %s\ax", script, tempSettings.dpsTimeSpanReport)
+			MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayDo DPS Reporting set to %s\ax", Module.Name, tempSettings.dpsTimeSpanReport)
 		elseif args[2] == 'all' then
 			tempSettings.dpsBattleReport = not tempSettings.dpsBattleReport
 			tempSettings.dpsTimeSpanReport = tempSettings.dpsBattleReport
-			MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayDo DPS Reporting set to %s\ax", script, tempSettings.dpsTimeSpanReport)
+			MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayDo DPS Reporting set to %s\ax", Module.Name, tempSettings.dpsTimeSpanReport)
 		else
 			MyUI_Utils.PrintOutput('MyDPS', nil,
-				"\aw[\at%s\ax] \arInvalid argument, \ayType \at/mydps doreporting\ax takes arguments \aw[\agall\aw|\agbattle\aw|\agtime\aw] \ayplease try again.", script)
+				"\aw[\at%s\ax] \arInvalid argument, \ayType \at/mydps doreporting\ax takes arguments \aw[\agall\aw|\agbattle\aw|\agtime\aw] \ayplease try again.", Module.Name)
 		end
 	elseif #args == 2 and cmd == "delay" then
 		if tonumber(args[2]) then
 			tempSettings.displayTime = tonumber(args[2])
-			MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayDisplay time set to %s\ax", script, tempSettings.displayTime)
+			MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayDisplay time set to %s\ax", Module.Name, tempSettings.displayTime)
 		else
-			MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \arInvalid argument, \ayType /mydps help for a list of commands.", script)
+			MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \arInvalid argument, \ayType /mydps help for a list of commands.", Module.Name)
 		end
 	elseif #args == 2 and cmd == "battledelay" then
 		if tonumber(args[2]) then
 			tempSettings.battleDuration = tonumber(args[2])
-			MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayBattle Duration time set to %s\ax", script, tempSettings.battleDuration)
+			MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayBattle Duration time set to %s\ax", Module.Name, tempSettings.battleDuration)
 		else
-			MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \arInvalid argument, \ayType /mydps help for a list of commands.", script)
+			MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \arInvalid argument, \ayType /mydps help for a list of commands.", Module.Name)
 		end
 	elseif cmd == "help" then
 		pHelp()
 	else
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \arUnknown command, \ayType /mydps help for a list of commands.", script)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \arUnknown command, \ayType /mydps help for a list of commands.", Module.Name)
 	end
 	local changed = false
 	for k, v in pairs(tempSettings) do
@@ -1339,7 +1337,7 @@ local function CheckArgs(args)
 		started = true
 		clickThrough = true
 		winFlags = bit32.bor(ImGuiWindowFlags.NoMouseInputs, ImGuiWindowFlags.NoDecoration)
-		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayStarted\ax", script)
+		MyUI_Utils.PrintOutput('MyDPS', nil, "\aw[\at%s\ax] \ayStarted\ax", Module.Name)
 	end
 end
 
@@ -1381,7 +1379,7 @@ local function Init()
 
 	Module.IsRunning = true
 	if not loadedExeternally then
-		mq.imgui.init(script, Module.RenderGUI)
+		mq.imgui.init(Module.Name, Module.RenderGUI)
 		Module.LocalLoop()
 	end
 end
@@ -1471,7 +1469,7 @@ function Module.LocalLoop()
 end
 
 if mq.TLO.EverQuest.GameState() ~= "INGAME" then
-	printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
+	printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", Module.Name)
 	mq.exit()
 end
 

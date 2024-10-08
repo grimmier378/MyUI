@@ -244,11 +244,12 @@ local function parseCurrentBattle(dur)
 end
 
 local function npcMeleeCallBack(line, dType, target, dmg)
+	local typeValue = dType or nil
 	if not tonumber(dmg) then
-		type = 'missed-me'
-		dmg  = 'MISSED'
+		typeValue = 'missed-me'
+		dmg       = 'MISSED'
 	else
-		type = 'hit-by'
+		typeValue = 'hit-by'
 		local startType, stopType = string.find(line, "(%w+) YOU")
 		target = string.sub(line, 1, startType - 2)
 	end
@@ -263,12 +264,12 @@ local function npcMeleeCallBack(line, dType, target, dmg)
 		leftCombatTime  = 0
 	end
 	parseCurrentBattle(os.time() - battleStartTime)
-	if not settings.Options.showMissMe and type == 'missed-me' then return end
-	if not settings.Options.showHitMe and type == 'hit-by' then return end
+	if not settings.Options.showMissMe and typeValue == 'missed-me' then return end
+	if not settings.Options.showHitMe and typeValue == 'hit-by' then return end
 	if damTable == nil then damTable = {} end
 	sequenceCounter = sequenceCounter + 1
 	table.insert(damTable, {
-		type      = type,
+		type      = typeValue,
 		target    = target,
 		damage    = dmg,
 		timestamp = os.time(),

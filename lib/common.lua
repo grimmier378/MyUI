@@ -147,6 +147,16 @@ function CommonUtils.SortTableColums(input_table, sorted_keys, num_columns)
 	return column_sorted
 end
 
+function CommonUtils.SortKeys(input_table)
+	local keys = {}
+	for k, _ in pairs(input_table) do
+		table.insert(keys, k)
+	end
+
+	table.sort(keys) -- Sort the keys
+	return keys
+end
+
 ---
 --- Takes in a table of default settings and a table of loaded settings and checks for depreciated settings
 ---
@@ -217,10 +227,10 @@ function CommonUtils.GiveItem(target_id)
 	if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
 		mq.cmdf("/target id %s", target_id)
 		if mq.TLO.Cursor() then
-			if mq.TLO.Target.Distance() > 5 then
-				mq.cmdf("/multiline ; /nav spawn %s", target_id)
+			if mq.TLO.Target.Distance() > 10 then
+				mq.cmdf("/multiline ; /tar id %s; /timed 5, /nav id %s dist=10; /timed 20, /click left target", target_id, target_id)
 			else
-				mq.cmdf('/multiline ; /tar id %s; /face; /if (${Cursor.ID}) /click left target', target_id)
+				mq.cmdf('/multiline ; /tar id %s; /timed 2, /face; /timed 5, /click left target', target_id)
 			end
 		end
 	end

@@ -1723,7 +1723,7 @@ function Module.AddChannel(editChanID, isNewChannel)
     if ImGui.BeginChild("Details##") then
         ------------------------------ table -------------------------------------
         if channelData[editChanID].Events ~= nil then
-            for eventID, eventDetails in pairs(channelData[editChanID].Events) do
+            for eventID, eventDetails in ipairs(channelData[editChanID].Events) do
                 if Module.hString[eventID] == nil then Module.hString[eventID] = string.format(channelData[editChanID].Name .. ' : ' .. eventDetails.eventString) end
                 if ImGui.CollapsingHeader(Module.hString[eventID]) then
                     local contentSizeX = ImGui.GetWindowContentRegionWidth()
@@ -1810,7 +1810,7 @@ function Module.AddChannel(editChanID, isNewChannel)
                             ImGui.TableSetColumnIndex(3)
                             ImGui.SeparatorText('')
                             --------------- Filters ----------------------
-                            for filterID, filterData in pairs(eventDetails.Filters) do
+                            for filterID, filterData in ipairs(eventDetails.Filters) do
                                 if filterID > 0 then --and filterData.filterString ~= '' then
                                     ImGui.TableNextRow()
                                     ImGui.TableSetColumnIndex(0)
@@ -1870,7 +1870,6 @@ local function buildConfig()
     if ImGui.BeginChild("Channels##") then
         for channelID, channelData in pairs(Module.tempSettings.Channels) do
             if channelID ~= lastID then
-                -- Check if the header is collapsed
                 if ImGui.CollapsingHeader(channelData.Name) then
                     local contentSizeX = ImGui.GetWindowContentRegionWidth()
                     ImGui.SetWindowFontScale(Module.Settings.Scale)
@@ -2056,6 +2055,9 @@ function Module.Config_GUI(open)
             writeSettings(Module.SettingsFile, Module.Settings)
         end
         ImGui.SeparatorText('Channels and Events Overview')
+        table.sort(Module.tempSettings.Channels, function(a, b)
+            return a.Name < b.Name
+        end)
         buildConfig()
     end
     if ColorCountConf > 0 then ImGui.PopStyleColor(ColorCountConf) end

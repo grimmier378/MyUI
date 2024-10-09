@@ -255,7 +255,7 @@ local function getTellChat(line, who)
     local master = mq.TLO.Spawn(who).Master.Type() or 'noMaster'
     -- local checkPet = string.format("pcpet %s",who)
     local pet = mq.TLO.Me.Pet.DisplayName() or 'noPet'
-    if (mq.TLO.SpawnCount(checkNPC)() ~= 0 or master == 'PC' or pet == who) then return end
+    if (mq.TLO.SpawnCount(checkNPC)() ~= 0 or master == 'PC' or string.find(pet, who)) then return end
     if RelayActor ~= nil then
         RelayActor:send({ mailbox = 'chat_relay', script = 'chatrelay', }, GenerateContent('Tell', line))
         RelayActor:send({ mailbox = 'chat_relay', script = 'myui', }, GenerateContent('Tell', line))

@@ -55,6 +55,7 @@ local useWinPos                        = false
 local ShowMenu                         = false
 local sortType                         = 'none'
 local showTableView                    = true
+local maxSongs                         = 30
 local winPositions                     = {
     Config = { x = 500, y = 500, },
     MailBox = { x = 500, y = 500, },
@@ -71,7 +72,7 @@ local winSizes                         = {
 }
 -- Timing Variables
 local clockTimer                       = mq.gettime()
-local lastTime                         = os.clock()
+local lastTime                         = os.time()
 local checkIn                          = os.time()
 local frameTime                        = 17
 local currZone, lastZone
@@ -177,9 +178,8 @@ local function GenerateContent(subject, songsTable, buffsTable, doWho, doWhat)
 end
 
 local function GetBuff(slot)
-    local fixSlotNum = slot + 1
     local buffTooltip, buffName, buffDurDisplay, buffIcon, buffID, buffBeneficial, buffHr, buffMin, buffSec, totalMin, totalSec, buffDurHMS
-    local buff = mq.TLO.Me.Buff(fixSlotNum)
+    local buff = mq.TLO.Me.Buff(slot)
     local duration = buff.Duration
 
     buffName = buff.Name() or ''
@@ -204,15 +204,15 @@ local function GetBuff(slot)
     local displayBuffMin = buffMin and string.format("%02d", buffMin) or "00"
     local displayBuffSec = buffSec and string.format("%02d", buffSec) or "00"
     buffDurDisplay = string.format("%s:%s:%s", dispBuffHr, displayBuffMin, displayBuffSec)
-    buffTooltip = string.format("%s) %s (%s)", fixSlotNum, buffName, buffDurHMS)
+    buffTooltip = string.format("%s) %s (%s)", slot, buffName, buffDurHMS)
 
 
 
-    if Module.buffTable[fixSlotNum] ~= nil then
-        if Module.buffTable[fixSlotNum].ID ~= buffID or (totalSec < 20) then
+    if Module.buffTable[slot] ~= nil then
+        if Module.buffTable[slot].ID ~= buffID or (totalSec < 20) then
             changed = true
         else
-            if totalSec - Module.buffTable[fixSlotNum].TotalSeconds > 1 then changed = true end
+            if totalSec - Module.buffTable[slot].TotalSeconds > 1 then changed = true end
         end
     end
 
@@ -233,7 +233,7 @@ local function GetBuff(slot)
                     Icon = buffIcon,
                     ID = buffID,
                     Hours = buffHr,
-                    Slot = fixSlotNum,
+                    Slot = slot,
                     Minutes = buffMin,
                     Seconds = buffSec,
                     TotalMinutes = totalMin,
@@ -249,7 +249,7 @@ local function GetBuff(slot)
                 Icon = buffIcon,
                 ID = buffID,
                 Hours = buffHr,
-                Slot = fixSlotNum,
+                Slot = slot,
                 Minutes = buffMin,
                 Seconds = buffSec,
                 TotalMinutes = totalMin,
@@ -259,14 +259,14 @@ local function GetBuff(slot)
         end
     end
 
-    Module.buffTable[fixSlotNum] = {
+    Module.buffTable[slot] = {
         Name = buffName,
         Beneficial = buffBeneficial,
         Duration = buffDurHMS,
         DurationDisplay = buffDurDisplay,
         Icon = buffIcon,
         ID = buffID,
-        Slot = fixSlotNum,
+        Slot = slot,
         Hours = buffHr,
         Minutes = buffMin,
         Seconds = buffSec,
@@ -277,16 +277,15 @@ local function GetBuff(slot)
 end
 
 local function GetSong(slot)
-    local fixSlotNum = slot + 1
     local songTooltip, songName, songDurationDisplay, songIcon, songID, songBeneficial, songHr, songMin, songSec, totalMin, totalSec, songDurHMS
-    songName = mq.TLO.Me.Song(fixSlotNum).Name() or ''
-    songIcon = mq.TLO.Me.Song(fixSlotNum).SpellIcon() or 0
-    songID = songName ~= '' and (mq.TLO.Me.Song(fixSlotNum).ID() or 0) or 0
-    songBeneficial = mq.TLO.Me.Song(fixSlotNum).Beneficial() or false
-    totalMin = mq.TLO.Me.Song(fixSlotNum).Duration.TotalMinutes() or 0
-    totalSec = mq.TLO.Me.Song(fixSlotNum).Duration.TotalSeconds() or 0
+    songName = mq.TLO.Me.Song(slot).Name() or ''
+    songIcon = mq.TLO.Me.Song(slot).SpellIcon() or 0
+    songID = songName ~= '' and (mq.TLO.Me.Song(slot).ID() or 0) or 0
+    songBeneficial = mq.TLO.Me.Song(slot).Beneficial() or false
+    totalMin = mq.TLO.Me.Song(slot).Duration.TotalMinutes() or 0
+    totalSec = mq.TLO.Me.Song(slot).Duration.TotalSeconds() or 0
 
-    local song = mq.TLO.Me.Song(fixSlotNum)
+    local song = mq.TLO.Me.Song(slot)
     local duration = song.Duration
 
     songName = song.Name() or ''
@@ -304,19 +303,19 @@ local function GetSong(slot)
     songSec = songSec and string.format("%02d", tonumber(songSec)) or "00"
     songDurationDisplay = string.format("%s:%s:%s", songHr, songMin, songSec)
 
-    songTooltip = string.format("%s) %s (%s)", fixSlotNum, songName, songDurHMS)
+    songTooltip = string.format("%s) %s (%s)", slot, songName, songDurHMS)
 
     if Module.songTable[slot + 1] ~= nil then
         if Module.songTable[slot + 1].ID ~= songID and os.time() - checkIn >= 6 then changed = true end
     end
-    Module.songTable[fixSlotNum] = {
+    Module.songTable[slot] = {
         Name = songName,
         Beneficial = songBeneficial,
         Duration = songDurHMS,
         DurationDisplay = songDurationDisplay,
         Icon = songIcon,
         ID = songID,
-        Slot = fixSlotNum,
+        Slot = slot,
         Hours = songHr,
         Minutes = songMin,
         Seconds = songSec,
@@ -327,7 +326,7 @@ local function GetSong(slot)
 end
 
 local function pulseIcon(speed)
-    local currentTime = os.clock()
+    local currentTime = os.time()
     if currentTime - lastTime < frameTime then
         return -- exit if not enough time has passed
     end
@@ -382,12 +381,12 @@ local function GetBuffs()
     local subject = 'Update'
     debuffOnMe = {}
     numSlots = mq.TLO.Me.MaxBuffSlots() or 0
-    if numSlots == 0 then return end
-    for i = 0, numSlots - 1 do
+    if numSlots == 0 then return end -- most likely not loaded all the way try again next cycle
+    for i = 1, numSlots do
         GetBuff(i)
     end
     if mq.TLO.Me.CountSongs() > 0 then
-        for i = 0, 19 do
+        for i = 1, maxSongs do
             GetSong(i)
         end
     end
@@ -877,7 +876,7 @@ local function BoxSongs(id, sorted, view)
     local rowCounterS = 0
     local maxSongRow = math.floor(ImGui.GetColumnWidth(-1) / (Module.iconSize)) or 1
     local counterSongs = 0
-    for i = 1, 20 do
+    for i = 1, maxSongs do
         if counterSongs > sCount then break end
         -- local songs[i] = songs[i] or nil
         local sID
@@ -1742,8 +1741,8 @@ function Module.MainLoop()
         if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
 
-    currZone = mq.TLO.Zone.ID()
     if mq.gettime() - clockTimer >= 10 then
+        currZone = mq.TLO.Zone.ID()
         if currZone ~= lastZone then
             lastZone = currZone
         end

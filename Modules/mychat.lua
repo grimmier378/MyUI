@@ -633,6 +633,7 @@ function Module.EventChat(channelID, eventName, line, spam)
         if txtBuffer then
             local haveFilters = false
             for fID = 1, #eventDetails.Filters * 2 do
+                negMatch = false
                 if eventDetails.Filters[fID] ~= nil then
                     local fData = eventDetails.Filters[fID]
                     if fID > 0 and not fMatch then
@@ -641,8 +642,8 @@ function Module.EventChat(channelID, eventName, line, spam)
                         if string.find(fString, 'NO2') then
                             fString = string.gsub(fString, 'NO2', '')
                             negMatch = true
-                            --print(fString)
                         end
+
                         if string.find(fString, 'M3') then
                             fString = string.gsub(fString, 'M3', MyUI_CharLoaded)
                         elseif string.find(fString, 'PT1') then
@@ -698,18 +699,19 @@ function Module.EventChat(channelID, eventName, line, spam)
                         elseif string.find(fString, 'GP1') then
                             fString = CheckGroup(fString, line, 'group')
                         end
-
                         if string.find(line, fString) then
                             colorVec = fData.color
                             fMatch = true
                         end
-                        if fMatch then break end
+                        if fMatch and negMatch then
+                            fMatch = false
+                            negMatch = false
+                        end
                     end
-                    if fMatch then break end
+                    if fMatch then goto found_match end
                 end
             end
-
-            if fMatch and negMatch then fMatch = false end       -- we matched but it was a negative match so leave
+            ::found_match::
             --print(tostring(#eventDetails.Filters))
             if not fMatch and haveFilters then return fMatch end -- we had filters and didn't match so leave
             if not spam then

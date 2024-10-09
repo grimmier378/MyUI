@@ -217,7 +217,11 @@ function CommonUtils.GiveItem(target_id)
 	if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
 		mq.cmdf("/target id %s", target_id)
 		if mq.TLO.Cursor() then
-			mq.cmdf('/multiline ; /tar id %s; /face; /if (${Cursor.ID}) /click left target', target_id)
+			if mq.TLO.Target.Distance() > 5 then
+				mq.cmdf("/multiline ; /nav spawn %s", target_id)
+			else
+				mq.cmdf('/multiline ; /tar id %s; /face; /if (${Cursor.ID}) /click left target', target_id)
+			end
 		end
 	end
 end

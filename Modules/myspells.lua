@@ -583,7 +583,7 @@ function Module.RenderGUI()
 	end
 	if show then
 		-- Calculate maxRow to account for window padding and element size
-		local windowWidth = ImGui.GetWindowWidth()
+		local windowWidth = ImGui.GetWindowWidth() or 100
 		maxRow = math.floor(windowWidth / (scale * 44))
 		if aSize then
 			maxRow = settings[Module.Name].maxRow

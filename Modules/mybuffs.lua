@@ -41,8 +41,7 @@ local winFlag                          = bit32.bor(ImGuiWindowFlags.NoScrollbar,
 local flashAlpha, flashAlphaT          = 1, 255
 local rise, riseT                      = true, true
 local RUNNING, firstRun, changed, solo = true, true, false, true
-local songTimer, buffTime              = 20,
-    5                                                                  -- timers for how many Minutes left before we show the timer.
+local songTimer, buffTime              = 20, 5
 local numSlots                         = mq.TLO.Me.MaxBuffSlots() or 0 --Max Buff Slots
 local Scale                            = 1.0
 local animSpell                        = mq.FindTextureAnimation('A_SpellIcons')
@@ -51,6 +50,7 @@ local activeButton                     = MyUI_CharLoaded -- Initialize the activ
 local PulseSpeed                       = 5
 local themeName                        = 'Default'
 local mailBox                          = {}
+local debuffOnMe                       = {}
 local useWinPos                        = false
 local ShowMenu                         = false
 local sortType                         = 'none'
@@ -70,10 +70,10 @@ local winSizes                         = {
     Songs = { x = 200, y = 300, },
 }
 -- Timing Variables
+local clockTimer                       = mq.gettime()
 local lastTime                         = os.clock()
 local checkIn                          = os.time()
-local frameTime                        = 1 / 60
-local debuffOnMe                       = {}
+local frameTime                        = 17
 local currZone, lastZone
 
 -- default config settings
@@ -114,8 +114,6 @@ Module.defaults                        = {
         Songs = { x = 200, y = 300, },
     },
 }
-
-local clockTimer                       = mq.gettime()
 
 -- Functions
 
@@ -180,7 +178,7 @@ end
 
 local function GetBuff(slot)
     local fixSlotNum = slot + 1
-    local buffTooltip, buffName, buffDuration, buffDurDisplay, buffIcon, buffID, buffBeneficial, buffHr, buffMin, buffSec, totalMin, totalSec, buffDurHMS
+    local buffTooltip, buffName, buffDurDisplay, buffIcon, buffID, buffBeneficial, buffHr, buffMin, buffSec, totalMin, totalSec, buffDurHMS
     local buff = mq.TLO.Me.Buff(fixSlotNum)
     local duration = buff.Duration
 
@@ -202,17 +200,22 @@ local function GetBuff(slot)
 
     -- format tooltip
 
-    buffHr = buffHr and string.format("%02d", tonumber(buffHr)) or "00"
-    buffMin = buffMin and string.format("%02d", tonumber(buffMin)) or "00"
-    buffSec = buffSec and string.format("%02d", tonumber(buffSec)) or "00"
-    buffDurDisplay = string.format("%s:%s:%s", buffHr, buffMin, buffSec)
+    local dispBuffHr = buffHr and string.format("%02d", buffHr) or "00"
+    local displayBuffMin = buffMin and string.format("%02d", buffMin) or "00"
+    local displayBuffSec = buffSec and string.format("%02d", buffSec) or "00"
+    buffDurDisplay = string.format("%s:%s:%s", dispBuffHr, displayBuffMin, displayBuffSec)
     buffTooltip = string.format("%s) %s (%s)", fixSlotNum, buffName, buffDurHMS)
 
 
 
     if Module.buffTable[fixSlotNum] ~= nil then
-        if Module.buffTable[fixSlotNum].ID ~= buffID or (buffID > 0 and totalSec < 20) then changed = true end
+        if Module.buffTable[fixSlotNum].ID ~= buffID or (totalSec < 20) then
+            changed = true
+        else
+            if totalSec - Module.buffTable[fixSlotNum].TotalSeconds > 1 then changed = true end
+        end
     end
+
     if not buffBeneficial then
         if #debuffOnMe > 0 then
             local found = false
@@ -255,6 +258,7 @@ local function GetBuff(slot)
             })
         end
     end
+
     Module.buffTable[fixSlotNum] = {
         Name = buffName,
         Beneficial = buffBeneficial,
@@ -1739,7 +1743,7 @@ function Module.MainLoop()
     end
 
     currZone = mq.TLO.Zone.ID()
-    if mq.gettime() - clockTimer >= 30 then
+    if mq.gettime() - clockTimer >= 10 then
         if currZone ~= lastZone then
             lastZone = currZone
         end

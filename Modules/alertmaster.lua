@@ -2448,6 +2448,7 @@ Module.MainLoop = function()
 	if Module.GUI_Main.Refresh.Table.Unhandled then RefreshUnhandled() end
 	if SearchWindow_Show == true or #Table_Cache.Mobs < 1 then RefreshZone() end
 end
+
 if mq.TLO.EverQuest.GameState() ~= "INGAME" then
 	printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", Module.Name)
 	mq.exit()

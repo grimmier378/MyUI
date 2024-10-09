@@ -27,7 +27,8 @@ MyUI_Guild           = mq.TLO.Me.Guild()
 local MyActor        = MyUI_Actor.register('myui', function(message) end)
 local mods           = {}
 local Minimized      = false
-
+MyUI_InitPctComplete = 0
+MyUI_CurLoading      = 'Loading Modules...'
 MyUI_Modules         = {}
 MyUI_Mode            = 'driver'
 MyUI_SettingsFile    = mq.configDir .. '/MyUI/' .. MyUI_Server:gsub(" ", "_") .. '/' .. MyUI_CharLoaded .. '.lua'
@@ -105,6 +106,21 @@ local function LoadSettings()
 	if newSetting then
 		mq.pickle(MyUI_SettingsFile, MyUI_Settings)
 	end
+end
+
+-- borrowed from RGMercs thanks Derple! <3
+local function RenderLoader()
+	ImGui.SetNextWindowSize(ImVec2(400, 80), ImGuiCond.Always)
+	ImGui.SetNextWindowPos(ImVec2(ImGui.GetIO().DisplaySize.x / 2 - 200, ImGui.GetIO().DisplaySize.y / 3 - 75), ImGuiCond.Always)
+
+	ImGui.Begin("MyUI Loader", nil, bit32.bor(ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoResize, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoScrollbar))
+	ImGui.Image(MyUI_Grimmier_Img:GetTextureID(), ImVec2(60, 60))
+	ImGui.SetCursorPosY(ImGui.GetCursorPosY() - 35)
+	ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 70)
+	ImGui.PushStyleColor(ImGuiCol.PlotHistogram, 0.2, 0.7, 1 - (MyUI_InitPctComplete / 100), MyUI_InitPctComplete / 100)
+	ImGui.ProgressBar(MyUI_InitPctComplete / 100, ImVec2(310, 0), MyUI_CurLoading)
+	ImGui.PopStyleColor()
+	ImGui.End()
 end
 
 local function HelpDocumentation()
@@ -244,116 +260,120 @@ local function DrawContextMenu()
 end
 
 local function MyUI_Render()
-	if MyUI_Settings.ShowMain then
-		Minimized = false
-		ImGui.SetNextWindowSize(400, 200, ImGuiCond.FirstUseEver)
+	if MyUI_InitPctComplete < 100 then
+		RenderLoader()
+	else
+		if MyUI_Settings.ShowMain then
+			Minimized = false
+			ImGui.SetNextWindowSize(400, 200, ImGuiCond.FirstUseEver)
 
-		local open_gui, show_gui = ImGui.Begin(MyUI_ScriptName .. "##" .. MyUI_CharLoaded, true, ImGuiWindowFlags.None)
+			local open_gui, show_gui = ImGui.Begin(MyUI_ScriptName .. "##" .. MyUI_CharLoaded, true, ImGuiWindowFlags.None)
 
-		if not open_gui then
-			MyUI_Settings.ShowMain = false
-			Minimized = true
-			mq.pickle(MyUI_SettingsFile, MyUI_Settings)
-		end
-
-		if show_gui then
-			ImGui.Text(MyUI_Icons.MD_SETTINGS)
-			if ImGui.BeginPopupContextItem() then
-				DrawContextMenu()
-				ImGui.EndPopup()
-			end
-			local sizeX, sizeY = ImGui.GetContentRegionAvail()
-			local col = math.floor(sizeX / 125) or 1
-			if ImGui.BeginTable("Modules", col, ImGuiWindowFlags.None) then
-				local tempSort = GetSortedModuleNames()
-				local sorted_names = MyUI_Utils.SortTableColums(nil, tempSort, col)
-
-				for _, name in ipairs(sorted_names) do
-					local module_data = nil
-					for _, data in ipairs(MyUI_Settings.mods_list) do
-						if data.name == name then
-							module_data = data
-							goto continue
-						end
-					end
-					::continue::
-
-					if module_data then
-						local pressed = false
-						ImGui.TableNextColumn()
-						ImGui.SetNextItemWidth(120)
-						local new_state = ImGui.Checkbox(module_data.name, module_data.enabled)
-
-						-- If checkbox changed, set flags for processing
-						if new_state ~= module_data.enabled then
-							MyUI_TempSettings.ModuleChanged = true
-							MyUI_TempSettings.ModuleName = module_data.name
-							MyUI_TempSettings.ModuleEnabled = new_state
-						end
-					end
-				end
-				ImGui.EndTable()
-			end
-
-			-- Add Custom Module Section
-			ImGui.SetNextItemWidth(150)
-			MyUI_TempSettings.AddModule = ImGui.InputText("Add Custom Module", MyUI_TempSettings.AddModule or '')
-
-			if MyUI_TempSettings.AddModule ~= '' then
-				if ImGui.Button("Add") then
-					MyUI_TempSettings.AddCustomModule = true
-				end
-
-				local found = false
-				for _, v in pairs(default_list) do
-					if v:lower() == MyUI_TempSettings.AddModule:lower() then
-						found = true
-						MyUI_TempSettings.AddModule = ''
-						goto found_one
-					end
-				end
-				::found_one::
-				if not found then
-					ImGui.SameLine()
-					if ImGui.Button("Remove") then
-						MyUI_TempSettings.RemoveModule = true
-					end
-				end
-			end
-		end
-		if ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows) then
-			if ImGui.IsKeyPressed(ImGuiKey.Escape) then
+			if not open_gui then
 				MyUI_Settings.ShowMain = false
 				Minimized = true
 				mq.pickle(MyUI_SettingsFile, MyUI_Settings)
 			end
-		end
-		ImGui.End()
-	end
 
-	if Minimized then
-		local open_gui, show_gui = ImGui.Begin(MyUI_ScriptName .. "##Mini" .. MyUI_CharLoaded, true,
-			bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar))
+			if show_gui then
+				ImGui.Text(MyUI_Icons.MD_SETTINGS)
+				if ImGui.BeginPopupContextItem() then
+					DrawContextMenu()
+					ImGui.EndPopup()
+				end
+				local sizeX, sizeY = ImGui.GetContentRegionAvail()
+				local col = math.floor(sizeX / 125) or 1
+				if ImGui.BeginTable("Modules", col, ImGuiWindowFlags.None) then
+					local tempSort = GetSortedModuleNames()
+					local sorted_names = MyUI_Utils.SortTableColums(nil, tempSort, col)
 
-		if not open_gui then
-			MyUI_Settings.ShowMain = false
-			Minimized = true
-			mq.pickle(MyUI_SettingsFile, MyUI_Settings)
-		end
-		if show_gui then
-			if ImGui.ImageButton("MyUI", MyUI_Grimmier_Img:GetTextureID(), ImVec2(30, 30)) then
-				MyUI_Settings.ShowMain = true
-				Minimized = false
+					for _, name in ipairs(sorted_names) do
+						local module_data = nil
+						for _, data in ipairs(MyUI_Settings.mods_list) do
+							if data.name == name then
+								module_data = data
+								goto continue
+							end
+						end
+						::continue::
+
+						if module_data then
+							local pressed = false
+							ImGui.TableNextColumn()
+							ImGui.SetNextItemWidth(120)
+							local new_state = ImGui.Checkbox(module_data.name, module_data.enabled)
+
+							-- If checkbox changed, set flags for processing
+							if new_state ~= module_data.enabled then
+								MyUI_TempSettings.ModuleChanged = true
+								MyUI_TempSettings.ModuleName = module_data.name
+								MyUI_TempSettings.ModuleEnabled = new_state
+							end
+						end
+					end
+					ImGui.EndTable()
+				end
+
+				-- Add Custom Module Section
+				ImGui.SetNextItemWidth(150)
+				MyUI_TempSettings.AddModule = ImGui.InputText("Add Custom Module", MyUI_TempSettings.AddModule or '')
+
+				if MyUI_TempSettings.AddModule ~= '' then
+					if ImGui.Button("Add") then
+						MyUI_TempSettings.AddCustomModule = true
+					end
+
+					local found = false
+					for _, v in pairs(default_list) do
+						if v:lower() == MyUI_TempSettings.AddModule:lower() then
+							found = true
+							MyUI_TempSettings.AddModule = ''
+							goto found_one
+						end
+					end
+					::found_one::
+					if not found then
+						ImGui.SameLine()
+						if ImGui.Button("Remove") then
+							MyUI_TempSettings.RemoveModule = true
+						end
+					end
+				end
 			end
+			if ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows) then
+				if ImGui.IsKeyPressed(ImGuiKey.Escape) then
+					MyUI_Settings.ShowMain = false
+					Minimized = true
+					mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+				end
+			end
+			ImGui.End()
 		end
-		if ImGui.BeginPopupContextWindow() then
-			DrawContextMenu()
-			ImGui.EndPopup()
-		end
-		ImGui.End()
-	end
 
-	RenderModules()
+		if Minimized then
+			local open_gui, show_gui = ImGui.Begin(MyUI_ScriptName .. "##Mini" .. MyUI_CharLoaded, true,
+				bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar))
+
+			if not open_gui then
+				MyUI_Settings.ShowMain = false
+				Minimized = true
+				mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+			end
+			if show_gui then
+				if ImGui.ImageButton("MyUI", MyUI_Grimmier_Img:GetTextureID(), ImVec2(30, 30)) then
+					MyUI_Settings.ShowMain = true
+					Minimized = false
+				end
+			end
+			if ImGui.BeginPopupContextWindow() then
+				DrawContextMenu()
+				ImGui.EndPopup()
+			end
+			ImGui.End()
+		end
+
+		RenderModules()
+	end
 end
 
 local function MyUI_Main()
@@ -438,6 +458,7 @@ local function StartUp()
 	mq.bind('/myui', CommandHandler)
 	CheckMode(args)
 	LoadSettings()
+	mq.imgui.init(MyUI_ScriptName, MyUI_Render)
 
 	for _, data in ipairs(MyUI_Settings.mods_list) do
 		if data.enabled then
@@ -450,7 +471,6 @@ local function StartUp()
 	InitModules()
 
 	MyUI_IsRunning = true
-	mq.imgui.init(MyUI_ScriptName, MyUI_Render)
 	HelpDocumentation()
 end
 

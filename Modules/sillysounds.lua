@@ -5,7 +5,7 @@ local Module = {}
 
 Module.Name = "SillySounds"
 Module.IsRunning = false
-Module.Path = MyUI_Path ~= nil and MyUI_Path or string.format("%s/%s/sounds/", mq.luaDir, Module.Name)
+Module.Path = MyUI_Path ~= nil and MyUI_Path .. '/sounds/' or string.format("%s/%s/sounds/", mq.luaDir, Module.Name)
 
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false

@@ -312,6 +312,8 @@ end
 
 local clockTimer = mq.gettime()
 local refreshTimer = 0
+local delTimerAdv = os.clock()
+local delTimerExp = os.clock()
 function Module.MainLoop()
 	if loadedExeternally then
 		---@diagnostic disable-next-line: undefined-global
@@ -334,26 +336,36 @@ function Module.MainLoop()
 		lastZone = currZone
 		clockTimer = mq.gettime()
 	end
+	local curTime = os.clock()
 	if mq.gettime() - clockTimer > 1000 then
 		local advActive = checkAdv() ~= 'No Adventure Started'
 		local expActive = checkExp() ~= 'No Expedition Started'
 		if advActive or expActive then
 			guiOpen = true
 			-- if ingame window is open and we didn't set the flag close it on all characters. we most likely zoned or just accepted the quest.
+
 			if not eqWinAdvOpen and AdvWIN.Open() and advActive then
-				if doDelay and delayTime ~= nil then mq.delay(delayTime) end
-				if mode == 'Solo' then
-					AdvWIN.DoClose()
-				else
-					mq.cmdf('/noparse %s/lua parse mq.TLO.Window("AdventureRequestWnd").DoClose()', groupCmd)
+				if doDelay and delayTime ~= nil then
+					if curTime - delTimerAdv >= delayTime then
+						if mode == 'Solo' then
+							AdvWIN.DoClose()
+						else
+							mq.cmdf('/noparse %s/lua parse mq.TLO.Window("AdventureRequestWnd").DoClose()', groupCmd)
+						end
+						delTimerAdv = os.clock()
+					end
 				end
 			end
 			if not eqWinExpOpen and ExpWIN.Open() and expActive then
-				if doDelay and delayTime ~= nil then mq.delay(delayTime) end
-				if mode == 'Solo' then
-					ExpWIN.DoClose()
-				else
-					mq.cmdf('/noparse %s/lua parse mq.TLO.Window("DynamicZoneWnd").DoClose()', groupCmd)
+				if doDelay and delayTime ~= nil then
+					if curTime - delTimerExp >= delayTime then
+						if mode == 'Solo' then
+							ExpWIN.DoClose()
+						else
+							mq.cmdf('/noparse %s/lua parse mq.TLO.Window("DynamicZoneWnd").DoClose()', groupCmd)
+						end
+						delTimerExp = os.clock()
+					end
 				end
 			end
 		else

@@ -475,7 +475,7 @@ local function BuildEvents()
         local eventOptions = { keepLinks = channelData.enableLinks, }
         for eventId, eventDetails in pairs(channelData.Events) do
             if eventDetails.enabled then
-                if eventDetails.eventString then
+                if eventDetails.eventString ~= 'new' then
                     local eventName = string.format("event_%s_%d", channelID, eventId)
                     if channelID ~= 9000 then
                         mq.event(eventName, eventDetails.eventString, function(line) Module.EventChat(channelID, eventName, line, false) end, eventOptions)
@@ -2287,7 +2287,7 @@ function Module.MainLoop()
         if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
 
-    local lastTime = os.clock()
+    local lastTime = os.time()
 
     if resetConsoles then
         ResetConsoles()
@@ -2299,9 +2299,9 @@ function Module.MainLoop()
         Module.SortChannels()
         resetEvnts = false
     end
-    if os.clock() - lastTime > 5 then
+    if os.time() - lastTime > 5 then
         Module.SortChannels()
-        lastTime = os.clock()
+        lastTime = os.time()
     end
     mq.doevents()
 end

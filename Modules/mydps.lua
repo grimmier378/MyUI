@@ -27,7 +27,7 @@ local tableSize = 0
 local sequenceCounter, battleCounter = 0, 0
 local dpsStartTime = os.time()
 local previewBG = false
-local dmgTotal, dmgCounter, dsCounter, dmgTotalDS, dmgTotalBattle, dmgBattCounter, critHealsTotal, critTotalBattle = 0, 0, 0, 0, 0, 0, 0, 0
+local dmgTotal, dmgCounter, dsCounter, dmgTotalDS, dmgTotalBattle, dmgBattCounter, critHealsTotal, critTotalBattle, dotTotalBattle = 0, 0, 0, 0, 0, 0, 0, 0, 0
 local workingTable, battlesHistory, actorsTable, actorsWorking = {}, {}, {}, {}
 local enteredCombat = false
 local battleStartTime, leftCombatTime = 0, 0
@@ -78,6 +78,7 @@ local defaults = {
 		["hit-by-non-melee"] = { 1, 1, 0, 1, },
 		["dShield"] = { 0, 1, 0, 1, },
 		['critHeals'] = { 0, 1, 1, 1, },
+		['dot'] = { 1, 1, 0, 1, },
 	},
 }
 
@@ -111,6 +112,18 @@ local function loadSettings()
 	end
 
 	loadThemeTable()
+
+	for k, v in pairs(defaults.Options) do
+		if settings.Options[k] == nil then
+			settings.Options[k] = v
+		end
+	end
+
+	for k, v in pairs(defaults.MeleeColors) do
+		if settings.MeleeColors[k] == nil then
+			settings.MeleeColors[k] = v
+		end
+	end
 
 	local newSetting = false
 
@@ -179,6 +192,7 @@ local function parseCurrentBattle(dur)
 				v.dmg       = dmgTotalBattle
 				v.crit      = critTotalBattle
 				v.critHeals = critHealsTotal
+				v.dot       = dotTotalBattle
 				v.avg       = avgDmg
 				exists      = true
 				break
@@ -194,6 +208,7 @@ local function parseCurrentBattle(dur)
 					avg = avgDmg,
 					crit = critTotalBattle,
 					critHeals = critHealsTotal,
+					dot = dotTotalBattle,
 				})
 		end
 		battlesHistory = sortTable(battlesHistory, 'history')
@@ -209,6 +224,7 @@ local function parseCurrentBattle(dur)
 				Remove = false,
 				Crit = critTotalBattle,
 				CritHeals = critHealsTotal,
+				Dots = dotTotalBattle,
 			}
 			ActorDPS:send({ mailbox = 'my_dps', script = 'mydps', }, (msgSend))
 			ActorDPS:send({ mailbox = 'my_dps', script = 'myui', }, (msgSend))
@@ -222,6 +238,7 @@ local function parseCurrentBattle(dur)
 					v.dmg       = dmgTotalBattle
 					v.crit      = critTotalBattle
 					v.critHeals = critHealsTotal
+					v.dot       = dotTotalBattle
 					v.avg       = avgDmg
 					found       = true
 					break
@@ -236,6 +253,7 @@ local function parseCurrentBattle(dur)
 					dmg       = dmgTotalBattle,
 					crit      = critTotalBattle,
 					critHeals = critHealsTotal,
+					dot       = dotTotalBattle,
 					avg       = avgDmg,
 				})
 			end
@@ -258,6 +276,7 @@ local function npcMeleeCallBack(line, dType, target, dmg)
 		enteredCombat   = true
 		dmgBattCounter  = 0
 		dmgTotalBattle  = 0
+		dotTotalBattle  = 0
 		critTotalBattle = 0
 		critHealsTotal  = 0
 		battleStartTime = os.time()
@@ -285,22 +304,23 @@ local function nonMeleeClallBack(line, target, dmg)
 		dmgBattCounter  = 0
 		critHealsTotal  = 0
 		critTotalBattle = 0
+		dotTotalBattle  = 0
 		dmgTotalBattle  = 0
 		battleStartTime = os.time()
 		leftCombatTime  = 0
 	end
-	local type = "non-melee"
+	local dmgType = "non-melee"
 	if target == nil then
-		target = 'YOU'
-		type   = "hit-by-non-melee"
+		target  = 'YOU'
+		dmgType = "hit-by-non-melee"
 	end
 
 	if string.find(line, "was hit") then
-		target = string.sub(line, 1, string.find(line, "was") - 2)
-		type   = "dShield"
+		target  = string.sub(line, 1, string.find(line, "was") - 2)
+		dmgType = "dShield"
 	end
 
-	if type ~= 'dShield' then
+	if dmgType ~= 'dShield' then
 		dmgTotal = dmgTotal + (tonumber(dmg) or 0)
 		dmgCounter = dmgCounter + 1
 		if enteredCombat then
@@ -316,7 +336,7 @@ local function nonMeleeClallBack(line, target, dmg)
 		end
 	end
 
-	if not settings.Options.showDS and type == 'dShield' then
+	if not settings.Options.showDS and dmgType == 'dShield' then
 		parseCurrentBattle(os.time() - battleStartTime)
 		return
 	end
@@ -324,7 +344,7 @@ local function nonMeleeClallBack(line, target, dmg)
 	if damTable == nil then damTable = {} end
 	sequenceCounter = sequenceCounter + 1
 	table.insert(damTable, {
-		type      = type,
+		type      = dmgType,
 		target    = target,
 		damage    = dmg,
 		timestamp = os.time(),
@@ -334,22 +354,61 @@ local function nonMeleeClallBack(line, target, dmg)
 	parseCurrentBattle(os.time() - battleStartTime)
 end
 
+local function dotCallBack(line, target, dmg, spell_name)
+	if target == nil then
+		return
+	end
+	if not tonumber(dmg) then return end
+	if not enteredCombat then
+		enteredCombat   = true
+		dmgBattCounter  = 0
+		critHealsTotal  = 0
+		critTotalBattle = 0
+		dotTotalBattle  = 0
+		dmgTotalBattle  = 0
+		battleStartTime = os.time()
+		leftCombatTime  = 0
+	end
+	local dmgType = "dot"
+
+	dmgTotalDS = dmgTotalDS + (tonumber(dmg) or 0)
+	dsCounter = dsCounter + 1
+	if enteredCombat then
+		dmgTotalBattle = dmgTotalBattle + (tonumber(dmg) or 0)
+		dotTotalBattle = dotTotalBattle + (tonumber(dmg) or 0)
+		dmgBattCounter = dmgBattCounter + 1
+	end
+
+	if damTable == nil then damTable = {} end
+	sequenceCounter = sequenceCounter + 1
+	table.insert(damTable, {
+		type      = dmgType,
+		target    = target,
+		damage    = string.format("DOT [%s] <%d>", spell_name, dmg),
+		timestamp = os.time(),
+		sequence  = sequenceCounter,
+	})
+	tableSize = tableSize + 1
+	parseCurrentBattle(os.time() - battleStartTime)
+end
+
 local function meleeCallBack(line, dType, target, dmg)
 	if string.find(line, "have been healed") then return end
-	local type = dType or nil
-	if type == nil then return end
+	local dmgType = dType or nil
+	if dmgType == nil then return end
 	if not enteredCombat then
 		enteredCombat   = true
 		dmgBattCounter  = 0
 		dmgTotalBattle  = 0
 		critTotalBattle = 0
+		dotTotalBattle  = 0
 		critHealsTotal  = 0
 		battleStartTime = os.time()
 		leftCombatTime  = 0
 	end
 	if dmg == nil then
 		dmg = 'MISSED'
-		type = 'miss'
+		dmgType = 'miss'
 	end
 
 	dmgTotal = dmgTotal + (tonumber(dmg) or 0)
@@ -359,17 +418,17 @@ local function meleeCallBack(line, dType, target, dmg)
 		dmgBattCounter = dmgBattCounter + 1
 	end
 
-	if not settings.Options.showMyMisses and type == 'miss' then
+	if not settings.Options.showMyMisses and dmgType == 'miss' then
 		parseCurrentBattle(os.time() - battleStartTime)
 		return
 	end
 
-	if type == 'miss' then target = 'YOU' end
+	if dmgType == 'miss' then target = 'YOU' end
 	if damTable == nil then damTable = {} end
 
 	sequenceCounter = sequenceCounter + 1
 	table.insert(damTable, {
-		type      = type,
+		type      = dmgType,
 		target    = target,
 		damage    = dmg,
 		timestamp = os.time(),
@@ -386,6 +445,7 @@ local function critCallBack(line, dmg)
 		dmgBattCounter  = 0
 		dmgTotalBattle  = 0
 		critTotalBattle = 0
+		dotTotalBattle  = 0
 		critHealsTotal  = 0
 		battleStartTime = os.time()
 		leftCombatTime  = 0
@@ -530,7 +590,7 @@ local function DrawHistory(tbl)
 	end
 	ImGui.SetWindowFontScale(tempSettings.fontScale)
 	if #tbl > 0 then
-		if ImGui.BeginTable("Battles", 8, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.Resizable,
+		if ImGui.BeginTable("Battles", 9, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.Resizable,
 				ImGuiTableFlags.Reorderable, ImGuiTableFlags.Hideable, ImGuiTableFlags.ScrollY)) then
 			ImGui.TableSetupScrollFreeze(0, 1)
 			ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.None)
@@ -539,6 +599,7 @@ local function DrawHistory(tbl)
 			ImGui.TableSetupColumn("Dur", ImGuiTableColumnFlags.None)
 			ImGui.TableSetupColumn("Avg.", ImGuiTableColumnFlags.None)
 			ImGui.TableSetupColumn("Crit Dmg", ImGuiTableColumnFlags.None)
+			ImGui.TableSetupColumn("Dots", ImGuiTableColumnFlags.None)
 			ImGui.TableSetupColumn("Crit Heals", ImGuiTableColumnFlags.None)
 			ImGui.TableSetupColumn("Total", ImGuiTableColumnFlags.None)
 			ImGui.TableSetupScrollFreeze(0, 1)
@@ -564,6 +625,8 @@ local function DrawHistory(tbl)
 				ImGui.Text(cleanNumber(data.avg, 1, true))
 				ImGui.TableNextColumn()
 				ImGui.Text(cleanNumber(data.crit, 2))
+				ImGui.TableNextColumn()
+				ImGui.Text(cleanNumber(data.dot, 2))
 				ImGui.TableNextColumn()
 				ImGui.Text(cleanNumber(data.critHeals, 1))
 				ImGui.TableNextColumn()
@@ -1003,7 +1066,16 @@ local function pDPS(dur, rType)
 		local dps     = dur > 0 and (dmgTotalBattle / dur) or 0
 		local avgDmg  = dmgBattCounter > 0 and (dmgTotalBattle / dmgBattCounter) or 0
 		battleCounter = battleCounter + 1
-		table.insert(battlesHistory, { sequence = battleCounter, dps = dps, dur = dur, dmg = dmgTotalBattle, avg = avgDmg, crit = critTotalBattle, critHeals = critHealsTotal, })
+		table.insert(battlesHistory, {
+			sequence = battleCounter,
+			dps = dps,
+			dur = dur,
+			dmg = dmgTotalBattle,
+			avg = avgDmg,
+			crit = critTotalBattle,
+			critHeals = critHealsTotal,
+			dot = dotTotalBattle,
+		})
 		if settings.Options.dpsBattleReport then
 			local msg = string.format(
 				"\aw[\at%s\ax] \ayChar:\ax\ao %s\ax, \ayDPS \ax(\aoBATTLE\ax): \at%s\ax, \ayTimeSpan:\ax\ao %.0f sec\ax, \ayTotal Damage: \ax\ao%s\ax, \ayAvg. Damage: \ax\ao%s\ax",
@@ -1024,6 +1096,7 @@ local function pDPS(dur, rType)
 					Remove = false,
 					Crit = critTotalBattle,
 					CritHeals = critHealsTotal,
+					Dot = dotTotalBattle,
 					Report = msg,
 				}
 				ActorDPS:send({ mailbox = 'my_dps', script = 'mydps', }, (msgSend))
@@ -1037,6 +1110,7 @@ local function pDPS(dur, rType)
 						v.dmg       = dmgTotalBattle
 						v.crit      = critTotalBattle
 						v.critHeals = critHealsTotal
+						v.dot       = dotTotalBattle
 						v.avg       = avgDmg
 						break
 					end
@@ -1044,6 +1118,7 @@ local function pDPS(dur, rType)
 			end
 		end
 		dmgTotalBattle = 0
+		dotTotalBattle = 0
 		battlesHistory = sortTable(battlesHistory, 'history')
 	end
 end
@@ -1278,10 +1353,21 @@ local function RegisterActor()
 		local battleNum    = MemberEntry.BattleNum or 0
 		local critDmg      = MemberEntry.Crit or 0
 		local critHealsAmt = MemberEntry.CritHeals or 0
+		local dotDmg       = MemberEntry.Dot or 0
 		local report       = MemberEntry.Report or ''
 		if who == MyUI_CharLoaded then return end
 		if #actorsTable == 0 then
-			table.insert(actorsTable, { name = who, dps = dps, avg = avgDmg, dmg = totalDmg, dur = timeSpan, sequence = battleNum, crit = critDmg, critHeals = critHealsAmt, })
+			table.insert(actorsTable, {
+				name = who,
+				dps = dps,
+				avg = avgDmg,
+				dmg = totalDmg,
+				dot = dotDmg,
+				dur = timeSpan,
+				sequence = battleNum,
+				crit = critDmg,
+				critHeals = critHealsAmt,
+			})
 		else
 			local found = false
 			for i = 1, #actorsTable do
@@ -1295,6 +1381,7 @@ local function RegisterActor()
 						actorsTable[i].dmg       = totalDmg
 						actorsTable[i].dur       = timeSpan
 						actorsTable[i].crit      = critDmg
+						actorsTable[i].dot       = dotDmg
 						actorsTable[i].critHeals = critHealsAmt
 						actorsTable[i].sequence  = battleNum
 					end
@@ -1303,7 +1390,17 @@ local function RegisterActor()
 				end
 			end
 			if not found then
-				table.insert(actorsTable, { name = who, dps = dps, avg = avgDmg, dmg = totalDmg, dur = timeSpan, sequence = battleNum, crit = critDmg, critHeals = critHealsAmt, })
+				table.insert(actorsTable, {
+					name = who,
+					dps = dps,
+					avg = avgDmg,
+					dmg = totalDmg,
+					dot = dotDmg,
+					dur = timeSpan,
+					sequence = battleNum,
+					crit = critDmg,
+					critHeals = critHealsAmt,
+				})
 			end
 		end
 		if report ~= '' and who ~= MyUI_CharLoaded then
@@ -1355,6 +1452,8 @@ local function Init()
 	mq.event("melee_deadly_strike", str, critCallBack)
 	str = string.format("#*#%s hit #1# for #2# points of non-melee damage#*#", MyUI_CharLoaded)
 	mq.event("melee_non_melee", str, nonMeleeClallBack)
+
+	mq.event('melee_damage_dot', '#1# has taken #2# damage from your #3#', dotCallBack)
 	mq.event("melee_damage_shield", "#*# was hit by non-melee for #2# points of damage#*#", nonMeleeClallBack)
 	mq.event("melee_you_hit_non-melee", "#*#You were hit by non-melee for #2# damage#*#", nonMeleeClallBack)
 	mq.event("melee_do_damage", "#*#You #1# #2# for #3# points of damage#*#", meleeCallBack)
@@ -1363,7 +1462,8 @@ local function Init()
 	mq.event("melee_missed_me", "#2# tries to #1# YOU, but misses#*#", npcMeleeCallBack)
 	mq.event("melee_crit_heal", "#*#You perform an exceptional heal! #*#(#1#)", critHealCallBack)
 	mq.bind("/mydps", processCommand)
-
+	-- #*# has taken #1# damage from #*# by #*# -- dot dmg others
+	-- #*# has taken #1# damage from your #*# -- dot dmg you
 	-- Register Actor Mailbox
 	if settings.Options.announceActors then RegisterActor() end
 

@@ -312,8 +312,8 @@ end
 
 local clockTimer = mq.gettime()
 local refreshTimer = 0
-local delTimerAdv = os.clock()
-local delTimerExp = os.clock()
+local delTimerAdv = os.time()
+local delTimerExp = os.time()
 function Module.MainLoop()
 	if loadedExeternally then
 		---@diagnostic disable-next-line: undefined-global
@@ -336,7 +336,7 @@ function Module.MainLoop()
 		lastZone = currZone
 		clockTimer = mq.gettime()
 	end
-	local curTime = os.clock()
+	local curTime = os.time()
 	if mq.gettime() - clockTimer > 1000 then
 		local advActive = checkAdv() ~= 'No Adventure Started'
 		local expActive = checkExp() ~= 'No Expedition Started'
@@ -352,7 +352,7 @@ function Module.MainLoop()
 						else
 							mq.cmdf('/noparse %s/lua parse mq.TLO.Window("AdventureRequestWnd").DoClose()', groupCmd)
 						end
-						delTimerAdv = os.clock()
+						delTimerAdv = os.time()
 					end
 				end
 			end
@@ -364,7 +364,7 @@ function Module.MainLoop()
 						else
 							mq.cmdf('/noparse %s/lua parse mq.TLO.Window("DynamicZoneWnd").DoClose()', groupCmd)
 						end
-						delTimerExp = os.clock()
+						delTimerExp = os.time()
 					end
 				end
 			end

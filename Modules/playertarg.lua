@@ -174,7 +174,7 @@ end
 
 local function pulseGeneric(speed, alpha, rising, lastTime, frameTime, maxAlpha, minAlpha)
     if speed == 0 then return alpha, rising, lastTime end
-    local currentTime = os.clock()
+    local currentTime = os.time()
     if currentTime - lastTime < frameTime then
         return alpha, rising, lastTime -- exit if not enough time has passed
     end
@@ -192,7 +192,7 @@ local function pulseGeneric(speed, alpha, rising, lastTime, frameTime, maxAlpha,
     return alpha, rising, lastTime
 end
 
-local lastTime, lastTimeCombat = os.clock(), os.clock()
+local lastTime, lastTimeCombat = os.time(), os.time()
 local frameTime, frameTimeCombat = 1 / 60, 1 / 120
 
 local function pulseIcon(speed)

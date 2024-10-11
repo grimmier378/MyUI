@@ -29,6 +29,7 @@ function Module.unload(module_name)
 		MyUI_MyChatHandler = nil
 		MyUI_Utils.PrintOutput(nil, nil, "\ayMyChat\ao Unloaded\at Defaulting Output to \ayMain Console")
 	end
+
 	MyUI_Modules[module_name] = nil
 end
 

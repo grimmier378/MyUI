@@ -105,7 +105,7 @@ local mouseOverTransparency                                      = 1.0
 local doMouseOver                                                = true
 
 -- File Paths
-local themeFile                                                  = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
+local themeFile                                                  = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
 local configFileOld                                              = string.format('%s/MyUI/%s/%s_Configs.lua', mq.configDir, Module.Name, Module.Name)
 local configFile                                                 = string.format('%s/MyUI/%s/%s_Configs.lua', mq.configDir, Module.Name, Module.Name)
 local pathsFile                                                  = string.format('%s/MyUI/%s/%s_Paths.lua', mq.configDir, Module.Name, Module.Name)
@@ -305,15 +305,11 @@ local function loadSettings()
 
     -- Check Settings
     if not MyUI_Utils.File.Exists(configFile) then
-        if MyUI_Utils.File.Exists(configFileOld) then
-            settings = dofile(configFileOld)
-            mq.pickle(configFile, settings)
-        else
-            -- Create the settings file from the defaults
-            settings[Module.Name] = defaults
-            mq.pickle(configFile, settings)
-            loadSettings()
-        end
+        -- Create the settings file from the defaults
+        settings[Module.Name] = defaults
+        settings[Module.Name].Interrupts = InterruptSet
+        mq.pickle(configFile, settings)
+        loadSettings()
     else
         -- Load settings from the Lua config file
         settings = dofile(configFile)
@@ -2441,7 +2437,7 @@ local function displayHelp()
     MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agOptions: \ayhelp \aw= \atPrints out this help list.", Module.Name)
     MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agArguments: \ayloop \aw= \atLoops the path, \ayrloop \aw= \atLoop in reverse.", Module.Name)
     MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agArguments: \ayclosest \aw= \atstart at closest wp, \ayrclosest \aw= \atstart at closest wp and go in reverse.", Module
-    .Name)
+        .Name)
     MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agArguments: \aystart \aw= \atstarts the path normally, \ayreverse \aw= \atrun the path backwards.", Module.Name)
     MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agArguments: \aypingpong \aw= \atstart in ping pong mode.", Module.Name)
     MyUI_Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agExample: \ay/mypaths \aogo \ayloop \am\"Loop A\"", Module.Name)

@@ -18,7 +18,7 @@ end
 local LoadTheme = MyUI_ThemeLoader
 local ActorDPS = nil
 local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, Module.Name, MyUI_Server, MyUI_CharLoaded)
-local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
+local themeFile = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
 local damTable, settings, theme = {}, {}, {}
 local winFlags = bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoTitleBar)
 local started = false

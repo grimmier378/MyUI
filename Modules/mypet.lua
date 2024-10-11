@@ -44,7 +44,7 @@ local autoHide = false
 local showTitleBar = true
 
 -- File Paths
-local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
+local themeFile = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
 local configFileOld = string.format('%s/MyUI/%s/%s_Configs.lua', mq.configDir, script, script)
 local configFile = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, script, MyUI_Server, MyUI_CharLoaded)
 local themezDir = mq.luaDir .. '/themez/init.lua'

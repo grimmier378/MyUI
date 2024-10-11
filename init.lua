@@ -27,11 +27,14 @@ MyUI_Guild           = mq.TLO.Me.Guild()
 local MyActor        = MyUI_Actor.register('myui', function(message) end)
 local mods           = {}
 local Minimized      = false
+
 MyUI_InitPctComplete = 0
+MyUI_NumModsEnabled  = 0
 MyUI_CurLoading      = 'Loading Modules...'
 MyUI_Modules         = {}
 MyUI_Mode            = 'driver'
-MyUI_SettingsFile    = mq.configDir .. '/MyUI/' .. MyUI_Server:gsub(" ", "_") .. '/' .. MyUI_CharLoaded .. '.lua'
+MyUI_ConfPath        = mq.configDir .. '/MyUI/' .. MyUI_Server:gsub(" ", "_") .. '/'
+MyUI_SettingsFile    = MyUI_ConfPath .. MyUI_CharLoaded .. '.lua'
 MyUI_MyChatLoaded    = false
 MyUI_MyChatHandler   = nil
 
@@ -77,7 +80,7 @@ MyUI_DefaultConfig   = {
 MyUI_Settings        = {}
 MyUI_TempSettings    = {}
 MyUI_Theme           = {}
-MyUI_ThemeFile       = string.format('%s/MyThemeZ.lua', mq.configDir)
+MyUI_ThemeFile       = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
 MyUI_ThemeName       = 'Default'
 
 local MyUI_IsRunning = false
@@ -87,6 +90,7 @@ local function LoadTheme()
 		MyUI_Theme = dofile(MyUI_ThemeFile)
 	else
 		MyUI_Theme = require('defaults.themes')
+		mq.pickle(MyUI_ThemeFile, MyUI_Theme)
 	end
 end
 
@@ -95,6 +99,8 @@ local function LoadSettings()
 		MyUI_Settings = dofile(MyUI_SettingsFile)
 	else
 		MyUI_Settings = MyUI_DefaultConfig
+		mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+		LoadSettings()
 	end
 
 	local newSetting = MyUI_Utils.CheckDefaultSettings(MyUI_DefaultConfig, MyUI_Settings)
@@ -260,7 +266,7 @@ local function DrawContextMenu()
 end
 
 local function MyUI_Render()
-	if MyUI_InitPctComplete < 100 then
+	if MyUI_InitPctComplete < 100 and MyUI_NumModsEnabled > 0 then
 		RenderLoader()
 	else
 		if MyUI_Settings.ShowMain then
@@ -463,6 +469,7 @@ local function StartUp()
 	for _, data in ipairs(MyUI_Settings.mods_list) do
 		if data.enabled then
 			table.insert(mods, data.name)
+			MyUI_NumModsEnabled = MyUI_NumModsEnabled + 1
 		end
 	end
 

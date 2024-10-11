@@ -29,7 +29,8 @@ local Scale = 1
 local serverName = MyUI_Server
 serverName = serverName:gsub(" ", "_")
 local configFileold2 = string.format("%s/MyUI/MyGroup/%s_%s_Config.lua", mq.configDir, serverName, MyUI_CharLoaded)
-local themeFile = mq.configDir .. '/MyThemeZ.lua'
+local themeFile = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
+
 local configFileOld = mq.configDir .. '/MyUI_Configs.lua'
 local configFile = string.format("%s/MyUI/MyGroup/%s/%s.lua", mq.configDir, serverName, MyUI_CharLoaded)
 local ColorCount, ColorCountConf, StyleCount, StyleCountConf = 0, 0, 0, 0
@@ -105,31 +106,17 @@ local function loadSettings()
     local newSetting = false
     if not MyUI_Utils.File.Exists(configFile) then
         --check for old file and convert to new format
-        if MyUI_Utils.File.Exists(configFileold2) then
-            settings = dofile(configFileold2)
-            writeSettings(configFile, settings)
-        else
-            if MyUI_Utils.File.Exists(configFileOld) then
-                settings = dofile(configFileOld)
-                writeSettings(configFile, settings)
-            else
-                settings = defaults
-                writeSettings(configFile, settings)
-            end
-        end
+        settings = defaults
+        writeSettings(configFile, settings)
+        loadSettings()
     else
         -- Load settings from the Lua config file
         settings = dofile(configFile)
-        if settings[Module.Name] == nil then
-            settings[Module.Name] = {}
-            settings[Module.Name] = defaults
-            newSetting = true
-        end
     end
 
     loadTheme()
 
-    newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings[Module.Name])
+    newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings)
     newSetting = MyUI_Utils.CheckRemovedSettings(defaults, settings) or newSetting
 
     showSelf = settings[Module.Name].ShowSelf
@@ -151,6 +138,7 @@ end
 local function DrawTheme(tName)
     local StyleCounter = 0
     local ColorCounter = 0
+    if tName == 'Default' then return ColorCounter, StyleCounter end
     for tID, tData in pairs(theme.Theme) do
         if tData.Name == tName then
             for pID, cData in pairs(theme.Theme[tID].Color) do

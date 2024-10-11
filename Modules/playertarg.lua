@@ -29,7 +29,7 @@ local iconSize, progressSize = 26, 10
 local flashAlpha, FontScale, cAlpha = 1, 1, 255
 local ShowGUI, locked, flashBorder, rise, cRise = true, false, true, true, false
 local openConfigGUI, openGUI = false, true
-local themeFile = mq.configDir .. '/MyThemeZ.lua'
+local themeFile = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
 local configFileOld = mq.configDir .. '/MyUI_Configs.lua'
 local configFile = string.format('%s/MyUI/PlayerTarg/%s/%s.lua', mq.configDir, MyUI_Server, MyUI_CharLoaded)
 local ColorCount, ColorCountConf, StyleCount, StyleCountConf = 0, 0, 0, 0

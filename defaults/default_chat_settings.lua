@@ -8,6 +8,7 @@ return {
 			['PopOut'] = false,
 			['locked'] = false,
 			['Scale'] = 1,
+			['MainFontSize'] = 16,
 			['TabOrder'] = 5,
 			['Events'] = {
 				[1] = {

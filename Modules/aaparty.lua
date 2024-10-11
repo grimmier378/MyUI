@@ -18,7 +18,7 @@ end
 
 local themeID                                                           = 1
 local expand, compact                                                   = {}, {}
-local themeFile                                                         = string.format('%s/MyThemeZ.lua', mq.configDir)
+local themeFile                                                         = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
 local configFile                                                        = mq.configDir .. '/myui/AA_Party_Configs.lua'
 local themezDir                                                         = mq.luaDir .. '/themez/init.lua'
 local script                                                            = 'AA Party'

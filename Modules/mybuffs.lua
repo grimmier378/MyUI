@@ -1,30 +1,39 @@
 -- Imports
-local mq                                                                                                        = require('mq')
-local ImGui                                                                                                     = require('ImGui')
+local mq                = require('mq')
+local ImGui             = require('ImGui')
 
-local Module                                                                                                    = {}
-Module.ActorMailBox                                                                                             = 'my_buffs'
-Module.Path                                                                                                     = MyUI_Path ~= nil and MyUI_Path or
-    string.format("%s/%s/", mq.luaDir, Module.Mane)
-local themeFile                                                                                                 = mq.configDir .. '/MyThemeZ.lua'
-local configFileOld                                                                                             = mq.configDir .. '/MyUI_Configs.lua'
+local Module            = {}
+Module.ActorMailBox     = 'my_buffs'
+Module.Path             = MyUI_Path ~= nil and MyUI_Path or string.format("%s/%s/", mq.luaDir, Module.Mane)
+local themeFile         = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
+local configFileOld     = mq.configDir .. '/MyUI_Configs.lua'
 
 -- Tables
-Module.boxes                                                                                                    = {}
-Module.settings                                                                                                 = {}
-Module.timerColor                                                                                               = {}
-Module.theme                                                                                                    = {}
-Module.buffTable                                                                                                = {}
-Module.songTable                                                                                                = {}
-Module.Name                                                                                                     = "MyBuffs"
-Module.IsRunning                                                                                                = false
+Module.boxes            = {}
+Module.settings         = {}
+Module.timerColor       = {}
+Module.theme            = {}
+Module.buffTable        = {}
+Module.songTable        = {}
+Module.Name             = "MyBuffs"
+Module.IsRunning        = false
 
-Module.ShowGUI, Module.SplitWin, Module.ShowConfig, Module.MailBoxShow, Module.ShowDebuffs, Module.showTitleBar = true, false, false, false, false, true
-Module.locked, Module.ShowIcons, Module.ShowTimer, Module.ShowText, Module.ShowScroll, Module.DoPulse           = false, true, true, true, true, true
-Module.iconSize                                                                                                 = 24
+Module.ShowGUI,
+Module.SplitWin,
+Module.ShowConfig,
+Module.MailBoxShow,
+Module.ShowDebuffs,
+Module.showTitleBar     = true, false, false, false, false, true
+Module.locked,
+Module.ShowIcons,
+Module.ShowTimer,
+Module.ShowText,
+Module.ShowScroll,
+Module.DoPulse          = false, true, true, true, true, true
+Module.iconSize         = 24
 
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally                                                                                         = MyUI_ScriptName ~= nil and true or false
+local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 if not loadedExeternally then
     MyUI_Utils = require('lib.common')
     MyUI_Actor = require('actors')

@@ -79,7 +79,7 @@ local zSettings = false
 local theme = require('defaults.themes')
 local useThemeName = 'Default'
 local openConfigGUI = false
-local themeFile = mq.configDir .. '/MyThemeZ.lua'
+local themeFile = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
 local ZoomLvl = 1.0
 local doOnce = true
 local ColorCountAlert, ColorCountConf, StyleCountConf, StyleCountAlert = 0, 0, 0, 0

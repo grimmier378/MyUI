@@ -24,7 +24,8 @@ end
 local LoadTheme = MyUI_ThemeLoader
 local themeID = 1
 local themeFileOld = string.format('%s/MyThemeZ.lua', mq.configDir)
-local themeFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
+local themeFile = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
+
 local gIcon = MyUI_Icons.MD_SETTINGS
 local hasDialog = false
 local Dialog = require('defaults.npc_dialog')

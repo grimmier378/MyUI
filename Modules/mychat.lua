@@ -99,7 +99,7 @@ local Module                                     = {
     mainEcho = '/say',
     doRefresh = false,
     SettingsFile = string.format('%s/MyUI/MyChat/%s/%s.lua', mq.configDir, serverName, MyUI_CharLoaded),
-    ThemesFile = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile,
+    ThemesFile = string.format('%s/MyThemeZ.lua', mq.configDir, serverName, MyUI_CharLoaded),
     KeyFocus = false,
     KeyName = 'RightShift',
     Settings = {
@@ -189,7 +189,6 @@ local function SetUpConsoles(channelID)
         Module.Consoles[channelID].txtAutoScroll = true
         -- ChatWin.Consoles[channelID].enableLinks = ChatWin.Settings[channelID].enableLinks
         Module.Consoles[channelID].console = ImGui.ConsoleWidget.new(channelID .. "##Console")
-        Module.Consoles[channelID].console.fontSize = Module.Settings.Channels[channelID].Scale or 16
     end
 end
 
@@ -379,11 +378,9 @@ local function loadSettings()
             Module.Settings.Channels[channelID].locked = false
         end
 
-        if Module.Settings.Channels[channelID].locked == nil then
-            Module.Settings.Channels[channelID].locked = false
+        if Module.Settings.Scale == nil then
+            Module.Settings.Scale = 1.0
         end
-
-
 
         if Module.Settings.Channels[channelID].TabOrder == nil then
             Module.Settings.Channels[channelID].TabOrder = i
@@ -402,9 +399,7 @@ local function loadSettings()
 
         SetUpConsoles(channelID)
         if not Module.Settings.Channels[channelID]['Scale'] then
-            Module.Settings.Channels[channelID]['Scale'] = 16
-        elseif Module.Settings.Channels[channelID]['Scale'] < 8 then
-            Module.Settings.Channels[channelID]['Scale'] = 16
+            Module.Settings.Channels[channelID]['Scale'] = 1.0
         end
 
         for eID, eData in pairs(channelData['Events']) do
@@ -442,14 +437,6 @@ local function loadSettings()
         i = i + 1
     end
 
-    if Module.Settings.Scale == nil then
-        Module.Settings.Scale = 1.0
-    end
-
-    if Module.Settings.Scale ~= nil then
-        Module.Settings.Scale = 1.0
-    end
-
     useThemeName = Module.Settings.LoadTheme
     if not MyUI_Utils.File.Exists(Module.ThemesFile) then
         local defaultThemes = MyUI_Utils.Library.Include('defaults.themes')
@@ -473,11 +460,6 @@ local function loadSettings()
     if Module.Settings.mainEcho == nil then
         Module.Settings.mainEcho = '/say'
     end
-
-    if Module.Settings.MainFontSize == nil then
-        Module.Settings.MainFontSize = 16
-    end
-
     eChan = Module.Settings.mainEcho
     Module.Settings.doLinks = true
     forceIndex = false
@@ -1232,18 +1214,80 @@ local function DrawChatWindow()
 
                 ImGui.EndPopup()
             end
+            if not zoomMain then
+                Module.console:Render(ImVec2(0, contentSizeY))
+                --Command Line
+                ImGui.Separator()
+                local textFlags = bit32.bor(0,
+                    ImGuiInputTextFlags.EnterReturnsTrue
+                -- not implemented yet
+                -- ImGuiInputTextFlags.CallbackCompletion,
+                -- ImGuiInputTextFlags.CallbackHistory
+                )
+            else
+                footerHeight = 35
+                contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
+                contentSizeY = contentSizeY - footerHeight
 
-            Module.console:Render(ImVec2(0, contentSizeY))
-            Module.console.fontSize = Module.Settings.MainFontSize or 16
-            --Command Line
-            ImGui.Separator()
+                if ImGui.BeginChild("ZoomScrollRegion##" .. windowNum, contentSizeX, contentSizeY, ImGuiWindowFlags.HorizontalScrollbar) then
+                    if ImGui.BeginTable('##channelID_' .. windowNum, 1, bit32.bor(ImGuiTableFlags.NoBordersInBody, ImGuiTableFlags.RowBg)) then
+                        ImGui.SetWindowFontScale(Module.Settings.Scale)
+                        ImGui.TableSetupColumn("##txt" .. windowNum, ImGuiTableColumnFlags.NoHeaderLabel)
+                        --- draw rows ---
+
+                        ImGui.TableNextRow()
+                        ImGui.TableSetColumnIndex(0)
+                        ImGui.SetWindowFontScale(Module.Settings.Scale)
+
+                        for line, data in pairs(mainBuffer) do
+                            ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(data.color[1], data.color[2], data.color[3], data.color[4]))
+                            if ImGui.Selectable("##selectable" .. line, false, ImGuiSelectableFlags.None) then end
+                            ImGui.SameLine()
+                            ImGui.TextWrapped(data.text)
+                            if ImGui.IsItemHovered() and ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsKeyDown(ImGuiKey.C) then
+                                ImGui.LogToClipboard()
+                                ImGui.LogText(data.text)
+                                ImGui.LogFinish()
+                            end
+                            ImGui.TableNextRow()
+                            ImGui.TableSetColumnIndex(0)
+                            ImGui.PopStyleColor()
+                        end
+
+
+
+                        --Scroll to the bottom if autoScroll is enabled
+                        local autoScroll = AutoScroll
+                        if autoScroll then
+                            ImGui.SetScrollHereY()
+                            mainBottomPosition = ImGui.GetCursorPosY()
+                        end
+
+                        local bottomPosition = mainBottomPosition or 0
+                        -- Detect manual scroll
+                        local lastScrollPos = mainLastScrollPos or 0
+                        local scrollPos = ImGui.GetScrollY()
+
+                        if scrollPos < lastScrollPos then
+                            AutoScroll = false -- Turn off autoscroll if scrolled up manually
+                        elseif scrollPos >= bottomPosition - (30 * Module.Settings.Scale) then
+                            AutoScroll = true
+                        end
+
+                        lastScrollPos = scrollPos
+                        mainLastScrollPos = lastScrollPos
+
+                        ImGui.EndTable()
+                    end
+                end
+                ImGui.EndChild()
+            end
             local textFlags = bit32.bor(0,
                 ImGuiInputTextFlags.EnterReturnsTrue
             -- not implemented yet
             -- ImGuiInputTextFlags.CallbackCompletion,
             -- ImGuiInputTextFlags.CallbackHistory
             )
-
             local contentSizeX, _ = ImGui.GetContentRegionAvail()
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 2)
@@ -1592,14 +1636,8 @@ function Module.AddChannel(editChanID, isNewChannel)
         ImGui.Text('')
     end
     -- Slider for adjusting zoom level
-    if Module.Consoles[editChanID].console ~= nil then
-        local changed = false
-        Module.Consoles[editChanID].console.fontSize, changed = ImGui.SliderInt("Font Size", Module.Consoles[editChanID].console.fontSize, 8, 300)
-        Module.tempSettings.Channels[editChanID].Scale = Module.Consoles[editChanID].console.fontSize
-        Module.Settings.Channels[editChanID].Scale = Module.Consoles[editChanID].console.fontSize
-        if changed then
-            mq.pickle(Module.SettingsFile, Module.Settings)
-        end
+    if Module.tempSettings.Channels[editChanID] then
+        Module.tempSettings.Channels[editChanID].Scale = ImGui.SliderFloat("Zoom Level", Module.tempSettings.Channels[editChanID].Scale, 0.5, 2.0)
     end
     if ImGui.Button('Add New Event') then
         newEvent = true
@@ -1991,12 +2029,7 @@ function Module.Config_GUI(open)
         -- Slider for adjusting zoom level
         local tmpZoom = Module.Settings.Scale
         if Module.Settings.Scale then
-            tmpZoom = ImGui.SliderFloat("Gui Zoom Level##MyBuffs", tmpZoom, 0.5, 2.0)
-        end
-
-        if Module.console ~= nil then
-            Module.console.fontSize = ImGui.SliderInt("Main Tab Font Size", Module.console.fontSize, 8, 300)
-            Module.Settings.MainFontSize = Module.console.fontSize
+            tmpZoom = ImGui.SliderFloat("Zoom Level##MyBuffs", tmpZoom, 0.5, 2.0)
         end
 
         if Module.Settings.Scale ~= tmpZoom then
@@ -2230,7 +2263,6 @@ local function init()
     -- initialize the console
     if Module.console == nil then
         Module.console = ImGui.ConsoleWidget.new("Chat##Console")
-        Module.console.fontSize = Module.Settings.MainFontSize or 16
         mainBuffer = {
             [1] = {
                 color = { [1] = 1, [2] = 1, [3] = 1, [4] = 1, },

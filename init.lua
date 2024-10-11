@@ -472,8 +472,11 @@ local function StartUp()
 			MyUI_NumModsEnabled = MyUI_NumModsEnabled + 1
 		end
 	end
-
-	MyUI_Modules = MyUI_LoadModules.loadAll(mods)
+	if MyUI_NumModsEnabled > 0 then
+		MyUI_Modules = MyUI_LoadModules.loadAll(mods)
+	else
+		MyUI_InitPctComplete = 100
+	end
 
 	InitModules()
 

@@ -7,13 +7,17 @@ local mq = require 'mq'
 function Module.loadAll(module_list)
 	local modules = {}
 	local count = 0
-	for _, module in ipairs(module_list) do
-		local moduleName = mq.luaDir .. "/MyUI/modules/" .. module:lower() .. ".lua"
-		Module.checkExternal(module)
-		modules[module] = dofile(moduleName)
-		count = count + 1
-		MyUI_InitPctComplete = ((count / #module_list) * 100)
-		MyUI_CurLoading = "Loading Module: " .. module .. " .."
+	if #module_list >= 0 then
+		for _, module in ipairs(module_list) do
+			local moduleName = mq.luaDir .. "/MyUI/modules/" .. module:lower() .. ".lua"
+			Module.checkExternal(module)
+			modules[module] = dofile(moduleName)
+			count = count + 1
+			MyUI_InitPctComplete = ((count / #module_list) * 100)
+			MyUI_CurLoading = "Loading Module: " .. module .. " .."
+		end
+	else
+		MyUI_InitPctComplete = 100
 	end
 
 	local newModule = setmetatable(modules, Module)

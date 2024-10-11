@@ -1,6 +1,6 @@
 # MyUI
 
-A MacroQuest LUA Script
+by Grimmier
 
 ## Description
 

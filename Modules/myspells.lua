@@ -24,12 +24,12 @@ Module.Path = MyUI_Path ~= nil and MyUI_Path or string.format("%s/%s/", mq.luaDi
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
 if not loadedExeternally then
-	MyUI_Utils = require('lib.common')
-	MyUI_Icons = require('mq.ICONS')
-	MyUI_CharLoaded = mq.TLO.Me.DisplayName()
-	MyUI_Server = mq.TLO.MacroQuest.Server()
+	MyUI_Utils         = require('lib.common')
+	MyUI_Icons         = require('mq.ICONS')
+	MyUI_CharLoaded    = mq.TLO.Me.DisplayName()
+	MyUI_Server        = mq.TLO.MacroQuest.Server()
 	MyUI_AbilityPicker = require('lib.AbilityPicker')
-	MyUI_ThemeLoader = require('lib.theme_loader')
+	MyUI_ThemeLoader   = require('lib.theme_loader')
 end
 
 local picker = MyUI_AbilityPicker.new()

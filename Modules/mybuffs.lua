@@ -35,12 +35,12 @@ Module.iconSize         = 24
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 if not loadedExeternally then
-    MyUI_Utils = require('lib.common')
-    MyUI_Actor = require('actors')
+    MyUI_Utils      = require('lib.common')
+    MyUI_Actor      = require('actors')
     MyUI_CharLoaded = mq.TLO.Me.DisplayName()
-    MyUI_Mode = 'driver'
-    MyUI_Icons = require('mq.ICONS')
-    MyUI_Server = mq.TLO.EverQuest.Server()
+    MyUI_Mode       = 'driver'
+    MyUI_Icons      = require('mq.ICONS')
+    MyUI_Server     = mq.TLO.EverQuest.Server()
 end
 
 local configFile                       = string.format("%s/MyUI/MyBuffs/%s/%s.lua", mq.configDir,

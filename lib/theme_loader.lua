@@ -37,7 +37,10 @@ end
 function LoadTheme.StartTheme(tName, tTable)
 	local StyleCounter = 0
 	local ColorCounter = 0
-	for tID, tData in pairs(tTable.Theme) do
+	if tTable.Theme == nil then
+		return 0, 0
+	end
+	for tID, tData in pairs(tTable.Theme or {}) do
 		if tData.Name == tName then
 			for pID, cData in pairs(tTable.Theme[tID].Color) do
 				ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))

@@ -13,11 +13,11 @@ Module.Path                                                       = MyUI_Path ~=
 local loadedExeternally                                           = MyUI_ScriptName ~= nil and true or false
 
 if not loadedExeternally then
-	MyUI_Utils = require('lib.common')
-	MyUI_CharLoaded = mq.TLO.Me.DisplayName()
-	MyUI_Server = mq.TLO.EverQuest.Server()
-	MyUI_Icons = require('mq.ICONS')
-	MyUI_Build = mq.TLO.MacroQuest.BuildName()
+	MyUI_Utils       = require('lib.common')
+	MyUI_CharLoaded  = mq.TLO.Me.DisplayName()
+	MyUI_Server      = mq.TLO.EverQuest.Server()
+	MyUI_Icons       = require('mq.ICONS')
+	MyUI_Build       = mq.TLO.MacroQuest.BuildName()
 	MyUI_ThemeLoader = require('lib.theme_loader')
 end
 

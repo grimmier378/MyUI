@@ -1,8 +1,9 @@
 local mq             = require('mq')
 local ImGui          = require 'ImGui'
 
-MyUI_Utils           = require('lib.common')
+MyUI_PackageMan      = require('mq.PackageMan')
 MyUI_Actor           = require('actors')
+MyUI_SQLite3         = MyUI_PackageMan.Require('lsqlite3')
 
 MyUI_Version         = '1.0.0'
 MyUI_ScriptName      = 'MyUI'
@@ -10,9 +11,10 @@ MyUI_Path            = mq.luaDir .. '/myui/'
 
 MyUI_Icons           = require('mq.ICONS')
 MyUI_Base64          = require('lib.base64') -- Ensure you have a base64 module available
-MyUI_PackageMan      = require('mq.PackageMan')
+
+MyUI_Utils           = require('lib.common')
+
 MyUI_LoadModules     = require('lib.modules')
-MyUI_SQLite3         = MyUI_PackageMan.Require('lsqlite3')
 MyUI_Colors          = require('lib.colors')
 MyUI_ThemeLoader     = require('lib.theme_loader')
 MyUI_AbilityPicker   = require('lib.AbilityPicker')
@@ -53,6 +55,7 @@ local default_list   = {
 	'SAST',
 	'SillySounds',
 	"AlertMaster",
+	"ThemeZ",
 }
 
 MyUI_DefaultConfig   = {
@@ -75,6 +78,7 @@ MyUI_DefaultConfig   = {
 		[12] = { name = 'ChatRelay', enabled = false, },
 		[13] = { name = 'AAParty', enabled = false, },
 		[14] = { name = 'AlertMaster', enabled = false, },
+		[15] = { name = 'ThemeZ', enabled = false, },
 	},
 }
 MyUI_Settings        = {}
@@ -172,7 +176,9 @@ end
 local function RenderModules()
 	for _, data in ipairs(MyUI_Settings.mods_list) do
 		if data.enabled and MyUI_Modules[data.name] ~= nil then
-			MyUI_Modules[data.name].RenderGUI()
+			if MyUI_Modules[data.name].RenderGUI ~= nil then
+				MyUI_Modules[data.name].RenderGUI()
+			end
 		end
 	end
 end

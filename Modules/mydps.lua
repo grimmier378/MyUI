@@ -8,11 +8,11 @@ Module.IsRunning = false
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
 if not loadedExeternally then
-	MyUI_Utils = require('lib.common')
+	MyUI_Utils       = require('lib.common')
 	MyUI_ThemeLoader = require('lib.theme_loader')
-	MyUI_Actor = require('actors')
-	MyUI_CharLoaded = mq.TLO.Me.DisplayName()
-	MyUI_Server = mq.TLO.MacroQuest.Server()
+	MyUI_Actor       = require('actors')
+	MyUI_CharLoaded  = mq.TLO.Me.DisplayName()
+	MyUI_Server      = mq.TLO.MacroQuest.Server()
 end
 
 local LoadTheme = MyUI_ThemeLoader

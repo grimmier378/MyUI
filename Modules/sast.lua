@@ -23,7 +23,7 @@ local eqWinAdvOpen, eqWinExpOpen = false, false
 local groupCmd = '/dgae '
 local mode = 'DanNet'
 local doDelay = false
-local delayTime
+local delayTime = 1
 local currZone, lastZone
 local winFlags = bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoFocusOnAppearing)
 local locked, showAdv, forcedOpen, refreshStats = false, false, false, false
@@ -247,26 +247,43 @@ local function doBind(...)
 		Module.IsRunning = false
 		MyUI_Utils.PrintOutput('MyUI', nil, '\aySimple Adventure Status Tracking\ao Exiting...')
 	end
-end
-
-local arg = { ..., }
-if #arg > 0 then
-	if arg[1] ~= nil then
-		if arg[1] and arg[1] == 'solo' then mode = 'Solo' end
-		if arg[1] and arg[1] == 'dannet' then mode = 'DanNet' end
-		if arg[1] and arg[1] == 'eqbc' then mode = 'EQBC' end
-	end
-	if #arg == 3 then
-		if arg[2] == 'delay' then
-			if tonumber(arg[3]) then
+	if #args == 2 then
+		if args[1] == 'delay' then
+			if tonumber(args[2]) then
 				doDelay = true
-				delayTime = tonumber(arg[3])
-				delayTime = delayTime * 1000
+				delayTime = tonumber(args[2])
+				delayTime = delayTime
 			else
 				MyUI_Utils.PrintOutput('MyUI', nil, 'Invalid Delay Time')
 			end
-		else
-			MyUI_Utils.PrintOutput('MyUI', nil, 'Invalid Command')
+		end
+	end
+end
+
+local arguments = { ..., }
+local function processArgs(arg)
+	if #arg == 0 then
+		doDelay = true
+		mode = 'Solo'
+		delayTime = delayTime
+	else
+		if arg[1] ~= nil then
+			if arg[1] and arg[1] == 'solo' then mode = 'Solo' end
+			if arg[1] and arg[1] == 'dannet' then mode = 'DanNet' end
+			if arg[1] and arg[1] == 'eqbc' then mode = 'EQBC' end
+		end
+		if #arg == 3 then
+			if arg[2] == 'delay' then
+				if tonumber(arg[3]) then
+					doDelay = true
+					delayTime = tonumber(arg[3])
+					delayTime = delayTime
+				else
+					MyUI_Utils.PrintOutput('MyUI', nil, 'Invalid Delay Time')
+				end
+			else
+				MyUI_Utils.PrintOutput('MyUI', nil, 'Invalid Command')
+			end
 		end
 	end
 	MyUI_Utils.PrintOutput('MyUI', nil, 'Simple Adventure Status Tracking')
@@ -280,6 +297,7 @@ function Module.Unload()
 end
 
 local function startup()
+	processArgs(arguments)
 	--check for MQ2EQBC plugin
 	if mode == 'EQBC' then
 		if not mq.TLO.Plugin('mq2eqbc').IsLoaded() then
@@ -295,7 +313,7 @@ local function startup()
 		groupCmd = '/dgae '
 	end
 	mq.bind("/sast", doBind)
-	local dTime = delayTime ~= nil and delayTime / 1000 or 'None'
+	local dTime = delayTime ~= nil and delayTime or 'None'
 	MyUI_Utils.PrintOutput('MyUI', nil, 'Starting SAST \aoMode: \at%s \aodoDelay: \at%s \aoDelayTime: \at%ss', mode, doDelay, dTime)
 	MyUI_Utils.PrintOutput('MyUI', nil, '\agSimple Adventure Status Tracking\ax\ay Loaded...\ax')
 	MyUI_Utils.PrintOutput('MyUI', nil, 'Use: \ay/sast stats\ax to toggle Adventure Stats')
@@ -307,6 +325,18 @@ local function startup()
 	if not loadedExeternally then
 		mq.imgui.init('Adventure Status', Module.RenderGUI)
 		Module.LocalLoop()
+	end
+end
+
+local function CloseWindow(win)
+	if win == 'adv' then
+		AdvWIN.DoClose()
+	elseif win == 'exp' then
+		ExpWIN.DoClose()
+	end
+	local cmdWinName = win == AdvWIN and "'AdventureRequestWnd'" or 'DynamicZoneWnd'
+	if mode ~= 'Solo' then
+		mq.cmdf('/noparse %s/lua parse mq.TLO.Window("%s").DoClose()', groupCmd, cmdWinName)
 	end
 end
 
@@ -345,27 +375,25 @@ function Module.MainLoop()
 			-- if ingame window is open and we didn't set the flag close it on all characters. we most likely zoned or just accepted the quest.
 
 			if not eqWinAdvOpen and AdvWIN.Open() and advActive then
-				if doDelay and delayTime ~= nil then
+				if doDelay then
 					if curTime - delTimerAdv >= delayTime then
-						if mode == 'Solo' then
-							AdvWIN.DoClose()
-						else
-							mq.cmdf('/noparse %s/lua parse mq.TLO.Window("AdventureRequestWnd").DoClose()', groupCmd)
-						end
+						CloseWindow('adv')
+
 						delTimerAdv = os.time()
 					end
+				else
+					CloseWindow('adv')
 				end
 			end
 			if not eqWinExpOpen and ExpWIN.Open() and expActive then
-				if doDelay and delayTime ~= nil then
+				if doDelay then
 					if curTime - delTimerExp >= delayTime then
-						if mode == 'Solo' then
-							ExpWIN.DoClose()
-						else
-							mq.cmdf('/noparse %s/lua parse mq.TLO.Window("DynamicZoneWnd").DoClose()', groupCmd)
-						end
+						CloseWindow('exp')
+
 						delTimerExp = os.time()
 					end
+				else
+					CloseWindow('exp')
 				end
 			end
 		else

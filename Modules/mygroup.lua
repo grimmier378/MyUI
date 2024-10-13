@@ -13,11 +13,11 @@ Module.IsRunning = false
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
 if not loadedExeternally then
-    MyUI_Utils = require('lib.common')
-    MyUI_Colors = require('lib.colors')
-    MyUI_Icons = require('mq.ICONS')
+    MyUI_Utils      = require('lib.common')
+    MyUI_Colors     = require('lib.colors')
+    MyUI_Icons      = require('mq.ICONS')
     MyUI_CharLoaded = mq.TLO.Me.DisplayName()
-    MyUI_Server = mq.TLO.MacroQuest.Server()
+    MyUI_Server     = mq.TLO.MacroQuest.Server()
 end
 
 local gIcon = MyUI_Icons.MD_SETTINGS

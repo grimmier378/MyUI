@@ -5,14 +5,14 @@ local ImGui             = require('ImGui')
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
 if not loadedExeternally then
-    MyUI_Utils = require('lib.common')
+    MyUI_Utils       = require('lib.common')
     MyUI_ThemeLoader = require('lib.theme_loader')
-    MyUI_Actor = require('actors')
-    MyUI_CharLoaded = mq.TLO.Me.DisplayName()
-    MyUI_Icons = require('mq.ICONS')
-    MyUI_Guild = mq.TLO.Me.Guild()
-    MyUI_Server = mq.TLO.MacroQuest.Server()
-    MyUI_Mode = 'driver'
+    MyUI_Actor       = require('actors')
+    MyUI_CharLoaded  = mq.TLO.Me.DisplayName()
+    MyUI_Icons       = require('mq.ICONS')
+    MyUI_Guild       = mq.TLO.Me.Guild()
+    MyUI_Server      = mq.TLO.MacroQuest.Server()
+    MyUI_Mode        = 'driver'
 end
 
 local setFocus                                   = false
@@ -644,17 +644,19 @@ function Module.EventChat(channelID, eventName, line, spam)
         local txtBuffer = Module.Consoles[channelID].txtBuffer            -- Text buffer for the channel ID we are working with.
         local colorVec = eventDetails.Filters[0].color or { 1, 1, 1, 1, } -- Color Code to change line to, default is white
         local fMatch = false
+        local matchCount = 0
         local negMatch = false
         local conColorStr = 'white'
         local gSize = mq.TLO.Me.GroupSize() -- size of the group including yourself
         gSize = gSize - 1
         if txtBuffer then
             local haveFilters = false
-            for fID = 1, #eventDetails.Filters * 2 do
+            for fID = 1, getNextID(eventDetails.Filters) - 1 do
                 negMatch = false
+                fMatch = false
                 if eventDetails.Filters[fID] ~= nil then
                     local fData = eventDetails.Filters[fID]
-                    if fID > 0 and not fMatch then
+                    if fID > 0 then
                         haveFilters = true
                         local fString = fData.filterString -- String value we are filtering for
                         if string.find(fString, 'NO2') then
@@ -724,14 +726,18 @@ function Module.EventChat(channelID, eventName, line, spam)
                         if fMatch and negMatch then
                             fMatch = false
                             negMatch = false
+                            matchCount = 0
+                            goto found_match
+                        end
+                        if fMatch then
+                            matchCount = matchCount + 1
                         end
                     end
-                    if fMatch then goto found_match end
                 end
             end
             ::found_match::
             --print(tostring(#eventDetails.Filters))
-            if not fMatch and haveFilters then return fMatch end -- we had filters and didn't match so leave
+            if matchCount == 0 and haveFilters then return fMatch end -- we had filters and didn't match so leave
             if not spam then
                 if string.lower(Module.Settings.Channels[channelID].Name) == 'consider' then
                     local conTarg = mq.TLO.Target
@@ -920,69 +926,69 @@ local function DrawConsole(channelID)
     local zoom = Module.Consoles[channelID].zoom
     local scale = Module.Settings.Channels[channelID].Scale
     local PopOut = Module.Settings.Channels[channelID].PopOut
-    if zoom and Module.Consoles[channelID].txtBuffer ~= '' then
-        local footerHeight = 35
-        local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
-        contentSizeY = contentSizeY - footerHeight
+    -- if zoom and Module.Consoles[channelID].txtBuffer ~= '' then
+    --     local footerHeight = 35
+    --     local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
+    --     contentSizeY = contentSizeY - footerHeight
 
-        if ImGui.BeginChild("ZoomScrollRegion##" .. channelID, contentSizeX, contentSizeY, ImGuiWindowFlags.HorizontalScrollbar) then
-            if ImGui.BeginTable('##channelID_' .. channelID, 1, bit32.bor(ImGuiTableFlags.NoBordersInBody, ImGuiTableFlags.RowBg)) then
-                ImGui.SetWindowFontScale(Module.Settings.Scale)
-                ImGui.TableSetupColumn("##txt" .. channelID, ImGuiTableColumnFlags.NoHeaderLabel)
-                --- draw rows ---
+    --     if ImGui.BeginChild("ZoomScrollRegion##" .. channelID, contentSizeX, contentSizeY, ImGuiWindowFlags.HorizontalScrollbar) then
+    --         if ImGui.BeginTable('##channelID_' .. channelID, 1, bit32.bor(ImGuiTableFlags.NoBordersInBody, ImGuiTableFlags.RowBg)) then
+    --             ImGui.SetWindowFontScale(Module.Settings.Scale)
+    --             ImGui.TableSetupColumn("##txt" .. channelID, ImGuiTableColumnFlags.NoHeaderLabel)
+    --             --- draw rows ---
 
-                ImGui.TableNextRow()
-                ImGui.TableSetColumnIndex(0)
-                ImGui.SetWindowFontScale(scale)
+    --             ImGui.TableNextRow()
+    --             ImGui.TableSetColumnIndex(0)
+    --             ImGui.SetWindowFontScale(scale)
 
-                for line, data in pairs(Module.Consoles[channelID].txtBuffer) do
-                    ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(data.color[1], data.color[2], data.color[3], data.color[4]))
-                    if ImGui.Selectable("##selectable" .. line, false, ImGuiSelectableFlags.None) then end
-                    ImGui.SameLine()
-                    ImGui.TextWrapped(data.text)
-                    if ImGui.IsItemHovered() and ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsKeyDown(ImGuiKey.C) then
-                        ImGui.LogToClipboard()
-                        ImGui.LogText(data.text)
-                        ImGui.LogFinish()
-                    end
-                    ImGui.TableNextRow()
-                    ImGui.TableSetColumnIndex(0)
-                    ImGui.PopStyleColor()
-                end
+    --             for line, data in pairs(Module.Consoles[channelID].txtBuffer) do
+    --                 ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(data.color[1], data.color[2], data.color[3], data.color[4]))
+    --                 if ImGui.Selectable("##selectable" .. line, false, ImGuiSelectableFlags.None) then end
+    --                 ImGui.SameLine()
+    --                 ImGui.TextWrapped(data.text)
+    --                 if ImGui.IsItemHovered() and ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsKeyDown(ImGuiKey.C) then
+    --                     ImGui.LogToClipboard()
+    --                     ImGui.LogText(data.text)
+    --                     ImGui.LogFinish()
+    --                 end
+    --                 ImGui.TableNextRow()
+    --                 ImGui.TableSetColumnIndex(0)
+    --                 ImGui.PopStyleColor()
+    --             end
 
 
 
-                --Scroll to the bottom if autoScroll is enabled
-                local autoScroll = Module.Consoles[channelID].txtAutoScroll
-                if autoScroll then
-                    ImGui.SetScrollHereY()
-                    Module.Consoles[channelID].bottomPosition = ImGui.GetCursorPosY()
-                end
+    --             --Scroll to the bottom if autoScroll is enabled
+    --             local autoScroll = Module.Consoles[channelID].txtAutoScroll
+    --             if autoScroll then
+    --                 ImGui.SetScrollHereY()
+    --                 Module.Consoles[channelID].bottomPosition = ImGui.GetCursorPosY()
+    --             end
 
-                local bottomPosition = Module.Consoles[channelID].bottomPosition or 0
-                -- Detect manual scroll
-                local lastScrollPos = Module.Consoles[channelID].lastScrollPos or 0
-                local scrollPos = ImGui.GetScrollY()
+    --             local bottomPosition = Module.Consoles[channelID].bottomPosition or 0
+    --             -- Detect manual scroll
+    --             local lastScrollPos = Module.Consoles[channelID].lastScrollPos or 0
+    --             local scrollPos = ImGui.GetScrollY()
 
-                if scrollPos < lastScrollPos then
-                    Module.Consoles[channelID].txtAutoScroll = false -- Turn off autoscroll if scrolled up manually
-                elseif scrollPos >= bottomPosition - (30 * scale) then
-                    Module.Consoles[channelID].txtAutoScroll = true
-                end
+    --             if scrollPos < lastScrollPos then
+    --                 Module.Consoles[channelID].txtAutoScroll = false -- Turn off autoscroll if scrolled up manually
+    --             elseif scrollPos >= bottomPosition - (30 * scale) then
+    --                 Module.Consoles[channelID].txtAutoScroll = true
+    --             end
 
-                lastScrollPos = scrollPos
-                Module.Consoles[channelID].lastScrollPos = lastScrollPos
+    --             lastScrollPos = scrollPos
+    --             Module.Consoles[channelID].lastScrollPos = lastScrollPos
 
-                ImGui.EndTable()
-            end
-        end
-        ImGui.EndChild()
-    else
-        local footerHeight = 35
-        local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
-        contentSizeY = contentSizeY - footerHeight
-        Module.Consoles[channelID].console:Render(ImVec2(0, contentSizeY))
-    end
+    --             ImGui.EndTable()
+    --         end
+    --     end
+    --     ImGui.EndChild()
+    -- else
+    local footerHeight = 35
+    local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
+    contentSizeY = contentSizeY - footerHeight
+    Module.Consoles[channelID].console:Render(ImVec2(0, contentSizeY))
+    -- end
     --Command Line
     ImGui.Separator()
     local textFlags = bit32.bor(0,
@@ -1140,25 +1146,25 @@ local function DrawChatWindow()
             end
             ImGui.EndMenu()
         end
-        if ImGui.BeginMenu('Zoom##' .. windowNum) then
-            ImGui.SetWindowFontScale(Module.Settings.Scale)
-            if ImGui.MenuItem('Main##MyChat', '', zoomMain) then
-                zoomMain = not zoomMain
-            end
-            for _, Data in ipairs(sortedChannels) do
-                -- for channelID, settings in pairs(ChatWin.Settings.Channels) do
-                local channelID = Data[1]
-                if channelID ~= 9000 or enableSpam then
-                    local zoom = Module.Consoles[channelID].zoom
-                    local name = Module.Settings.Channels[channelID].Name
-                    if ImGui.MenuItem(name, '', zoom) then
-                        Module.Consoles[channelID].zoom = not zoom
-                    end
-                end
-            end
+        -- if ImGui.BeginMenu('Zoom##' .. windowNum) then
+        --     ImGui.SetWindowFontScale(Module.Settings.Scale)
+        --     if ImGui.MenuItem('Main##MyChat', '', zoomMain) then
+        --         zoomMain = not zoomMain
+        --     end
+        --     for _, Data in ipairs(sortedChannels) do
+        --         -- for channelID, settings in pairs(ChatWin.Settings.Channels) do
+        --         local channelID = Data[1]
+        --         if channelID ~= 9000 or enableSpam then
+        --             local zoom = Module.Consoles[channelID].zoom
+        --             local name = Module.Settings.Channels[channelID].Name
+        --             if ImGui.MenuItem(name, '', zoom) then
+        --                 Module.Consoles[channelID].zoom = not zoom
+        --             end
+        --         end
+        --     end
 
-            ImGui.EndMenu()
-        end
+        --     ImGui.EndMenu()
+        -- end
         if ImGui.BeginMenu('Links##' .. windowNum) then
             ImGui.SetWindowFontScale(Module.Settings.Scale)
             for _, Data in ipairs(sortedChannels) do
@@ -1225,10 +1231,10 @@ local function DrawChatWindow()
                     Module.console:Clear()
                     mainBuffer = {}
                 end
-                ImGui.Separator()
-                if ImGui.Selectable('Zoom##Main' .. windowNum) then
-                    zoomMain = not zoomMain
-                end
+                -- ImGui.Separator()
+                -- if ImGui.Selectable('Zoom##Main' .. windowNum) then
+                --     zoomMain = not zoomMain
+                -- end
 
                 ImGui.EndPopup()
             end
@@ -1323,10 +1329,10 @@ local function DrawChatWindow()
                             end
 
                             ImGui.Separator()
-                            if ImGui.Selectable(tNameZ .. '##' .. windowNum) then
-                                zoom = not zoom
-                                Module.Consoles[channelID].zoom = zoom
-                            end
+                            -- if ImGui.Selectable(tNameZ .. '##' .. windowNum) then
+                            --     zoom = not zoom
+                            --     Module.Consoles[channelID].zoom = zoom
+                            -- end
                             if ImGui.Selectable(tNameP .. '##' .. windowNum) then
                                 PopOut = not PopOut
                                 Module.Settings.Channels[channelID].PopOut = PopOut
@@ -1341,7 +1347,7 @@ local function DrawChatWindow()
                                 writeSettings(Module.SettingsFile, Module.Settings)
                             end
 
-                            if channelID < 9000 then
+                            if channelID ~= 9000 then
                                 if ImGui.Selectable(tNameL .. '##' .. windowNum) then
                                     links = not links
                                     Module.Settings.Channels[channelID].enableLinks = links
@@ -1991,12 +1997,13 @@ function Module.Config_GUI(open)
         -- Slider for adjusting zoom level
         local tmpZoom = Module.Settings.Scale
         if Module.Settings.Scale then
-            tmpZoom = ImGui.SliderFloat("Gui Zoom Level##MyBuffs", tmpZoom, 0.5, 2.0)
+            tmpZoom = ImGui.SliderFloat("Gui Font Scale Level##MyBuffs", tmpZoom, 0.5, 2.0)
         end
 
         if Module.console ~= nil then
             Module.console.fontSize = ImGui.SliderInt("Main Tab Font Size", Module.console.fontSize, 8, 300)
             Module.Settings.MainFontSize = Module.console.fontSize
+            writeSettings(Module.SettingsFile, Module.Settings)
         end
 
         if Module.Settings.Scale ~= tmpZoom then

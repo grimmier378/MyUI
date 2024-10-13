@@ -16,7 +16,9 @@ BMButtonEditor.tmpButton           = nil
 
 BMButtonEditor.selectedTimerType   = 1
 BMButtonEditor.selectedUpdateRate  = 1
-
+BMButtonEditor.textEditor          = ImGui.TextEditor.new("##TextEditor")
+BMButtonEditor.textEditor:SetSyntax('lua')
+BMButtonEditor.textEditor.windowFlags = bit32.bor(TextEditorWindowFlags.ShowLineNumbers, TextEditorWindowFlags.WrapText, TextEditorWindowFlags.ShowIndicators)
 function BMButtonEditor:RenderEditButtonPopup()
     if not self.editButtonPopupOpen then
         picker:SetClosed()
@@ -162,6 +164,7 @@ function BMButtonEditor:OpenEditPopup(Set, Index)
     self.editButtonSet = Set
     self.selectedTimerType = 1
     self.selectedUpdateRate = 1
+
     local button = BMSettings:GetButtonBySetIndex(Set, Index)
     self.tmpButton = btnUtils.shallowcopy(button)
 
@@ -278,8 +281,15 @@ function BMButtonEditor:RenderButtonEditUI(renderButton, enableShare, enableEdit
     local footerHeight = 35
     local editHeight = ImGui.GetWindowHeight() - yPos - footerHeight
     ImGui.PushFont(ImGui.ConsoleFont)
-    renderButton.Cmd, textChanged = ImGui.InputTextMultiline("##_Cmd_Edit", renderButton.Cmd or "",
-        ImVec2(ImGui.GetWindowWidth() * 0.98, editHeight), ImGuiInputTextFlags.AllowTabInput)
+    -- renderButton.Cmd, textChanged = ImGui.InputTextMultiline("##_Cmd_Edit", renderButton.Cmd or "",
+    --     ImVec2(ImGui.GetWindowWidth() * 0.98, editHeight), ImGuiInputTextFlags.AllowTabInput)
+    self.textEditor:Render(ImVec2(ImGui.GetWindowWidth() * 0.98, editHeight))
+    local textContents = self.textEditor.text ~= '' and self.textEditor.text or (renderButton.Cmd and renderButton.Cmd or "")
+    self.textEditor:LoadContents(textContents)
+    if self.textEditor.text ~= renderButton.Cmd then
+        textChanged = true
+        renderButton.Cmd = self.textEditor.text
+    end
     ImGui.PopFont()
     self.editButtonUIChanged = self.editButtonUIChanged or textChanged
 end

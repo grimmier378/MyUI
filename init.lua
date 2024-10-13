@@ -394,7 +394,7 @@ local function MyUI_Main()
 		ProcessModuleChanges()
 		for idx, data in ipairs(MyUI_Settings.mods_list) do
 			if data.enabled then
-				MyUI_Modules[data.name].MainLoop()
+				if MyUI_Modules[data.name].MainLoop ~= nil then MyUI_Modules[data.name].MainLoop() end
 			end
 		end
 		mq.delay(1)

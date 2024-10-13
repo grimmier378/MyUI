@@ -4,9 +4,9 @@ local ImGui             = require('ImGui')
 
 local Module            = {}
 Module.ActorMailBox     = 'my_buffs'
-Module.Path             = MyUI_Path ~= nil and MyUI_Path or string.format("%s/%s/", mq.luaDir, Module.Mane)
-local themeFile         = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
-local configFileOld     = mq.configDir .. '/MyUI_Configs.lua'
+Module.Path             = Module.Path ~= nil and Module.Path or string.format("%s/%s/", mq.luaDir, Module.Mane)
+local themeFile         = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
+local configFileOld     = mq.configDir .. '/Module.Configs.lua'
 
 -- Tables
 Module.boxes            = {}
@@ -35,16 +35,23 @@ Module.iconSize         = 24
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 if not loadedExeternally then
-    MyUI_Utils      = require('lib.common')
-    MyUI_Actor      = require('actors')
-    MyUI_CharLoaded = mq.TLO.Me.DisplayName()
-    MyUI_Mode       = 'driver'
-    MyUI_Icons      = require('mq.ICONS')
-    MyUI_Server     = mq.TLO.EverQuest.Server()
+    Module.Utils      = require('lib.common')
+    Module.Actor      = require('actors')
+    Module.CharLoaded = mq.TLO.Me.DisplayName()
+    Module.Mode       = 'driver'
+    Module.Icons      = require('mq.ICONS')
+    Module.Server     = mq.TLO.EverQuest.Server()
+else
+    Module.Utils = MyUI_Utils
+    Module.Actor = MyUI_Actor
+    Module.CharLoaded = MyUI_CharLoaded
+    Module.Mode = MyUI_Mode
+    Module.Icons = MyUI_Icons
+    Module.Server = MyUI_Server
 end
 
 local configFile                       = string.format("%s/MyUI/MyBuffs/%s/%s.lua", mq.configDir,
-    MyUI_Server, MyUI_CharLoaded)
+    Module.Server, Module.CharLoaded)
 local MyBuffs_Actor                    = nil
 local winFlag                          = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse, ImGuiWindowFlags.NoFocusOnAppearing)
 local flashAlpha, flashAlphaT          = 1, 255
@@ -54,8 +61,8 @@ local songTimer, buffTime              = 20, 5
 local numSlots                         = mq.TLO.Me.MaxBuffSlots() or 0 --Max Buff Slots
 local Scale                            = 1.0
 local animSpell                        = mq.FindTextureAnimation('A_SpellIcons')
-local gIcon                            = MyUI_Icons.MD_SETTINGS
-local activeButton                     = MyUI_CharLoaded -- Initialize the active button with the first box's name
+local gIcon                            = Module.Icons.MD_SETTINGS
+local activeButton                     = Module.CharLoaded -- Initialize the active button with the first box's name
 local PulseSpeed                       = 5
 local themeName                        = 'Default'
 local mailBox                          = {}
@@ -166,7 +173,7 @@ local function GenerateContent(subject, songsTable, buffsTable, doWho, doWhat)
     end
 
     local content = {
-        Name = MyUI_CharLoaded,
+        Name = Module.CharLoaded,
         Buffs = buffsTable,
         Songs = songsTable,
         DoWho = dWho,
@@ -204,7 +211,7 @@ local function GetBuff(slot)
     -- Calculate total minutes and total seconds
     totalMin = duration.TotalMinutes() or 0
     totalSec = duration.TotalSeconds() or 0
-    -- MyUI_Utils.PrintOutput('MyUI',nil,totalSec)
+    -- Module.Utils.PrintOutput('MyUI',nil,totalSec)
     buffDurHMS = duration.TimeHMS() or ''
 
     -- format tooltip
@@ -412,7 +419,7 @@ local function GetBuffs()
             changed = false
         else
             for i = 1, #Module.boxes do
-                if Module.boxes[i].Name == MyUI_CharLoaded then
+                if Module.boxes[i].Name == Module.CharLoaded then
                     Module.boxes[i].Buffs = Module.buffTable
                     Module.boxes[i].Songs = Module.songTable
                     Module.boxes[i].SongCount = mq.TLO.Me.CountSongs() or 0
@@ -431,7 +438,7 @@ local function GetBuffs()
     else
         if Module.boxes[1] == nil then
             table.insert(Module.boxes, {
-                Name = MyUI_CharLoaded,
+                Name = Module.CharLoaded,
                 Buffs = Module.buffTable,
                 Songs = Module.songTable,
                 Check = os.time(),
@@ -446,7 +453,7 @@ local function GetBuffs()
         else
             Module.boxes[1].Buffs = Module.buffTable
             Module.boxes[1].Songs = Module.songTable
-            Module.boxes[1].Name = MyUI_CharLoaded
+            Module.boxes[1].Name = Module.CharLoaded
             Module.boxes[1].BuffCount = mq.TLO.Me.BuffCount() or 0
             Module.boxes[1].SongCount = mq.TLO.Me.CountSongs() or 0
             Module.boxes[1].BuffSlots = numSlots
@@ -461,7 +468,7 @@ local function GetBuffs()
 end
 
 local function MessageHandler()
-    MyBuffs_Actor = MyUI_Actor.register(Module.ActorMailBox, function(message)
+    MyBuffs_Actor = Module.Actor.register(Module.ActorMailBox, function(message)
         local MemberEntry    = message()
         local who            = MemberEntry.Name or 'Unknown'
         local charBuffs      = MemberEntry.Buffs or {}
@@ -484,7 +491,7 @@ local function MessageHandler()
         end
         if MemberEntry.Subject == 'Action' and who ~= 'Unknown' then
             if MemberEntry.DoWho ~= nil and MemberEntry.DoWhat ~= nil then
-                if MemberEntry.DoWho == MyUI_CharLoaded then
+                if MemberEntry.DoWho == Module.CharLoaded then
                     local bName = MemberEntry.DoWhat:sub(5) or 0
                     if MemberEntry.DoWhat:find("^buff") then
                         mq.TLO.Me.Buff(bName).Remove()
@@ -510,7 +517,7 @@ local function MessageHandler()
         --New member connected if Hello is true. Lets send them our data so they have it.
         if MemberEntry.Subject == 'Hello' then
             check = os.time()
-            if who ~= MyUI_CharLoaded and who ~= 'Unknown' and MyBuffs_Actor ~= nil then
+            if who ~= Module.CharLoaded and who ~= 'Unknown' and MyBuffs_Actor ~= nil then
                 MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'mybuffs', }, GenerateContent('Welcome', Module.songTable, Module.buffTable))
                 MyBuffs_Actor:send({ mailbox = 'my_buffs', script = 'myui', }, GenerateContent('Welcome', Module.songTable, Module.buffTable))
             end
@@ -562,7 +569,7 @@ end
 local function SayGoodBye()
     local message = {
         Subject = 'Goodbye',
-        Name = MyUI_CharLoaded,
+        Name = Module.CharLoaded,
         Check = 0,
     }
     if MyBuffs_Actor ~= nil then
@@ -571,20 +578,19 @@ local function SayGoodBye()
     end
 end
 
-local function loadTheme()
-    if MyUI_Utils.File.Exists(themeFile) then
-        Module.theme = dofile(themeFile)
+local function loadTheme(theme_file)
+    if Module.Utils.File.Exists(theme_file) then
+        Module.theme = dofile(theme_file)
     else
         Module.theme = require('defaults.themes')
-        mq.pickle(themeFile, Module.theme)
+        mq.pickle(theme_file, Module.theme)
     end
-    themeName = Module.theme.LoadTheme or 'notheme'
 end
 
 local function loadSettings()
     local newSetting = false
-    if not MyUI_Utils.File.Exists(configFile) then
-        if MyUI_Utils.File.Exists(configFileOld) then
+    if not Module.Utils.File.Exists(configFile) then
+        if Module.Utils.File.Exists(configFileOld) then
             local tmp = dofile(configFileOld)
             Module.settings[Module.Name] = tmp[Module.Name]
         else
@@ -603,11 +609,11 @@ local function loadSettings()
         end
         Module.timerColor = Module.settings[Module.Name]
     end
-
-    loadTheme()
-    newSetting = MyUI_Utils.CheckDefaultSettings(Module.defaults, Module.settings[Module.Name])
-    newSetting = MyUI_Utils.CheckDefaultSettings(Module.defaults.WindowPositions, Module.settings[Module.Name].WindowPositions) or newSetting
-    newSetting = MyUI_Utils.CheckDefaultSettings(Module.defaults.WindowSizes, Module.settings[Module.Name].WindowSizes) or newSetting
+    themeName = Module.settings[Module.Name].LoadTheme or 'Default'
+    loadTheme(themeFile)
+    newSetting = Module.Utils.CheckDefaultSettings(Module.defaults, Module.settings[Module.Name])
+    newSetting = Module.Utils.CheckDefaultSettings(Module.defaults.WindowPositions, Module.settings[Module.Name].WindowPositions) or newSetting
+    newSetting = Module.Utils.CheckDefaultSettings(Module.defaults.WindowSizes, Module.settings[Module.Name].WindowSizes) or newSetting
 
     Module.showTitleBar = Module.settings[Module.Name].ShowTitleBar
     showTableView = Module.settings[Module.Name].TableView
@@ -748,7 +754,7 @@ local function BoxBuffs(id, sorted, view)
                     DrawInspectableSpellIcon(boxBuffs[i].Icon, boxBuffs[i], slot)
                     ImGui.SameLine()
                 end
-                if boxChar == MyUI_CharLoaded then
+                if boxChar == Module.CharLoaded then
                     if Module.ShowTimer then
                         local sDur = boxBuffs[i].TotalMinutes or 0
                         if sDur < buffTime then
@@ -794,7 +800,7 @@ local function BoxBuffs(id, sorted, view)
         end
 
         if ImGui.BeginPopupContextItem("##Buff" .. tostring(i)) then
-            if boxChar == MyUI_CharLoaded then
+            if boxChar == Module.CharLoaded then
                 if ImGui.MenuItem("Inspect##" .. boxBuffs[i].Slot) then
                     mq.TLO.Me.Buff(bName).Inspect()
                 end
@@ -834,7 +840,7 @@ local function BoxBuffs(id, sorted, view)
             ImGui.BeginTooltip()
             if boxBuffs[i] ~= nil then
                 if boxBuffs[i].Icon > 0 then
-                    if boxChar == MyUI_CharLoaded then
+                    if boxChar == Module.CharLoaded then
                         ImGui.Text(boxBuffs[i].Tooltip)
                     else
                         ImGui.Text(boxBuffs[i].Name)
@@ -901,7 +907,7 @@ local function BoxSongs(id, sorted, view)
 
                     ImGui.SameLine()
                 end
-                if boxChar == MyUI_CharLoaded then
+                if boxChar == Module.CharLoaded then
                     if Module.ShowTimer then
                         local sngDurS = boxSongs[i].TotalSeconds or 0
                         if sngDurS < songTimer then
@@ -972,7 +978,7 @@ local function BoxSongs(id, sorted, view)
             ImGui.BeginTooltip()
             if boxSongs[i] ~= nil then
                 if boxSongs[i].Icon > 0 then
-                    if boxChar == MyUI_CharLoaded then
+                    if boxChar == Module.CharLoaded then
                         ImGui.Text(boxSongs[i].Tooltip)
                     else
                         ImGui.Text(boxSongs[i].Name)
@@ -1034,10 +1040,10 @@ function Module.RenderGUI()
             ImGui.SetNextWindowPos(ImVec2(winPosX, winPosY), ImGuiCond.Appearing)
             ImGui.SetNextWindowSize(ImVec2(winSizeX, winSizeY), ImGuiCond.Appearing)
         end
-        local splitIcon = Module.SplitWin and MyUI_Icons.FA_TOGGLE_ON or MyUI_Icons.FA_TOGGLE_OFF
-        local sortIcon = sortType == 'none' and MyUI_Icons.FA_SORT_NUMERIC_ASC or sortType == 'alpha' and MyUI_Icons.FA_SORT_ALPHA_ASC or MyUI_Icons.MD_TIMER
-        local lockedIcon = Module.locked and MyUI_Icons.FA_LOCK or MyUI_Icons.FA_UNLOCK
-        local openGUI, showMain = ImGui.Begin("MyBuffs##" .. MyUI_CharLoaded, true, flags)
+        local splitIcon = Module.SplitWin and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
+        local sortIcon = sortType == 'none' and Module.Icons.FA_SORT_NUMERIC_ASC or sortType == 'alpha' and Module.Icons.FA_SORT_ALPHA_ASC or Module.Icons.MD_TIMER
+        local lockedIcon = Module.locked and Module.Icons.FA_LOCK or Module.Icons.FA_UNLOCK
+        local openGUI, showMain = ImGui.Begin("MyBuffs##" .. Module.CharLoaded, true, flags)
         if not openGUI then
             Module.ShowGUI = false
         end
@@ -1060,7 +1066,7 @@ function Module.RenderGUI()
                         Module.ShowConfig = not Module.ShowConfig
                     end
 
-                    if ImGui.Selectable(MyUI_Icons.FA_TABLE .. " Show Table") then
+                    if ImGui.Selectable(Module.Icons.FA_TABLE .. " Show Table") then
                         showTableView = not showTableView
                         Module.settings[Module.Name].TableView = showTableView
                         mq.pickle(configFile, Module.settings)
@@ -1074,17 +1080,17 @@ function Module.RenderGUI()
                     end
 
                     if ImGui.BeginMenu(sortIcon .. " Sort Menu") then
-                        if ImGui.Selectable(MyUI_Icons.FA_SORT_NUMERIC_ASC .. " Sort by Slot") then
+                        if ImGui.Selectable(Module.Icons.FA_SORT_NUMERIC_ASC .. " Sort by Slot") then
                             sortType = 'none'
                             Module.settings[Module.Name].SortBy = sortType
                             mq.pickle(configFile, Module.settings)
                         end
-                        if ImGui.Selectable(MyUI_Icons.FA_SORT_ALPHA_ASC .. " Sort by Name") then
+                        if ImGui.Selectable(Module.Icons.FA_SORT_ALPHA_ASC .. " Sort by Name") then
                             sortType = 'alpha'
                             Module.settings[Module.Name].SortBy = sortType
                             mq.pickle(configFile, Module.settings)
                         end
-                        if ImGui.Selectable(MyUI_Icons.MD_TIMER .. " Sort by Duration") then
+                        if ImGui.Selectable(Module.Icons.MD_TIMER .. " Sort by Duration") then
                             sortType = 'dur'
                             Module.settings[Module.Name].SortBy = sortType
                         end
@@ -1095,13 +1101,13 @@ function Module.RenderGUI()
                 end
 
                 if ImGui.BeginMenu(sortIcon .. "Sort") then
-                    if ImGui.Selectable(MyUI_Icons.FA_SORT_NUMERIC_ASC .. " Sort by Slot") then
+                    if ImGui.Selectable(Module.Icons.FA_SORT_NUMERIC_ASC .. " Sort by Slot") then
                         sortType = 'none'
                     end
-                    if ImGui.Selectable(MyUI_Icons.FA_SORT_ALPHA_ASC .. " Sort by Name") then
+                    if ImGui.Selectable(Module.Icons.FA_SORT_ALPHA_ASC .. " Sort by Name") then
                         sortType = 'alpha'
                     end
-                    if ImGui.Selectable(MyUI_Icons.MD_TIMER .. " Sort by Duration") then
+                    if ImGui.Selectable(Module.Icons.MD_TIMER .. " Sort by Duration") then
                         sortType = 'dur'
                     end
                     ImGui.EndMenu()
@@ -1169,7 +1175,7 @@ function Module.RenderGUI()
                         for i = 1, #Module.boxes do
                             ImGui.TableNextColumn()
                             ImGui.SetWindowFontScale(Scale)
-                            if Module.boxes[i].Name == MyUI_CharLoaded then
+                            if Module.boxes[i].Name == Module.CharLoaded then
                                 ImGui.TextColored(ImVec4(0, 1, 1, 1), Module.boxes[i].Name)
                             else
                                 ImGui.Text(Module.boxes[i].Name)
@@ -1222,17 +1228,17 @@ function Module.RenderGUI()
                 Module.settings[Module.Name].SplitWin = Module.SplitWin
                 mq.pickle(configFile, Module.settings)
             end
-            if ImGui.MenuItem(MyUI_Icons.FA_SORT_NUMERIC_ASC .. "Sort by Slot") then
+            if ImGui.MenuItem(Module.Icons.FA_SORT_NUMERIC_ASC .. "Sort by Slot") then
                 sortType = 'none'
                 Module.settings[Module.Name].SortBy = sortType
                 mq.pickle(configFile, Module.settings)
             end
-            if ImGui.MenuItem(MyUI_Icons.FA_SORT_ALPHA_ASC .. "Sort by Name") then
+            if ImGui.MenuItem(Module.Icons.FA_SORT_ALPHA_ASC .. "Sort by Name") then
                 sortType = 'alpha'
                 Module.settings[Module.Name].SortBy = sortType
                 mq.pickle(configFile, Module.settings)
             end
-            if ImGui.MenuItem(MyUI_Icons.MD_TIMER .. "Sort by Duration") then
+            if ImGui.MenuItem(Module.Icons.MD_TIMER .. "Sort by Duration") then
                 sortType = 'dur'
                 Module.settings[Module.Name].SortBy = sortType
                 mq.pickle(configFile, Module.settings)
@@ -1267,7 +1273,7 @@ function Module.RenderGUI()
         end
         ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
         local ColorCountSongs, StyleCountSongs = DrawTheme(themeName)
-        local songWin, show = ImGui.Begin("MyBuffs Songs##Songs" .. MyUI_CharLoaded, true, flags)
+        local songWin, show = ImGui.Begin("MyBuffs Songs##Songs" .. Module.CharLoaded, true, flags)
         ImGui.SetWindowFontScale(Scale)
         if not songWin then
             Module.SplitWin = false
@@ -1338,7 +1344,27 @@ function Module.RenderGUI()
                 end
 
                 if ImGui.Button('Reload Theme File') then
-                    loadTheme()
+                    loadTheme(themeFile)
+                end
+
+
+                ImGui.SameLine()
+                if loadedExeternally then
+                    if ImGui.Button('Edit ThemeZ') then
+                        if MyUI_Modules.ThemeZ ~= nil then
+                            if MyUI_Modules.ThemeZ.IsRunning then
+                                MyUI_Modules.ThemeZ.ShowGui = true
+                            else
+                                MyUI_TempSettings.ModuleChanged = true
+                                MyUI_TempSettings.ModuleName = 'ThemeZ'
+                                MyUI_TempSettings.ModuleEnabled = true
+                            end
+                        else
+                            MyUI_TempSettings.ModuleChanged = true
+                            MyUI_TempSettings.ModuleName = 'ThemeZ'
+                            MyUI_TempSettings.ModuleEnabled = true
+                        end
+                    end
                 end
             end
             --------------------- Sliders ----------------------
@@ -1522,7 +1548,7 @@ function Module.RenderGUI()
         end
         if found then
             ColorCountDebuffs, StyleCountDebuffs = DrawTheme(themeName)
-            local openDebuffs, showDebuffs = ImGui.Begin("MyBuffs Debuffs##" .. MyUI_CharLoaded, true,
+            local openDebuffs, showDebuffs = ImGui.Begin("MyBuffs Debuffs##" .. Module.CharLoaded, true,
                 bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoFocusOnAppearing))
             ImGui.SetWindowFontScale(Scale)
 
@@ -1576,7 +1602,7 @@ function Module.RenderGUI()
             ImGui.SetNextWindowPos(ImVec2(winPosX, winPosY), ImGuiCond.Appearing)
             ImGui.SetNextWindowSize(ImVec2(winSizeX, winSizeY), ImGuiCond.Appearing)
         end
-        local openMail, showMail = ImGui.Begin("MyBuffs MailBox##MailBox_MyBuffs_" .. MyUI_CharLoaded, true, ImGuiWindowFlags.NoFocusOnAppearing)
+        local openMail, showMail = ImGui.Begin("MyBuffs MailBox##MailBox_MyBuffs_" .. Module.CharLoaded, true, ImGuiWindowFlags.NoFocusOnAppearing)
         if not openMail then
             Module.MailBoxShow = false
             mailBox = {}
@@ -1638,21 +1664,21 @@ function Module.RenderGUI()
 end
 
 function Module.CheckMode()
-    if MyUI_Mode == 'driver' then
+    if Module.Mode == 'driver' then
         Module.ShowGUI = true
         solo = false
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Setting \atDriver\ax Mode. Actors [\agEnabled\ax] UI [\agOn\ax].')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
-    elseif MyUI_Mode == 'client' then
+        Module.Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Setting \atDriver\ax Mode. Actors [\agEnabled\ax] UI [\agOn\ax].')
+        Module.Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
+    elseif Module.Mode == 'client' then
         Module.ShowGUI = false
         solo = false
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Setting \atClient\ax Mode.Actors [\agEnabled\ax] UI [\arOff\ax].')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
+        Module.Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Setting \atClient\ax Mode.Actors [\agEnabled\ax] UI [\arOff\ax].')
+        Module.Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
     else
         Module.ShowGUI = true
         solo = true
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Setting \atSolo\ax Mode. Actors [\arDisabled\ax] UI [\agOn\ax].')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
+        Module.Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Setting \atSolo\ax Mode. Actors [\arDisabled\ax] UI [\agOn\ax].')
+        Module.Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Type \at/mybuffs show\ax. to Toggle the UI')
     end
 end
 
@@ -1693,21 +1719,21 @@ local function processCommand(...)
         if args[1] == 'gui' or args[1] == 'show' or args[1] == 'open' then
             Module.ShowGUI = not Module.ShowGUI
             if Module.ShowGUI then
-                MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Toggling GUI \atOpen\ax.')
+                Module.Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Toggling GUI \atOpen\ax.')
             else
-                MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Toggling GUI \atClosed\ax.')
+                Module.Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Toggling GUI \atClosed\ax.')
             end
         elseif args[1] == 'exit' or args[1] == 'quit' then
-            MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Exiting.')
+            Module.Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Exiting.')
             if not solo then SayGoodBye() end
             Module.IsRunning = false
         elseif args[1] == 'mailbox' then
             Module.MailBoxShow = not Module.MailBoxShow
         end
     else
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao No command given.')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ag /mybuffs gui \ao- Toggles the GUI on and off.')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ag /mybuffs exit \ao- Exits the plugin.')
+        Module.Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao No command given.')
+        Module.Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ag /mybuffs gui \ao- Toggles the GUI on and off.')
+        Module.Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ag /mybuffs exit \ao- Exits the plugin.')
     end
 end
 

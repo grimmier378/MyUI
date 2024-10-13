@@ -34,14 +34,22 @@ function LoadTheme.EvaluateLua(str)
 	return LoadTheme.PCallString(string.format(runEnv, str))
 end
 
+---Loads a Theme from a Table and returns the number of Styles and Colors pushed so you can Pop them later
+---@param tName string Theme Name
+---@param tTable table Theme Table
+---@return integer StyleCounter Count of Styles Pushed
+---@return integer ColorCounter Count of Colors Pushed
+---@return integer themeID Theme ID Loaded
 function LoadTheme.StartTheme(tName, tTable)
 	local StyleCounter = 0
 	local ColorCounter = 0
+	local themeID = 0
 	if tTable.Theme == nil then
-		return 0, 0
+		return StyleCounter, ColorCounter, themeID
 	end
 	for tID, tData in pairs(tTable.Theme or {}) do
 		if tData.Name == tName then
+			themeID = tID
 			for pID, cData in pairs(tTable.Theme[tID].Color) do
 				ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
 				ColorCounter = ColorCounter + 1
@@ -61,7 +69,7 @@ function LoadTheme.StartTheme(tName, tTable)
 			end
 		end
 	end
-	return ColorCounter, StyleCounter
+	return ColorCounter, StyleCounter, themeID
 end
 
 ---@param themeColorPop integer

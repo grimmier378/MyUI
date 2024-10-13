@@ -153,6 +153,7 @@ end
 
 function BMButtonEditor:CloseEditPopup()
     picker:SetClosed()
+    self.textEditor:Clear()
     self.editButtonPopupOpen = false
     self.editButtonIndex = 0
     self.editButtonSet = ""
@@ -182,6 +183,7 @@ function BMButtonEditor:OpenEditPopup(Set, Index)
             end
         end
     end
+    self.textEditor:Clear()
 end
 
 function BMButtonEditor:CreateButtonFromCursor(Set, Index)

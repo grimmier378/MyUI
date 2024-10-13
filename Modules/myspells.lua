@@ -18,45 +18,52 @@ local ImGui = require('ImGui')
 local Module = {}
 Module.IsRunning = false
 Module.Name = "MySpells"
-Module.Path = MyUI_Path ~= nil and MyUI_Path or string.format("%s/%s/", mq.luaDir, Module.Name)
+Module.Path = Module.Path ~= nil and Module.Path or string.format("%s/%s/", mq.luaDir, Module.Name)
 
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
 if not loadedExeternally then
-	MyUI_Utils         = require('lib.common')
-	MyUI_Icons         = require('mq.ICONS')
-	MyUI_CharLoaded    = mq.TLO.Me.DisplayName()
-	MyUI_Server        = mq.TLO.MacroQuest.Server()
-	MyUI_AbilityPicker = require('lib.AbilityPicker')
-	MyUI_ThemeLoader   = require('lib.theme_loader')
+	Module.Utils         = require('lib.common')
+	Module.Icons         = require('mq.ICONS')
+	Module.CharLoaded    = mq.TLO.Me.DisplayName()
+	Module.Server        = mq.TLO.MacroQuest.Server()
+	Module.AbilityPicker = require('lib.AbilityPicker')
+	Module.ThemeLoader   = require('lib.theme_loader')
+else
+	Module.Utils = MyUI_Utils
+	Module.Icons = MyUI_Icons
+	Module.CharLoaded = MyUI_CharLoaded
+	Module.Server = MyUI_Server
+	Module.AbilityPicker = MyUI_AbilityPicker
+	Module.ThemeLoader = MyUI_ThemeLoader
 end
 
-local picker = MyUI_AbilityPicker.new()
+local picker = Module.AbilityPicker.new()
 local pickerOpen = false
-local bIcon = MyUI_Icons.FA_BOOK
-local gIcon = MyUI_Icons.MD_SETTINGS
-local LoadTheme = MyUI_ThemeLoader
+local bIcon = Module.Icons.FA_BOOK
+local gIcon = Module.Icons.MD_SETTINGS
+local LoadTheme = Module.ThemeLoader
 local themeID = 1
 local theme, castTheme, defaults, settings, timerColor = {}, {}, {}, {}, {}
 local themeFileOld = string.format('%s/MyThemeZ.lua', mq.configDir)
 local configFileOld = mq.configDir .. '/myui/MySpells_Configs.lua'
 local configFileOld2 = ''
-local themeFile = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
+local themeFile = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
 local configFile = ''
 local themezDir = mq.luaDir .. '/themez/init.lua'
 local themeName = 'Default'
 local casting = false
 local spellBar = {}
 local numGems = 8
-local redGem = MyUI_Utils.SetImage(Module.Path .. '/images/red_gem.png')
-local greenGem = MyUI_Utils.SetImage(Module.Path .. '/images/green_gem.png')
-local purpleGem = MyUI_Utils.SetImage(Module.Path .. '/images/purple_gem.png')
-local blueGem = MyUI_Utils.SetImage(Module.Path .. '/images/blue_gem.png')
-local orangeGem = MyUI_Utils.SetImage(Module.Path .. '/images/orange_gem.png')
-local yellowGem = MyUI_Utils.SetImage(Module.Path .. '/images/yellow_gem.png')
-local openBook = MyUI_Utils.SetImage(Module.Path .. '/images/open_book.png')
-local closedBook = MyUI_Utils.SetImage(Module.Path .. '/images/closed_book.png')
+local redGem = Module.Utils.SetImage(Module.Path .. '/images/red_gem.png')
+local greenGem = Module.Utils.SetImage(Module.Path .. '/images/green_gem.png')
+local purpleGem = Module.Utils.SetImage(Module.Path .. '/images/purple_gem.png')
+local blueGem = Module.Utils.SetImage(Module.Path .. '/images/blue_gem.png')
+local orangeGem = Module.Utils.SetImage(Module.Path .. '/images/orange_gem.png')
+local yellowGem = Module.Utils.SetImage(Module.Path .. '/images/yellow_gem.png')
+local openBook = Module.Utils.SetImage(Module.Path .. '/images/open_book.png')
+local closedBook = Module.Utils.SetImage(Module.Path .. '/images/closed_book.png')
 local memSpell = -1
 local currentTime = os.time()
 local maxRow, rowCount, iconSize, scale = 1, 0, 30, 1
@@ -119,11 +126,11 @@ local function pickColorByType(spellID)
 end
 
 local function loadTheme()
-	if MyUI_Utils.File.Exists(themeFile) then
+	if Module.Utils.File.Exists(themeFile) then
 		theme = dofile(themeFile)
 		castTheme = dofile(themeFile)
 	else
-		if MyUI_Utils.File.Exists(themeFileOld) then
+		if Module.Utils.File.Exists(themeFileOld) then
 			theme = dofile(themeFileOld)
 			castTheme = dofile(themeFileOld)
 		else
@@ -172,7 +179,7 @@ end
 local function loadSettings()
 	-- Check if the dialog data file exists
 	local newSetting = false
-	if not MyUI_Utils.File.Exists(configFile) then
+	if not Module.Utils.File.Exists(configFile) then
 		settings = defaults
 		mq.pickle(configFile, settings)
 		loadSettings()
@@ -183,12 +190,12 @@ local function loadSettings()
 	end
 
 	-- check for new settings and add them to the settings file
-	newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings)
-	newSetting = MyUI_Utils.CheckRemovedSettings(defaults, settings) or newSetting
+	newSetting = Module.Utils.CheckDefaultSettings(defaults, settings)
+	newSetting = Module.Utils.CheckRemovedSettings(defaults, settings) or newSetting
 
-	if settings[Module.Name][MyUI_CharLoaded] == nil then
-		settings[Module.Name][MyUI_CharLoaded] = {}
-		settings[Module.Name][MyUI_CharLoaded].Sets = {}
+	if settings[Module.Name][Module.CharLoaded] == nil then
+		settings[Module.Name][Module.CharLoaded] = {}
+		settings[Module.Name][Module.CharLoaded].Sets = {}
 		newSetting = true
 	end
 
@@ -212,7 +219,7 @@ local function loadSettings()
 end
 
 local function MemSpell(line, spell)
-	-- MyUI_Utils.PrintOutput(nil,"Memorized: ", spell)
+	-- Module.Utils.PrintOutput(nil,"Memorized: ", spell)
 	for i = 1, numGems do
 		if spellBar[i].sName == spell then
 			mq.delay(1)
@@ -223,7 +230,7 @@ local function MemSpell(line, spell)
 end
 
 local function CastDetect(line, spell)
-	-- MyUI_Utils.PrintOutput(nil,"Memorized: ", spell)
+	-- Module.Utils.PrintOutput(nil,"Memorized: ", spell)
 	if not startedCast then
 		startedCast = true
 		startCastTime = os.time()
@@ -328,9 +335,9 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 	end
 
 	-- draw spell icon
-	MyUI_Utils.Animation_Spell:SetTextureCell(iconID or 0)
+	Module.Utils.Animation_Spell:SetTextureCell(iconID or 0)
 	ImGui.SetCursorPos(cursor_x + (scale * 8), cursor_y + (5 * scale))
-	ImGui.DrawTextureAnimation(MyUI_Utils.Animation_Spell, scale * (iconSize - 4), scale * (iconSize - 5))
+	ImGui.DrawTextureAnimation(Module.Utils.Animation_Spell, scale * (iconSize - 4), scale * (iconSize - 5))
 
 	----------- overlay ----------------
 	ImGui.SetCursorPos(cursor_x, cursor_y - 2)
@@ -421,10 +428,10 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 end
 
 local function SaveSet(SetName)
-	if settings[Module.Name][MyUI_CharLoaded].Sets[SetName] == nil then
-		settings[Module.Name][MyUI_CharLoaded].Sets[SetName] = {}
+	if settings[Module.Name][Module.CharLoaded].Sets[SetName] == nil then
+		settings[Module.Name][Module.CharLoaded].Sets[SetName] = {}
 	end
-	settings[Module.Name][MyUI_CharLoaded].Sets[SetName] = spellBar
+	settings[Module.Name][Module.CharLoaded].Sets[SetName] = spellBar
 	mq.pickle(configFile, settings)
 	settings = dofile(configFile)
 	tmpName = ''
@@ -433,7 +440,7 @@ end
 local function LoadSet(set)
 	loadSet      = false
 	local setBar = {}
-	for i, t in pairs(settings[Module.Name][MyUI_CharLoaded].Sets[set]) do
+	for i, t in pairs(settings[Module.Name][Module.CharLoaded].Sets[set]) do
 		setBar[i] = {}
 		for k, v in pairs(t) do
 			setBar[i][k] = v
@@ -522,9 +529,25 @@ local function DrawConfigWin()
 		if scale > 2 then scale = 2 end
 	end
 
-	if hasThemeZ then
+	if hasThemeZ or loadedExeternally then
 		if ImGui.Button('Edit ThemeZ') then
-			mq.cmd("/lua run themez")
+			if not loadedExeternally then
+				mq.cmd("/lua run themez")
+			else
+				if MyUI_Modules.ThemeZ ~= nil then
+					if MyUI_Modules.ThemeZ.IsRunning then
+						MyUI_Modules.ThemeZ.ShowGui = true
+					else
+						MyUI_TempSettings.ModuleChanged = true
+						MyUI_TempSettings.ModuleName = 'ThemeZ'
+						MyUI_TempSettings.ModuleEnabled = true
+					end
+				else
+					MyUI_TempSettings.ModuleChanged = true
+					MyUI_TempSettings.ModuleName = 'ThemeZ'
+					MyUI_TempSettings.ModuleEnabled = true
+				end
+			end
 		end
 		ImGui.SameLine()
 	end
@@ -569,7 +592,7 @@ function Module.RenderGUI()
 	if locked then winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoMove) end
 	if not showTitle then winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoTitleBar) end
 	local ColorCount, StyleCount = DrawTheme(themeName, theme.Theme)
-	local open, show = ImGui.Begin(bIcon .. '##MySpells_' .. MyUI_CharLoaded, true, winFlags)
+	local open, show = ImGui.Begin(bIcon .. '##MySpells_' .. Module.CharLoaded, true, winFlags)
 	if not open then
 		Module.IsRunning = false
 	end
@@ -728,7 +751,7 @@ function Module.RenderGUI()
 				end
 			end
 			ImGui.SameLine()
-			local rIcon = aSize and MyUI_Icons.FA_EXPAND or MyUI_Icons.FA_COMPRESS
+			local rIcon = aSize and Module.Icons.FA_EXPAND or Module.Icons.FA_COMPRESS
 			ImGui.Text(rIcon)
 			if ImGui.IsItemHovered() then
 				local label = aSize and "Disable Auto Size" or "Enable Auto Size"
@@ -745,7 +768,7 @@ function Module.RenderGUI()
 				end
 			end
 			ImGui.SameLine()
-			local lIcon = locked and MyUI_Icons.FA_LOCK or MyUI_Icons.FA_UNLOCK
+			local lIcon = locked and Module.Icons.FA_LOCK or Module.Icons.FA_UNLOCK
 			ImGui.Text(lIcon)
 			if ImGui.IsItemHovered() then
 				local label = locked and "Unlock" or "Lock"
@@ -759,7 +782,7 @@ function Module.RenderGUI()
 				end
 			end
 			ImGui.SameLine()
-			local tIcon = showTitle and MyUI_Icons.FA_EYE_SLASH or MyUI_Icons.FA_EYE
+			local tIcon = showTitle and Module.Icons.FA_EYE_SLASH or Module.Icons.FA_EYE
 			ImGui.Text(tIcon)
 			if ImGui.IsItemHovered() then
 				local label = showTitle and "Hide Title Bar" or "Show Title Bar"
@@ -785,7 +808,7 @@ function Module.RenderGUI()
 			ImGui.SeparatorText("Load Set")
 			ImGui.SetNextItemWidth(150)
 			if ImGui.BeginCombo("##LoadSet", setName) then
-				for k, data in pairs(settings[Module.Name][MyUI_CharLoaded].Sets) do
+				for k, data in pairs(settings[Module.Name][Module.CharLoaded].Sets) do
 					local isSelected = k == setName
 					if ImGui.Selectable(k, isSelected) then
 						setName = k
@@ -803,7 +826,7 @@ function Module.RenderGUI()
 
 			if setName ~= 'None' then
 				if ImGui.Button("Delete Set") then
-					settings[Module.Name][MyUI_CharLoaded].Sets[setName] = nil
+					settings[Module.Name][Module.CharLoaded].Sets[setName] = nil
 					mq.pickle(configFile, settings)
 					setName = 'None'
 					tmpName = ''
@@ -839,7 +862,7 @@ function Module.RenderGUI()
 		ImGui.SetNextWindowSize(ImVec2(150, 55), ImGuiCond.FirstUseEver)
 		ImGui.SetNextWindowPos(ImGui.GetMousePosVec(), ImGuiCond.FirstUseEver)
 
-		local openCast, showCast = ImGui.Begin('Casting##MyCastingWin_' .. MyUI_CharLoaded, true, castFlags)
+		local openCast, showCast = ImGui.Begin('Casting##MyCastingWin_' .. Module.CharLoaded, true, castFlags)
 		if not openCast then
 			castBarShow = false
 		end
@@ -859,7 +882,7 @@ function Module.RenderGUI()
 				-- if remaining < 0 then remaining = 0 end
 				local colorHpMin = { 0.0, 1.0, 0.0, 1.0, }
 				local colorHpMax = { 1.0, 0.0, 0.0, 1.0, }
-				ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, (remaining / castTime * 100))))
+				ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorHpMin, colorHpMax, (remaining / castTime * 100))))
 				ImGui.ProgressBar(remaining / castTime, ImVec2(ImGui.GetWindowWidth(), 15), '')
 				ImGui.PopStyleColor()
 				local lbl = remaining > 0 and string.format("%.1f", (remaining / 1000)) or '0'
@@ -900,14 +923,14 @@ end
 
 local function Init()
 	if mq.TLO.Me.MaxMana() == 0 then
-		MyUI_Utils.PrintOutput(nil, true, "You are not a caster!")
+		Module.Utils.PrintOutput(nil, true, "You are not a caster!")
 		Module.IsRunning = false
 		return
 	end
-	configFileOld2 = string.format('%s/myui/MySpells/MySpells_%s_Configs.lua', mq.configDir, MyUI_CharLoaded)
-	configFile = string.format('%s/myui/MySpells/%s/MySpells_%s.lua', mq.configDir, MyUI_Server, MyUI_CharLoaded)
+	configFileOld2 = string.format('%s/myui/MySpells/MySpells_%s_Configs.lua', mq.configDir, Module.CharLoaded)
+	configFile = string.format('%s/myui/MySpells/%s/MySpells_%s.lua', mq.configDir, Module.Server, Module.CharLoaded)
 	loadSettings()
-	if MyUI_Utils.File.Exists(themezDir) then
+	if Module.Utils.File.Exists(themezDir) then
 		hasThemeZ = true
 	end
 	picker:InitializeAbilities({ 'spell', })

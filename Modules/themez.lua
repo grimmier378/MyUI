@@ -7,9 +7,10 @@ Module.IsRunning = false -- Keep track of running state. if not running we can u
 Module.ShowGui = true
 
 if not loadedExeternally then
-	MyUI_Utils = require('lib.common')
+	Module.Utils = require('lib.common')
 	Module.ThemeLoader = require('lib.theme_loader')
 else
+	Module.Utils = MyUI_Utils
 	Module.ThemeLoader = MyUI_ThemeLoader
 end
 
@@ -18,10 +19,7 @@ local theme = {}
 local settingsFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
 local themeName = 'Default'
 local tmpName = 'Default'
--- local StyleCount = 0
--- local ColorCount = 0
 local themeID = 0
-
 local tFlags = bit32.bor(ImGuiTableFlags.NoBordersInBody)
 local tempSettings = {
 	['LoadTheme'] = 'Default',
@@ -39,41 +37,16 @@ local tempSettings = {
 
 --Helper Functioons
 
-function File_Exists(name)
-	local f = io.open(name, "r")
-	if f ~= nil then
-		io.close(f)
-		return true
-	else
-		return false
-	end
-end
+local function writeSettings(file_name, settings_table)
+	mq.pickle(file_name, settings_table)
 
-local function writeSettings(file, settings)
-	mq.pickle(file, settings)
-
-	if file ~= string.format('%s/MyUI/MyThemeZ.lua', mq.configDir) then
-		writeSettings(string.format('%s/MyUI/MyThemeZ.lua', mq.configDir), settings)
+	if file_name ~= settingsFile then
+		writeSettings(settingsFile, settings_table)
 	end
-end
-
-local function deepcopy(orig)
-	local orig_type = type(orig)
-	local copy
-	if orig_type == 'table' then
-		copy = {}
-		for orig_key, orig_value in next, orig, nil do
-			copy[deepcopy(orig_key)] = deepcopy(orig_value)
-		end
-		setmetatable(copy, deepcopy(getmetatable(orig)))
-	else -- number, string, boolean, etc
-		copy = orig
-	end
-	return copy
 end
 
 local function loadSettings()
-	if not File_Exists(settingsFile) then
+	if not Module.Utils.File.Exists(settingsFile) then
 		mq.pickle(settingsFile, defaults)
 		loadSettings()
 	else
@@ -106,16 +79,6 @@ local function loadSettings()
 	if styleFlag then writeSettings(settingsFile, tempSettings) end
 end
 
-local function getNextID(table)
-	local maxID = 0
-	for k, _ in pairs(table) do
-		local numericId = tonumber(k)
-		if numericId and numericId > maxID then
-			maxID = numericId
-		end
-	end
-	return maxID + 1
-end
 
 local function exportRGMercs(table)
 	if table == nil then return end
@@ -324,9 +287,7 @@ function Module.RenderGUI()
 	if not Module.IsRunning then return end
 	if Module.ShowGui then
 		ImGui.SetNextWindowSize(450, 300, ImGuiCond.FirstUseEver)
-		ImGui.SetNextWindowSize(450, 300, ImGuiCond.Always)
-
-		local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, theme)
+		local ColorCount, StyleCount, loadedID = Module.ThemeLoader.StartTheme(themeName, theme)
 		-- Begin GUI
 		local open, show = ImGui.Begin("ThemeZ Builder##", true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.NoScrollbar))
 		if not open then
@@ -334,9 +295,11 @@ function Module.RenderGUI()
 			Module.ShowGui = false
 		end
 		if show then
+			tempSettings.Theme[loadedID] = theme.Theme[loadedID]
+
 			-- create table entry for themeID if missing.
-			if tempSettings.Theme[themeID] == nil then
-				local i = themeID + 1
+			if tempSettings.Theme[loadedID] == nil then
+				local i = Module.Utils.GetNextID(tempSettings.Theme)
 				tempSettings.Theme = {
 					[i] = {
 						['Name'] = '',
@@ -348,21 +311,22 @@ function Module.RenderGUI()
 					},
 				}
 			end
-			local newName = tempSettings.Theme[themeID]['Name'] or 'New'
+			local newName = tempSettings.Theme[loadedID]['Name'] or 'New'
 			-- Save Current Theme to Config
 			local pressed = ImGui.Button("Save")
 			if pressed then
 				if tmpName == '' then tmpName = themeName end
-				if tempSettings.Theme[themeID]['Name'] ~= tmpName then
-					local nID = getNextID(tempSettings.Theme)
+				if tempSettings.Theme[loadedID]['Name'] ~= tmpName then
+					local nID = Module.Utils.GetNextID(tempSettings.Theme)
 					tempSettings.Theme[nID] = {
 						['Name'] = tmpName,
-						['Color'] = tempSettings.Theme[themeID]['Color'],
+						['Color'] = tempSettings.Theme[loadedID]['Color'],
 					}
-					themeID = nID
+					loadedID = nID
 				end
+				themeName = tmpName
 				writeSettings(settingsFile, tempSettings)
-				theme = deepcopy(tempSettings)
+				theme = Module.Utils.Deepcopy(tempSettings)
 			end
 
 			ImGui.SameLine()
@@ -383,13 +347,13 @@ function Module.RenderGUI()
 			-- Make New Theme
 			local newPressed = ImGui.Button("New")
 			if newPressed then
-				local nID = getNextID(tempSettings.Theme)
+				local nID = Module.Utils.GetNextID(tempSettings.Theme)
 				tempSettings.Theme[nID] = {
 					['Name'] = tmpName,
-					['Color'] = theme.Theme[themeID]['Color'],
+					['Color'] = theme.Theme[loadedID]['Color'],
 				}
 				themeName = tmpName
-				themeID = nID
+				loadedID = nID
 				for k, data in pairs(tempSettings.Theme) do
 					if data.Name == themeName then
 						tempSettings['LoadTheme'] = data['Name']
@@ -431,7 +395,7 @@ function Module.RenderGUI()
 
 			if collapsed then
 				if ImGui.Button('Defaults##Color') then
-					tempSettings.Theme[themeID]['Color'] = defaults.Theme[1].Color
+					tempSettings.Theme[loadedID]['Color'] = defaults.Theme[1].Color
 				end
 				cWidth, xHeight = ImGui.GetContentRegionAvail()
 				if cFlag then
@@ -439,7 +403,7 @@ function Module.RenderGUI()
 				else
 					ImGui.BeginChild('Colors', cWidth, xHeight, ImGuiChildFlags.Border)
 				end
-				for pID, pData in pairs(tempSettings.Theme[themeID]['Color']) do
+				for pID, pData in pairs(tempSettings.Theme[loadedID]['Color']) do
 					if pID ~= nil then
 						local propertyName = pData.PropertyName
 						if propertyName ~= nil then
@@ -459,7 +423,7 @@ function Module.RenderGUI()
 					ImGui.BeginChild('Styles', cWidth, xHeight * 0.5, ImGuiChildFlags.Border)
 				end
 				if ImGui.Button('Defaults##Style') then
-					tempSettings.Theme[themeID]['Style'] = defaults.Theme[1].Style
+					tempSettings.Theme[loadedID]['Style'] = defaults.Theme[1].Style
 				end
 				DrawStyles()
 				ImGui.EndChild()
@@ -481,7 +445,7 @@ local function commandHandler(...)
 	if #args > 0 then
 		if args[1] == 'exit' or args[1] == 'quit' then
 			Module.IsRunning = false
-			MyUI_Utils.PrintOutput('MyUI', true, "\ay%s \awis \arExiting\aw...", Module.Name)
+			Module.Utils.PrintOutput('MyUI', true, "\ay%s \awis \arExiting\aw...", Module.Name)
 		elseif args[1] == 'show' or args[1] == 'ui' then
 			Module.ShowGui = not Module.ShowGui
 		end
@@ -497,10 +461,10 @@ local function startup()
 		mq.imgui.init("ThemeZ Builder##", Module.RenderGUI)
 		Module.LocalLoop()
 	end
-	MyUI_Utils.PrintOutput('MyUI', false, "\ayModule \a-w[\at%s\a-w] \agLoaded\aw!", Module.Name)
-	MyUI_Utils.PrintOutput('MyUI', false, "\ayTheme \a-w[\at%s\a-w] \agLoaded\aw!", themeName)
-	MyUI_Utils.PrintOutput('MyUI', false, "\ay/themez \a-w[\atshow\a-w] \aoToggles the GUI\aw!")
-	MyUI_Utils.PrintOutput('MyUI', false, "\ay/themez \a-w[\atexit\a-w] \aoExits the Module\aw!")
+	Module.Utils.PrintOutput('MyUI', false, "\ayModule \a-w[\at%s\a-w] \agLoaded\aw!", Module.Name)
+	Module.Utils.PrintOutput('MyUI', false, "\ayTheme \a-w[\at%s\a-w] \agLoaded\aw!", themeName)
+	Module.Utils.PrintOutput('MyUI', false, "\ay/themez \a-w[\atshow\a-w] \aoToggles the GUI\aw!")
+	Module.Utils.PrintOutput('MyUI', false, "\ay/themez \a-w[\atexit\a-w] \aoExits the Module\aw!")
 end
 --
 function Module.MainLoop()

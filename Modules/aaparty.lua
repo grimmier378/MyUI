@@ -9,16 +9,22 @@ Module.Name             = 'AAParty'
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 if not loadedExeternally then
-    MyUI_Utils       = require('lib.common')
-    MyUI_ThemeLoader = require('lib.theme_loader')
-    MyUI_Actor       = require('actors')
-    MyUI_CharLoaded  = mq.TLO.Me.DisplayName()
-    MyUI_Mode        = 'driver'
+    Module.Utils       = require('lib.common')
+    Module.ThemeLoader = require('lib.theme_loader')
+    Module.Actor       = require('actors')
+    Module.CharLoaded  = mq.TLO.Me.DisplayName()
+    Module.Mode        = 'driver'
+else
+    Module.Utils       = MyUI_Utils
+    Module.ThemeLoader = MyUI_ThemeLoader
+    Module.Actor       = MyUI_Actor
+    Module.CharLoaded  = MyUI_CharLoaded
+    Module.Mode        = MyUI_Mode
 end
 
 local themeID                                                           = 1
 local expand, compact                                                   = {}, {}
-local themeFile                                                         = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
+local themeFile                                                         = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
 local configFile                                                        = mq.configDir .. '/myui/AA_Party_Configs.lua'
 local themezDir                                                         = mq.luaDir .. '/themez/init.lua'
 local script                                                            = 'AA Party'
@@ -29,7 +35,7 @@ local checkIn                                                           = os.tim
 local currZone, lastZone
 local PctAA, SettingAA, PtsAA, PtsSpent, PtsTotal, PtsAALast, LastState = 0, '0', 0, 0, 0, 0, ""
 local firstRun                                                          = true
-local hasThemeZ                                                         = MyUI_Utils.File.Exists(themezDir)
+local hasThemeZ                                                         = Module.Utils.File.Exists(themezDir)
 
 local theme                                                             = {}
 local settings                                                          = {}
@@ -53,7 +59,7 @@ local defaults                                                          = {
 }
 
 local function loadTheme()
-    if MyUI_Utils.File.Exists(themeFile) then
+    if Module.Utils.File.Exists(themeFile) then
         theme = dofile(themeFile)
     else
         theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
@@ -71,7 +77,7 @@ end
 local function loadSettings()
     -- Check if the dialog data file exists
     local newSetting = false
-    if not MyUI_Utils.File.Exists(configFile) then
+    if not Module.Utils.File.Exists(configFile) then
         settings[script] = defaults
         mq.pickle(configFile, settings)
         loadSettings()
@@ -221,7 +227,7 @@ end
 
 --create mailbox for actors to send messages to
 local function MessageHandler()
-    aaActor = MyUI_Actor.register(Module.ActorMailBox, function(message)
+    aaActor = Module.Actor.register(Module.ActorMailBox, function(message)
         local MemberEntry = message()
         local subject     = MemberEntry.Subject or 'Update'
         local aaXP        = MemberEntry.PctExpAA or 0
@@ -248,7 +254,7 @@ local function MessageHandler()
         end
         --New member connected if Hello is true. Lets send them our data so they have it.
         if subject == 'Hello' then
-            -- if who ~= MyUI_CharLoaded then
+            -- if who ~= Module.CharLoaded then
             if aaActor ~= nil then
                 aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(nil, 'Welcome'))
                 aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(nil, 'Welcome'))
@@ -258,7 +264,7 @@ local function MessageHandler()
             -- checkIn = os.time()
         elseif subject == 'Action' then
             if dowho ~= 'N/A' then
-                if MemberEntry.DoWho == MyUI_CharLoaded then
+                if MemberEntry.DoWho == Module.CharLoaded then
                     if dowhat == 'Less' then
                         mq.TLO.Window("AAWindow/AAW_LessExpButton").LeftMouseUp()
                         return
@@ -291,8 +297,8 @@ local function MessageHandler()
                         groupData[i].Check = check
                         groupData[i].State = MemberEntry.State
                         if groupData[i].LastPts ~= pts then
-                            if who ~= MyUI_CharLoaded and AAPartyMode == 'driver' and groupData[i].LastPts < pts then
-                                MyUI_Utils.PrintOutput('MyUI', true, "%s gained an AA, now has %d unspent", who, pts)
+                            if who ~= Module.CharLoaded and AAPartyMode == 'driver' and groupData[i].LastPts < pts then
+                                Module.Utils.PrintOutput('MyUI', true, "%s gained an AA, now has %d unspent", who, pts)
                             end
                             groupData[i].LastPts = pts
                         end
@@ -384,7 +390,7 @@ end
 local function SayGoodBye()
     local message = {
         Subject = 'Goodbye',
-        Name = MyUI_CharLoaded,
+        Name = Module.CharLoaded,
         Check = 0,
     }
     if aaActor ~= nil then
@@ -402,7 +408,7 @@ function Module.RenderGUI()
             winFlags = bit32.bor(ImGuiWindowFlags.None)
         end
         local ColorCount, StyleCount = DrawTheme(settings[script].LoadTheme or 'Default')
-        local openGUI, showGUI = imgui.Begin("AA Party##_" .. MyUI_CharLoaded, true, winFlags)
+        local openGUI, showGUI = imgui.Begin("AA Party##_" .. Module.CharLoaded, true, winFlags)
         if not openGUI then
             AAPartyShow = false
         end
@@ -445,17 +451,17 @@ function Module.RenderGUI()
                         ImGui.SameLine()
                         local combatState = groupData[i].State
                         if combatState == 'DEBUFFED' then
-                            MyUI_Utils.DrawStatusIcon('A_PWCSDebuff', 'pwcs', 'You are Debuffed and need a cure before resting.', iconSize)
+                            Module.Utils.DrawStatusIcon('A_PWCSDebuff', 'pwcs', 'You are Debuffed and need a cure before resting.', iconSize)
                         elseif combatState == 'ACTIVE' then
-                            MyUI_Utils.DrawStatusIcon('A_PWCSStanding', 'pwcs', 'You are not in combat and may rest at any time.', iconSize)
+                            Module.Utils.DrawStatusIcon('A_PWCSStanding', 'pwcs', 'You are not in combat and may rest at any time.', iconSize)
                         elseif combatState == 'COOLDOWN' then
-                            MyUI_Utils.DrawStatusIcon('A_PWCSTimer', 'pwcs', 'You are recovering from combat and can not reset yet', iconSize)
+                            Module.Utils.DrawStatusIcon('A_PWCSTimer', 'pwcs', 'You are recovering from combat and can not reset yet', iconSize)
                         elseif combatState == 'RESTING' then
-                            MyUI_Utils.DrawStatusIcon('A_PWCSRegen', 'pwcs', 'You are Resting.', iconSize)
+                            Module.Utils.DrawStatusIcon('A_PWCSRegen', 'pwcs', 'You are Resting.', iconSize)
                         elseif combatState == 'COMBAT' then
-                            MyUI_Utils.DrawStatusIcon('A_PWCSInCombat', 'pwcs', 'You are in Combat.', iconSize)
+                            Module.Utils.DrawStatusIcon('A_PWCSInCombat', 'pwcs', 'You are in Combat.', iconSize)
                         else
-                            MyUI_Utils.DrawStatusIcon(3996, 'item', ' ', iconSize)
+                            Module.Utils.DrawStatusIcon(3996, 'item', ' ', iconSize)
                         end
 
                         if not compact[groupData[i].Name] then
@@ -546,28 +552,28 @@ function Module.RenderGUI()
                 end
             end
             if ImGui.BeginPopupContextWindow() then
-                if ImGui.MenuItem("Config##Config_" .. MyUI_CharLoaded) then
+                if ImGui.MenuItem("Config##Config_" .. Module.CharLoaded) then
                     AAPartyConfigShow = not AAPartyConfigShow
                 end
-                if ImGui.MenuItem("Toggle Auto Size##Size_" .. MyUI_CharLoaded) then
+                if ImGui.MenuItem("Toggle Auto Size##Size_" .. Module.CharLoaded) then
                     TempSettings.aSize = not TempSettings.aSize
                 end
-                if ImGui.MenuItem("Toggle Tooltip##Tooltip_" .. MyUI_CharLoaded) then
+                if ImGui.MenuItem("Toggle Tooltip##Tooltip_" .. Module.CharLoaded) then
                     TempSettings.showTooltip = not TempSettings.showTooltip
                 end
                 ImGui.EndPopup()
             end
-            MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
+            Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
             imgui.End()
         else
-            MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
+            Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
             imgui.End()
         end
     end
 
     if MailBoxShow then
         local ColorCount, StyleCount = DrawTheme(settings[script].LoadTheme or 'Default')
-        local openMail, showMail = imgui.Begin("AA Party MailBox##MailBox_" .. MyUI_CharLoaded, true, ImGuiWindowFlags.None)
+        local openMail, showMail = imgui.Begin("AA Party MailBox##MailBox_" .. Module.CharLoaded, true, ImGuiWindowFlags.None)
         if not openMail then
             MailBoxShow = false
             mailBox = {}
@@ -599,7 +605,7 @@ function Module.RenderGUI()
             end
             ImGui.EndTable()
         end
-        MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
+        Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
         imgui.End()
     else
         mailBox = {}
@@ -633,9 +639,25 @@ function Module.RenderGUI()
                 if TempSettings.scale > 2 then TempSettings.scale = 2 end
             end
 
-            if hasThemeZ then
+            if hasThemeZ or loadedExeternally then
                 if ImGui.Button('Edit ThemeZ') then
-                    mq.cmd("/lua run themez")
+                    if not loadedExeternally then
+                        mq.cmd("/lua run themez")
+                    else
+                        if MyUI_Modules.ThemeZ ~= nil then
+                            if MyUI_Modules.ThemeZ.IsRunning then
+                                MyUI_Modules.ThemeZ.ShowGui = true
+                            else
+                                MyUI_TempSettings.ModuleChanged = true
+                                MyUI_TempSettings.ModuleName = 'ThemeZ'
+                                MyUI_TempSettings.ModuleEnabled = true
+                            end
+                        else
+                            MyUI_TempSettings.ModuleChanged = true
+                            MyUI_TempSettings.ModuleName = 'ThemeZ'
+                            MyUI_TempSettings.ModuleEnabled = true
+                        end
+                    end
                 end
                 ImGui.SameLine()
             end
@@ -659,22 +681,22 @@ function Module.RenderGUI()
                 AAPartyConfigShow = false
             end
         end
-        MyUI_ThemeLoader.EndTheme(ColorCountTheme, StyleCountTheme)
+        Module.ThemeLoader.EndTheme(ColorCountTheme, StyleCountTheme)
         ImGui.End()
     end
 end
 
 function Module.CheckMode()
-    if MyUI_Mode == 'driver' then
+    if Module.Mode == 'driver' then
         AAPartyShow = true
         AAPartyMode = 'driver'
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Setting \atDriver\ax Mode. UI will be displayed.')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Type \at/aaparty show\ax. to Toggle the UI')
-    elseif MyUI_Mode == 'client' then
+        Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Setting \atDriver\ax Mode. UI will be displayed.')
+        Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Type \at/aaparty show\ax. to Toggle the UI')
+    elseif Module.Mode == 'client' then
         AAPartyMode = 'client'
         AAPartyShow = false
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Setting \atClient\ax Mode. UI will not be displayed.')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Type \at/aaparty show\ax. to Toggle the UI')
+        Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Setting \atClient\ax Mode. UI will not be displayed.')
+        Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Type \at/aaparty show\ax. to Toggle the UI')
     end
 end
 
@@ -716,29 +738,29 @@ local function processCommand(...)
         if args[1] == 'gui' or args[1] == 'show' or args[1] == 'open' then
             AAPartyShow = not AAPartyShow
             if AAPartyShow then
-                MyUI_Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Toggling GUI \atOpen\ax.')
+                Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Toggling GUI \atOpen\ax.')
             else
-                MyUI_Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Toggling GUI \atClosed\ax.')
+                Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Toggling GUI \atClosed\ax.')
             end
         elseif args[1] == 'exit' or args[1] == 'quit' then
             Module.IsRunning = false
-            MyUI_Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Exiting.')
+            Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Exiting.')
             SayGoodBye()
             Module.IsRunning = false
         elseif args[1] == 'mailbox' then
             MailBoxShow = not MailBoxShow
             if MailBoxShow then
-                MyUI_Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Toggling MailBox \atOpen\ax.')
+                Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Toggling MailBox \atOpen\ax.')
             else
-                MyUI_Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Toggling MailBox \atClosed\ax.')
+                Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Toggling MailBox \atClosed\ax.')
             end
         else
-            MyUI_Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Invalid command given.')
+            Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Invalid command given.')
         end
     else
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao No command given.')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ag /aaparty gui \ao- Toggles the GUI on and off.')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ag /aaparty exit \ao- Exits the plugin.')
+        Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao No command given.')
+        Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ag /aaparty gui \ao- Toggles the GUI on and off.')
+        Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ag /aaparty exit \ao- Exits the plugin.')
     end
 end
 
@@ -757,7 +779,7 @@ local function init()
     loadSettings()
     getMyAA()
     Module.IsRunning = true
-    if MyUI_Utils.File.Exists(themezDir) then
+    if Module.Utils.File.Exists(themezDir) then
         hasThemeZ = true
     end
 

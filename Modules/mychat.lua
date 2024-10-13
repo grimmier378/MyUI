@@ -3,52 +3,88 @@ local ImGui             = require('ImGui')
 
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
-
+local Module            = {}
 if not loadedExeternally then
-    MyUI_Utils       = require('lib.common')
-    MyUI_ThemeLoader = require('lib.theme_loader')
-    MyUI_Actor       = require('actors')
-    MyUI_CharLoaded  = mq.TLO.Me.DisplayName()
-    MyUI_Icons       = require('mq.ICONS')
-    MyUI_Guild       = mq.TLO.Me.Guild()
-    MyUI_Server      = mq.TLO.MacroQuest.Server()
-    MyUI_Mode        = 'driver'
+    Module.Utils       = require('lib.common')
+    Module.ThemeLoader = require('lib.theme_loader')
+    Module.Actor       = require('actors')
+    Module.CharLoaded  = mq.TLO.Me.DisplayName()
+    Module.Icons       = require('mq.ICONS')
+    Module.Guild       = mq.TLO.Me.Guild()
+    Module.Server      = mq.TLO.MacroQuest.Server()
+    Module.Mode        = 'driver'
+else
+    Module.Utils = MyUI_Utils
+    Module.ThemeLoader = MyUI_ThemeLoader
+    Module.Actor = MyUI_Actor
+    Module.CharLoaded = MyUI_CharLoaded
+    Module.Icons = MyUI_Icons
+    Module.Guild = MyUI_Guild
+    Module.Server = MyUI_Server
+    Module.Mode = MyUI_Mode
 end
+Module.Name              = "MyChat"
+Module.IsRunning         = false
+Module.defaults          = Module.Utils.Library.Include('defaults.default_chat_settings')
+Module.tempSettings      = {}
+Module.eventNames        = {}
+Module.tempFilterStrings = {}
+Module.tempEventStrings  = {}
+Module.tempChanColors    = {}
+Module.tempFiltColors    = {}
+Module.hString           = {}
+Module.TLOConsoles       = {}
+Module.theme             = {}
+Module.SHOW              = true
+Module.openGUI           = true
+Module.openConfigGUI     = false
+Module.refreshLinkDB     = 10
+Module.mainEcho          = '/say'
+Module.doRefresh         = false
+Module.SettingsFile      = string.format('%s/MyUI/MyChat/%s/%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
+Module.ThemesFile        = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
+Module.KeyFocus          = false
+Module.KeyName           = 'RightShift'
+Module.Settings          = {
+    -- Channels
+    Channels = {},
+}
+Module.console           = nil
+Module.commandBuffer     = ''
+Module.timeStamps        = true
+Module.doLinks           = false
+-- Consoles
+Module.Consoles          = {}
+-- Flags
+Module.tabFlags          = bit32.bor(ImGuiTabBarFlags.Reorderable, ImGuiTabBarFlags.FittingPolicyResizeDown, ImGuiTabBarFlags.TabListPopupButton)
+Module.winFlags          = bit32.bor(ImGuiWindowFlags.MenuBar, ImGuiWindowFlags.NoScrollbar)
+Module.PopOutFlags       = bit32.bor(ImGuiWindowFlags.NoScrollbar)
 
-local setFocus                                   = false
-local commandBuffer                              = ''
 
 -- local var's
-local serverName                                 = string.gsub(MyUI_Server, ' ', '_') or ''
-local addChannel                                 = false -- Are we adding a new channel or editing an old one
-local sortedChannels                             = {}
-local useTheme, timeStamps, newEvent, newFilter  = false, true, false, false
-local zBuffer                                    = 1000      -- the buffer size for the Zoom chat buffer.
-local editChanID, editEventID, lastID, lastChan  = 0, 0, 0, 0
-local ActTab, activeID                           = 'Main', 0 -- info about active tab channels
-local useThemeName                               = 'Default' -- Name of the theme we wish to apply
-local ColorCountEdit, ColorCountConf, ColorCount = 0, 0, 0   -- Counters for the color editing windows
-local StyleCount, StyleCountEdit, StyleCountConf = 0, 0, 0   -- Counters for the style edits
-local lastImport                                 = 'none'    -- file name of the last imported file, if we try and import the same file again we will abort.
-local windowNum                                  = 0         --unused will remove later.
-local fromConf                                   = false     -- Did we open the edit channel window from the main config window? if we did we will go back to that window after closing.
-local gIcon                                      = MyUI_Icons.MD_SETTINGS
-local zoomMain                                   = false
-local firstPass, forceIndex, doLinks             = true, false, false
-local mainLastScrollPos                          = 0
-local mainBottomPosition                         = 0
-local doRefresh                                  = false
--- local timeA = os.time()
-local mainBuffer                                 = {}
-local importFile                                 = 'Server_Name/CharName.lua'
-local settingsOld                                = string.format('%s/MyChat_%s_%s.lua', mq.configDir, serverName, MyUI_CharLoaded)
-local cleanImport                                = false
--- local Tokens = {} -- may use this later to hold the tokens and remove a long string of if elseif.
-local enableSpam, resetConsoles                  = false, false
-local eChan                                      = '/say'
-local keyName                                    = 'RightShift'
 
-local keyboardKeys                               = {
+local setFocus                                  = false
+local commandBuffer                             = ''
+local addChannel                                = false -- Are we adding a new channel or editing an old one
+local sortedChannels                            = {}
+local timeStamps, newEvent, newFilter           = true, false, false
+local zBuffer                                   = 1000   -- the buffer size for the Zoom chat buffer.
+local editChanID, editEventID, lastID, lastChan = 0, 0, 0, 0
+local activeTabID                               = 0      -- info about active tab channels
+local lastImport                                = 'none' -- file name of the last imported file, if we try and import the same file again we will abort.
+local windowNum                                 = 0      --unused will remove later.
+local fromConf                                  = false  -- Did we open the edit channel window from the main config window? if we did we will go back to that window after closing.
+local gIcon                                     = Module.Icons.MD_SETTINGS
+local firstPass, forceIndex, doLinks            = true, false, false
+local doRefresh                                 = false
+local mainBuffer                                = {}
+local importFile                                = 'Server_Name/CharName.lua'
+local settingsOld                               = string.format('%s/MyChat_%s_%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
+local cleanImport                               = false
+local enableSpam, resetConsoles                 = false, false
+local eChan                                     = '/say'
+local fontSizes                                 = {}
+local keyboardKeys                              = {
     [1]  = 'GraveAccent',
     [2]  = 'Enter',
     [3]  = 'RightShift',
@@ -88,49 +124,6 @@ local keyboardKeys                               = {
     [76] = 'Slash',
     [77] = 'Menu',
 }
-
--- local build, server
-
-local Module                                     = {
-    SHOW = true,
-    openGUI = true,
-    openConfigGUI = false,
-    refreshLinkDB = 10,
-    mainEcho = '/say',
-    doRefresh = false,
-    SettingsFile = string.format('%s/MyUI/MyChat/%s/%s.lua', mq.configDir, serverName, MyUI_CharLoaded),
-    ThemesFile = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile,
-    KeyFocus = false,
-    KeyName = 'RightShift',
-    Settings = {
-        -- Channels
-        Channels = {},
-    },
-    ---@type ConsoleWidget
-    console = nil,
-    commandBuffer = '',
-    timeStamps = true,
-    doLinks = false,
-    -- Consoles
-    Consoles = {},
-    -- Flags
-    tabFlags = bit32.bor(ImGuiTabBarFlags.Reorderable, ImGuiTabBarFlags.FittingPolicyResizeDown, ImGuiTabBarFlags.TabListPopupButton),
-    winFlags = bit32.bor(ImGuiWindowFlags.MenuBar, ImGuiWindowFlags.NoScrollbar),
-    PopOutFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar),
-
-}
-Module.Name                                      = "MyChat"
-Module.IsRunning                                 = false
-Module.defaults                                  = MyUI_Utils.Library.Include('defaults.default_chat_settings')
-Module.tempSettings                              = {}
-Module.eventNames                                = {}
-Module.tempFilterStrings                         = {}
-Module.tempEventStrings                          = {}
-Module.tempChanColors                            = {}
-Module.tempFiltColors                            = {}
-Module.hString                                   = {}
-Module.TLOConsoles                               = {}
-Module.theme                                     = {} -- table to hold the themes file into.
 
 
 local MyColorFlags = bit32.bor(
@@ -272,7 +265,7 @@ local function reIndexSettings(file, table)
                 for eID, eData in pairs(table.Channels[cID].Events) do
                     for k, v in pairs(eData) do
                         if k == "Filters" then
-                            tmpTbl.Channels[cID][id][eID].Filters = reindexFilters(v)
+                            tmpTbl.Channels[cID][id][eID].Filters = reindex(v)
                         end
                     end
                 end
@@ -313,9 +306,9 @@ local function writeSettings(file, table)
 end
 
 local function loadSettings()
-    if not MyUI_Utils.File.Exists(Module.SettingsFile) then
-        settingsOld = string.format('%s/MyChat_%s_%s.lua', mq.configDir, serverName, MyUI_CharLoaded)
-        if MyUI_Utils.File.Exists(settingsOld) then
+    if not Module.Utils.File.Exists(Module.SettingsFile) then
+        settingsOld = string.format('%s/MyChat_%s_%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
+        if Module.Utils.File.Exists(settingsOld) then
             Module.Settings = dofile(settingsOld)
             mq.pickle(Module.SettingsFile, Module.Settings)
         else
@@ -328,10 +321,19 @@ local function loadSettings()
         Module.Settings = dofile(Module.SettingsFile)
         if firstPass then
             local date = os.date("%m_%d_%Y_%H_%M")
-            local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, MyUI_CharLoaded, date)
-            if not MyUI_Utils.File.Exists(backup) then mq.pickle(backup, Module.Settings) end
+            local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded, date)
+            if not Module.Utils.File.Exists(backup) then mq.pickle(backup, Module.Settings) end
             reIndexSettings(Module.SettingsFile, Module.Settings)
             firstPass = false
+        end
+    end
+
+    for i = 10, 40 do
+        if i % 2 == 0 then
+            table.insert(fontSizes, i)
+            if i == 12 then
+                table.insert(fontSizes, 13) -- this is the default font size so keep it in the list
+            end
         end
     end
 
@@ -450,9 +452,8 @@ local function loadSettings()
         Module.Settings.Scale = 1.0
     end
 
-    useThemeName = Module.Settings.LoadTheme
-    if not MyUI_Utils.File.Exists(Module.ThemesFile) then
-        local defaultThemes = MyUI_Utils.Library.Include('defaults.themes')
+    if not Module.Utils.File.Exists(Module.ThemesFile) then
+        local defaultThemes = Module.Utils.Library.Include('defaults.themes')
         Module.theme = defaultThemes
     else
         -- Load settings from the Lua config file
@@ -461,10 +462,6 @@ local function loadSettings()
 
     if not Module.Settings.LoadTheme then
         Module.Settings.LoadTheme = Module.theme.LoadTheme
-    end
-
-    if useThemeName ~= 'Default' then
-        useTheme = true
     end
 
     if Module.Settings.doLinks == nil then
@@ -665,7 +662,7 @@ function Module.EventChat(channelID, eventName, line, spam)
                         end
 
                         if string.find(fString, 'M3') then
-                            fString = string.gsub(fString, 'M3', MyUI_CharLoaded)
+                            fString = string.gsub(fString, 'M3', Module.CharLoaded)
                         elseif string.find(fString, 'PT1') then
                             fString = string.gsub(fString, 'PT1', mq.TLO.Me.Pet.DisplayName() or 'NO PET')
                         elseif string.find(fString, 'PT3') then
@@ -731,6 +728,7 @@ function Module.EventChat(channelID, eventName, line, spam)
                         end
                         if fMatch then
                             matchCount = matchCount + 1
+                            goto found_match
                         end
                     end
                 end
@@ -751,7 +749,7 @@ function Module.EventChat(channelID, eventName, line, spam)
                 local colorCode = ImVec4(colorVec[1], colorVec[2], colorVec[3], colorVec[4])
 
                 if Module.Consoles[channelID].console then
-                    MyUI_Utils.AppendColoredTimestamp(Module.Consoles[channelID].console, tStamp, conLine, colorCode, timeStamps)
+                    Module.Utils.AppendColoredTimestamp(Module.Consoles[channelID].console, tStamp, conLine, colorCode, timeStamps)
                 end
 
                 -- -- write channel console
@@ -763,7 +761,7 @@ function Module.EventChat(channelID, eventName, line, spam)
 
                 -- write main console
                 if Module.tempSettings.Channels[channelID].MainEnable then
-                    MyUI_Utils.AppendColoredTimestamp(Module.console, tStamp, conLine, colorCode, timeStamps)
+                    Module.Utils.AppendColoredTimestamp(Module.console, tStamp, conLine, colorCode, timeStamps)
                     -- ChatWin.console:AppendText(colorCode,conLine)
                     local z = getNextID(mainBuffer)
 
@@ -859,7 +857,7 @@ function Module.EventChatSpam(channelID, line)
             end
             -- write channel console
             if Module.Consoles[channelID].console then
-                MyUI_Utils.AppendColoredTimestamp(Module.Consoles[channelID].console, tStamp, conLine, colorCode, timeStamps)
+                Module.Utils.AppendColoredTimestamp(Module.Consoles[channelID].console, tStamp, conLine, colorCode, timeStamps)
                 -- ChatWin.Consoles[channelID].console:AppendText(colorCode, conLine)
             end
 
@@ -1039,8 +1037,8 @@ local function DrawChatWindow()
     -- Main menu bar
     if ImGui.BeginMenuBar() then
         ImGui.SetWindowFontScale(Module.Settings.Scale)
-        local lockedIcon = Module.Settings.locked and MyUI_Icons.FA_LOCK .. '##lockTabButton_MyChat' or
-            MyUI_Icons.FA_UNLOCK .. '##lockTablButton_MyChat'
+        local lockedIcon = Module.Settings.locked and Module.Icons.FA_LOCK .. '##lockTabButton_MyChat' or
+            Module.Icons.FA_UNLOCK .. '##lockTablButton_MyChat'
         if ImGui.Button(lockedIcon) then
             --ImGuiWindowFlags.NoMove
             Module.Settings.locked = not Module.Settings.locked
@@ -1220,8 +1218,7 @@ local function DrawChatWindow()
                 ImGui.Text(sizeBuff)
                 ImGui.EndTooltip()
             end
-            ActTab = 'Main'
-            activeID = 0
+            activeTabID = 0
             local footerHeight = 35
             local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
             contentSizeY = contentSizeY - footerHeight
@@ -1311,8 +1308,7 @@ local function DrawChatWindow()
                 if not PopOut then
                     ImGui.SetWindowFontScale(1)
                     if ImGui.BeginTabItem(name) then
-                        ActTab = name
-                        activeID = channelID
+                        activeTabID = channelID
                         ImGui.SetWindowFontScale(Module.Settings.Scale)
                         if ImGui.IsItemHovered() then
                             tabToolTip()
@@ -1389,13 +1385,13 @@ end
 function Module.RenderGUI()
     if not Module.IsRunning then return end
 
-    local windowName = 'My Chat - Main##' .. MyUI_CharLoaded .. '_' .. windowNum
+    local windowName = 'My Chat - Main##' .. Module.CharLoaded .. '_' .. windowNum
     ImGui.SetWindowPos(windowName, ImVec2(20, 20), ImGuiCond.FirstUseEver)
     ImGui.SetNextWindowSize(ImVec2(640, 480), ImGuiCond.FirstUseEver)
-    if useTheme then
-        local themeName = Module.tempSettings.LoadTheme
-        ColorCount, StyleCount = DrawTheme(themeName)
-    end
+
+    local themeName = Module.tempSettings.LoadTheme
+    local ColorCount, StyleCount = DrawTheme(themeName)
+
     local winFlags = Module.winFlags
     if Module.Settings.locked then
         winFlags = bit32.bor(ImGuiWindowFlags.MenuBar, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoScrollbar)
@@ -1434,8 +1430,8 @@ function Module.RenderGUI()
                 local show
                 PopOut, show = ImGui.Begin(name .. "##" .. channelID .. name, PopOut, Module.PopOutFlags)
                 if show then
-                    local lockedIcon = Module.Settings.Channels[channelID].locked and MyUI_Icons.FA_LOCK .. '##lockTabButton' .. channelID or
-                        MyUI_Icons.FA_UNLOCK .. '##lockTablButton' .. channelID
+                    local lockedIcon = Module.Settings.Channels[channelID].locked and Module.Icons.FA_LOCK .. '##lockTabButton' .. channelID or
+                        Module.Icons.FA_UNLOCK .. '##lockTablButton' .. channelID
                     if ImGui.Button(lockedIcon) then
                         --ImGuiWindowFlags.NoMove
                         Module.Settings.Channels[channelID].locked = not Module.Settings.Channels[channelID].locked
@@ -1454,7 +1450,7 @@ function Module.RenderGUI()
                         ResetEvents()
                     end
                     ImGui.SameLine()
-                    if ImGui.Button(MyUI_Icons.MD_SETTINGS .. "##" .. channelID) then
+                    if ImGui.Button(Module.Icons.MD_SETTINGS .. "##" .. channelID) then
                         editChanID = channelID
                         addChannel = false
                         fromConf = false
@@ -1600,9 +1596,23 @@ function Module.AddChannel(editChanID, isNewChannel)
     -- Slider for adjusting zoom level
     if Module.Consoles[editChanID].console ~= nil then
         local changed = false
-        Module.Consoles[editChanID].console.fontSize, changed = ImGui.SliderInt("Font Size", Module.Consoles[editChanID].console.fontSize, 8, 300)
-        Module.tempSettings.Channels[editChanID].Scale = Module.Consoles[editChanID].console.fontSize
-        Module.Settings.Channels[editChanID].Scale = Module.Consoles[editChanID].console.fontSize
+        if ImGui.BeginCombo("Font Size##" .. editChanID, tostring(Module.Consoles[editChanID].console.fontSize)) then
+            for k, data in pairs(fontSizes) do
+                local isSelected = data == Module.Consoles[editChanID].console.fontSize
+                if ImGui.Selectable(tostring(data), isSelected) then
+                    if Module.Consoles[editChanID].console.fontSize ~= data then
+                        Module.Consoles[editChanID].console.fontSize = data
+                        Module.Settings.Channels[editChanID].Scale = Module.Consoles[editChanID].console.fontSize
+                        Module.tempSettings.Channels[editChanID].Scale = Module.Consoles[editChanID].console.fontSize
+                        changed = true
+                    end
+                end
+            end
+            ImGui.EndCombo()
+        end
+        -- Module.Consoles[editChanID].console.fontSize, changed = ImGui.SliderInt("Font Size", Module.Consoles[editChanID].console.fontSize, 8, 300)
+        -- Module.tempSettings.Channels[editChanID].Scale = Module.Consoles[editChanID].console.fontSize
+        -- Module.Settings.Channels[editChanID].Scale = Module.Consoles[editChanID].console.fontSize
         if changed then
             mq.pickle(Module.SettingsFile, Module.Settings)
         end
@@ -1613,7 +1623,7 @@ function Module.AddChannel(editChanID, isNewChannel)
     ImGui.SameLine()
     if ImGui.Button('Save Settings') then
         local date = os.date("%m_%d_%Y_%H_%M")
-        local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, MyUI_CharLoaded, date)
+        local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded, date)
         mq.pickle(backup, Module.Settings)
         Module.tempSettings.Channels[editChanID] = Module.tempSettings.Channels[editChanID] or { Events = {}, Name = "New Channel", enabled = true, }
         Module.tempSettings.Channels[editChanID].Name = Module.tempEventStrings[editChanID].Name or "New Channel"
@@ -1656,7 +1666,7 @@ function Module.AddChannel(editChanID, isNewChannel)
         -- Delete the event
         local date = os.date("%m_%d_%Y_%H_%M")
 
-        local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, MyUI_CharLoaded, date)
+        local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded, date)
         mq.pickle(backup, Module.Settings)
         Module.tempSettings.Channels[editChanID] = nil
         Module.tempEventStrings[editChanID] = nil
@@ -1898,13 +1908,9 @@ local function buildConfig()
 end
 
 function Module.Config_GUI(open)
-    local themeName = Module.tempSettings.LoadTheme or 'notheme'
-    if themeName ~= 'notheme' then useTheme = true end
+    local themeName = Module.tempSettings.LoadTheme or 'Default'
     -- Push Theme Colors
-    if useTheme then
-        local themeName = Module.tempSettings.LoadTheme
-        ColorCountConf, StyleCountConf = DrawTheme(themeName)
-    end
+    local ColorCountConf, StyleCountConf = DrawTheme(themeName)
     local show = false
     open, show = ImGui.Begin("Event Configuration", open, bit32.bor(ImGuiWindowFlags.None))
     if not open then Module.openConfigGUI = false end
@@ -1924,7 +1930,24 @@ function Module.Config_GUI(open)
         if ImGui.Button("Reload Theme File") then
             loadSettings()
         end
-
+        ImGui.SameLine()
+        if loadedExeternally then
+            if ImGui.Button('Edit ThemeZ') then
+                if MyUI_Modules.ThemeZ ~= nil then
+                    if MyUI_Modules.ThemeZ.IsRunning then
+                        MyUI_Modules.ThemeZ.ShowGui = true
+                    else
+                        MyUI_TempSettings.ModuleChanged = true
+                        MyUI_TempSettings.ModuleName = 'ThemeZ'
+                        MyUI_TempSettings.ModuleEnabled = true
+                    end
+                else
+                    MyUI_TempSettings.ModuleChanged = true
+                    MyUI_TempSettings.ModuleName = 'ThemeZ'
+                    MyUI_TempSettings.ModuleEnabled = true
+                end
+            end
+        end
         ImGui.SameLine()
         -- Close Button
         if ImGui.Button('Close') then
@@ -1942,14 +1965,14 @@ function Module.Config_GUI(open)
 
         if ImGui.Button('Import Channels') then
             local tmp = mq.configDir .. '/MyUI/MyChat/' .. importFile
-            if not MyUI_Utils.File.Exists(tmp) then
+            if not Module.Utils.File.Exists(tmp) then
                 mq.cmd("/msgbox 'No File Found!")
             else
                 -- Load settings from the Lua config file
                 local date = os.date("%m_%d_%Y_%H_%M")
 
                 -- print(date)
-                local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, serverName, MyUI_CharLoaded, date)
+                local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded, date)
                 mq.pickle(backup, Module.Settings)
                 local newSettings = {}
                 local newID = getNextID(Module.tempSettings.Channels)
@@ -2001,9 +2024,29 @@ function Module.Config_GUI(open)
         end
 
         if Module.console ~= nil then
-            Module.console.fontSize = ImGui.SliderInt("Main Tab Font Size", Module.console.fontSize, 8, 300)
-            Module.Settings.MainFontSize = Module.console.fontSize
-            writeSettings(Module.SettingsFile, Module.Settings)
+            local changed = false
+            if ImGui.BeginCombo("Main Tab Font Size##" .. editChanID, tostring(Module.console.fontSize)) then
+                for k, data in pairs(fontSizes) do
+                    local isSelected = data == Module.console.fontSize
+                    if ImGui.Selectable(tostring(data), isSelected) then
+                        if Module.console.fontSize ~= data then
+                            Module.console.fontSize = data
+                            Module.Settings.MainFontSize = Module.console.fontSize
+
+                            changed = true
+                        end
+                    end
+                end
+                ImGui.EndCombo()
+            end
+            if changed then
+                writeSettings(Module.SettingsFile, Module.Settings)
+            end
+
+
+            -- Module.console.fontSize = ImGui.SliderInt("Main Tab Font Size", Module.console.fontSize, 8, 300)
+            -- Module.Settings.MainFontSize = Module.console.fontSize
+            -- writeSettings(Module.SettingsFile, Module.Settings)
         end
 
         if Module.Settings.Scale ~= tmpZoom then
@@ -2042,10 +2085,10 @@ end
 
 function Module.Edit_GUI(open)
     if not Module.openEditGUI then return end
-    if useTheme then
-        local themeName = Module.Settings.LoadTheme
-        ColorCountEdit, StyleCountEdit = DrawTheme(themeName)
-    end
+
+    local themeName = Module.Settings.LoadTheme
+    local ColorCountEdit, StyleCountEdit = DrawTheme(themeName)
+
     local showEdit
     open, showEdit = ImGui.Begin("Channel Editor", open, bit32.bor(ImGuiWindowFlags.None))
     if not open then Module.openEditGUI = false end
@@ -2084,8 +2127,8 @@ function Module.ExecCommand(text)
         if text == 'clear' then
             Module.console:Clear()
         elseif string.sub(text, 1, 1) ~= '/' then
-            if activeID > 0 then
-                eChan = Module.Settings.Channels[activeID].Echo or '/say'
+            if activeTabID > 0 then
+                eChan = Module.Settings.Channels[activeTabID].Echo or '/say'
             end
             if string.find(eChan, '_') then
                 eChan = string.gsub(eChan, '_', '')
@@ -2175,7 +2218,7 @@ end
 function Module.MyChatHandler(consoleName, message)
     -- if console specified is main then just print to main console
     if consoleName:lower() == 'main' then
-        MyUI_Utils.AppendColoredTimestamp(Module.console, mq.TLO.Time.Time24(), message, nil, true)
+        Module.Utils.AppendColoredTimestamp(Module.console, mq.TLO.Time.Time24(), message, nil, true)
         return
     end
 
@@ -2185,11 +2228,11 @@ function Module.MyChatHandler(consoleName, message)
 
     -- main console if enabled
     if Module.Settings.Channels[consoleID].MainEnable ~= false then
-        MyUI_Utils.AppendColoredTimestamp(Module.console, mq.TLO.Time.Time24(), message, nil, true)
+        Module.Utils.AppendColoredTimestamp(Module.console, mq.TLO.Time.Time24(), message, nil, true)
     end
 
     -- our console
-    MyUI_Utils.AppendColoredTimestamp(Module.Consoles[consoleID].console, mq.TLO.Time.Time24(), message, nil, true)
+    Module.Utils.AppendColoredTimestamp(Module.Consoles[consoleID].console, mq.TLO.Time.Time24(), message, nil, true)
 end
 
 function Module.SortChannels()

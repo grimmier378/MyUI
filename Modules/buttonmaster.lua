@@ -18,19 +18,23 @@ Module.IsRunning        = false
 Module.Name             = 'ButtonMaster'
 
 ---@diagnostic disable-next-line:undefined-global
-Module.Path             = MyUI_Path ~= nil and MyUI_Path or string.format("%s/%s/", mq.luaDir, Module.Name)
+Module.Path             = Module.Path ~= nil and Module.Path or string.format("%s/%s/", mq.luaDir, Module.Name)
 
 local FrameTime         = mq.gettime()
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 if not loadedExeternally then
-    MyUI_Icons      = require('mq.ICONS')
-    MyUI_Actor      = require('actors')
-    MyUI_CharLoaded = mq.TLO.Me.DisplayName()
+    Module.Icons      = require('mq.ICONS')
+    Module.Actor      = require('actors')
+    Module.CharLoaded = mq.TLO.Me.DisplayName()
+else
+    Module.Icons = MyUI_Icons
+    Module.Actor = MyUI_Actor
+    Module.CharLoaded = MyUI_CharLoaded
 end
 
-ButtonActors           = MyUI_Actor
-Icons                  = MyUI_Icons
+ButtonActors           = Module.Actor
+Icons                  = Module.Icons
 BMSettings             = require('bm.bmSettings').new()
 BMEditPopup            = require('bm.bmEditButtonPopup')
 
@@ -187,7 +191,7 @@ local script_actor = ButtonActors.register(function(message)
 
     btnUtils.Debug("MSG! " .. msg["script"] .. " " .. msg["from"])
 
-    if msg["from"] == MyUI_CharLoaded then
+    if msg["from"] == Module.CharLoaded then
         return
     end
     if msg["script"] ~= "ButtonMaster" then

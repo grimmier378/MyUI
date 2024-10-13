@@ -112,6 +112,17 @@ function CommonUtils.PrintOutput(mychat_tab, main_console, msg, ...)
 	end
 end
 
+function CommonUtils.GetNextID(table)
+	local maxID = 0
+	for k, _ in pairs(table) do
+		local numericId = tonumber(k)
+		if numericId and numericId > maxID then
+			maxID = numericId
+		end
+	end
+	return maxID + 1
+end
+
 --- Takes in a table or sorted index,key pairs and returns a sorted table of keys based on the number of columns to sorty by.
 ---
 ---This will keep your table sorted by columns instead of rows.
@@ -158,6 +169,21 @@ function CommonUtils.SortKeys(input_table)
 
 	table.sort(keys) -- Sort the keys
 	return keys
+end
+
+function CommonUtils.Deepcopy(orig)
+	local orig_type = type(orig)
+	local copy
+	if orig_type == 'table' then
+		copy = {}
+		for orig_key, orig_value in next, orig, nil do
+			copy[CommonUtils.Deepcopy(orig_key)] = CommonUtils.Deepcopy(orig_value)
+		end
+		setmetatable(copy, CommonUtils.Deepcopy(getmetatable(orig)))
+	else -- number, string, boolean, etc
+		copy = orig
+	end
+	return copy
 end
 
 ---
@@ -227,14 +253,11 @@ function CommonUtils.AppendColoredTimestamp(console, timestamp, text, textColor,
 end
 
 function CommonUtils.GiveItem(target_id)
+	if target_id == nil then return end
 	if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
 		mq.cmdf("/target id %s", target_id)
 		if mq.TLO.Cursor() then
-			if mq.TLO.Target.Distance() > 10 then
-				mq.cmdf("/multiline ; /tar id %s; /timed 5, /nav id %s dist=10; /timed 20, /click left target", target_id, target_id)
-			else
-				mq.cmdf('/multiline ; /tar id %s; /timed 2, /face; /timed 5, /click left target', target_id)
-			end
+			mq.cmdf('/multiline ; /tar id %s; /timed 2, /face; /timed 5, /click left target', target_id)
 		end
 	end
 end

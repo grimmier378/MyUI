@@ -17,11 +17,17 @@ Module.Name = 'MyPet'
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
 if not loadedExeternally then
-	MyUI_Utils      = require('lib.common')
-	MyUI_Colors     = require('lib.colors')
-	MyUI_Icons      = require('mq.ICONS')
-	MyUI_CharLoaded = mq.TLO.Me.DisplayName()
-	MyUI_Server     = mq.TLO.MacroQuest.Server()
+	Module.Utils      = require('lib.common')
+	Module.Colors     = require('lib.colors')
+	Module.Icons      = require('mq.ICONS')
+	Module.CharLoaded = mq.TLO.Me.DisplayName()
+	Module.Server     = mq.TLO.MacroQuest.Server()
+else
+	Module.Utils = MyUI_Utils
+	Module.Colors = MyUI_Colors
+	Module.Icons = MyUI_Icons
+	Module.CharLoaded = MyUI_CharLoaded
+	Module.Server = MyUI_Server
 end
 
 -- Variables
@@ -44,9 +50,9 @@ local autoHide = false
 local showTitleBar = true
 
 -- File Paths
-local themeFile = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
+local themeFile = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
 local configFileOld = string.format('%s/MyUI/%s/%s_Configs.lua', mq.configDir, script, script)
-local configFile = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, script, MyUI_Server, MyUI_CharLoaded)
+local configFile = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, script, Module.Server, Module.CharLoaded)
 local themezDir = mq.luaDir .. '/themez/init.lua'
 Module.TempSettings = {}
 
@@ -93,7 +99,7 @@ defaults = {
 
 local function loadTheme()
 	-- Check for the Theme File
-	if MyUI_Utils.File.Exists(themeFile) then
+	if Module.Utils.File.Exists(themeFile) then
 		theme = dofile(themeFile)
 	else
 		-- Create the theme file from the defaults
@@ -138,8 +144,8 @@ local function loadSettings()
 	local newSetting = false -- Check if we need to save the settings file
 
 	-- Check Settings
-	if not MyUI_Utils.File.Exists(configFile) then
-		if MyUI_Utils.File.Exists(configFileOld) then
+	if not Module.Utils.File.Exists(configFile) then
+		if Module.Utils.File.Exists(configFileOld) then
 			-- Load the old settings file
 			settings = dofile(configFileOld)
 			-- Save the settings to the new file
@@ -160,9 +166,9 @@ local function loadSettings()
 		end
 	end
 
-	newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings[script])
-	newSetting = MyUI_Utils.CheckDefaultSettings(defaults.Buttons, settings[script].Buttons) or newSetting
-	newSetting = MyUI_Utils.CheckDefaultSettings(defaults.ConColors, settings[script].ConColors) or newSetting
+	newSetting = Module.Utils.CheckDefaultSettings(defaults, settings[script])
+	newSetting = Module.Utils.CheckDefaultSettings(defaults.Buttons, settings[script].Buttons) or newSetting
+	newSetting = Module.Utils.CheckDefaultSettings(defaults.ConColors, settings[script].ConColors) or newSetting
 
 	-- Load the theme
 	loadTheme()
@@ -244,7 +250,7 @@ local function DrawInspectableSpellIcon(iconID, bene, name, i)
 	if ImGui.BeginPopupContextItem() then
 		if ImGui.MenuItem("Inspect##PetBuff" .. i) then
 			spell.Inspect()
-			if MyUI_Build == 'Emu' then
+			if Module.Build == 'Emu' then
 				mq.cmdf("/nomodkey /altkey /notify PetInfoWindow PetBuff%s leftmouseup", i - 1)
 			end
 		end
@@ -276,7 +282,7 @@ function Module.RenderGUI()
 		if (autoHide and petName ~= 'No Pet') or not autoHide then
 			ImGui.SetNextWindowSize(ImVec2(275, 255), ImGuiCond.FirstUseEver)
 			-- Set Window Name
-			local winName = string.format('%s##Main_%s', script, MyUI_CharLoaded)
+			local winName = string.format('%s##Main_%s', script, Module.CharLoaded)
 			-- Load Theme
 			local ColorCount, StyleCount = DrawTheme(themeName)
 			-- Create Main Window
@@ -330,19 +336,19 @@ function Module.RenderGUI()
 						ImGui.BeginGroup()
 						ImGui.Text("Lvl:")
 						ImGui.SameLine()
-						ImGui.TextColored((MyUI_Colors.color('teal')), "%s", petLvl)
+						ImGui.TextColored((Module.Colors.color('teal')), "%s", petLvl)
 						ImGui.SameLine()
 						ImGui.Text("Dist:")
 						ImGui.SameLine()
 						petDist = mq.TLO.Pet.Distance() or 0
 
 						if petDist >= 150 then
-							ImGui.TextColored((MyUI_Colors.color('red')), "%.0f", petDist)
+							ImGui.TextColored((Module.Colors.color('red')), "%.0f", petDist)
 						else
-							ImGui.TextColored((MyUI_Colors.color('green')), "%.0f", petDist)
+							ImGui.TextColored((Module.Colors.color('green')), "%.0f", petDist)
 						end
 						local yPos = ImGui.GetCursorPosY() - 1
-						ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor({ 0.245, 0.245, 0.938, 1.000, }, { 0.976, 0.134, 0.134, 1.000, }, petHP, nil, 0)))
+						ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor({ 0.245, 0.245, 0.938, 1.000, }, { 0.976, 0.134, 0.134, 1.000, }, petHP, nil, 0)))
 						ImGui.ProgressBar(petHP / 100, -1, 15, "##")
 						ImGui.PopStyleColor()
 						ImGui.SetCursorPosY(yPos)
@@ -351,7 +357,10 @@ function Module.RenderGUI()
 						ImGui.EndGroup()
 						if ImGui.IsItemHovered() then
 							if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
-								MyUI_Utils.GiveItem(mq.TLO.Me.Pet.ID())
+								mq.cmdf("/target id %s", mq.TLO.Pet.ID() or 0)
+								if mq.TLO.Cursor() ~= nil then
+									Module.Utils.GiveItem(mq.TLO.Pet.ID())
+								end
 							end
 						end
 						local conCol = mq.TLO.Pet.Target.ConColor() or 'WHITE'
@@ -360,7 +369,7 @@ function Module.RenderGUI()
 						ImGui.TextColored(ImVec4(txCol[1], txCol[2], txCol[3], txCol[4]), "%s", petTarg)
 						if petTarg ~= nil then
 							ImGui.PushStyleColor(ImGuiCol.PlotHistogram,
-								(MyUI_Utils.CalculateColor({ 0.165, 0.488, 0.162, 1.000, }, { 0.858, 0.170, 0.106, 1.000, }, petTargHP, nil, 0)))
+								(Module.Utils.CalculateColor({ 0.165, 0.488, 0.162, 1.000, }, { 0.858, 0.170, 0.106, 1.000, }, petTargHP, nil, 0)))
 							ImGui.ProgressBar(petTargHP / 100, -1, 15)
 							ImGui.PopStyleColor()
 						else
@@ -440,7 +449,7 @@ function Module.RenderGUI()
 	end
 
 	if showConfigGUI then
-		local winName = string.format('%s Config##Config_%s', script, MyUI_CharLoaded)
+		local winName = string.format('%s Config##Config_%s', script, Module.CharLoaded)
 		local ColCntConf, StyCntConf = DrawTheme(themeName)
 		local openConfig, showConfig = ImGui.Begin(winName, true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
 		if not openConfig then
@@ -471,10 +480,25 @@ function Module.RenderGUI()
 					if scale > 2 then scale = 2 end
 				end
 
-				-- Edit ThemeZ Button if ThemeZ lua exists.
-				if hasThemeZ then
+				if hasThemeZ or loadedExeternally then
 					if ImGui.Button('Edit ThemeZ') then
-						mq.cmd("/lua run themez")
+						if not loadedExeternally then
+							mq.cmd("/lua run themez")
+						else
+							if MyUI_Modules.ThemeZ ~= nil then
+								if MyUI_Modules.ThemeZ.IsRunning then
+									MyUI_Modules.ThemeZ.ShowGui = true
+								else
+									MyUI_TempSettings.ModuleChanged = true
+									MyUI_TempSettings.ModuleName = 'ThemeZ'
+									MyUI_TempSettings.ModuleEnabled = true
+								end
+							else
+								MyUI_TempSettings.ModuleChanged = true
+								MyUI_TempSettings.ModuleName = 'ThemeZ'
+								MyUI_TempSettings.ModuleEnabled = true
+							end
+						end
 					end
 					ImGui.SameLine()
 				end
@@ -540,12 +564,12 @@ function Module.RenderGUI()
 
 			-- draw 2 test bars
 			ImGui.SetNextItemWidth(100)
-			ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(Module.TempSettings.ColorHPMin, Module.TempSettings.ColorHPMax, testVal, nil, 0))
+			ImGui.PushStyleColor(ImGuiCol.PlotHistogram, Module.Utils.CalculateColor(Module.TempSettings.ColorHPMin, Module.TempSettings.ColorHPMax, testVal, nil, 0))
 			ImGui.ProgressBar(testVal / 100, -1, 15, 'Pet HP')
 			ImGui.PopStyleColor()
 
 			ImGui.SetNextItemWidth(100)
-			ImGui.PushStyleColor(ImGuiCol.PlotHistogram, MyUI_Utils.CalculateColor(Module.TempSettings.ColorTargMin, Module.TempSettings.ColorTargMax, testVal, nil, 0))
+			ImGui.PushStyleColor(ImGuiCol.PlotHistogram, Module.Utils.CalculateColor(Module.TempSettings.ColorTargMin, Module.TempSettings.ColorTargMax, testVal, nil, 0))
 			ImGui.ProgressBar(testVal / 100, -1, 15, 'Target HP')
 			ImGui.PopStyleColor()
 
@@ -562,7 +586,7 @@ function Module.RenderGUI()
 					ImGui.TableNextRow()
 					ImGui.TableNextColumn()
 
-					local atkToggle = settings[script].Buttons.Attack.show and MyUI_Icons.FA_TOGGLE_ON or MyUI_Icons.FA_TOGGLE_OFF
+					local atkToggle = settings[script].Buttons.Attack.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
 					ImGui.Text("%s Attack", atkToggle)
 					if ImGui.IsItemClicked(0) then
 						settings[script].Buttons.Attack.show = not settings[script].Buttons.Attack.show
@@ -570,7 +594,7 @@ function Module.RenderGUI()
 
 					ImGui.TableNextColumn()
 
-					local tauntToggle = settings[script].Buttons.Taunt.show and MyUI_Icons.FA_TOGGLE_ON or MyUI_Icons.FA_TOGGLE_OFF
+					local tauntToggle = settings[script].Buttons.Taunt.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
 					ImGui.Text("%s Taunt", tauntToggle)
 					if ImGui.IsItemClicked(0) then
 						settings[script].Buttons.Taunt.show = not settings[script].Buttons.Taunt.show
@@ -578,7 +602,7 @@ function Module.RenderGUI()
 
 					ImGui.TableNextColumn()
 
-					local backToggle = settings[script].Buttons.Back.show and MyUI_Icons.FA_TOGGLE_ON or MyUI_Icons.FA_TOGGLE_OFF
+					local backToggle = settings[script].Buttons.Back.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
 					ImGui.Text("%s Back", backToggle)
 					if ImGui.IsItemClicked(0) then
 						settings[script].Buttons.Back.show = not settings[script].Buttons.Back.show
@@ -587,7 +611,7 @@ function Module.RenderGUI()
 					ImGui.TableNextRow()
 					ImGui.TableNextColumn()
 
-					local followToggle = settings[script].Buttons.Follow.show and MyUI_Icons.FA_TOGGLE_ON or MyUI_Icons.FA_TOGGLE_OFF
+					local followToggle = settings[script].Buttons.Follow.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
 					ImGui.Text("%s Follow", followToggle)
 					if ImGui.IsItemClicked(0) then
 						settings[script].Buttons.Follow.show = not settings[script].Buttons.Follow.show
@@ -595,7 +619,7 @@ function Module.RenderGUI()
 
 					ImGui.TableNextColumn()
 
-					local guardToggle = settings[script].Buttons.Guard.show and MyUI_Icons.FA_TOGGLE_ON or MyUI_Icons.FA_TOGGLE_OFF
+					local guardToggle = settings[script].Buttons.Guard.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
 					ImGui.Text("%s Guard", guardToggle)
 					if ImGui.IsItemClicked(0) then
 						settings[script].Buttons.Guard.show = not settings[script].Buttons.Guard.show
@@ -603,7 +627,7 @@ function Module.RenderGUI()
 
 					ImGui.TableNextColumn()
 
-					local sitToggle = settings[script].Buttons.Sit.show and MyUI_Icons.FA_TOGGLE_ON or MyUI_Icons.FA_TOGGLE_OFF
+					local sitToggle = settings[script].Buttons.Sit.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
 					ImGui.Text("%s Sit", sitToggle)
 					if ImGui.IsItemClicked(0) then
 						settings[script].Buttons.Sit.show = not settings[script].Buttons.Sit.show
@@ -612,7 +636,7 @@ function Module.RenderGUI()
 					ImGui.TableNextRow()
 					ImGui.TableNextColumn()
 
-					local byeToggle = settings[script].Buttons.Bye.show and MyUI_Icons.FA_TOGGLE_ON or MyUI_Icons.FA_TOGGLE_OFF
+					local byeToggle = settings[script].Buttons.Bye.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
 					ImGui.Text("%s Bye", byeToggle)
 					if ImGui.IsItemClicked(0) then
 						settings[script].Buttons.Bye.show = not settings[script].Buttons.Bye.show
@@ -620,7 +644,7 @@ function Module.RenderGUI()
 
 					ImGui.TableNextColumn()
 
-					local focusToggle = settings[script].Buttons.Focus.show and MyUI_Icons.FA_TOGGLE_ON or MyUI_Icons.FA_TOGGLE_OFF
+					local focusToggle = settings[script].Buttons.Focus.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
 					ImGui.Text("%s Focus", focusToggle)
 					if ImGui.IsItemClicked(0) then
 						settings[script].Buttons.Focus.show = not settings[script].Buttons.Focus.show
@@ -628,7 +652,7 @@ function Module.RenderGUI()
 
 					ImGui.TableNextColumn()
 
-					local holdToggle = settings[script].Buttons.Hold.show and MyUI_Icons.FA_TOGGLE_ON or MyUI_Icons.FA_TOGGLE_OFF
+					local holdToggle = settings[script].Buttons.Hold.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
 					ImGui.Text("%s Hold", holdToggle)
 					if ImGui.IsItemClicked(0) then
 						settings[script].Buttons.Hold.show = not settings[script].Buttons.Hold.show
@@ -637,7 +661,7 @@ function Module.RenderGUI()
 
 					ImGui.TableNextColumn()
 
-					local stopToggle = settings[script].Buttons.Stop.show and MyUI_Icons.FA_TOGGLE_ON or MyUI_Icons.FA_TOGGLE_OFF
+					local stopToggle = settings[script].Buttons.Stop.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
 					ImGui.Text("%s Stop", stopToggle)
 					if ImGui.IsItemClicked(0) then
 						settings[script].Buttons.Stop.show = not settings[script].Buttons.Stop.show
@@ -645,7 +669,7 @@ function Module.RenderGUI()
 
 					ImGui.TableNextColumn()
 
-					local regroupToggle = settings[script].Buttons.Regroup.show and MyUI_Icons.FA_TOGGLE_ON or MyUI_Icons.FA_TOGGLE_OFF
+					local regroupToggle = settings[script].Buttons.Regroup.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
 					ImGui.Text("%s Regroup", regroupToggle)
 					if ImGui.IsItemClicked(0) then
 						settings[script].Buttons.Regroup.show = not settings[script].Buttons.Regroup.show
@@ -653,7 +677,7 @@ function Module.RenderGUI()
 
 					ImGui.TableNextColumn()
 
-					local swarmToggle = settings[script].Buttons.Swarm.show and MyUI_Icons.FA_TOGGLE_ON or MyUI_Icons.FA_TOGGLE_OFF
+					local swarmToggle = settings[script].Buttons.Swarm.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
 					ImGui.Text("%s Swarm", swarmToggle)
 					if ImGui.IsItemClicked(0) then
 						settings[script].Buttons.Swarm.show = not settings[script].Buttons.Swarm.show
@@ -662,7 +686,7 @@ function Module.RenderGUI()
 
 					ImGui.TableNextColumn()
 
-					local killToggle = settings[script].Buttons.Kill.show and MyUI_Icons.FA_TOGGLE_ON or MyUI_Icons.FA_TOGGLE_OFF
+					local killToggle = settings[script].Buttons.Kill.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
 					ImGui.Text("%s Kill", killToggle)
 					if ImGui.IsItemClicked(0) then
 						settings[script].Buttons.Kill.show = not settings[script].Buttons.Kill.show
@@ -670,7 +694,7 @@ function Module.RenderGUI()
 
 					ImGui.TableNextColumn()
 
-					local reportToggle = settings[script].Buttons.Report.show and MyUI_Icons.FA_TOGGLE_ON or MyUI_Icons.FA_TOGGLE_OFF
+					local reportToggle = settings[script].Buttons.Report.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
 					ImGui.Text("%s Report", reportToggle)
 					if ImGui.IsItemClicked(0) then
 						settings[script].Buttons.Report.show = not settings[script].Buttons.Report.show
@@ -707,9 +731,9 @@ local function Init()
 	-- Load Settings
 	loadSettings()
 	-- Get Character Name
-	configFile = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, script, MyUI_Server, MyUI_CharLoaded)
+	configFile = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, script, Module.Server, Module.CharLoaded)
 	-- Check if ThemeZ exists
-	if MyUI_Utils.File.Exists(themezDir) then
+	if Module.Utils.File.Exists(themezDir) then
 		hasThemeZ = true
 	end
 	-- Initialize ImGui	getPetData()
@@ -730,7 +754,7 @@ function Module.MainLoop()
 	end
 
 	local timeDiff = mq.gettime() - clockTimer
-	if timeDiff > 33 then
+	if timeDiff > 10 then
 		petName = mq.TLO.Pet.DisplayName() or 'No Pet'
 		local curTime = os.time()
 		-- Process ImGui Window Flag Changes

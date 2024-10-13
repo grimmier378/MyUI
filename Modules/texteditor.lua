@@ -23,7 +23,7 @@
 	TextEditor:Render(ImVec2(w,h)) - Renders with option display size arg
 	TextEditor:Clear() - Clears Text
 	TextEditor:SetSyntax( syntaxName ) - sets the syntax highligher format
-	TextEditor.text = text
+	TextEditor:LoadContents( contents )
 	TextEditor.fontSize = n
 	TextEditor:GetFontSize()
 	TextEditor:.windowFlags = flags

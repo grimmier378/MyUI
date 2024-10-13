@@ -112,7 +112,7 @@ local function LoadSettings()
 
 	Minimized = not MyUI_Settings.ShowMain
 	LoadTheme()
-
+	MyUI_ThemeName = MyUI_Settings.ThemeName
 	if newSetting then
 		mq.pickle(MyUI_SettingsFile, MyUI_Settings)
 	end
@@ -122,7 +122,7 @@ end
 local function RenderLoader()
 	ImGui.SetNextWindowSize(ImVec2(400, 80), ImGuiCond.Always)
 	ImGui.SetNextWindowPos(ImVec2(ImGui.GetIO().DisplaySize.x / 2 - 200, ImGui.GetIO().DisplaySize.y / 3 - 75), ImGuiCond.Always)
-
+	local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
 	ImGui.Begin("MyUI Loader", nil, bit32.bor(ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoResize, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoScrollbar))
 	ImGui.Image(MyUI_Grimmier_Img:GetTextureID(), ImVec2(60, 60))
 	ImGui.SetCursorPosY(ImGui.GetCursorPosY() - 35)
@@ -130,6 +130,7 @@ local function RenderLoader()
 	ImGui.PushStyleColor(ImGuiCol.PlotHistogram, 0.2, 0.7, 1 - (MyUI_InitPctComplete / 100), MyUI_InitPctComplete / 100)
 	ImGui.ProgressBar(MyUI_InitPctComplete / 100, ImVec2(310, 0), MyUI_CurLoading)
 	ImGui.PopStyleColor()
+	MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
 	ImGui.End()
 end
 
@@ -278,7 +279,7 @@ local function MyUI_Render()
 		if MyUI_Settings.ShowMain then
 			Minimized = false
 			ImGui.SetNextWindowSize(400, 200, ImGuiCond.FirstUseEver)
-
+			local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
 			local open_gui, show_gui = ImGui.Begin(MyUI_ScriptName .. "##" .. MyUI_CharLoaded, true, ImGuiWindowFlags.None)
 
 			if not open_gui then
@@ -293,6 +294,47 @@ local function MyUI_Render()
 					DrawContextMenu()
 					ImGui.EndPopup()
 				end
+				if ImGui.CollapsingHeader('Theme##Coll' .. 'MyUI') then
+					ImGui.Text("Cur Theme: %s", MyUI_ThemeName)
+					-- Combo Box Load Theme
+
+					if ImGui.BeginCombo("Load Theme##MyBuffs", MyUI_ThemeName) then
+						for k, data in pairs(MyUI_Theme.Theme) do
+							local isSelected = data.Name == MyUI_ThemeName
+							if ImGui.Selectable(data.Name, isSelected) then
+								if MyUI_ThemeName ~= data.Name then
+									MyUI_ThemeName = data.Name
+									MyUI_Settings.ThemeName = MyUI_ThemeName
+									mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+								end
+							end
+						end
+						ImGui.EndCombo()
+					end
+
+					if ImGui.Button('Reload Theme File') then
+						LoadTheme()
+					end
+
+
+					ImGui.SameLine()
+					if ImGui.Button('Edit ThemeZ') then
+						if MyUI_Modules.ThemeZ ~= nil then
+							if MyUI_Modules.ThemeZ.IsRunning then
+								MyUI_Modules.ThemeZ.ShowGui = true
+							else
+								MyUI_TempSettings.ModuleChanged = true
+								MyUI_TempSettings.ModuleName = 'ThemeZ'
+								MyUI_TempSettings.ModuleEnabled = true
+							end
+						else
+							MyUI_TempSettings.ModuleChanged = true
+							MyUI_TempSettings.ModuleName = 'ThemeZ'
+							MyUI_TempSettings.ModuleEnabled = true
+						end
+					end
+				end
+				ImGui.SeparatorText('Modules')
 				local sizeX, sizeY = ImGui.GetContentRegionAvail()
 				local col = math.floor(sizeX / 125) or 1
 				if ImGui.BeginTable("Modules", col, ImGuiWindowFlags.None) then
@@ -359,10 +401,13 @@ local function MyUI_Render()
 					mq.pickle(MyUI_SettingsFile, MyUI_Settings)
 				end
 			end
+			MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
 			ImGui.End()
 		end
 
 		if Minimized then
+			local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
+
 			local open_gui, show_gui = ImGui.Begin(MyUI_ScriptName .. "##Mini" .. MyUI_CharLoaded, true,
 				bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar))
 
@@ -381,6 +426,7 @@ local function MyUI_Render()
 				DrawContextMenu()
 				ImGui.EndPopup()
 			end
+			MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
 			ImGui.End()
 		end
 

@@ -644,9 +644,9 @@ function Module.RenderGUI()
                     if not loadedExeternally then
                         mq.cmd("/lua run themez")
                     else
-                        if MyUI_Modules.ThemeZ ~= nil then
-                            if MyUI_Modules.ThemeZ.IsRunning then
-                                MyUI_Modules.ThemeZ.ShowGui = true
+                        if Module.Modules.ThemeZ ~= nil then
+                            if Module.Modules.ThemeZ.IsRunning then
+                                Module.Modules.ThemeZ.ShowGui = true
                             else
                                 MyUI_TempSettings.ModuleChanged = true
                                 MyUI_TempSettings.ModuleName = 'ThemeZ'
@@ -798,7 +798,7 @@ local clockTimer = mq.gettime()
 function Module.MainLoop()
     if loadedExeternally then
         ---@diagnostic disable-next-line: undefined-global
-        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+        if not Module.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
     local elapsedTime = mq.gettime() - clockTimer
     if not loadedExeternally or elapsedTime >= 50 then

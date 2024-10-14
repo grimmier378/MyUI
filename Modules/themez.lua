@@ -282,7 +282,19 @@ end
 
 -- GUI
 local cFlag = false
+local sorteedKeys = {}
+local function SortColors()
+	local keys = {}
+	for k, v in pairs(tempSettings.Theme[themeID]['Color']) do
+		table.insert(keys, { id = k, name = v.PropertyName, })
+	end
 
+	table.sort(keys, function(a, b)
+		return a.name < b.name
+	end)
+
+	return keys
+end
 function Module.RenderGUI()
 	if not Module.IsRunning then return end
 	if Module.ShowGui then
@@ -403,14 +415,17 @@ function Module.RenderGUI()
 				else
 					ImGui.BeginChild('Colors', cWidth, xHeight, ImGuiChildFlags.Border)
 				end
-				for pID, pData in pairs(tempSettings.Theme[loadedID]['Color']) do
-					if pID ~= nil then
+				for i = 1, #sorteedKeys do
+					local pID = sorteedKeys[i].id
+					local pData = tempSettings.Theme[loadedID]['Color'][pID]
+					if pData ~= nil then
 						local propertyName = pData.PropertyName
 						if propertyName ~= nil then
 							pData.Color = ImGui.ColorEdit4(pData.PropertyName .. "##", pData.Color)
 						end
 					end
 				end
+
 				ImGui.EndChild()
 			end
 			cWidth, xHeight = ImGui.GetContentRegionAvail()
@@ -457,6 +472,7 @@ local function startup()
 	Module.IsRunning = true
 	loadSettings()
 	mq.bind("/themez", commandHandler)
+	sorteedKeys = SortColors()
 	if not loadedExeternally then
 		mq.imgui.init("ThemeZ Builder##", Module.RenderGUI)
 		Module.LocalLoop()

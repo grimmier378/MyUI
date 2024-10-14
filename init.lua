@@ -200,9 +200,13 @@ local function ProcessModuleChanges()
 				else
 					for i, v in ipairs(mods) do
 						if v == module_name then
-							MyUI_Modules[module_name].Unload()
-							MyUI_LoadModules.unload(module_name)
-							-- MyUI_Modules[module_name] = nil
+							if MyUI_Modules[module_name] ~= nil then
+								if MyUI_Modules[module_name].Unload() ~= nil then
+									MyUI_Modules[module_name].Unload()
+								end
+								MyUI_LoadModules.unload(module_name)
+								-- MyUI_Modules[module_name] = nil
+							end
 							table.remove(mods, i)
 						end
 					end

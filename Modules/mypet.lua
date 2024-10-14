@@ -40,8 +40,24 @@ local scale = 1
 local locked, hasThemeZ = false, false
 local petHP, petTarg, petDist, petBuffs, petName, petTargHP, petLvl, petBuffCount = 0, nil, 0, {}, 'No Pet', 0, -1, 0
 local lastCheck = 0
-local btnKeys = { "Attack", "Back", "Taunt", "Follow", "Guard", "Focus", "Sit", "Hold", "Stop", "Bye", "Regroup", "Report", "Swarm", "Kill", }
-btnInfo = { attack = false, back = false, taunt = false, follow = false, guard = false, focus = false, sit = false, hold = false, stop = false, bye = false, regroup = false, report = false, swarm = false, kill = false, }
+local btnKeys = {
+	"Attack",
+	"Back",
+	"Taunt",
+	"Follow",
+	"Guard",
+	"Focus",
+	"Sit",
+	"Hold",
+	"Stop",
+	"Bye",
+	"Regroup",
+	"Report",
+	"Swarm",
+	"Kill",
+	"qAttack",
+	"gHold", }
+btnInfo = { attack = false, back = false, taunt = false, follow = false, guard = false, focus = false, sit = false, hold = false, stop = false, bye = false, regroup = false, report = false, swarm = false, kill = false, qattack = false, ghold = false, }
 -- GUI Settings
 local winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoFocusOnAppearing)
 local animSpell = mq.FindTextureAnimation('A_SpellIcons')
@@ -55,7 +71,7 @@ local configFileOld = string.format('%s/MyUI/%s/%s_Configs.lua', mq.configDir, s
 local configFile = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, script, Module.Server, Module.CharLoaded)
 local themezDir = mq.luaDir .. '/themez/init.lua'
 Module.TempSettings = {}
-
+Module.ButtonLabels = {}
 -- Default Settings
 defaults = {
 	Scale = 1.0,
@@ -75,12 +91,15 @@ defaults = {
 		Focus = { show = false, cmd = "/pet focus", },
 		Sit = { show = true, cmd = "/pet sit", },
 		Hold = { show = false, cmd = "/pet hold", },
+		gHold = { show = false, cmd = "/pet ghold", },
 		Stop = { show = false, cmd = "/pet stop", },
 		Bye = { show = true, cmd = "/pet get lost", },
 		Regroup = { show = false, cmd = "/pet regroup", },
 		Report = { show = true, cmd = "/pet report health", },
 		Swarm = { show = false, cmd = "/pet swarm", },
 		Kill = { show = false, cmd = "/pet kill", },
+		qAttack = { show = true, cmd = "/pet qattack", },
+
 	},
 	ConColors = {
 		['RED'] = { 0.9, 0.4, 0.4, 0.8, },
@@ -212,6 +231,7 @@ local function DrawTheme(tName)
 end
 
 local function GetButtonStates()
+	local pet = mq.TLO.Pet
 	local stance = mq.TLO.Pet.Stance()
 	btnInfo.follow = stance == 'FOLLOW' and true or false
 	btnInfo.guard = stance == 'GUARD' and true or false
@@ -221,6 +241,7 @@ local function GetButtonStates()
 	btnInfo.hold = mq.TLO.Pet.Hold() and true or false
 	btnInfo.focus = mq.TLO.Pet.Focus() and true or false
 	btnInfo.regroup = mq.TLO.Pet.ReGroup() and true or false
+	btnInfo.ghold = mq.TLO.Pet.GHold() and true or false
 end
 
 local function DrawInspectableSpellIcon(iconID, bene, name, i)
@@ -449,14 +470,31 @@ function Module.RenderGUI()
 	end
 
 	if showConfigGUI then
+		ImGui.SetNextWindowSize(ImVec2(400, 400), ImGuiCond.FirstUseEver)
 		local winName = string.format('%s Config##Config_%s', script, Module.CharLoaded)
 		local ColCntConf, StyCntConf = DrawTheme(themeName)
-		local openConfig, showConfig = ImGui.Begin(winName, true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
+		local openConfig, showConfig = ImGui.Begin(winName, true, bit32.bor(ImGuiWindowFlags.NoCollapse))
 		if not openConfig then
 			showConfigGUI = false
 		end
 		if showConfig then
+			if ImGui.Button("Save & Close") then
+				settings[script].ShowTitlebar = showTitleBar
+				settings[script].locked = locked
+				settings[script].Scale = scale
+				settings[script].IconSize = iconSize
+				settings[script].LoadTheme = themeName
+				settings[script].AutoHide = autoHide
+				settings[script].ColorHPMax = Module.TempSettings.ColorHPMax
+				settings[script].ColorHPMin = Module.TempSettings.ColorHPMin
+				settings[script].ColorTargMax = Module.TempSettings.ColorTargMax
+				settings[script].ColorTargMin = Module.TempSettings.ColorTargMin
+
+				mq.pickle(configFile, settings)
+				showConfigGUI = false
+			end
 			-- Configure ThemeZ --
+
 			ImGui.SeparatorText("Theme##" .. script)
 			if ImGui.CollapsingHeader("Theme##" .. script) then
 				ImGui.Text("Cur Theme: %s", themeName)
@@ -575,148 +613,34 @@ function Module.RenderGUI()
 
 			ImGui.SeparatorText("Buttons##" .. script)
 			if ImGui.CollapsingHeader('Buttons##PetConfigButtons') then
+				local sizeX, sizeY = ImGui.GetContentRegionAvail()
+				sizeY = sizeY - 50
+				local col = math.floor(sizeX / 75) or 1
+				local sorted_names = MyUI_Utils.SortTableColums(nil, btnKeys, col)
+
 				ImGui.SetNextItemWidth(100)
 				settings[script].ButtonsRow = ImGui.InputInt("Buttons Per Row##" .. script, settings[script].ButtonsRow, 1, 5)
 
 				ImGui.SeparatorText("Buttons to Display")
-				if ImGui.BeginTable("ButtonToggles##Toggles", 3, ImGuiTableFlags.ScrollY, ImVec2(-1, 100)) then
-					ImGui.TableSetupColumn("Col1", ImGuiTableColumnFlags.None, -1)
-					ImGui.TableSetupColumn("Col2", ImGuiTableColumnFlags.None, -1)
-					ImGui.TableSetupColumn("Col3", ImGuiTableColumnFlags.None, -1)
+				if ImGui.BeginTable("ButtonToggles##Toggles", col, ImGuiTableFlags.ScrollY) then
 					ImGui.TableNextRow()
 					ImGui.TableNextColumn()
+					for i = 1, 16 do
+						if sorted_names[i] ~= nil then
+							local name = sorted_names[i]
+							Module.ButtonLabels[name] = settings[script].Buttons[name].show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
+							ImGui.Text("%s %s", Module.ButtonLabels[name], name)
+							if ImGui.IsItemClicked(0) then
+								settings[script].Buttons[name].show = not settings[script].Buttons[name].show
+							end
 
-					local atkToggle = settings[script].Buttons.Attack.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
-					ImGui.Text("%s Attack", atkToggle)
-					if ImGui.IsItemClicked(0) then
-						settings[script].Buttons.Attack.show = not settings[script].Buttons.Attack.show
-					end
-
-					ImGui.TableNextColumn()
-
-					local tauntToggle = settings[script].Buttons.Taunt.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
-					ImGui.Text("%s Taunt", tauntToggle)
-					if ImGui.IsItemClicked(0) then
-						settings[script].Buttons.Taunt.show = not settings[script].Buttons.Taunt.show
-					end
-
-					ImGui.TableNextColumn()
-
-					local backToggle = settings[script].Buttons.Back.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
-					ImGui.Text("%s Back", backToggle)
-					if ImGui.IsItemClicked(0) then
-						settings[script].Buttons.Back.show = not settings[script].Buttons.Back.show
-					end
-
-					ImGui.TableNextRow()
-					ImGui.TableNextColumn()
-
-					local followToggle = settings[script].Buttons.Follow.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
-					ImGui.Text("%s Follow", followToggle)
-					if ImGui.IsItemClicked(0) then
-						settings[script].Buttons.Follow.show = not settings[script].Buttons.Follow.show
-					end
-
-					ImGui.TableNextColumn()
-
-					local guardToggle = settings[script].Buttons.Guard.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
-					ImGui.Text("%s Guard", guardToggle)
-					if ImGui.IsItemClicked(0) then
-						settings[script].Buttons.Guard.show = not settings[script].Buttons.Guard.show
-					end
-
-					ImGui.TableNextColumn()
-
-					local sitToggle = settings[script].Buttons.Sit.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
-					ImGui.Text("%s Sit", sitToggle)
-					if ImGui.IsItemClicked(0) then
-						settings[script].Buttons.Sit.show = not settings[script].Buttons.Sit.show
-					end
-
-					ImGui.TableNextRow()
-					ImGui.TableNextColumn()
-
-					local byeToggle = settings[script].Buttons.Bye.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
-					ImGui.Text("%s Bye", byeToggle)
-					if ImGui.IsItemClicked(0) then
-						settings[script].Buttons.Bye.show = not settings[script].Buttons.Bye.show
-					end
-
-					ImGui.TableNextColumn()
-
-					local focusToggle = settings[script].Buttons.Focus.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
-					ImGui.Text("%s Focus", focusToggle)
-					if ImGui.IsItemClicked(0) then
-						settings[script].Buttons.Focus.show = not settings[script].Buttons.Focus.show
-					end
-
-					ImGui.TableNextColumn()
-
-					local holdToggle = settings[script].Buttons.Hold.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
-					ImGui.Text("%s Hold", holdToggle)
-					if ImGui.IsItemClicked(0) then
-						settings[script].Buttons.Hold.show = not settings[script].Buttons.Hold.show
-					end
-					ImGui.TableNextRow()
-
-					ImGui.TableNextColumn()
-
-					local stopToggle = settings[script].Buttons.Stop.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
-					ImGui.Text("%s Stop", stopToggle)
-					if ImGui.IsItemClicked(0) then
-						settings[script].Buttons.Stop.show = not settings[script].Buttons.Stop.show
-					end
-
-					ImGui.TableNextColumn()
-
-					local regroupToggle = settings[script].Buttons.Regroup.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
-					ImGui.Text("%s Regroup", regroupToggle)
-					if ImGui.IsItemClicked(0) then
-						settings[script].Buttons.Regroup.show = not settings[script].Buttons.Regroup.show
-					end
-
-					ImGui.TableNextColumn()
-
-					local swarmToggle = settings[script].Buttons.Swarm.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
-					ImGui.Text("%s Swarm", swarmToggle)
-					if ImGui.IsItemClicked(0) then
-						settings[script].Buttons.Swarm.show = not settings[script].Buttons.Swarm.show
-					end
-					ImGui.TableNextRow()
-
-					ImGui.TableNextColumn()
-
-					local killToggle = settings[script].Buttons.Kill.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
-					ImGui.Text("%s Kill", killToggle)
-					if ImGui.IsItemClicked(0) then
-						settings[script].Buttons.Kill.show = not settings[script].Buttons.Kill.show
-					end
-
-					ImGui.TableNextColumn()
-
-					local reportToggle = settings[script].Buttons.Report.show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
-					ImGui.Text("%s Report", reportToggle)
-					if ImGui.IsItemClicked(0) then
-						settings[script].Buttons.Report.show = not settings[script].Buttons.Report.show
+							ImGui.TableNextColumn()
+						end
 					end
 					ImGui.EndTable()
 				end
 			end
 			-- Save & Close Button --
-			if ImGui.Button("Save & Close") then
-				settings[script].ShowTitlebar = showTitleBar
-				settings[script].locked = locked
-				settings[script].Scale = scale
-				settings[script].IconSize = iconSize
-				settings[script].LoadTheme = themeName
-				settings[script].AutoHide = autoHide
-				settings[script].ColorHPMax = Module.TempSettings.ColorHPMax
-				settings[script].ColorHPMin = Module.TempSettings.ColorHPMin
-				settings[script].ColorTargMax = Module.TempSettings.ColorTargMax
-				settings[script].ColorTargMin = Module.TempSettings.ColorTargMin
-				mq.pickle(configFile, settings)
-				showConfigGUI = false
-			end
 		end
 		LoadTheme.EndTheme(ColCntConf, StyCntConf)
 		ImGui.End()
@@ -724,7 +648,7 @@ function Module.RenderGUI()
 end
 
 function Module.Unload()
-
+	return
 end
 
 local function Init()

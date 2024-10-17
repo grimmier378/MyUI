@@ -5,7 +5,6 @@ local Module = {}
 
 Module.Name = "SillySounds"
 Module.IsRunning = false
-Module.Path = Module.Path ~= nil and Module.Path .. '/sounds/' or string.format("%s/%s/sounds/", mq.luaDir, Module.Name)
 
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
@@ -15,11 +14,13 @@ if not loadedExeternally then
     Module.Icons = require('mq.ICONS')
     Module.CharLoaded = mq.TLO.Me.DisplayName()
     Module.Server = mq.TLO.MacroQuest.Server()
+    Module.Path = string.format("%s/%s/sounds/", mq.luaDir, Module.Name)
 else
     Module.Utils = MyUI_Utils
     Module.Icons = MyUI_Icons
     Module.CharLoaded = MyUI_CharLoaded
     Module.Server = MyUI_Server
+    Module.Path = MyUI_Path .. 'sounds/'
 end
 
 local itemWatch = false

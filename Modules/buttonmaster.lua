@@ -17,12 +17,11 @@ Module.ActorMailBox     = 'buttonmaster'
 Module.IsRunning        = false
 Module.Name             = 'ButtonMaster'
 
----@diagnostic disable-next-line:undefined-global
-Module.Path             = Module.Path ~= nil and Module.Path or string.format("%s/%s/", mq.luaDir, Module.Name)
-
 local FrameTime         = mq.gettime()
+
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+
 if not loadedExeternally then
     Module.Icons      = require('mq.ICONS')
     Module.Actor      = require('actors')

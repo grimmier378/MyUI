@@ -37,10 +37,16 @@ end
 ---Loads a Theme from a Table and returns the number of Styles and Colors pushed so you can Pop them later
 ---@param tName string Theme Name
 ---@param tTable table Theme Table
+---@param mouseOver boolean|nil Mouse Over option for changing alpha
+---@param mouseHovered boolean|nil Pass Mouse Hovered state to change alpha
+---@param mouseOvaerAlpha number|nil Alpha to set when Mouse Over is true
 ---@return integer StyleCounter Count of Styles Pushed
 ---@return integer ColorCounter Count of Colors Pushed
 ---@return integer themeID Theme ID Loaded
-function LoadTheme.StartTheme(tName, tTable)
+function LoadTheme.StartTheme(tName, tTable, mouseOver, mouseHovered, mouseOvaerAlpha)
+	if mouseOver == nil then mouseOver = false end
+	if mouseHovered == nil then mouseHovered = false end
+	if mouseOvaerAlpha == nil then mouseOvaerAlpha = 1 end
 	local StyleCounter = 0
 	local ColorCounter = 0
 	local themeID = 0
@@ -51,8 +57,18 @@ function LoadTheme.StartTheme(tName, tTable)
 		if tData.Name == tName then
 			themeID = tID
 			for pID, cData in pairs(tTable.Theme[tID].Color) do
-				ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
-				ColorCounter = ColorCounter + 1
+				if cData.PropertyName == 'WindowBg' and mouseOver then
+					if mouseHovered then
+						ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], 1.0))
+						ColorCounter = ColorCounter + 1
+					else
+						ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], mouseOvaerAlpha))
+						ColorCounter = ColorCounter + 1
+					end
+				else
+					ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
+					ColorCounter = ColorCounter + 1
+				end
 			end
 			if tData['Style'] ~= nil then
 				if next(tData['Style']) ~= nil then

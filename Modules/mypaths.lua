@@ -24,21 +24,24 @@ if not loadedExeternally then
     Module.Base64      = require('lib.base64')
     Module.PackageMan  = require('mq.PackageMan')
     Module.SQLite3     = Module.PackageMan.Require('lsqlite3')
+    Module.ThemeFile   = string.format('%s/MyUI/ThemeZ.lua', mq.configDir)
+    Module.Theme       = {}
 else
-    Module.Utils = MyUI_Utils
+    Module.Utils       = MyUI_Utils
     Module.ThemeLoader = MyUI_ThemeLoader
-    Module.Icons = MyUI_Icons
-    Module.CharLoaded = MyUI_CharLoaded
-    Module.Server = MyUI_Server
-    Module.Base64 = MyUI_Base64
-    Module.PackageMan = MyUI_PackageMan
-    Module.SQLite3 = MyUI_SQLite3
+    Module.Icons       = MyUI_Icons
+    Module.CharLoaded  = MyUI_CharLoaded
+    Module.Server      = MyUI_Server
+    Module.Base64      = MyUI_Base64
+    Module.PackageMan  = MyUI_PackageMan
+    Module.SQLite3     = MyUI_SQLite3
+    Module.ThemeFile   = MyUI_ThemeFile
+    Module.Theme       = MyUI_Theme
 end
 
 -- Variables
 local themeName                                                  = 'Default'
-local themeID                                                    = 1
-local theme, defaults, settings, debugMessages                   = {}, {}, {}, {}
+local defaults, settings, debugMessages                          = {}, {}, {}
 local Paths, ChainedPaths                                        = {}, {}
 local newPath                                                    = ''
 local curTime                                                    = os.time()
@@ -112,9 +115,9 @@ local aSize, locked, hasThemeZ                                   = false, false,
 local hudTransparency                                            = 0.5
 local mouseOverTransparency                                      = 1.0
 local doMouseOver                                                = true
+local args                                                       = { ..., }
 
 -- File Paths
-local themeFile                                                  = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
 local configFileOld                                              = string.format('%s/MyUI/%s/%s_Configs.lua', mq.configDir, Module.Name, Module.Name)
 local configFile                                                 = string.format('%s/MyUI/%s/%s_Configs.lua', mq.configDir, Module.Name, Module.Name)
 local pathsFile                                                  = string.format('%s/MyUI/%s/%s_Paths.lua', mq.configDir, Module.Name, Module.Name)
@@ -163,50 +166,13 @@ local manaClass                                                  = {
 
 local function loadTheme()
     -- Check for the Theme File
-    if Module.Utils.File.Exists(themeFile) then
-        theme = dofile(themeFile)
+    if Module.Utils.File.Exists(Module.ThemeFile) then
+        Module.Theme = dofile(Module.ThemeFile)
     else
         -- Create the theme file from the defaults
-        theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
-        mq.pickle(themeFile, theme)
+        Module.Theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
+        mq.pickle(Module.ThemeFile, Module.Theme)
     end
-    -- Load the theme from the settings file
-    themeName = settings[Module.Name].LoadTheme or 'Default'
-    -- Find the theme ID
-    if theme and theme.Theme then
-        for tID, tData in pairs(theme.Theme) do
-            if tData['Name'] == themeName then
-                themeID = tID
-            end
-        end
-    end
-end
-
-local function DrawTheme(tName)
-    local StyleCounter = 0
-    local ColorCounter = 0
-    for tID, tData in pairs(theme.Theme) do
-        if tData.Name == tName then
-            for pID, cData in pairs(theme.Theme[tID].Color) do
-                ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
-                ColorCounter = ColorCounter + 1
-            end
-            if tData['Style'] ~= nil then
-                if next(tData['Style']) ~= nil then
-                    for sID, sData in pairs(theme.Theme[tID].Style) do
-                        if sData.Size ~= nil then
-                            ImGui.PushStyleVar(sID, sData.Size)
-                            StyleCounter = StyleCounter + 1
-                        elseif sData.X ~= nil then
-                            ImGui.PushStyleVar(sID, sData.X, sData.Y)
-                            StyleCounter = StyleCounter + 1
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return ColorCounter, StyleCounter
 end
 
 local function SavePaths()
@@ -335,7 +301,10 @@ local function loadSettings()
     newSetting = Module.Utils.CheckDefaultSettings(InterruptSet, settings[Module.Name].Interrupts) or newSetting
 
     -- Load the theme
-    loadTheme()
+    if not loadedExeternally then
+        loadTheme()
+    end
+    themeName = settings[Module.Name].LoadTheme or 'Default'
     hudLock = settings[Module.Name].HudLock
     InterruptSet = settings[Module.Name].Interrupts
     -- Set the settings to the variables
@@ -358,8 +327,6 @@ local function loadSettings()
     -- Save the settings if new settings were added
     if newSetting then mq.pickle(configFile, settings) end
 end
-
--------- Path Functions --------
 
 local function RecordWaypoint(name)
     local zone = mq.TLO.Zone.ShortName()
@@ -404,14 +371,17 @@ local function RecordWaypoint(name)
         INSERT INTO Paths_Table (zone_name, path_name, step_number, step_cmd, step_door, step_door_rev, step_loc, step_delay)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ]])
+
     stmt:bind_values(zone, name, index, '', 0, 0, loc, 0)
     stmt:step()
     stmt:finalize()
     db:close()
     mq.pickle(pathsFile, Paths)
+
     if NavSet.autoRecord then
         status = "Recording: Waypoint #" .. index .. " Added!"
     end
+
     if DEBUG then
         table.insert(debugMessages, {
             Time = os.date("%H:%M:%S"),
@@ -663,7 +633,9 @@ local function groupWatch(type)
     end
     return false
 end
+
 local interruptInProgress = false
+
 local function CheckInterrupts()
     if not InterruptSet.interruptsOn then return false end
     if not NavSet.doNav then return false end
@@ -875,11 +847,13 @@ local function NavigatePath(name)
     end
     while NavSet.doNav do
         local tmp = sortPathsTable(zone, name)
+
         if tmp == nil then
             NavSet.doNav = false
             status = 'Idle'
             return
         end
+
         for i = startNum, #tmp do
             if NavSet.doSingle then i = NavSet.CurrentStepIndex end
             NavSet.CurrentStepIndex = i
@@ -983,7 +957,9 @@ local function NavigatePath(name)
                 end
             end
         end
+
         -- Check if we need to loop
+
         if not NavSet.doLoop then
             NavSet.doNav = false
             status = 'Idle - Arrived at Destination!'
@@ -1098,7 +1074,9 @@ end
 local mousedOverFlag = false
 local importString = ''
 local tmpCmd = ''
-local exportZone, exportPathName = 'Select Zone...', 'Select Path...'
+local exportZone = 'Select Zone...'
+local exportPathName = 'Select Path...'
+local sFlag = false
 
 local function DrawStatus()
     ImGui.BeginGroup()
@@ -1128,27 +1106,28 @@ local function DrawStatus()
     ImGui.Text("Current Loc: ")
     ImGui.SameLine()
     ImGui.TextColored(1, 1, 0, 1, "%s", mq.TLO.Me.LocYXZ())
-    -- if NavSet.doNav then
-    --     local tmpTable = sortPathsTable(currZone, NavSet.SelectedPath) or {}
-    --     if tmpTable[NavSet.CurrentStepIndex] then
-    --         ImGui.Text("Current WP: ")
-    --         ImGui.SameLine()
-    --         ImGui.TextColored(1,1,0,1,"%s ",tmpTable[NavSet.CurrentStepIndex].step or 0)
-    --         ImGui.SameLine()
-    --         ImGui.Text("Distance: ")
-    --         ImGui.SameLine()
-    --         ImGui.TextColored(0,1,1,1,"%.2f", mq.TLO.Math.Distance(tmpLoc)())
-    --         local tmpDist = mq.TLO.Math.Distance(tmpLoc)() or 0
-    --         local dist = string.format("%.2f",tmpDist)
-    --         local tmpStatus = status
-    --         if tmpStatus:find("Distance") then
-    --             tmpStatus = tmpStatus:sub(1, tmpStatus:find("Distance:") - 1)
-    --             tmpStatus = string.format("%s Distance: %s",tmpStatus,dist)
-    --             ImGui.TextColored(ImVec4(0,1,1,1), tmpStatus)
-    --         end
-    --     end
-    -- end
-
+    --[[
+    if NavSet.doNav then
+        local tmpTable = sortPathsTable(currZone, NavSet.SelectedPath) or {}
+        if tmpTable[NavSet.CurrentStepIndex] then
+            ImGui.Text("Current WP: ")
+            ImGui.SameLine()
+            ImGui.TextColored(1,1,0,1,"%s ",tmpTable[NavSet.CurrentStepIndex].step or 0)
+            ImGui.SameLine()
+            ImGui.Text("Distance: ")
+            ImGui.SameLine()
+            ImGui.TextColored(0,1,1,1,"%.2f", mq.TLO.Math.Distance(tmpLoc)())
+            local tmpDist = mq.TLO.Math.Distance(tmpLoc)() or 0
+            local dist = string.format("%.2f",tmpDist)
+            local tmpStatus = status
+            if tmpStatus:find("Distance") then
+                tmpStatus = tmpStatus:sub(1, tmpStatus:find("Distance:") - 1)
+                tmpStatus = string.format("%s Distance: %s",tmpStatus,dist)
+                ImGui.TextColored(ImVec4(0,1,1,1), tmpStatus)
+            end
+        end
+    end
+    ]]
     ImGui.Text("Nav Type: ")
     ImGui.SameLine()
     if not NavSet.doNav then
@@ -1225,9 +1204,6 @@ local function DrawStatus()
     end
     ImGui.EndGroup()
 end
-
-local sFlag = false
-
 function Module.RenderGUI()
     -- Main Window
     if showMainGUI then
@@ -1236,7 +1212,7 @@ function Module.RenderGUI()
         -- Set Window Name
         local winName = string.format('%s##Main_%s', Module.Name, Module.CharLoaded)
         -- Load Theme
-        local ColorCount, StyleCount = DrawTheme(themeName)
+        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
         -- Create Main Window
         local openMain, showMain = ImGui.Begin(winName, true, winFlags)
         -- Check if the window is open
@@ -2146,7 +2122,7 @@ function Module.RenderGUI()
     if showConfigGUI then
         if currZone ~= lastZone then return end
         local winName = string.format('%s Config##Config_%s', Module.Name, Module.CharLoaded)
-        local ColCntConf, StyCntConf = DrawTheme(themeName)
+        local ColCntConf, StyCntConf = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
 
         local openConfig, showConfig = ImGui.Begin(winName, true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
         if not openConfig then
@@ -2164,12 +2140,11 @@ function Module.RenderGUI()
                 -- Combo Box Load Theme
                 ImGui.SetNextItemWidth(100)
                 if ImGui.BeginCombo("Load Theme##" .. Module.Name, themeName) then
-                    for k, data in pairs(theme.Theme) do
+                    for k, data in pairs(Module.Theme.Theme) do
                         local isSelected = data.Name == themeName
                         if ImGui.Selectable(data.Name, isSelected) then
-                            theme.LoadTheme = data.Name
-                            themeID = k
-                            themeName = theme.LoadTheme
+                            Module.Theme.LoadTheme = data.Name
+                            themeName = Module.Theme.LoadTheme
                         end
                     end
                     ImGui.EndCombo()
@@ -2420,7 +2395,7 @@ function Module.RenderGUI()
     end
 end
 
--------- Main Functions --------
+--[[-------- Main Functions --------]]
 
 local function displayHelp()
     --[[
@@ -2683,7 +2658,6 @@ local function bind(...)
     end
 end
 
-local args = { ..., }
 local function processArgs()
     if #args == 0 then
         displayHelp()
@@ -2814,7 +2788,9 @@ function Module.MainLoop()
 
     if justZoned then return end
 
-    if NavSet.doNav and NavSet.ChainStart and not NavSet.doChainPause then NavSet.ChainPath = NavSet.SelectedPath end
+    if NavSet.doNav and NavSet.ChainStart and not NavSet.doChainPause then
+        NavSet.ChainPath = NavSet.SelectedPath
+    end
 
     if NavSet.ChainStart and NavSet.doChainPause then
         for i = 1, #ChainedPaths do

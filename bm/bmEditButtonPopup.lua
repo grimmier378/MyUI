@@ -16,8 +16,10 @@ BMButtonEditor.tmpButton           = nil
 
 BMButtonEditor.selectedTimerType   = 1
 BMButtonEditor.selectedUpdateRate  = 1
+---@diagnostic disable-next-line:undefined-field
 BMButtonEditor.textEditor          = ImGui.TextEditor.new("##TextEditor")
 BMButtonEditor.textEditor:SetSyntax('lua')
+---@diagnostic disable-next-line:undefined-global
 BMButtonEditor.textEditor.windowFlags = bit32.bor(TextEditorWindowFlags.ShowLineNumbers, TextEditorWindowFlags.WrapText, TextEditorWindowFlags.ShowIndicators)
 function BMButtonEditor:RenderEditButtonPopup()
     if not self.editButtonPopupOpen then

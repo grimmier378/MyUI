@@ -20,12 +20,18 @@ if not loadedExeternally then
     Module.Colors = require('lib.colors')
     Module.CharLoaded = mq.TLO.Me.DisplayName()
     Module.Server = mq.TLO.MacroQuest.Server()
+    Module.ThemeFile = string.format('%s/MyUI/ThemeZ.lua', mq.configDir)
+    Module.Theme = {}
+    Module.ThemeLoader = require('lib.theme_loader')
 else
     Module.Utils = MyUI_Utils
     Module.Icons = MyUI_Icons
     Module.Colors = MyUI_Colors
     Module.CharLoaded = MyUI_CharLoaded
     Module.Server = MyUI_Server
+    Module.ThemeFile = MyUI_ThemeFile
+    Module.Theme = MyUI_Theme
+    Module.ThemeLoader = MyUI_ThemeLoader
 end
 
 local gIcon = Module.Icons.MD_SETTINGS
@@ -35,10 +41,8 @@ local iconSize, progressSize = 26, 10
 local flashAlpha, FontScale, cAlpha = 1, 1, 255
 local ShowGUI, locked, flashBorder, rise, cRise = true, false, true, true, false
 local openConfigGUI, openGUI = false, true
-local themeFile = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
 local configFileOld = mq.configDir .. '/Module.Configs.lua'
 local configFile = string.format('%s/MyUI/PlayerTarg/%s/%s.lua', mq.configDir, Module.Server, Module.CharLoaded)
-local ColorCount, ColorCountConf, StyleCount, StyleCountConf = 0, 0, 0, 0
 local themeName = 'Default'
 local pulseSpeed = 5
 local combatPulseSpeed = 10
@@ -66,7 +70,7 @@ local targFlag = bit32.bor(ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoScrol
 
 --Tables
 
-local defaults, settings, themeRowBG, themeBorderBG, theme = {}, {}, {}, {}, {}
+local defaults, settings, themeRowBG, themeBorderBG = {}, {}, {}, {}
 themeRowBG = { 1, 1, 1, 0, }
 themeBorderBG = { 1, 1, 1, 1, }
 
@@ -109,12 +113,11 @@ local function GetInfoToolTip()
 end
 
 local function loadTheme()
-    if Module.Utils.File.Exists(themeFile) then
-        theme = dofile(themeFile)
+    if Module.Utils.File.Exists(Module.ThemeFile) then
+        Module.Theme = dofile(Module.ThemeFile)
     else
-        theme = require('defaults.themes')
+        Module.Theme = require('defaults.themes')
     end
-    themeName = theme.LoadTheme or 'notheme'
 end
 
 local function loadSettings()
@@ -141,9 +144,9 @@ local function loadSettings()
             settings[Module.Name] = defaults
         end
     end
-
-    loadTheme()
-
+    if not loadedExeternally then
+        loadTheme()
+    end
     local newSetting = false
 
     newSetting = Module.Utils.CheckDefaultSettings(defaults, settings[Module.Name]) or newSetting
@@ -213,15 +216,15 @@ end
 
 
 ---comment
----@param tName string -- name of the theme to load form table
----@param window string -- name of the window to apply the theme to
+---@param tName string -- name of the Module.Theme to load form table
+---@param window string -- name of the window to apply the Module.Theme to
 ---@return integer, integer -- returns the new counter values
 local function DrawTheme(tName, window)
     local StyleCounter = 0
     local ColorCounter = 0
-    for tID, tData in pairs(theme.Theme) do
+    for tID, tData in pairs(Module.Theme.Theme) do
         if tData.Name == tName then
-            for pID, cData in pairs(theme.Theme[tID].Color) do
+            for pID, cData in pairs(Module.Theme.Theme[tID].Color) do
                 if window == 'main' then
                     if cData.PropertyName == 'Border' then
                         themeBorderBG = { cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4], }
@@ -269,7 +272,7 @@ local function DrawTheme(tName, window)
             end
             if tData['Style'] ~= nil then
                 if next(tData['Style']) ~= nil then
-                    for sID, sData in pairs(theme.Theme[tID].Style) do
+                    for sID, sData in pairs(Module.Theme.Theme[tID].Style) do
                         if sData.Size ~= nil then
                             ImGui.PushStyleVar(sID, sData.Size)
                             StyleCounter = StyleCounter + 1
@@ -380,9 +383,8 @@ end
 -- GUI
 local function PlayerTargConf_GUI()
     if not openConfigGUI then return end
-    ColorCountConf = 0
-    StyleCountConf = 0
-    ColorCountConf, StyleCountConf = DrawTheme(themeName, 'config')
+
+    local ColorCountConf, StyleCountConf = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
     local open, showConfigGUI = ImGui.Begin("PlayerTarg Conf##" .. Module.Name, true,
         bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
 
@@ -409,12 +411,14 @@ local function PlayerTargConf_GUI()
             ImGui.Text("Cur Theme: %s", themeName)
             -- Combo Box Load Theme
             if ImGui.BeginCombo("Load Theme##" .. Module.Name, themeName) then
-                for k, data in pairs(theme.Theme) do
+                for k, data in pairs(Module.Theme.Theme) do
                     local isSelected = data.Name == themeName
                     if ImGui.Selectable(data.Name, isSelected) then
-                        theme.LoadTheme = data.Name
-                        themeName = theme.LoadTheme
-                        settings[Module.Name].LoadTheme = themeName
+                        if settings[Module.Name].LoadTheme ~= data.Name then
+                            themeName = data.Name
+                            settings[Module.Name].LoadTheme = themeName
+                            mq.pickle(configFile, settings)
+                        end
                     end
                 end
                 ImGui.EndCombo()
@@ -578,8 +582,7 @@ local function PlayerTargConf_GUI()
         end
     end
 
-    if StyleCountConf > 0 then ImGui.PopStyleVar(StyleCountConf) end
-    if ColorCountConf > 0 then ImGui.PopStyleColor(ColorCountConf) end
+    Module.ThemeLoader.EndTheme(ColorCountConf, StyleCountConf)
     ImGui.SetWindowFontScale(1)
     ImGui.End()
 end
@@ -725,12 +728,10 @@ local function drawTarget()
 end
 
 function Module.RenderGUI()
-    ColorCount = 0
-    StyleCount = 0
     local flags = winFlag
     -- Default window size
     ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
-    ColorCount, StyleCount = DrawTheme(themeName, 'main')
+    local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme, settings[Module.Name].MouseOver, mouseHud, settings[Module.Name].WinTransparency)
     if locked then
         flags = bit32.bor(ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.MenuBar, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoScrollWithMouse)
     end
@@ -980,14 +981,14 @@ function Module.RenderGUI()
             end
             ImGui.PopStyleVar(2)
         end
-        if StyleCount > 0 then ImGui.PopStyleVar(StyleCount) end
-        if ColorCount > 0 then ImGui.PopStyleColor(ColorCount) end
 
+        Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
         ImGui.End()
     end
 
     if splitTarget and mq.TLO.Target() ~= nil then
-        local colorCountTarget, styleCountTarget = DrawTheme(themeName, 'targ')
+        local colorCountTarget, styleCountTarget = Module.ThemeLoader.StartTheme(themeName, Module.Theme, settings[Module.Name].MouseOver, mouseHudTarg,
+            settings[Module.Name].WinTransparency)
         local tmpFlag = targFlag
         if locked then tmpFlag = bit32.bor(targFlag, ImGuiWindowFlags.NoMove) end
         local openT, showT = ImGui.Begin("Target##TargetPopout" .. Module.CharLoaded, true, tmpFlag)
@@ -1003,8 +1004,7 @@ function Module.RenderGUI()
             ImGui.PopStyleVar(2)
         end
 
-        if styleCountTarget > 0 then ImGui.PopStyleVar(styleCountTarget) end
-        if colorCountTarget > 0 then ImGui.PopStyleColor(colorCountTarget) end
+        Module.ThemeLoader.EndTheme(colorCountTarget, styleCountTarget)
 
         ImGui.End()
     end
@@ -1015,7 +1015,7 @@ function Module.RenderGUI()
         if not showTitleBreath then bFlags = bit32.bor(bFlags, ImGuiWindowFlags.NoTitleBar) end
 
 
-        local ColorCountBreath, StyleCountBreath = DrawTheme(themeName, 'breath')
+        local ColorCountBreath, StyleCountBreath = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
         ImGui.SetNextWindowSize(ImVec2(150, 55), ImGuiCond.FirstUseEver)
         ImGui.SetNextWindowPos(ImGui.GetMousePosVec(), ImGuiCond.FirstUseEver)
         local openBreath, showBreath = ImGui.Begin('Breath##MyBreathWin_' .. Module.CharLoaded, true, bFlags)
@@ -1041,8 +1041,7 @@ function Module.RenderGUI()
             end
             ImGui.SetWindowFontScale(1)
         end
-        if StyleCountBreath > 0 then ImGui.PopStyleVar(StyleCountBreath) end
-        if ColorCountBreath > 0 then ImGui.PopStyleColor(ColorCountBreath) end
+        Module.ThemeLoader.EndTheme(ColorCountBreath, StyleCountBreath)
         ImGui.End()
     end
 

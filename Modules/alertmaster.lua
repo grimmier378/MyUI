@@ -27,24 +27,32 @@ local mq = require('mq')
 local ImGui = require('ImGui')
 Module = {}
 Module.Name = 'AlertMaster'
-Module.Path = Module.Path ~= nil and Module.Path or string.format("%s/%s/", mq.luaDir, Module.Name)
-Module.SoundPath = string.format("%s/sounds/default/", Module.Path)
+Module.Path = string.format("%s/%s/", mq.luaDir, Module.Name)
 
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 if not loadedExeternally then
-	Module.Utils      = require('lib.common')
-	Module.CharLoaded = mq.TLO.Me.DisplayName()
-	Module.Colors     = require('lib.colors')
-	Module.Guild      = mq.TLO.Me.Guild()
-	Module.Icons      = require('mq.ICONS')
+	Module.Utils       = require('lib.common')
+	Module.CharLoaded  = mq.TLO.Me.DisplayName()
+	Module.Colors      = require('lib.colors')
+	Module.Guild       = mq.TLO.Me.Guild()
+	Module.Icons       = require('mq.ICONS')
+	Module.ThemeLoader = require('lib.theme_loader')
+	Module.ThemeFile   = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
+	Module.Theme       = require('defaults.themes')
+	Module.Path        = string.format("%s/%s/", mq.luaDir, Module.Name)
 else
 	Module.Utils = MyUI_Utils
 	Module.CharLoaded = MyUI_CharLoaded
 	Module.Colors = MyUI_Colors
 	Module.Guild = MyUI_Guild
 	Module.Icons = MyUI_Icons
+	Module.ThemeLoader = MyUI_ThemeLoader
+	Module.ThemeFile = MyUI_ThemeFile
+	Module.Theme = MyUI_Theme
+	Module.Path = MyUI_Path
 end
+Module.SoundPath = string.format("%s/sounds/default/", Module.Path)
 
 -- Variables
 local arg = { ..., }
@@ -82,10 +90,8 @@ local AlertWindow_Show, AlertWindowOpen, SearchWindowOpen, SearchWindow_Show, sh
 local currentTab = "zone"
 local newSpawnName = ''
 local zSettings = false
-local theme = require('defaults.themes')
 local useThemeName = 'Default'
 local openConfigGUI = false
-local themeFile = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
 local ZoomLvl = 1.0
 local doOnce = true
 local ColorCountAlert, ColorCountConf, StyleCountConf, StyleCountAlert = 0, 0, 0, 0
@@ -354,10 +360,11 @@ local function load_settings()
 		}
 		save_settings()
 	end
-	if Module.Utils.File.Exists(themeFile) then
-		theme = dofile(themeFile)
+	if not loadedExeternally then
+		if Module.Utils.File.Exists(Module.ThemeFile) then
+			Module.Theme = dofile(Module.ThemeFile)
+		end
 	end
-
 	if Module.Utils.File.Exists(smSettings) then
 		spawnsSpawnMaster = LIP.loadSM(smSettings)
 		haveSM = true
@@ -368,7 +375,7 @@ local function load_settings()
 		importedZones = dofile(smImportList)
 	end
 
-	useThemeName = theme.LoadTheme
+	useThemeName = Module.Theme.LoadTheme
 	-- if this character doesn't have the sections in the ini, create them
 	if settings[CharConfig] == nil then settings[CharConfig] = defaultConfig end
 	if settings[CharCommands] == nil then settings[CharCommands] = {} end
@@ -1023,35 +1030,6 @@ function DrawArrow(topPoint, width, height, color)
 end
 
 ----------------------------
----comment
----@param tName string -- name of the theme to load form table
----@return integer, integer -- returns the new counter values
-local function DrawTheme(tName)
-	local StyleCounter = 0
-	local ColorCounter = 0
-	for tID, tData in pairs(theme.Theme) do
-		if tData.Name == tName then
-			for pID, cData in pairs(theme.Theme[tID].Color) do
-				ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
-				ColorCounter = ColorCounter + 1
-			end
-			if tData['Style'] ~= nil then
-				if next(tData['Style']) ~= nil then
-					for sID, sData in pairs(theme.Theme[tID].Style) do
-						if sData.Size ~= nil then
-							ImGui.PushStyleVar(sID, sData.Size)
-							StyleCounter = StyleCounter + 1
-						elseif sData.X ~= nil then
-							ImGui.PushStyleVar(sID, sData.X, sData.Y)
-							StyleCounter = StyleCounter + 1
-						end
-					end
-				end
-			end
-		end
-	end
-	return ColorCounter, StyleCounter
-end
 
 local function DrawToggles()
 	local lockedIcon = Module.GUI_Main.Locked and Module.Icons.FA_LOCK .. '##lockTabButton' or
@@ -1342,7 +1320,7 @@ local function DrawSearchWindow()
 	end
 	if SearchWindowOpen then
 		-- ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 5)
-		local ColorCount, StyleCount = DrawTheme(useThemeName)
+		local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(useThemeName, Module.Theme)
 		if ZoomLvl > 1.25 then ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, 4, 7) end
 		SearchWindowOpen = ImGui.Begin("Alert Master##" .. Module.CharLoaded, SearchWindowOpen, Module.GUI_Main.Flags)
 		ImGui.BeginMenuBar()
@@ -1560,7 +1538,7 @@ local function Config_GUI()
 	ColorCountConf = 0
 	StyleCountConf = 0
 	-- local themeName = theme.LoadTheme or 'notheme'
-	ColorCountConf, StyleCountConf = DrawTheme(useThemeName)
+	ColorCountConf, StyleCountConf = Module.ThemeLoader.StartTheme(useThemeName, Module.Theme)
 
 	local open, drawConfigGUI = ImGui.Begin("Alert master Config", true, bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoCollapse))
 	ImGui.SetWindowFontScale(ZoomLvl)
@@ -1574,11 +1552,11 @@ local function Config_GUI()
 			-- Combo Box Load Theme
 			if ImGui.BeginCombo("Load Theme", useThemeName) then
 				ImGui.SetWindowFontScale(ZoomLvl)
-				for k, data in pairs(theme.Theme) do
+				for k, data in pairs(Module.Theme.Theme) do
 					local isSelected = data.Name == useThemeName
 					if ImGui.Selectable(data.Name, isSelected) then
-						theme.LoadTheme = data.Name
-						useThemeName = theme.LoadTheme
+						Module.Theme.LoadTheme = data.Name
+						useThemeName = Module.Theme.LoadTheme
 						settings[CharConfig]['theme'] = useThemeName
 						save_settings()
 					end
@@ -1894,7 +1872,7 @@ function DrawAlertGUI() -- Draw GUI Window
 		StyleCountAlert = 0
 		if currZone ~= lastZone then return end
 		-- ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 5)
-		ColorCountAlert, StyleCountAlert = DrawTheme(useThemeName)
+		ColorCountAlert, StyleCountAlert = Module.ThemeLoader.StartTheme(useThemeName, Module.Theme)
 		AlertWindowOpen, opened = ImGui.Begin("Alert Window##" .. Module.CharLoaded, AlertWindowOpen, Module.GUI_Alert.Flags)
 		if not opened then
 			AlertWindowOpen = false

@@ -13,49 +13,48 @@ Module.IsRunning = false
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
 if not loadedExeternally then
-    Module.Utils      = require('lib.common')
-    Module.Colors     = require('lib.colors')
-    Module.Icons      = require('mq.ICONS')
-    Module.CharLoaded = mq.TLO.Me.DisplayName()
-    Module.Server     = mq.TLO.MacroQuest.Server()
+    Module.Utils       = require('lib.common')
+    Module.Colors      = require('lib.colors')
+    Module.Icons       = require('mq.ICONS')
+    Module.CharLoaded  = mq.TLO.Me.DisplayName()
+    Module.Server      = mq.TLO.MacroQuest.Server()
+    Module.ThemeFile   = string.format('%s/MyUI/ThemeZ.lua', mq.configDir)
+    Module.Theme       = {}
+    Module.ThemeLoader = require('lib.theme_loader')
 else
     Module.Utils = MyUI_Utils
     Module.Colors = MyUI_Colors
     Module.Icons = MyUI_Icons
     Module.CharLoaded = MyUI_CharLoaded
     Module.Server = MyUI_Server
+    Module.ThemeFile = MyUI_ThemeFile
+    Module.Theme = MyUI_Theme
+    Module.ThemeLoader = MyUI_ThemeLoader
 end
 
 local gIcon = Module.Icons.MD_SETTINGS
--- set variables
 local winFlag = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.MenuBar)
 local iconSize = 15
 local mimicMe, followMe = false, false
 local Scale = 1
-local serverName = Module.Server
-serverName = serverName:gsub(" ", "_")
-local configFileold2 = string.format("%s/MyUI/MyGroup/%s_%s_Config.lua", mq.configDir, serverName, Module.CharLoaded)
-local themeFile = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
-
-local configFileOld = mq.configDir .. '/Module.Configs.lua'
-local configFile = string.format("%s/MyUI/MyGroup/%s/%s.lua", mq.configDir, serverName, Module.CharLoaded)
-local ColorCount, ColorCountConf, StyleCount, StyleCountConf = 0, 0, 0, 0
+local configFile = string.format("%s/MyUI/MyGroup/%s/%s.lua", mq.configDir, Module.Server:gsub(" ", "_"), Module.CharLoaded)
 local lastTar = mq.TLO.Target.ID() or 0
 local themeName = 'Default'
-local locked, showMana, showEnd, showPet, mouseHover = false, true, true, true, false
-local defaults, settings, theme = {}, {}, {}
+local locked = false
+local showMana = true
+local showEnd = true
+local showPet = true
+local mouseHover = false
+local defaults, settings = {}, {}
 local useEQBC = false
 local meID = mq.TLO.Me.ID()
 local OpenConfigGUI = false
-
-local hideTitle, showSelf = false, false
+local hideTitle = false
+local showSelf = false
 local currZone, lastZone
 
--- Flags
-local tPlayerFlags = bit32.bor(ImGuiTableFlags.NoBordersInBody, ImGuiTableFlags.NoPadInnerX,
-    ImGuiTableFlags.NoPadOuterX, ImGuiTableFlags.Resizable, ImGuiTableFlags.SizingFixedFit)
+local tPlayerFlags = bit32.bor(ImGuiTableFlags.NoBordersInBody, ImGuiTableFlags.NoPadInnerX, ImGuiTableFlags.NoPadOuterX, ImGuiTableFlags.Resizable, ImGuiTableFlags.SizingFixedFit)
 
--- Tables
 local manaClass = {
     [1] = 'WIZ',
     [2] = 'MAG',
@@ -92,12 +91,12 @@ defaults = {
 }
 
 local function loadTheme()
-    if Module.Utils.File.Exists(themeFile) then
-        theme = dofile(themeFile)
+    if Module.Utils.File.Exists(Module.ThemeFile) then
+        Module.Theme = dofile(Module.ThemeFile)
     else
-        theme = require('defaults.themes')
+        Module.Theme = require('defaults.themes')
     end
-    themeName = theme.LoadTheme or themeName
+    themeName = Module.Theme.LoadTheme or themeName
 end
 
 ---comment Writes settings from the settings table passed to the setting file (full path required)
@@ -119,9 +118,9 @@ local function loadSettings()
         -- Load settings from the Lua config file
         settings = dofile(configFile)
     end
-
-    loadTheme()
-
+    if not loadedExeternally then
+        loadTheme()
+    end
     newSetting = Module.Utils.CheckDefaultSettings(defaults, settings)
     newSetting = Module.Utils.CheckRemovedSettings(defaults, settings) or newSetting
 
@@ -136,50 +135,6 @@ local function loadSettings()
     themeName = settings[Module.Name].LoadTheme
 
     if newSetting then writeSettings(configFile, settings) end
-end
-
----comment
----@param tName string -- name of the theme to load form table
----@return integer, integer -- returns the new counter values
-local function DrawTheme(tName)
-    local StyleCounter = 0
-    local ColorCounter = 0
-    if tName == 'Default' then return ColorCounter, StyleCounter end
-    for tID, tData in pairs(theme.Theme) do
-        if tData.Name == tName then
-            for pID, cData in pairs(theme.Theme[tID].Color) do
-                if cData.PropertyName == 'WindowBg' then
-                    if not settings[Module.Name].MouseOver then
-                        ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[Module.Name].WinTransparency))
-                        ColorCounter = ColorCounter + 1
-                    elseif settings[Module.Name].MouseOver and mouseHover then
-                        ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], 1.0))
-                        ColorCounter = ColorCounter + 1
-                    elseif settings[Module.Name].MouseOver and not mouseHover then
-                        ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[Module.Name].WinTransparency))
-                        ColorCounter = ColorCounter + 1
-                    end
-                else
-                    ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
-                    ColorCounter = ColorCounter + 1
-                end
-            end
-            if tData['Style'] ~= nil then
-                if next(tData['Style']) ~= nil then
-                    for sID, sData in pairs(theme.Theme[tID].Style) do
-                        if sData.Size ~= nil then
-                            ImGui.PushStyleVar(sID, sData.Size)
-                            StyleCounter = StyleCounter + 1
-                        elseif sData.X ~= nil then
-                            ImGui.PushStyleVar(sID, sData.X, sData.Y)
-                            StyleCounter = StyleCounter + 1
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return ColorCounter, StyleCounter
 end
 
 local function DrawGroupMember(id)
@@ -631,9 +586,6 @@ end
 function Module.RenderGUI()
     ------- Main Window --------
     if Module.IsRunning then
-        ColorCount = 0
-        StyleCount = 0
-
         if currZone ~= lastZone then return end
         local flags = winFlag
         if locked then
@@ -641,7 +593,7 @@ function Module.RenderGUI()
         end
         -- Default window size
         ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
-        ColorCount, StyleCount = DrawTheme(themeName)
+        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme, settings[Module.Name].MouseOver, mouseHover, settings[Module.Name].WinTransparency)
         local openGUI, showMain = ImGui.Begin("My Group##MyGroup" .. mq.TLO.Me.DisplayName(), true, flags)
         if not openGUI then Module.IsRunning = false end
         if showMain then
@@ -758,8 +710,7 @@ function Module.RenderGUI()
             if mimicMe then ImGui.PopStyleColor(1) end
             mimicMe = tmpMimic
         end
-        if StyleCount > 0 then ImGui.PopStyleVar(StyleCount) end
-        if ColorCount > 0 then ImGui.PopStyleColor(ColorCount) end
+        Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
 
         ImGui.SetWindowFontScale(1)
         ImGui.End()
@@ -767,9 +718,7 @@ function Module.RenderGUI()
 
     -- Config Window
     if OpenConfigGUI then
-        ColorCountConf = 0
-        StyleCountConf = 0
-        ColorCountConf, StyleCountConf = DrawTheme(themeName)
+        local ColorCountConf, StyleCountConf = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
         local open, configShow = ImGui.Begin("MyGroup Conf", true, bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
         if not open then OpenConfigGUI = false end
         if configShow then
@@ -778,11 +727,11 @@ function Module.RenderGUI()
             ImGui.Text("Cur Theme: %s", themeName)
             -- Combo Box Load Theme
             if ImGui.BeginCombo("Load Theme##MyGroup", themeName) then
-                for k, data in pairs(theme.Theme) do
+                for k, data in pairs(Module.Theme.Theme) do
                     local isSelected = data.Name == themeName
                     if ImGui.Selectable(data.Name, isSelected) then
-                        theme.LoadTheme = data.Name
-                        themeName = theme.LoadTheme
+                        Module.Theme.LoadTheme = data.Name
+                        themeName = Module.Theme.LoadTheme
                         settings[Module.Name].LoadTheme = themeName
                     end
                 end
@@ -876,8 +825,7 @@ function Module.RenderGUI()
                 writeSettings(configFile, settings)
             end
         end
-        if StyleCountConf > 0 then ImGui.PopStyleVar(StyleCountConf) end
-        if ColorCountConf > 0 then ImGui.PopStyleColor(ColorCountConf) end
+        Module.ThemeLoader.EndTheme(ColorCountConf, StyleCountConf)
         ImGui.SetWindowFontScale(1)
         ImGui.End()
     end

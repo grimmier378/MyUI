@@ -1,12 +1,13 @@
 local mq                = require('mq')
 local imgui             = require 'ImGui'
+---@diagnostic disable:undefined-global
 
 local Module            = {}
 Module.ActorMailBox     = 'aa_party'
 Module.IsRunning        = false
 Module.Name             = 'AAParty'
+Module.DisplayName      = 'AA Party'
 
----@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 if not loadedExeternally then
     Module.Utils       = require('lib.common')
@@ -14,20 +15,22 @@ if not loadedExeternally then
     Module.Actor       = require('actors')
     Module.CharLoaded  = mq.TLO.Me.DisplayName()
     Module.Mode        = 'driver'
+    Module.ThemeFile   = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
+    Module.Theme       = {}
 else
     Module.Utils       = MyUI_Utils
     Module.ThemeLoader = MyUI_ThemeLoader
     Module.Actor       = MyUI_Actor
     Module.CharLoaded  = MyUI_CharLoaded
     Module.Mode        = MyUI_Mode
+    Module.ThemeFile   = MyUI_ThemeFile
+    Module.Theme       = MyUI_Theme
 end
 
 local themeID                                                           = 1
 local expand, compact                                                   = {}, {}
-local themeFile                                                         = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
 local configFile                                                        = mq.configDir .. '/myui/AA_Party_Configs.lua'
 local themezDir                                                         = mq.luaDir .. '/themez/init.lua'
-local script                                                            = 'AA Party'
 local MeLevel                                                           = mq.TLO.Me.Level()
 local PctExp                                                            = mq.TLO.Me.PctExp()
 local winFlags                                                          = bit32.bor(ImGuiWindowFlags.None)
@@ -37,7 +40,6 @@ local PctAA, SettingAA, PtsAA, PtsSpent, PtsTotal, PtsAALast, LastState = 0, '0'
 local firstRun                                                          = true
 local hasThemeZ                                                         = Module.Utils.File.Exists(themezDir)
 
-local theme                                                             = {}
 local settings                                                          = {}
 local TempSettings                                                      = {}
 local groupData                                                         = {}
@@ -59,81 +61,76 @@ local defaults                                                          = {
 }
 
 local function loadTheme()
-    if Module.Utils.File.Exists(themeFile) then
-        theme = dofile(themeFile)
+    if Module.Utils.File.Exists(Module.ThemeFile) then
+        Module.Theme = dofile(Module.ThemeFile)
     else
-        theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
+        Module.Theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
     end
-    TempSettings.themeName = settings[script].LoadTheme or 'Default'
-    if theme and theme.Theme then
-        for tID, tData in pairs(theme.Theme) do
-            if tData['Name'] == TempSettings.themeName then
-                themeID = tID
-            end
-        end
-    end
+    TempSettings.themeName = settings[Module.DisplayName].LoadTheme or 'Default'
 end
 
 local function loadSettings()
     -- Check if the dialog data file exists
     local newSetting = false
     if not Module.Utils.File.Exists(configFile) then
-        settings[script] = defaults
+        settings[Module.DisplayName] = defaults
         mq.pickle(configFile, settings)
         loadSettings()
     else
         -- Load settings from the Lua config file
         settings = dofile(configFile)
-        if settings[script] == nil then
-            settings[script] = {}
-            settings[script] = defaults
+        if settings[Module.DisplayName] == nil then
+            settings[Module.DisplayName] = {}
+            settings[Module.DisplayName] = defaults
             newSetting = true
         end
     end
 
-    if settings[script].locked == nil then
-        settings[script].locked = false
+    if settings[Module.DisplayName].locked == nil then
+        settings[Module.DisplayName].locked = false
         newSetting = true
     end
 
-    if settings[script].AlphaSort == nil then
-        settings[script].AlphaSort = false
+    if settings[Module.DisplayName].AlphaSort == nil then
+        settings[Module.DisplayName].AlphaSort = false
         newSetting = true
     end
 
-    if settings[script].Scale == nil then
-        settings[script].Scale = 1
+    if settings[Module.DisplayName].Scale == nil then
+        settings[Module.DisplayName].Scale = 1
         newSetting = true
     end
 
-    if settings[script].ShowTooltip == nil then
-        settings[script].ShowTooltip = true
+    if settings[Module.DisplayName].ShowTooltip == nil then
+        settings[Module.DisplayName].ShowTooltip = true
         newSetting = true
     end
 
-    if settings[script].MaxRow == nil then
-        settings[script].MaxRow = 1
+    if settings[Module.DisplayName].MaxRow == nil then
+        settings[Module.DisplayName].MaxRow = 1
         newSetting = true
     end
 
-    if settings[script].LoadTheme == nil then
-        settings[script].LoadTheme = 'Default'
+    if settings[Module.DisplayName].LoadTheme == nil then
+        settings[Module.DisplayName].LoadTheme = 'Default'
         newSetting = true
     end
 
-    loadTheme()
+    if not loadedExeternally then
+        loadTheme()
+    end
 
-    if settings[script].AutoSize == nil then
-        settings[script].AutoSize = TempSettings.aSize
+    if settings[Module.DisplayName].AutoSize == nil then
+        settings[Module.DisplayName].AutoSize = TempSettings.aSize
         newSetting = true
     end
 
     -- Set the settings to the variables
-    TempSettings.alphaSort   = settings[script].AlphaSort
-    TempSettings.aSize       = settings[script].AutoSize
-    TempSettings.scale       = settings[script].Scale
-    TempSettings.showTooltip = settings[script].ShowTooltip
-    TempSettings.themeName   = settings[script].LoadTheme
+    TempSettings.alphaSort   = settings[Module.DisplayName].AlphaSort
+    TempSettings.aSize       = settings[Module.DisplayName].AutoSize
+    TempSettings.scale       = settings[Module.DisplayName].Scale
+    TempSettings.showTooltip = settings[Module.DisplayName].ShowTooltip
+    TempSettings.themeName   = settings[Module.DisplayName].LoadTheme
     if newSetting then mq.pickle(configFile, settings) end
 end
 
@@ -189,33 +186,6 @@ local function GenerateContent(who, sub, what)
         Check    = checkIn,
         State    = cState,
     }
-end
-
-local function DrawTheme(tName)
-    local StyleCounter = 0
-    local ColorCounter = 0
-    for tID, tData in pairs(theme.Theme) do
-        if tData.Name == tName then
-            for pID, cData in pairs(theme.Theme[tID].Color) do
-                ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
-                ColorCounter = ColorCounter + 1
-            end
-            if tData['Style'] ~= nil then
-                if next(tData['Style']) ~= nil then
-                    for sID, sData in pairs(theme.Theme[tID].Style) do
-                        if sData.Size ~= nil then
-                            ImGui.PushStyleVar(sID, sData.Size)
-                            StyleCounter = StyleCounter + 1
-                        elseif sData.X ~= nil then
-                            ImGui.PushStyleVar(sID, sData.X, sData.Y)
-                            StyleCounter = StyleCounter + 1
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return ColorCounter, StyleCounter
 end
 
 local function sortedBoxes(boxes)
@@ -407,7 +377,7 @@ function Module.RenderGUI()
         else
             winFlags = bit32.bor(ImGuiWindowFlags.None)
         end
-        local ColorCount, StyleCount = DrawTheme(settings[script].LoadTheme or 'Default')
+        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(settings[Module.DisplayName].LoadTheme or 'Default', Module.Theme)
         local openGUI, showGUI = imgui.Begin("AA Party##_" .. Module.CharLoaded, true, winFlags)
         if not openGUI then
             AAPartyShow = false
@@ -572,7 +542,7 @@ function Module.RenderGUI()
     end
 
     if MailBoxShow then
-        local ColorCount, StyleCount = DrawTheme(settings[script].LoadTheme or 'Default')
+        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(settings[Module.DisplayName].LoadTheme or 'Default', Module.Theme)
         local openMail, showMail = imgui.Begin("AA Party MailBox##MailBox_" .. Module.CharLoaded, true, ImGuiWindowFlags.None)
         if not openMail then
             MailBoxShow = false
@@ -612,7 +582,7 @@ function Module.RenderGUI()
     end
 
     if AAPartyConfigShow then
-        local ColorCountTheme, StyleCountTheme = DrawTheme(settings[script].LoadTheme or 'Default')
+        local ColorCountTheme, StyleCountTheme = Module.ThemeLoader.StartTheme(settings[Module.DisplayName].LoadTheme or 'Default', Module.Theme)
         local openTheme, showConfig = ImGui.Begin('Config##MySpells_', true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
         if not openTheme then
             AAPartyConfigShow = false
@@ -622,19 +592,19 @@ function Module.RenderGUI()
             ImGui.Text("Cur Theme: %s", TempSettings.themeName)
             -- Combo Box Load Theme
             if ImGui.BeginCombo("Load Theme##MySpells", TempSettings.themeName) then
-                for k, data in pairs(theme.Theme) do
+                for k, data in pairs(Module.Theme.Theme) do
                     local isSelected = data.Name == TempSettings.themeName
                     if ImGui.Selectable(data.Name, isSelected) then
-                        theme.LoadTheme = data.Name
-                        themeID = k
-                        TempSettings.themeName = theme.LoadTheme
+                        settings[Module.DisplayName].LoadTheme = data.Name
+                        TempSettings.themeName = settings[Module.DisplayName].LoadTheme
+                        mq.pickle(configFile, settings)
                     end
                 end
                 ImGui.EndCombo()
             end
 
             TempSettings.scale = ImGui.SliderFloat("Scale##DialogDB", TempSettings.scale, 0.5, 2)
-            if TempSettings.scale ~= settings[script].Scale then
+            if TempSettings.scale ~= settings[Module.DisplayName].Scale then
                 if TempSettings.scale < 0.5 then TempSettings.scale = 0.5 end
                 if TempSettings.scale > 2 then TempSettings.scale = 2 end
             end
@@ -644,9 +614,9 @@ function Module.RenderGUI()
                     if not loadedExeternally then
                         mq.cmd("/lua run themez")
                     else
-                        if Module.Modules.ThemeZ ~= nil then
-                            if Module.Modules.ThemeZ.IsRunning then
-                                Module.Modules.ThemeZ.ShowGui = true
+                        if MyUI_Modules.ThemeZ ~= nil then
+                            if MyUI_Modules.ThemeZ.IsRunning then
+                                MyUI_Modules.ThemeZ.ShowGui = true
                             else
                                 MyUI_TempSettings.ModuleChanged = true
                                 MyUI_TempSettings.ModuleName = 'ThemeZ'
@@ -673,10 +643,10 @@ function Module.RenderGUI()
 
             if ImGui.Button("Save & Close") then
                 settings = dofile(configFile)
-                settings[script].Scale = TempSettings.scale
-                settings[script].AlphaSort = TempSettings.alphaSort
-                settings[script].LoadTheme = TempSettings.themeName
-                settings[script].ShowTooltip = TempSettings.showTooltip
+                settings[Module.DisplayName].Scale = TempSettings.scale
+                settings[Module.DisplayName].AlphaSort = TempSettings.alphaSort
+                settings[Module.DisplayName].LoadTheme = TempSettings.themeName
+                settings[Module.DisplayName].ShowTooltip = TempSettings.showTooltip
                 mq.pickle(configFile, settings)
                 AAPartyConfigShow = false
             end
@@ -701,7 +671,7 @@ function Module.CheckMode()
 end
 
 local args = { ..., }
-function Module.CheckArgsar(args)
+function Module.CheckArgs(args)
     if #args > 0 then
         if args[1] == 'driver' then
             AAPartyShow = true
@@ -769,7 +739,7 @@ local function init()
     lastZone = currZone
     firstRun = true
     if not loadedExeternally then
-        Module.CheckArgsar(args)
+        Module.CheckArgs(args)
         mq.imgui.init(Module.Name, Module.RenderGUI)
     else
         Module.CheckMode()
@@ -797,8 +767,7 @@ local clockTimer = mq.gettime()
 
 function Module.MainLoop()
     if loadedExeternally then
-        ---@diagnostic disable-next-line: undefined-global
-        if not Module.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
     local elapsedTime = mq.gettime() - clockTimer
     if not loadedExeternally or elapsedTime >= 50 then
@@ -824,7 +793,7 @@ function Module.LocalLoop()
 end
 
 if mq.TLO.EverQuest.GameState() ~= "INGAME" then
-    printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
+    printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", Module.DisplayName)
     mq.exit()
 end
 

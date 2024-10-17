@@ -13,19 +13,21 @@ if not loadedExeternally then
 	Module.Actor       = require('actors')
 	Module.CharLoaded  = mq.TLO.Me.DisplayName()
 	Module.Server      = mq.TLO.MacroQuest.Server()
+	Module.ThemeFile   = string.format('%s/MyUI/ThemeZ.lua', mq.configDir)
+	Module.Theme       = {}
 else
 	Module.Utils = MyUI_Utils
 	Module.ThemeLoader = MyUI_ThemeLoader
 	Module.Actor = MyUI_Actor
 	Module.CharLoaded = MyUI_CharLoaded
 	Module.Server = MyUI_Server
+	Module.ThemeFile = MyUI_ThemeFile
+	Module.Theme = MyUI_Theme
 end
 
-local LoadTheme = Module.ThemeLoader
 local ActorDPS = nil
 local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, Module.Name, Module.Server, Module.CharLoaded)
-local themeFile = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
-local damTable, settings, theme = {}, {}, {}
+local damTable, settings = {}, {}
 local winFlags = bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoTitleBar)
 local started = false
 local clickThrough = false
@@ -38,7 +40,7 @@ local workingTable, battlesHistory, actorsTable, actorsWorking = {}, {}, {}, {}
 local enteredCombat = false
 local battleStartTime, leftCombatTime = 0, 0
 local firstRun = true
-local themeName, themeID = "Default", 1
+local themeName = "Default"
 local tempSettings = {}
 local defaults = {
 	Options = {
@@ -89,19 +91,11 @@ local defaults = {
 }
 
 local function loadThemeTable()
-	if Module.Utils.File.Exists(themeFile) then
-		theme = dofile(themeFile)
+	if Module.Utils.File.Exists(Module.ThemeFile) then
+		Module.Theme = dofile(Module.ThemeFile)
 	else
-		theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
-		mq.pickle(themeFile, theme)
-	end
-	themeName = settings.Options.useTheme or 'Default'
-	if theme and theme.Theme then
-		for tID, tData in pairs(theme.Theme) do
-			if tData['Name'] == themeName then
-				themeID = tID
-			end
-		end
+		Module.Theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
+		mq.pickle(Module.ThemeFile, Module.Theme)
 	end
 end
 
@@ -117,7 +111,9 @@ local function loadSettings()
 		end
 	end
 
-	loadThemeTable()
+	if not loadedExeternally then
+		loadThemeTable()
+	end
 
 	for k, v in pairs(defaults.Options) do
 		if settings.Options[k] == nil then
@@ -146,6 +142,7 @@ local function loadSettings()
 		tempSettings[k] = v
 	end
 	tempSettings.doActors = settings.Options.announceActors
+	themeName = settings.Options.useTheme or 'Default'
 	if newSetting then mq.pickle(configFile, settings) end
 end
 
@@ -813,11 +810,10 @@ local function DrawOptions()
 		ImGui.Text("Cur Theme: %s", themeName)
 		-- Combo Box Load Theme
 		if ImGui.BeginCombo("Load Theme##DialogDB", themeName) then
-			for k, data in pairs(theme.Theme) do
+			for k, data in pairs(Module.Theme.Theme) do
 				local isSelected = data.Name == themeName
 				if ImGui.Selectable(data.Name, isSelected) then
 					tempSettings.useTheme = data.Name
-					themeID = k
 					themeName = tempSettings.useTheme
 				end
 			end
@@ -848,34 +844,6 @@ local function DrawOptions()
 		end
 	end
 	DrawButtons()
-end
-
-local function DrawTheme(tName)
-	local StyleCounter = 0
-	local ColorCounter = 0
-	if tName == "Default" then return ColorCounter, StyleCounter end
-	for tID, tData in pairs(theme.Theme) do
-		if tData.Name == tName then
-			for pID, cData in pairs(theme.Theme[tID].Color) do
-				ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
-				ColorCounter = ColorCounter + 1
-			end
-			if tData['Style'] ~= nil then
-				if next(tData['Style']) ~= nil then
-					for sID, sData in pairs(theme.Theme[tID].Style) do
-						if sData.Size ~= nil then
-							ImGui.PushStyleVar(sID, sData.Size)
-							StyleCounter = StyleCounter + 1
-						elseif sData.X ~= nil then
-							ImGui.PushStyleVar(sID, sData.X, sData.Y)
-							StyleCounter = StyleCounter + 1
-						end
-					end
-				end
-			end
-		end
-	end
-	return ColorCounter, StyleCounter
 end
 
 function Module.RenderGUI()
@@ -936,7 +904,7 @@ function Module.RenderGUI()
 	end
 
 	if tempSettings.showHistory then
-		local ColorCount, StyleCount = DrawTheme(themeName)
+		local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(tempSettings.useTheme, Module.Theme)
 		ImGui.SetNextWindowSize(400, 200, ImGuiCond.FirstUseEver)
 		local openReport, showReport = ImGui.Begin("DPS Report##" .. Module.CharLoaded, true, ImGuiWindowFlags.None)
 		if not openReport then
@@ -961,7 +929,7 @@ function Module.RenderGUI()
 				ImGui.EndTabBar()
 			end
 		end
-		LoadTheme.EndTheme(ColorCount, StyleCount)
+		Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
 		ImGui.End()
 	end
 end

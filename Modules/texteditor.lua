@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-global, undefined-field, inject-field
 --[[
 	---------------TextEditor Window Flags-------------
 	---
@@ -55,7 +56,6 @@ local TextEditor
 local fontSize          = 18
 local syntax            = 'lua'
 
----@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
 local Module            = {}
@@ -387,7 +387,6 @@ end
 
 function Module.MainLoop()
 	if loadedExeternally then
-		---@diagnostic disable-next-line: undefined-global
 		if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then
 			Module.IsRunning = false
 			return

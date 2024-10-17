@@ -4,16 +4,13 @@
     Description: Guild Chat Relay over Actors.
 ]]
 
-local mq            = require('mq')
-local ImGui         = require 'ImGui'
-local Module        = {}
-Module.ActorMailBox = 'chat_relay'
-Module.IsRunning    = false
-Module.Name         = 'ChatRelay'
-Module.DisplayName  = 'Chat Relay'
-Module.Path         = Module.Path ~= nil and Module.Path or string.format("%s/%s/", mq.luaDir, Module.Name)
-Module.ImgPath      = Module.Path .. "images/phone.png"
-
+local mq                = require('mq')
+local ImGui             = require 'ImGui'
+local Module            = {}
+Module.ActorMailBox     = 'chat_relay'
+Module.IsRunning        = false
+Module.Name             = 'ChatRelay'
+Module.DisplayName      = 'Chat Relay'
 
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
@@ -26,6 +23,9 @@ if not loadedExeternally then
     Module.Guild       = mq.TLO.Me.Guild()
     Module.Server      = mq.TLO.MacroQuest.Server()
     Module.Mode        = 'driver'
+    Module.ThemeFile   = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
+    Module.Theme       = require('defaults.themes')
+    Module.Path        = string.format("%s/%s/", mq.luaDir, Module.Name)
 else
     Module.Utils = MyUI_Utils
     Module.ThemeLoader = MyUI_ThemeLoader
@@ -34,7 +34,11 @@ else
     Module.Guild = MyUI_Guild
     Module.Server = MyUI_Server
     Module.Mode = MyUI_Mode
+    Module.ThemeFile = MyUI_ThemeFile
+    Module.Theme = MyUI_Theme
+    Module.Path = MyUI_Path
 end
+Module.ImgPath                          = Module.Path .. "images/phone.png"
 
 local winFlags                          = bit32.bor(ImGuiWindowFlags.None)
 local currZone, lastZone, configFile, mode
@@ -47,7 +51,7 @@ local lastAnnounce                      = 0
 local RelayGuild                        = false
 local RelayTells                        = false
 local NewMessage                        = false
-
+local themeName                         = 'Default'
 local minImg                            = Module.Utils.SetImage(Module.ImgPath)
 local Minimized                         = false
 local showMain                          = false
@@ -67,6 +71,7 @@ local defaults                          = {
     ShowOnNewMessage = true,
     IconSize         = 30,
     FontSize         = 16,
+    ThemeName        = 'Default',
 }
 local settings                          = {}
 
@@ -82,8 +87,6 @@ function LoadSettings()
         settings = dofile(configFile)
         if settings[Module.DisplayName] == nil then
             settings[Module.DisplayName] = {}
-            -- settings[script] = defaults
-            -- newSetting = true
         end
     end
 
@@ -100,6 +103,7 @@ function LoadSettings()
 
     RelayGuild = settings[Module.DisplayName].RelayGuild
     RelayTells = settings[Module.DisplayName].RelayTells
+    themeName = settings[Module.DisplayName].ThemeName
     if newSetting then mq.pickle(configFile, settings) end
 end
 
@@ -290,6 +294,7 @@ function Module.RenderGUI()
     if showMain then
         Minimized = false
         NewMessage = false
+        local ColCount, StylCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
         --ImGui.PushStyleColor(ImGuiCol.Tab, ImVec4(0.000, 0.000, 0.000, 0.000))
         ImGui.PushStyleColor(ImGuiCol.TabActive, ImVec4(0.848, 0.449, 0.115, 1.000))
         ImGui.SetNextWindowSize(185, 480, ImGuiCond.FirstUseEver)
@@ -417,14 +422,14 @@ function Module.RenderGUI()
                 showMain = false
             end
         end
+        Module.ThemeLoader.EndTheme(ColCount, StylCount)
         ImGui.PopStyleColor()
         ImGui.End()
     end
 
     if Minimized then
-        ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.1, 0.1, 0.1, 1))
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0.2, 0.2, 0.2, 1))
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0.6))
+        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
+
         ImGui.SetNextWindowSize(100, 100, ImGuiCond.FirstUseEver)
         ImGui.SetNextWindowPos(500, 700, ImGuiCond.FirstUseEver)
         local openMini, showMini = ImGui.Begin("Chat Relay Mini##" .. Module.CharLoaded, true, bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar))
@@ -454,19 +459,34 @@ function Module.RenderGUI()
                 ImGui.EndPopup()
             end
         end
-        ImGui.PopStyleColor(3)
+        Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
+
         ImGui.End()
     end
 
     if showConfig then
+        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
         local openConfGui, showConfGui = ImGui.Begin("Chat Relay Config", true, ImGuiWindowFlags.None)
         if not openConfGui then
             showConfig = false
         end
         if showConfGui then
             ImGui.Text("Chat Relay Configuration")
-            ImGui.Separator()
-
+            if ImGui.CollapsingHeader("Theme Settings##ChatRelay") then
+                ImGui.Text("Cur Theme: %s", themeName)
+                -- Combo Box Load Theme
+                if ImGui.BeginCombo("Load Theme##MySpells", themeName) then
+                    for k, data in pairs(Module.Theme.Theme) do
+                        local isSelected = data.Name == themeName
+                        if ImGui.Selectable(data.Name, isSelected) then
+                            settings[Module.DisplayName].ThemeName = data.Name
+                            themeName = settings[Module.DisplayName].ThemeName
+                            mq.pickle(configFile, settings)
+                        end
+                    end
+                    ImGui.EndCombo()
+                end
+            end
             ImGui.Text("Chat Relay Settings")
             RelayTells = ImGui.Checkbox("Relay Tells", RelayTells)
             RelayGuild = ImGui.Checkbox("Relay Guild", RelayGuild)
@@ -497,6 +517,7 @@ function Module.RenderGUI()
                 mq.pickle(configFile, settings)
                 showConfig = false
             end
+            Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
             ImGui.End()
         end
     end

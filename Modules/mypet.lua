@@ -8,7 +8,6 @@
 -- Load Libraries
 local mq = require('mq')
 local ImGui = require('ImGui')
-local LoadTheme = require('lib.theme_loader')
 local Module = {}
 Module.IsRunning = true
 Module.TempSettings = {}
@@ -17,24 +16,30 @@ Module.Name = 'MyPet'
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
 if not loadedExeternally then
-	Module.Utils      = require('lib.common')
-	Module.Colors     = require('lib.colors')
-	Module.Icons      = require('mq.ICONS')
-	Module.CharLoaded = mq.TLO.Me.DisplayName()
-	Module.Server     = mq.TLO.MacroQuest.Server()
+	Module.Utils       = require('lib.common')
+	Module.Colors      = require('lib.colors')
+	Module.Icons       = require('mq.ICONS')
+	Module.ThemeLoader = require('lib.theme_loader')
+	Module.CharLoaded  = mq.TLO.Me.DisplayName()
+	Module.Server      = mq.TLO.MacroQuest.Server()
+	Module.Theme       = {}
+	Module.ThemeFile   = string.format('%s/MyUI/ThemeZ.lua', mq.configDir)
 else
 	Module.Utils = MyUI_Utils
 	Module.Colors = MyUI_Colors
 	Module.Icons = MyUI_Icons
 	Module.CharLoaded = MyUI_CharLoaded
 	Module.Server = MyUI_Server
+	Module.Theme = MyUI_Theme
+	Module.ThemeFile = MyUI_ThemeFile
+	Module.ThemeLoader = MyUI_ThemeLoader
 end
+Module.TempSettings = {}
+Module.ButtonLabels = {}
 
 -- Variables
-local script = 'MyPet' -- Change this to the name of your script
 local themeName = 'Default'
-local themeID = 1
-local theme, defaults, settings, btnInfo = {}, {}, {}, {}
+local defaults, settings, btnInfo = {}, {}, {}
 local showMainGUI, showConfigGUI = true, false
 local scale = 1
 local locked, hasThemeZ = false, false
@@ -56,8 +61,26 @@ local btnKeys = {
 	"Swarm",
 	"Kill",
 	"qAttack",
-	"gHold", }
-btnInfo = { attack = false, back = false, taunt = false, follow = false, guard = false, focus = false, sit = false, hold = false, stop = false, bye = false, regroup = false, report = false, swarm = false, kill = false, qattack = false, ghold = false, }
+	"gHold",
+}
+btnInfo = {
+	attack = false,
+	back = false,
+	taunt = false,
+	follow = false,
+	guard = false,
+	focus = false,
+	sit = false,
+	hold = false,
+	stop = false,
+	bye = false,
+	regroup = false,
+	report = false,
+	swarm = false,
+	kill = false,
+	qattack = false,
+	ghold = false,
+}
 -- GUI Settings
 local winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoFocusOnAppearing)
 local animSpell = mq.FindTextureAnimation('A_SpellIcons')
@@ -66,12 +89,10 @@ local autoHide = false
 local showTitleBar = true
 
 -- File Paths
-local themeFile = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
-local configFileOld = string.format('%s/MyUI/%s/%s_Configs.lua', mq.configDir, script, script)
-local configFile = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, script, Module.Server, Module.CharLoaded)
+local configFileOld = string.format('%s/MyUI/%s/%s_Configs.lua', mq.configDir, Module.Name, Module.Name)
+local configFile = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, Module.Name, Module.Server, Module.CharLoaded)
 local themezDir = mq.luaDir .. '/themez/init.lua'
-Module.TempSettings = {}
-Module.ButtonLabels = {}
+
 -- Default Settings
 defaults = {
 	Scale = 1.0,
@@ -118,22 +139,12 @@ defaults = {
 
 local function loadTheme()
 	-- Check for the Theme File
-	if Module.Utils.File.Exists(themeFile) then
-		theme = dofile(themeFile)
+	if Module.Utils.File.Exists(Module.ThemeFile) then
+		Module.Theme = dofile(Module.ThemeFile)
 	else
-		-- Create the theme file from the defaults
-		theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
-		mq.pickle(themeFile, theme)
-	end
-	-- Load the theme from the settings file
-	themeName = settings[script].LoadTheme or 'Default'
-	-- Find the theme ID
-	if theme and theme.Theme then
-		for tID, tData in pairs(theme.Theme) do
-			if tData['Name'] == themeName then
-				themeID = tID
-			end
-		end
+		-- Create the Module.Theme file from the defaults
+		Module.Theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
+		mq.pickle(Module.ThemeFile, Module.Theme)
 	end
 end
 
@@ -171,63 +182,37 @@ local function loadSettings()
 			mq.pickle(configFile, settings)
 		else
 			-- Create the settings file from the defaults
-			settings[script] = defaults
+			settings[Module.Name] = defaults
 			mq.pickle(configFile, settings)
 		end
 	else
 		-- Load settings from the Lua config file
 		settings = dofile(configFile)
 		-- Check if the settings are missing from the file
-		if settings[script] == nil then
-			settings[script] = {}
-			settings[script] = defaults
+		if settings[Module.Name] == nil then
+			settings[Module.Name] = {}
+			settings[Module.Name] = defaults
 			newSetting = true
 		end
 	end
 
-	newSetting = Module.Utils.CheckDefaultSettings(defaults, settings[script])
-	newSetting = Module.Utils.CheckDefaultSettings(defaults.Buttons, settings[script].Buttons) or newSetting
-	newSetting = Module.Utils.CheckDefaultSettings(defaults.ConColors, settings[script].ConColors) or newSetting
-
-	-- Load the theme
-	loadTheme()
-
+	newSetting = Module.Utils.CheckDefaultSettings(defaults, settings[Module.Name])
+	newSetting = Module.Utils.CheckDefaultSettings(defaults.Buttons, settings[Module.Name].Buttons) or newSetting
+	newSetting = Module.Utils.CheckDefaultSettings(defaults.ConColors, settings[Module.Name].ConColors) or newSetting
+	if loadedExeternally then
+		-- Load the Module.Theme
+		loadTheme()
+	end
 	-- Set the settings to the variables
-	showTitleBar = settings[script].ShowTitlebar
-	autoHide = settings[script].AutoHide
-	locked = settings[script].locked
-	scale = settings[script].Scale
-	themeName = settings[script].LoadTheme
-	Module.TempSettings = settings[script]
+	themeName = settings[Module.Name].LoadTheme or 'Default'
+	showTitleBar = settings[Module.Name].ShowTitlebar
+	autoHide = settings[Module.Name].AutoHide
+	locked = settings[Module.Name].locked
+	scale = settings[Module.Name].Scale
+	themeName = settings[Module.Name].LoadTheme
+	Module.TempSettings = settings[Module.Name]
 	-- Save the settings if new settings were added
 	if newSetting then mq.pickle(configFile, settings) end
-end
-
-local function DrawTheme(tName)
-	local StyleCounter = 0
-	local ColorCounter = 0
-	for tID, tData in pairs(theme.Theme) do
-		if tData.Name == tName then
-			for pID, cData in pairs(theme.Theme[tID].Color) do
-				ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
-				ColorCounter = ColorCounter + 1
-			end
-			if tData['Style'] ~= nil then
-				if next(tData['Style']) ~= nil then
-					for sID, sData in pairs(theme.Theme[tID].Style) do
-						if sData.Size ~= nil then
-							ImGui.PushStyleVar(sID, sData.Size)
-							StyleCounter = StyleCounter + 1
-						elseif sData.X ~= nil then
-							ImGui.PushStyleVar(sID, sData.X, sData.Y)
-							StyleCounter = StyleCounter + 1
-						end
-					end
-				end
-			end
-		end
-	end
-	return ColorCounter, StyleCounter
 end
 
 local function GetButtonStates()
@@ -249,7 +234,7 @@ local function DrawInspectableSpellIcon(iconID, bene, name, i)
 	local cursor_x, cursor_y = ImGui.GetCursorPos()
 	local beniColor = IM_COL32(0, 20, 180, 190) -- blue benificial default color
 	if iconID == 0 then
-		ImGui.SetWindowFontScale(settings[script].Scale)
+		ImGui.SetWindowFontScale(settings[Module.Name].Scale)
 		ImGui.Dummy(iconSize, iconSize)
 		ImGui.SetWindowFontScale(1)
 		return
@@ -284,7 +269,7 @@ local function DrawInspectableSpellIcon(iconID, bene, name, i)
 		ImGui.EndPopup()
 	end
 	if ImGui.IsItemHovered() then
-		ImGui.SetWindowFontScale(settings[script].Scale)
+		ImGui.SetWindowFontScale(settings[Module.Name].Scale)
 		ImGui.BeginTooltip()
 		ImGui.Text(sName)
 		ImGui.EndTooltip()
@@ -303,9 +288,9 @@ function Module.RenderGUI()
 		if (autoHide and petName ~= 'No Pet') or not autoHide then
 			ImGui.SetNextWindowSize(ImVec2(275, 255), ImGuiCond.FirstUseEver)
 			-- Set Window Name
-			local winName = string.format('%s##Main_%s', script, Module.CharLoaded)
+			local winName = string.format('%s##Main_%s', Module.Name, Module.CharLoaded)
 			-- Load Theme
-			local ColorCount, StyleCount = DrawTheme(themeName)
+			local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
 			-- Create Main Window
 			local openMain, showMain = ImGui.Begin(winName, true, winFlags)
 			-- Check if the window is open
@@ -325,13 +310,13 @@ function Module.RenderGUI()
 					local lockLabel = locked and 'Unlock' or 'Lock'
 					if ImGui.MenuItem(lockLabel .. "##MyPet") then
 						locked = not locked
-						settings[script].locked = locked
+						settings[Module.Name].locked = locked
 						mq.pickle(configFile, settings)
 					end
 					local titleBarLabel = showTitleBar and 'Hide Title Bar' or 'Show Title Bar'
 					if ImGui.MenuItem(titleBarLabel .. "##MyPet") then
 						showTitleBar = not showTitleBar
-						settings[script].ShowTitlebar = showTitleBar
+						settings[Module.Name].ShowTitlebar = showTitleBar
 						mq.pickle(configFile, settings)
 					end
 
@@ -386,7 +371,7 @@ function Module.RenderGUI()
 						end
 						local conCol = mq.TLO.Pet.Target.ConColor() or 'WHITE'
 						if conCol == nil then conCol = 'WHITE' end
-						local txCol = settings[script].ConColors[conCol]
+						local txCol = settings[Module.Name].ConColors[conCol]
 						ImGui.TextColored(ImVec4(txCol[1], txCol[2], txCol[3], txCol[4]), "%s", petTarg)
 						if petTarg ~= nil then
 							ImGui.PushStyleColor(ImGuiCol.PlotHistogram,
@@ -400,23 +385,23 @@ function Module.RenderGUI()
 						-- Buttons Section
 						local btnCount = 0
 						for i = 1, #btnKeys do
-							if settings[script].Buttons[btnKeys[i]].show then
+							if settings[Module.Name].Buttons[btnKeys[i]].show then
 								local tmpname = btnKeys[i] or 'none'
 								tmpname = string.lower(tmpname)
 								if btnInfo[tmpname] ~= nil then
 									if btnInfo[tmpname] then
 										ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(0, 1, 1, 1))
 										if ImGui.Button(btnKeys[i] .. "##ButtonPet_" .. btnKeys[i], 60, 20) then
-											mq.cmd(settings[script].Buttons[btnKeys[i]].cmd)
+											mq.cmd(settings[Module.Name].Buttons[btnKeys[i]].cmd)
 										end
 										ImGui.PopStyleColor()
 									else
 										if ImGui.Button(btnKeys[i] .. "##ButtonPet_" .. btnKeys[i], 60, 20) then
-											mq.cmd(settings[script].Buttons[btnKeys[i]].cmd)
+											mq.cmd(settings[Module.Name].Buttons[btnKeys[i]].cmd)
 										end
 									end
 									btnCount = btnCount + 1
-									if btnCount < settings[script].ButtonsRow and i < #btnKeys then
+									if btnCount < settings[Module.Name].ButtonsRow and i < #btnKeys then
 										ImGui.SameLine()
 									else
 										btnCount = 0
@@ -464,56 +449,55 @@ function Module.RenderGUI()
 				-- Reset Font Scale
 				ImGui.SetWindowFontScale(1)
 			end
-			LoadTheme.EndTheme(ColorCount, StyleCount)
+			Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
 			ImGui.End()
 		end
 	end
 
 	if showConfigGUI then
 		ImGui.SetNextWindowSize(ImVec2(400, 400), ImGuiCond.FirstUseEver)
-		local winName = string.format('%s Config##Config_%s', script, Module.CharLoaded)
-		local ColCntConf, StyCntConf = DrawTheme(themeName)
+		local winName = string.format('%s Config##Config_%s', Module.Name, Module.CharLoaded)
+		local ColCntConf, StyCntConf = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
 		local openConfig, showConfig = ImGui.Begin(winName, true, bit32.bor(ImGuiWindowFlags.NoCollapse))
 		if not openConfig then
 			showConfigGUI = false
 		end
 		if showConfig then
 			if ImGui.Button("Save & Close") then
-				settings[script].ShowTitlebar = showTitleBar
-				settings[script].locked = locked
-				settings[script].Scale = scale
-				settings[script].IconSize = iconSize
-				settings[script].LoadTheme = themeName
-				settings[script].AutoHide = autoHide
-				settings[script].ColorHPMax = Module.TempSettings.ColorHPMax
-				settings[script].ColorHPMin = Module.TempSettings.ColorHPMin
-				settings[script].ColorTargMax = Module.TempSettings.ColorTargMax
-				settings[script].ColorTargMin = Module.TempSettings.ColorTargMin
+				settings[Module.Name].ShowTitlebar = showTitleBar
+				settings[Module.Name].locked = locked
+				settings[Module.Name].Scale = scale
+				settings[Module.Name].IconSize = iconSize
+				settings[Module.Name].LoadTheme = themeName
+				settings[Module.Name].AutoHide = autoHide
+				settings[Module.Name].ColorHPMax = Module.TempSettings.ColorHPMax
+				settings[Module.Name].ColorHPMin = Module.TempSettings.ColorHPMin
+				settings[Module.Name].ColorTargMax = Module.TempSettings.ColorTargMax
+				settings[Module.Name].ColorTargMin = Module.TempSettings.ColorTargMin
 
 				mq.pickle(configFile, settings)
 				showConfigGUI = false
 			end
 			-- Configure ThemeZ --
 
-			ImGui.SeparatorText("Theme##" .. script)
-			if ImGui.CollapsingHeader("Theme##" .. script) then
+			ImGui.SeparatorText("Theme##" .. Module.Name)
+			if ImGui.CollapsingHeader("Theme##" .. Module.Name) then
 				ImGui.Text("Cur Theme: %s", themeName)
 				-- Combo Box Load Theme
-				if ImGui.BeginCombo("Load Theme##" .. script, themeName) then
-					for k, data in pairs(theme.Theme) do
+				if ImGui.BeginCombo("Load Theme##" .. Module.Name, themeName) then
+					for k, data in pairs(Module.Theme.Theme) do
 						local isSelected = data.Name == themeName
 						if ImGui.Selectable(data.Name, isSelected) then
-							theme.LoadTheme = data.Name
-							themeID = k
-							themeName = theme.LoadTheme
+							Module.Theme.LoadTheme = data.Name
+							themeName = Module.Theme.LoadTheme
 						end
 					end
 					ImGui.EndCombo()
 				end
 
 				-- Configure Scale --
-				scale = ImGui.SliderFloat("Scale##" .. script, scale, 0.5, 2)
-				if scale ~= settings[script].Scale then
+				scale = ImGui.SliderFloat("Scale##" .. Module.Name, scale, 0.5, 2)
+				if scale ~= settings[Module.Name].Scale then
 					if scale < 0.5 then scale = 0.5 end
 					if scale > 2 then scale = 2 end
 				end
@@ -551,54 +535,55 @@ function Module.RenderGUI()
 				ImGui.SeparatorText("Con Colors")
 				if ImGui.BeginTable('##PConCol', 2) then
 					ImGui.TableNextColumn()
-					settings[script].ConColors.RED = ImGui.ColorEdit4("RED##ConColors", settings[script].ConColors.RED, ImGuiColorEditFlags.NoInputs)
+					settings[Module.Name].ConColors.RED = ImGui.ColorEdit4("RED##ConColors", settings[Module.Name].ConColors.RED, ImGuiColorEditFlags.NoInputs)
 					ImGui.TableNextColumn()
-					settings[script].ConColors.YELLOW = ImGui.ColorEdit4("YELLOW##ConColors", settings[script].ConColors.YELLOW, ImGuiColorEditFlags.NoInputs)
+					settings[Module.Name].ConColors.YELLOW = ImGui.ColorEdit4("YELLOW##ConColors", settings[Module.Name].ConColors.YELLOW, ImGuiColorEditFlags.NoInputs)
 					ImGui.TableNextColumn()
-					settings[script].ConColors.WHITE = ImGui.ColorEdit4("WHITE##ConColors", settings[script].ConColors.WHITE, ImGuiColorEditFlags.NoInputs)
+					settings[Module.Name].ConColors.WHITE = ImGui.ColorEdit4("WHITE##ConColors", settings[Module.Name].ConColors.WHITE, ImGuiColorEditFlags.NoInputs)
 					ImGui.TableNextColumn()
-					settings[script].ConColors.BLUE = ImGui.ColorEdit4("BLUE##ConColors", settings[script].ConColors.BLUE, ImGuiColorEditFlags.NoInputs)
+					settings[Module.Name].ConColors.BLUE = ImGui.ColorEdit4("BLUE##ConColors", settings[Module.Name].ConColors.BLUE, ImGuiColorEditFlags.NoInputs)
 					ImGui.TableNextColumn()
-					settings[script].ConColors['LIGHT BLUE'] = ImGui.ColorEdit4("LIGHT BLUE##ConColors", settings[script].ConColors['LIGHT BLUE'], ImGuiColorEditFlags.NoInputs)
+					settings[Module.Name].ConColors['LIGHT BLUE'] = ImGui.ColorEdit4("LIGHT BLUE##ConColors", settings[Module.Name].ConColors['LIGHT BLUE'],
+						ImGuiColorEditFlags.NoInputs)
 					ImGui.TableNextColumn()
-					settings[script].ConColors.GREEN = ImGui.ColorEdit4("GREEN##ConColors", settings[script].ConColors.GREEN, ImGuiColorEditFlags.NoInputs)
+					settings[Module.Name].ConColors.GREEN = ImGui.ColorEdit4("GREEN##ConColors", settings[Module.Name].ConColors.GREEN, ImGuiColorEditFlags.NoInputs)
 					ImGui.TableNextColumn()
-					settings[script].ConColors.GREY = ImGui.ColorEdit4("GREY##ConColors", settings[script].ConColors.GREY, ImGuiColorEditFlags.NoInputs)
+					settings[Module.Name].ConColors.GREY = ImGui.ColorEdit4("GREY##ConColors", settings[Module.Name].ConColors.GREY, ImGuiColorEditFlags.NoInputs)
 					ImGui.EndTable()
 				end
 			end
 			-- Configure Toggles for Button Display --
-			iconSize = ImGui.InputInt("Icon Size##" .. script, iconSize, 1, 5)
+			iconSize = ImGui.InputInt("Icon Size##" .. Module.Name, iconSize, 1, 5)
 			if ImGui.BeginTable("##Colors", 2) then
 				ImGui.TableNextColumn()
-				autoHide = ImGui.Checkbox("Auto Hide##" .. script, autoHide)
+				autoHide = ImGui.Checkbox("Auto Hide##" .. Module.Name, autoHide)
 				ImGui.TableNextColumn()
 
-				locked = ImGui.Checkbox("Lock Window##" .. script, locked)
+				locked = ImGui.Checkbox("Lock Window##" .. Module.Name, locked)
 				ImGui.TableNextColumn()
 
-				showTitleBar = ImGui.Checkbox("Show Title Bar##" .. script, showTitleBar)
+				showTitleBar = ImGui.Checkbox("Show Title Bar##" .. Module.Name, showTitleBar)
 				ImGui.TableNextColumn()
 				ImGui.TableNextColumn()
 
 				-- Configure Dynamic Color for Porgress Bars --
 				ImGui.SetNextItemWidth(60)
-				Module.TempSettings.ColorHPMin = ImGui.ColorEdit4("Pet HP Min##" .. script, Module.TempSettings.ColorHPMin, ImGuiColorEditFlags.NoInputs)
+				Module.TempSettings.ColorHPMin = ImGui.ColorEdit4("Pet HP Min##" .. Module.Name, Module.TempSettings.ColorHPMin, ImGuiColorEditFlags.NoInputs)
 				ImGui.TableNextColumn()
 
 				ImGui.SetNextItemWidth(60)
-				Module.TempSettings.ColorHPMax = ImGui.ColorEdit4("Pet HP Max##" .. script, Module.TempSettings.ColorHPMax, ImGuiColorEditFlags.NoInputs)
+				Module.TempSettings.ColorHPMax = ImGui.ColorEdit4("Pet HP Max##" .. Module.Name, Module.TempSettings.ColorHPMax, ImGuiColorEditFlags.NoInputs)
 				ImGui.TableNextColumn()
 
 				ImGui.SetNextItemWidth(60)
-				Module.TempSettings.ColorTargMin = ImGui.ColorEdit4("Target HP Min##" .. script, Module.TempSettings.ColorTargMin, ImGuiColorEditFlags.NoInputs)
+				Module.TempSettings.ColorTargMin = ImGui.ColorEdit4("Target HP Min##" .. Module.Name, Module.TempSettings.ColorTargMin, ImGuiColorEditFlags.NoInputs)
 				ImGui.TableNextColumn()
 
 				ImGui.SetNextItemWidth(60)
-				Module.TempSettings.ColorTargMax = ImGui.ColorEdit4("Target HP Max##" .. script, Module.TempSettings.ColorTargMax, ImGuiColorEditFlags.NoInputs)
+				Module.TempSettings.ColorTargMax = ImGui.ColorEdit4("Target HP Max##" .. Module.Name, Module.TempSettings.ColorTargMax, ImGuiColorEditFlags.NoInputs)
 				ImGui.EndTable()
 			end
-			local testVal = ImGui.SliderInt("Test Slider##" .. script, 100, 0, 100)
+			local testVal = ImGui.SliderInt("Test Slider##" .. Module.Name, 100, 0, 100)
 
 			-- draw 2 test bars
 			ImGui.SetNextItemWidth(100)
@@ -611,7 +596,7 @@ function Module.RenderGUI()
 			ImGui.ProgressBar(testVal / 100, -1, 15, 'Target HP')
 			ImGui.PopStyleColor()
 
-			ImGui.SeparatorText("Buttons##" .. script)
+			ImGui.SeparatorText("Buttons##" .. Module.Name)
 			if ImGui.CollapsingHeader('Buttons##PetConfigButtons') then
 				local sizeX, sizeY = ImGui.GetContentRegionAvail()
 				sizeY = sizeY - 50
@@ -619,7 +604,7 @@ function Module.RenderGUI()
 				local sorted_names = MyUI_Utils.SortTableColums(nil, btnKeys, col)
 
 				ImGui.SetNextItemWidth(100)
-				settings[script].ButtonsRow = ImGui.InputInt("Buttons Per Row##" .. script, settings[script].ButtonsRow, 1, 5)
+				settings[Module.Name].ButtonsRow = ImGui.InputInt("Buttons Per Row##" .. Module.Name, settings[Module.Name].ButtonsRow, 1, 5)
 
 				ImGui.SeparatorText("Buttons to Display")
 				if ImGui.BeginTable("ButtonToggles##Toggles", col, ImGuiTableFlags.ScrollY) then
@@ -628,10 +613,10 @@ function Module.RenderGUI()
 					for i = 1, 16 do
 						if sorted_names[i] ~= nil then
 							local name = sorted_names[i]
-							Module.ButtonLabels[name] = settings[script].Buttons[name].show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
+							Module.ButtonLabels[name] = settings[Module.Name].Buttons[name].show and Module.Icons.FA_TOGGLE_ON or Module.Icons.FA_TOGGLE_OFF
 							ImGui.Text("%s %s", Module.ButtonLabels[name], name)
 							if ImGui.IsItemClicked(0) then
-								settings[script].Buttons[name].show = not settings[script].Buttons[name].show
+								settings[Module.Name].Buttons[name].show = not settings[Module.Name].Buttons[name].show
 							end
 
 							ImGui.TableNextColumn()
@@ -642,7 +627,7 @@ function Module.RenderGUI()
 			end
 			-- Save & Close Button --
 		end
-		LoadTheme.EndTheme(ColCntConf, StyCntConf)
+		Module.ThemeLoader.EndTheme(ColCntConf, StyCntConf)
 		ImGui.End()
 	end
 end
@@ -652,10 +637,8 @@ function Module.Unload()
 end
 
 local function Init()
-	-- Load Settings
 	loadSettings()
-	-- Get Character Name
-	configFile = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, script, Module.Server, Module.CharLoaded)
+
 	-- Check if ThemeZ exists
 	if Module.Utils.File.Exists(themezDir) then
 		hasThemeZ = true
@@ -708,7 +691,7 @@ function Module.LocalLoop()
 end
 
 if mq.TLO.EverQuest.GameState() ~= "INGAME" then
-	printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", script)
+	printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", Module.Name)
 	mq.exit()
 end
 

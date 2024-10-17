@@ -1,7 +1,7 @@
+---@diagnostic disable: inject-field, undefined-global
 local mq                = require('mq')
 local ImGui             = require('ImGui')
 
----@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 local Module            = {}
 if not loadedExeternally then
@@ -12,6 +12,8 @@ if not loadedExeternally then
     Module.Icons       = require('mq.ICONS')
     Module.Guild       = mq.TLO.Me.Guild()
     Module.Server      = mq.TLO.MacroQuest.Server()
+    Module.ThemesFile  = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
+    Module.Theme       = {}
     Module.Mode        = 'driver'
 else
     Module.Utils = MyUI_Utils
@@ -22,6 +24,8 @@ else
     Module.Guild = MyUI_Guild
     Module.Server = MyUI_Server
     Module.Mode = MyUI_Mode
+    Module.ThemesFile = MyUI_ThemeFile
+    Module.Theme = MyUI_Theme
 end
 Module.Name              = "MyChat"
 Module.IsRunning         = false
@@ -34,7 +38,6 @@ Module.tempChanColors    = {}
 Module.tempFiltColors    = {}
 Module.hString           = {}
 Module.TLOConsoles       = {}
-Module.theme             = {}
 Module.SHOW              = true
 Module.openGUI           = true
 Module.openConfigGUI     = false
@@ -42,7 +45,6 @@ Module.refreshLinkDB     = 10
 Module.mainEcho          = '/say'
 Module.doRefresh         = false
 Module.SettingsFile      = string.format('%s/MyUI/MyChat/%s/%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
-Module.ThemesFile        = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
 Module.KeyFocus          = false
 Module.KeyName           = 'RightShift'
 Module.Settings          = {
@@ -224,31 +226,6 @@ local function reindex(table)
     return newTable
 end
 
-local function reindexFilters(table)
-    local newTable = {}
-    local newIdx = 0
-    local indexCnt = 0
-    for k, v in pairs(table) do
-        indexCnt = indexCnt + 1
-        if k == 0 or k == 9000 or k >= 9100 then
-            newTable[k] = v
-        end
-    end
-
-    for i = 1, indexCnt do
-        if table[i] ~= nil then
-            newIdx = newIdx + 1
-            if newIdx == i then
-                newTable[i] = table[i]
-            else
-                newTable[newIdx] = table[i]
-            end
-        else
-            newTable[i] = nil
-        end
-    end
-    return newTable
-end
 
 ---Process ChatWin.Settings and reindex the Channel, Events, and Filter ID's
 ---Runs each table through the reindex function and updates the settings file when done
@@ -452,16 +429,18 @@ local function loadSettings()
         Module.Settings.Scale = 1.0
     end
 
-    if not Module.Utils.File.Exists(Module.ThemesFile) then
-        local defaultThemes = Module.Utils.Library.Include('defaults.themes')
-        Module.theme = defaultThemes
-    else
-        -- Load settings from the Lua config file
-        Module.theme = dofile(Module.ThemesFile)
+    if not loadedExeternally then
+        if not Module.Utils.File.Exists(Module.ThemesFile) then
+            local defaultThemes = Module.Utils.Library.Include('defaults.themes')
+            Module.Theme = defaultThemes
+        else
+            -- Load settings from the Lua config file
+            Module.Theme = dofile(Module.ThemesFile)
+        end
     end
 
     if not Module.Settings.LoadTheme then
-        Module.Settings.LoadTheme = Module.theme.LoadTheme
+        Module.Settings.LoadTheme = Module.Theme.LoadTheme
     end
 
     if Module.Settings.doLinks == nil then
@@ -508,7 +487,7 @@ end
 local function ModifyEvent(chanID)
     local channelEvents = Module.Settings.Channels[chanID].Events
     local linksEnabled = Module.Settings.Channels[chanID].enableLinks
-    local eventOptions = { keep_links = linksEnabled, }
+    local eventOptions = { keepLinks = linksEnabled, }
     for eID, eData in pairs(channelEvents) do
         local eName = string.format("event_%s_%d", chanID, eID)
         mq.unevent(eName)
@@ -895,15 +874,15 @@ end
 local function DrawTheme(tName)
     local StyleCounter = 0
     local ColorCounter = 0
-    for tID, tData in pairs(Module.theme.Theme) do
+    for tID, tData in pairs(Module.Theme.Theme) do
         if tData.Name == tName then
-            for pID, cData in pairs(Module.theme.Theme[tID].Color) do
+            for pID, cData in pairs(Module.Theme.Theme[tID].Color) do
                 ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
                 ColorCounter = ColorCounter + 1
             end
             if tData['Style'] ~= nil then
                 if next(tData['Style']) ~= nil then
-                    for sID, sData in pairs(Module.theme.Theme[tID].Style) do
+                    for sID, sData in pairs(Module.Theme.Theme[tID].Style) do
                         if sData.Size ~= nil then
                             ImGui.PushStyleVar(sID, sData.Size)
                             StyleCounter = StyleCounter + 1
@@ -1390,7 +1369,7 @@ function Module.RenderGUI()
     ImGui.SetNextWindowSize(ImVec2(640, 480), ImGuiCond.FirstUseEver)
 
     local themeName = Module.tempSettings.LoadTheme
-    local ColorCount, StyleCount = DrawTheme(themeName)
+    local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
 
     local winFlags = Module.winFlags
     if Module.Settings.locked then
@@ -1400,15 +1379,12 @@ function Module.RenderGUI()
     openMain, Module.SHOW = ImGui.Begin(windowName, openMain, winFlags)
 
     if not Module.SHOW then
-        if StyleCount > 0 then ImGui.PopStyleVar(StyleCount) end
-        if ColorCount > 0 then ImGui.PopStyleColor(ColorCount) end
+        Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
         ImGui.End()
     else
         DrawChatWindow()
 
-
-        if StyleCount > 0 then ImGui.PopStyleVar(StyleCount) end
-        if ColorCount > 0 then ImGui.PopStyleColor(ColorCount) end
+        Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
         ImGui.End()
     end
 
@@ -1426,7 +1402,7 @@ function Module.RenderGUI()
                 ImGui.SetNextWindowSize(ImVec2(640, 480), ImGuiCond.FirstUseEver)
 
                 local themeName = Module.tempSettings.LoadTheme
-                local PopoutColorCount, PopoutStyleCount = DrawTheme(themeName)
+                local PopoutColorCount, PopoutStyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
                 local show
                 PopOut, show = ImGui.Begin(name .. "##" .. channelID .. name, PopOut, Module.PopOutFlags)
                 if show then
@@ -1471,14 +1447,13 @@ function Module.RenderGUI()
                         Module.Settings.Channels[channelID].PopOut = ShowPop
                         Module.tempSettings.Channels[channelID].PopOut = ShowPop
                         ResetEvents()
-                        if PopoutStyleCount > 0 then ImGui.PopStyleVar(PopoutStyleCount) end
-                        if PopoutColorCount > 0 then ImGui.PopStyleColor(PopoutColorCount) end
+                        Module.ThemeLoader.EndTheme(PopoutColorCount, PopoutStyleCount)
                         ImGui.End()
                     end
                 end
                 ImGui.SetWindowFontScale(1)
-                if PopoutStyleCount > 0 then ImGui.PopStyleVar(PopoutStyleCount) end
-                if PopoutColorCount > 0 then ImGui.PopStyleColor(PopoutColorCount) end
+                Module.ThemeLoader.EndTheme(PopoutColorCount, PopoutStyleCount)
+
                 ImGui.End()
             end
         end
@@ -1910,7 +1885,7 @@ end
 function Module.Config_GUI(open)
     local themeName = Module.tempSettings.LoadTheme or 'Default'
     -- Push Theme Colors
-    local ColorCountConf, StyleCountConf = DrawTheme(themeName)
+    local ColorCountConf, StyleCountConf = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
     local show = false
     open, show = ImGui.Begin("Event Configuration", open, bit32.bor(ImGuiWindowFlags.None))
     if not open then Module.openConfigGUI = false end
@@ -2004,7 +1979,7 @@ function Module.Config_GUI(open)
             ImGui.Text("Cur Theme: %s", themeName)
             -- Combo Box Load Theme
             if ImGui.BeginCombo("Load Theme", themeName) then
-                for k, data in pairs(Module.theme.Theme) do
+                for k, data in pairs(Module.Theme.Theme) do
                     local isSelected = data['Name'] == themeName
                     if ImGui.Selectable(data['Name'], isSelected) then
                         Module.tempSettings['LoadTheme'] = data['Name']
@@ -2077,8 +2052,7 @@ function Module.Config_GUI(open)
         end)
         buildConfig()
     end
-    if ColorCountConf > 0 then ImGui.PopStyleColor(ColorCountConf) end
-    if StyleCountConf > 0 then ImGui.PopStyleVar(StyleCountConf) end
+    Module.ThemeLoader.EndTheme(ColorCountConf, StyleCountConf)
     ImGui.SetWindowFontScale(1)
     ImGui.End()
 end
@@ -2087,7 +2061,7 @@ function Module.Edit_GUI(open)
     if not Module.openEditGUI then return end
 
     local themeName = Module.Settings.LoadTheme
-    local ColorCountEdit, StyleCountEdit = DrawTheme(themeName)
+    local ColorCountEdit, StyleCountEdit = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
 
     local showEdit
     open, showEdit = ImGui.Begin("Channel Editor", open, bit32.bor(ImGuiWindowFlags.None))
@@ -2105,8 +2079,7 @@ function Module.Edit_GUI(open)
         end
     end
     ImGui.SetWindowFontScale(1)
-    if ColorCountEdit > 0 then ImGui.PopStyleColor(ColorCountEdit) end
-    if StyleCountEdit > 0 then ImGui.PopStyleVar(StyleCountEdit) end
+    Module.ThemeLoader.EndTheme(ColorCountEdit, StyleCountEdit)
     ImGui.End()
 end
 
@@ -2301,7 +2274,6 @@ end
 
 function Module.MainLoop()
     if loadedExeternally then
-        ---@diagnostic disable-next-line: undefined-global
         if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
 

@@ -4,15 +4,12 @@ local ImGui             = require('ImGui')
 
 local Module            = {}
 Module.ActorMailBox     = 'my_buffs'
-Module.Path             = Module.Path ~= nil and Module.Path or string.format("%s/%s/", mq.luaDir, Module.Mane)
-local themeFile         = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
-local configFileOld     = mq.configDir .. '/Module.Configs.lua'
 
 -- Tables
 Module.boxes            = {}
 Module.settings         = {}
 Module.timerColor       = {}
-Module.theme            = {}
+Module.Theme            = {}
 Module.buffTable        = {}
 Module.songTable        = {}
 Module.Name             = "MyBuffs"
@@ -35,12 +32,15 @@ Module.iconSize         = 24
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 if not loadedExeternally then
-    Module.Utils      = require('lib.common')
-    Module.Actor      = require('actors')
-    Module.CharLoaded = mq.TLO.Me.DisplayName()
-    Module.Mode       = 'driver'
-    Module.Icons      = require('mq.ICONS')
-    Module.Server     = mq.TLO.EverQuest.Server()
+    Module.Utils       = require('lib.common')
+    Module.Actor       = require('actors')
+    Module.CharLoaded  = mq.TLO.Me.DisplayName()
+    Module.Mode        = 'driver'
+    Module.Icons       = require('mq.ICONS')
+    Module.Server      = mq.TLO.EverQuest.Server()
+    Module.Path        = string.format("%s/%s/", mq.luaDir, Module.Mane)
+    Module.ThemeFile   = string.format('%s/MyUI/ThemeZ.lua', mq.configDir)
+    Module.ThemeLoader = require('lib.theme_loader')
 else
     Module.Utils = MyUI_Utils
     Module.Actor = MyUI_Actor
@@ -48,8 +48,13 @@ else
     Module.Mode = MyUI_Mode
     Module.Icons = MyUI_Icons
     Module.Server = MyUI_Server
+    Module.ThemeFile = MyUI_ThemeFile
+    Module.Theme = MyUI_Theme
+    Module.ThemeLoader = MyUI_ThemeLoader
+    Module.Path = MyUI_Path
 end
 
+local configFileOld                    = mq.configDir .. '/Module.Configs.lua'
 local configFile                       = string.format("%s/MyUI/MyBuffs/%s/%s.lua", mq.configDir,
     Module.Server, Module.CharLoaded)
 local MyBuffs_Actor                    = nil
@@ -580,10 +585,10 @@ end
 
 local function loadTheme(theme_file)
     if Module.Utils.File.Exists(theme_file) then
-        Module.theme = dofile(theme_file)
+        Module.Theme = dofile(theme_file)
     else
-        Module.theme = require('defaults.themes')
-        mq.pickle(theme_file, Module.theme)
+        Module.Theme = require('defaults.themes')
+        mq.pickle(theme_file, Module.Theme)
     end
 end
 
@@ -610,7 +615,9 @@ local function loadSettings()
         Module.timerColor = Module.settings[Module.Name]
     end
     themeName = Module.settings[Module.Name].LoadTheme or 'Default'
-    loadTheme(themeFile)
+    if not loadedExeternally then
+        loadTheme(Module.ThemeFile)
+    end
     newSetting = Module.Utils.CheckDefaultSettings(Module.defaults, Module.settings[Module.Name])
     newSetting = Module.Utils.CheckDefaultSettings(Module.defaults.WindowPositions, Module.settings[Module.Name].WindowPositions) or newSetting
     newSetting = Module.Utils.CheckDefaultSettings(Module.defaults.WindowSizes, Module.settings[Module.Name].WindowSizes) or newSetting
@@ -681,36 +688,6 @@ local function DrawInspectableSpellIcon(iconID, spell, slotNum, view)
     ImGui.SetCursorPos(cursor_x, cursor_y)
     ImGui.InvisibleButton(sName, ImVec2(Module.iconSize, Module.iconSize), bit32.bor(ImGuiButtonFlags.MouseButtonRight))
     ImGui.PopID()
-end
-
----comment
----@param tName string -- name of the theme to load form table
----@return integer, integer -- returns the new counter values
-local function DrawTheme(tName)
-    local StyleCounter = 0
-    local ColorCounter = 0
-    for tID, tData in pairs(Module.theme.Theme) do
-        if tData.Name == tName then
-            for pID, cData in pairs(Module.theme.Theme[tID].Color) do
-                ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
-                ColorCounter = ColorCounter + 1
-            end
-            if tData['Style'] ~= nil then
-                if next(tData['Style']) ~= nil then
-                    for sID, sData in pairs(Module.theme.Theme[tID].Style) do
-                        if sData.Size ~= nil then
-                            ImGui.PushStyleVar(sID, sData.Size)
-                            StyleCounter = StyleCounter + 1
-                        elseif sData.X ~= nil then
-                            ImGui.PushStyleVar(sID, sData.X, sData.Y)
-                            StyleCounter = StyleCounter + 1
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return ColorCounter, StyleCounter
 end
 
 local function BoxBuffs(id, sorted, view)
@@ -1033,7 +1010,7 @@ function Module.RenderGUI()
             flags = bit32.bor(flags, ImGuiWindowFlags.MenuBar)
         end
 
-        local ColorCount, StyleCount = DrawTheme(themeName)
+        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
         local winPosX, winPosY = winPositions.Buffs.x, winPositions.Buffs.y
         local winSizeX, winSizeY = winSizes.Buffs.x, winSizes.Buffs.y
         if useWinPos then
@@ -1245,8 +1222,7 @@ function Module.RenderGUI()
             end
             ImGui.EndPopup()
         end
-        if StyleCount > 0 then ImGui.PopStyleVar(StyleCount) end
-        if ColorCount > 0 then ImGui.PopStyleColor(ColorCount) end
+        Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
         ImGui.SetWindowFontScale(1)
         ImGui.End()
     end
@@ -1272,7 +1248,7 @@ function Module.RenderGUI()
             ImGui.SetNextWindowPos(ImVec2(winPosX, winPosY), ImGuiCond.Appearing)
         end
         ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
-        local ColorCountSongs, StyleCountSongs = DrawTheme(themeName)
+        local ColorCountSongs, StyleCountSongs = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
         local songWin, show = ImGui.Begin("MyBuffs Songs##Songs" .. Module.CharLoaded, true, flags)
         ImGui.SetWindowFontScale(Scale)
         if not songWin then
@@ -1303,8 +1279,7 @@ function Module.RenderGUI()
             mq.pickle(configFile, Module.settings)
         end
 
-        if StyleCountSongs > 0 then ImGui.PopStyleVar(StyleCountSongs) end
-        if ColorCountSongs > 0 then ImGui.PopStyleColor(ColorCountSongs) end
+        Module.ThemeLoader.EndTheme(ColorCountSongs, StyleCountSongs)
         ImGui.SetWindowFontScale(1)
         ImGui.End()
     end
@@ -1312,7 +1287,7 @@ function Module.RenderGUI()
     if Module.ShowConfig then
         local winPosX, winPosY = winPositions.Config.x, winPositions.Config.y
         local winSizeX, winSizeY = winSizes.Config.x, winSizes.Config.y
-        local ColorCountConf, StyleCountConf = DrawTheme(themeName)
+        local ColorCountConf, StyleCountConf = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
         if useWinPos then
             ImGui.SetNextWindowSize(ImVec2(winSizeX, winSizeY), ImGuiCond.Appearing)
             ImGui.SetNextWindowPos(ImVec2(winPosX, winPosY), ImGuiCond.Appearing)
@@ -1332,11 +1307,11 @@ function Module.RenderGUI()
 
                 if ImGui.BeginCombo("Load Theme##MyBuffs", themeName) then
                     ImGui.SetWindowFontScale(Scale)
-                    for k, data in pairs(Module.theme.Theme) do
+                    for k, data in pairs(Module.Theme.Theme) do
                         local isSelected = data.Name == themeName
                         if ImGui.Selectable(data.Name, isSelected) then
-                            Module.theme.LoadTheme = data.Name
-                            themeName = Module.theme.LoadTheme
+                            Module.Theme.LoadTheme = data.Name
+                            themeName = Module.Theme.LoadTheme
                             Module.settings[Module.Name].LoadTheme = themeName
                         end
                     end
@@ -1344,7 +1319,7 @@ function Module.RenderGUI()
                 end
 
                 if ImGui.Button('Reload Theme File') then
-                    loadTheme(themeFile)
+                    loadTheme(Module.ThemeFile)
                 end
 
 
@@ -1525,8 +1500,7 @@ function Module.RenderGUI()
             Module.settings[Module.Name].WindowSizes.Config.y = winSizeY
             mq.pickle(configFile, Module.settings)
         end
-        if StyleCountConf > 0 then ImGui.PopStyleVar(StyleCountConf) end
-        if ColorCountConf > 0 then ImGui.PopStyleColor(ColorCountConf) end
+        Module.ThemeLoader.EndTheme(ColorCountConf, StyleCountConf)
         ImGui.SetWindowFontScale(1)
         ImGui.End()
     end
@@ -1547,7 +1521,7 @@ function Module.RenderGUI()
             end
         end
         if found then
-            ColorCountDebuffs, StyleCountDebuffs = DrawTheme(themeName)
+            ColorCountDebuffs, StyleCountDebuffs = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
             local openDebuffs, showDebuffs = ImGui.Begin("MyBuffs Debuffs##" .. Module.CharLoaded, true,
                 bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoFocusOnAppearing))
             ImGui.SetWindowFontScale(Scale)
@@ -1587,15 +1561,14 @@ function Module.RenderGUI()
                 Module.settings[Module.Name].WindowPositions.Debuffs.y = curPosY
                 mq.pickle(configFile, Module.settings)
             end
-            if StyleCountDebuffs > 0 then ImGui.PopStyleVar(StyleCountDebuffs) end
-            if ColorCountDebuffs > 0 then ImGui.PopStyleColor(ColorCountDebuffs) end
+            Module.ThemeLoader.EndTheme(ColorCountDebuffs, StyleCountDebuffs)
             ImGui.SetWindowFontScale(1)
             ImGui.End()
         end
     end
 
     if Module.MailBoxShow then
-        local ColorCountMail, StyleCountMail = DrawTheme(themeName)
+        local ColorCountMail, StyleCountMail = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
         local winPosX, winPosY = winPositions.MailBox.x, winPositions.MailBox.y
         local winSizeX, winSizeY = winSizes.MailBox.x, winSizes.MailBox.y
         if useWinPos then
@@ -1655,8 +1628,7 @@ function Module.RenderGUI()
             Module.settings[Module.Name].WindowSizes.MailBox.y = winSizeY
             mq.pickle(configFile, Module.settings)
         end
-        if StyleCountMail > 0 then ImGui.PopStyleVar(StyleCountMail) end
-        if ColorCountMail > 0 then ImGui.PopStyleColor(ColorCountMail) end
+        Module.ThemeLoader.EndTheme(ColorCountMail, StyleCountMail)
         ImGui.End()
     else
         mailBox = {}

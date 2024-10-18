@@ -111,8 +111,9 @@ function BMButtonEditor:RenderEditButtonPopup()
                     ButtonKey                                                                      -- add the button key for this button set index
                 BMSettings:GetSettings().Buttons[ButtonKey] = btnUtils.shallowcopy(self.tmpButton) -- store the tmp button into the settings table
                 BMSettings:GetSettings().Buttons[ButtonKey].Unassigned = nil                       -- clear the unassigned flag
-
                 BMSettings:SaveSettings(true)
+                BMSettings:updateButtonDB(btnUtils.shallowcopy(self.tmpButton), ButtonKey)
+                BMSettings:updateSetDB(self.editButtonSet, self.editButtonIndex, ButtonKey)
                 self.editButtonUIChanged = false
             else
                 btnUtils.Output("\arSave failed.  Button Label cannot be empty.")
@@ -143,6 +144,8 @@ function BMButtonEditor:RenderEditButtonPopup()
                 BMSettings:GetSettings().Buttons[ButtonKey].Unassigned = nil                       -- clear the unassigned flag
 
                 BMSettings:SaveSettings(true)
+                BMSettings:updateButtonDB(btnUtils.shallowcopy(self.tmpButton), ButtonKey)
+                BMSettings:updateSetDB(self.editButtonSet, self.editButtonIndex, ButtonKey)
                 self.editButtonUIChanged = false
             else
                 btnUtils.Output("\arSave failed.  Button Label cannot be empty.")

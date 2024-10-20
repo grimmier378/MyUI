@@ -26,20 +26,20 @@ else
     Module.ThemeFile   = MyUI_ThemeFile
     Module.Theme       = MyUI_Theme
 end
+local myself                                                            = mq.TLO.Me
 
 local themeID                                                           = 1
 local expand, compact                                                   = {}, {}
 local configFile                                                        = mq.configDir .. '/myui/AA_Party_Configs.lua'
 local themezDir                                                         = mq.luaDir .. '/themez/init.lua'
-local MeLevel                                                           = mq.TLO.Me.Level()
-local PctExp                                                            = mq.TLO.Me.PctExp()
+local MeLevel                                                           = myself.Level()
+local PctExp                                                            = myself.PctExp()
 local winFlags                                                          = bit32.bor(ImGuiWindowFlags.None)
 local checkIn                                                           = os.time()
 local currZone, lastZone
 local PctAA, SettingAA, PtsAA, PtsSpent, PtsTotal, PtsAALast, LastState = 0, '0', 0, 0, 0, 0, ""
 local firstRun                                                          = true
 local hasThemeZ                                                         = Module.Utils.File.Exists(themezDir)
-
 local settings                                                          = {}
 local TempSettings                                                      = {}
 local groupData                                                         = {}
@@ -165,7 +165,7 @@ local function GenerateContent(who, sub, what)
     local doWhat = what or nil
     local doWho = who or nil
     local Subject = sub or 'Update'
-    local cState = mq.TLO.Me.CombatState()
+    local cState = myself.CombatState()
     LastState = cState
     if firstRun then
         Subject = 'Hello'
@@ -179,7 +179,7 @@ local function GenerateContent(who, sub, what)
         Setting  = SettingAA,
         DoWho    = doWho,
         DoWhat   = doWhat,
-        Name     = mq.TLO.Me.DisplayName(),
+        Name     = myself.DisplayName(),
         Pts      = PtsAA,
         PtsTotal = PtsTotal,
         PtsSpent = PtsSpent,
@@ -320,14 +320,14 @@ end
 
 local function getMyAA()
     local changed      = false
-    local tmpExpAA     = mq.TLO.Me.PctAAExp() or 0
+    local tmpExpAA     = myself.PctAAExp() or 0
     local tmpSettingAA = mq.TLO.Window("AAWindow/AAW_PercentCount").Text() or '0'
-    local tmpPts       = mq.TLO.Me.AAPoints() or 0
-    local tmpPtsTotal  = mq.TLO.Me.AAPointsTotal() or 0
-    local tmpPtsSpent  = mq.TLO.Me.AAPointsSpent() or 0
-    local tmpPctXP     = mq.TLO.Me.PctExp() or 0
-    local tmpLvl       = mq.TLO.Me.Level() or 0
-    local cState       = mq.TLO.Me.CombatState() or ""
+    local tmpPts       = myself.AAPoints() or 0
+    local tmpPtsTotal  = myself.AAPointsTotal() or 0
+    local tmpPtsSpent  = myself.AAPointsSpent() or 0
+    local tmpPctXP     = myself.PctExp() or 0
+    local tmpLvl       = myself.Level() or 0
+    local cState       = myself.CombatState() or ""
     if firstRun or (PctAA ~= tmpExpAA or SettingAA ~= tmpSettingAA or PtsAA ~= tmpPts or
             PtsSpent ~= tmpPtsSpent or PtsTotal ~= tmpPtsTotal or tmpLvl ~= MeLevel or tmpPctXP ~= PctExp or cState ~= LastState) then
         PctAA = tmpExpAA
@@ -745,7 +745,7 @@ local function init()
         Module.CheckMode()
     end
     mq.bind('/aaparty', processCommand)
-    PtsAA = mq.TLO.Me.AAPoints()
+    PtsAA = myself.AAPoints()
     loadSettings()
     getMyAA()
     Module.IsRunning = true

@@ -134,7 +134,7 @@ local function RegisterRelayActor()
             end
             if guildChat[MemberEntry.Guild] == nil then
                 guildChat[MemberEntry.Guild] = ImGui.ConsoleWidget.new("chat_relay_Console" .. MemberEntry.Guild .. "##chat_relayConsole")
-                guildChat[MemberEntry.Guild].fontSize = settings[Module.DisplayName].FontSize
+                -- guildChat[MemberEntry.Guild].fontSize = settings[Module.DisplayName].FontSize
                 guildBufferCount[MemberEntry.Guild] = { Current = 1, Last = 1, }
             end
             Module.Utils.AppendColoredTimestamp(guildChat[MemberEntry.Guild], tStamp, MemberEntry.Message)
@@ -142,7 +142,7 @@ local function RegisterRelayActor()
         elseif MemberEntry.Subject == 'Tell' and settings[Module.DisplayName].RelayTells then
             if tellChat[MemberEntry.Name] == nil then
                 tellChat[MemberEntry.Name] = ImGui.ConsoleWidget.new("chat_relay_Console" .. MemberEntry.Name .. "##chat_relayConsole")
-                tellChat[MemberEntry.Name].fontSize = settings[Module.DisplayName].FontSize
+                -- tellChat[MemberEntry.Name].fontSize = settings[Module.DisplayName].FontSize
             end
             Module.Utils.AppendColoredTimestamp(tellChat[MemberEntry.Name], tStamp, MemberEntry.Message)
             charBufferCount[MemberEntry.Name].Current = charBufferCount[MemberEntry.Name].Current + 1
@@ -159,7 +159,7 @@ local function RegisterRelayActor()
                 local announce = os.time()
                 if tellChat[MemberEntry.Name] == nil and RelayActor ~= nil then
                     tellChat[MemberEntry.Name] = ImGui.ConsoleWidget.new("chat_relay_Console" .. MemberEntry.Name .. "##chat_relayConsole")
-                    tellChat[MemberEntry.Name].fontSize = settings[Module.DisplayName].FontSize
+                    -- tellChat[MemberEntry.Name].fontSize = settings[Module.DisplayName].FontSize
                     RelayActor:send({ mailbox = 'chat_relay', script = 'myui', }, GenerateContent('Hello', 'Hello'))
                     RelayActor:send({ mailbox = 'chat_relay', script = 'chatrelay', }, GenerateContent('Hello', 'Hello'))
 
@@ -169,7 +169,7 @@ local function RegisterRelayActor()
                 end
                 if guildChat[MemberEntry.Guild] == nil then
                     guildChat[MemberEntry.Guild] = ImGui.ConsoleWidget.new("chat_relay_Console" .. MemberEntry.Guild .. "##chat_relayConsole")
-                    tellChat[MemberEntry.Name].fontSize = settings[Module.DisplayName].FontSize
+                    -- tellChat[MemberEntry.Name].fontSize = settings[Module.DisplayName].FontSize
                     guildBufferCount[MemberEntry.Guild] = { Current = 1, Last = 1, }
                     Module.Utils.AppendColoredTimestamp(guildChat[MemberEntry.Guild], tStamp, " Guild Added")
                 end
@@ -282,12 +282,12 @@ local function getTellChat(line, who)
 end
 
 local function resizeConsoleFonts()
-    for k in pairs(guildChat) do
-        guildChat[k].fontSize = settings[Module.DisplayName].FontSize
-    end
-    for k in pairs(tellChat) do
-        tellChat[k].fontSize = settings[Module.DisplayName].FontSize
-    end
+    -- for k in pairs(guildChat) do
+    --     guildChat[k].fontSize = settings[Module.DisplayName].FontSize
+    -- end
+    -- for k in pairs(tellChat) do
+    --     tellChat[k].fontSize = settings[Module.DisplayName].FontSize
+    -- end
 end
 
 function Module.RenderGUI()
@@ -499,16 +499,16 @@ function Module.RenderGUI()
             settings[Module.DisplayName].IconSize = ImGui.SliderInt("Icon Size", settings[Module.DisplayName].IconSize, 10, 50)
             ImGui.SetNextItemWidth(100)
 
-            if ImGui.BeginCombo("Font Size##ChatRelay", tostring(settings[Module.DisplayName].FontSize)) then
-                for k, data in pairs(fontSizes) do
-                    local isSelected = data == settings[Module.DisplayName].FontSize
-                    if ImGui.Selectable(tostring(data), isSelected) then
-                        settings[Module.DisplayName].FontSize = data
-                        resizeConsoleFonts()
-                    end
-                end
-                ImGui.EndCombo()
-            end
+            -- if ImGui.BeginCombo("Font Size##ChatRelay", tostring(settings[Module.DisplayName].FontSize)) then
+            --     for k, data in pairs(fontSizes) do
+            --         local isSelected = data == settings[Module.DisplayName].FontSize
+            --         if ImGui.Selectable(tostring(data), isSelected) then
+            --             settings[Module.DisplayName].FontSize = data
+            --             resizeConsoleFonts()
+            --         end
+            --     end
+            --     ImGui.EndCombo()
+            -- end
 
             ImGui.Separator()
             if ImGui.Button("Save") then
@@ -637,9 +637,9 @@ local function init()
     mq.event('out_chat_relay', "You told #1#, '#*#", getTellChat, { keepLinks = true, })
     Module.IsRunning = true
     guildChat[Module.Guild] = ImGui.ConsoleWidget.new("chat_relay_Console" .. Module.Guild .. "##chat_relayConsole")
-    guildChat[Module.Guild].fontSize = settings[Module.DisplayName].FontSize
+    -- guildChat[Module.Guild].fontSize = settings[Module.DisplayName].FontSize
     tellChat[Module.CharLoaded] = ImGui.ConsoleWidget.new("chat_relay_Console" .. Module.CharLoaded .. "##chat_relayConsole")
-    tellChat[Module.CharLoaded].fontSize = settings[Module.DisplayName].FontSize
+    -- tellChat[Module.CharLoaded].fontSize = settings[Module.DisplayName].FontSize
     Module.Utils.AppendColoredTimestamp(guildChat[Module.Guild], tStamp, "Welcome to Chat Relay")
     Module.Utils.AppendColoredTimestamp(tellChat[Module.CharLoaded], tStamp, "Welcome to Chat Relay")
     charBufferCount[Module.CharLoaded] = { Current = 1, Last = 1, }

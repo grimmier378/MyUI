@@ -234,7 +234,7 @@ local function Init()
 	end
 	TextEditor = ImGui.TextEditor.new("##TextEditor")
 	TextEditor:SetSyntax(syntax)
-	TextEditor.fontSize = fontSize
+	-- TextEditor.fontSize = fontSize
 	TextEditor.windowFlags = editorWinFlags
 	if not loadedExeternally then
 		mq.imgui.init(Module.Name, Module.RenderGUI)
@@ -287,21 +287,21 @@ function Module.RenderGUI()
 						end
 						ImGui.EndMenu()
 					end
-					if ImGui.BeginMenu('Font Size##' .. Module.Name) then
-						if ImGui.BeginCombo("Font Size##Editor", tostring(fontSize)) then
-							for k, data in pairs(fontSizes) do
-								local isSelected = data == fontSize
-								if ImGui.Selectable(tostring(data), isSelected) then
-									if fontSize ~= data then
-										fontSize = data
-										TextEditor.fontSize = data
-									end
-								end
-							end
-							ImGui.EndCombo()
-						end
-						ImGui.EndMenu()
-					end
+					-- if ImGui.BeginMenu('Font Size##' .. Module.Name) then
+					-- 	if ImGui.BeginCombo("Font Size##Editor", tostring(fontSize)) then
+					-- 		for k, data in pairs(fontSizes) do
+					-- 			local isSelected = data == fontSize
+					-- 			if ImGui.Selectable(tostring(data), isSelected) then
+					-- 				if fontSize ~= data then
+					-- 					fontSize = data
+					-- 					TextEditor.fontSize = data
+					-- 				end
+					-- 			end
+					-- 		end
+					-- 		ImGui.EndCombo()
+					-- 	end
+					-- 	ImGui.EndMenu()
+					-- end
 					ImGui.EndMenu()
 				end
 				if ImGui.BeginMenu('Syntax Highlighting##' .. Module.Name) then

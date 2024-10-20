@@ -586,6 +586,8 @@ end
 local function AlertTableSortSpecs(a, b)
 	for i = 1, Module.GUI_Alert.Table.SortSpecs.SpecsCount do
 		local spec = Module.GUI_Alert.Table.SortSpecs:Specs(i)
+		local spawnA = mq.TLO.Spawn(a.MobID)
+		local spawnB = mq.TLO.Spawn(b.MobID)
 		local delta = 0
 		if spec.ColumnUserID == Module.GUI_Alert.Table.Column_ID.MobName then
 			if a.MobName and b.MobName then
@@ -599,9 +601,9 @@ local function AlertTableSortSpecs(a, b)
 			end
 		elseif spec.ColumnUserID == Module.GUI_Alert.Table.Column_ID.MobDist then
 			if a.MobDist and b.MobDist then
-				if math.floor(mq.TLO.Spawn(a.MobID).Distance()) < math.floor(mq.TLO.Spawn(b.MobID).Distance()) then
+				if math.floor(spawnA.Distance()) < math.floor(spawnB.Distance()) then
 					delta = -1
-				elseif math.floor(mq.TLO.Spawn(a.MobID).Distance()) > math.floor(mq.TLO.Spawn(b.MobID).Distance()) then
+				elseif math.floor(spawnA.Distance()) > math.floor(spawnB.Distance()) then
 					delta = 1
 				end
 			else
@@ -1280,7 +1282,7 @@ end
 
 local function DrawAlertRuleRow(entry)
 	local sHeadingTo = entry.MobDirection
-
+	local spawn = mq.TLO.Spawn(entry.MobID)
 	ImGui.TableSetColumnIndex(0)
 	ImGui.PushStyleColor(ImGuiCol.Text, Module.Colors.color('green'))
 	ImGui.Text(entry.MobName)
@@ -1299,7 +1301,7 @@ local function DrawAlertRuleRow(entry)
 		end
 	end
 	ImGui.TableSetColumnIndex(1)
-	local distance = math.floor(mq.TLO.Spawn(entry.MobID).Distance() or 0)
+	local distance = math.floor(spawn.Distance() or 0)
 	ImGui.PushStyleColor(ImGuiCol.Text, ColorDistance(distance))
 	ImGui.Text('\t' .. tostring(distance))
 	ImGui.PopStyleColor()

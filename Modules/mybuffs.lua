@@ -59,8 +59,8 @@ local configFile                       = string.format("%s/MyUI/MyBuffs/%s/%s.lu
     Module.Server, Module.CharLoaded)
 local MyBuffs_Actor                    = nil
 local winFlag                          = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse, ImGuiWindowFlags.NoFocusOnAppearing)
-local flashAlpha, flashAlphaT          = 1, 255
-local rise, riseT                      = true, true
+local flashAlpha                       = 1
+local rise                             = true
 local RUNNING, firstRun, changed, solo = true, true, false, true
 local songTimer, buffTime              = 20, 5
 local numSlots                         = mq.TLO.Me.MaxBuffSlots() or 0 --Max Buff Slots
@@ -93,9 +93,9 @@ local winSizes                         = {
 }
 -- Timing Variables
 local clockTimer                       = mq.gettime()
-local lastTime                         = os.time()
+local lastTime                         = mq.gettime()
 local checkIn                          = os.time()
-local frameTime                        = 17
+local frameTime                        = 33
 local currZone, lastZone
 
 -- default config settings
@@ -346,27 +346,29 @@ local function GetSong(slot)
     }
 end
 
-local function pulseIcon(speed)
-    local currentTime = os.time()
-    if currentTime - lastTime < frameTime then
-        return -- exit if not enough time has passed
+local function pulseGeneric(speed, alpha, rising, lTime, fTime, maxAlpha, minAlpha)
+    if speed == 0 then return alpha, rising, lTime end
+    local currentTime = mq.gettime()
+    if currentTime - lTime < fTime then
+        return alpha, rising, lTime -- exit if not enough time has passed
     end
+    lTime = currentTime             -- update the last time
+    if rising then
+        alpha = alpha + speed
+    else
+        alpha = alpha - speed
+    end
+    if alpha >= maxAlpha then
+        rising = false
+    elseif alpha <= minAlpha then
+        rising = true
+    end
+    return alpha, rising, lTime
+end
 
-    lastTime = currentTime -- update the last time
-    if riseT == true then
-        flashAlphaT = flashAlphaT - speed
-    elseif riseT == false then
-        flashAlphaT = flashAlphaT + speed
-    end
-    if flashAlphaT == 200 then riseT = false end
-    if flashAlphaT == 10 then riseT = true end
-    if rise == true then
-        flashAlpha = flashAlpha + speed
-    elseif rise == false then
-        flashAlpha = flashAlpha - speed
-    end
-    if flashAlpha == 200 then rise = false end
-    if flashAlpha == 10 then rise = true end
+local function pulseIcon(speed)
+    flashAlpha, rise, lastTime = pulseGeneric(speed, flashAlpha, rise, lastTime, frameTime, 200, 10)
+    if speed == 0 then flashAlpha = 0 end
 end
 
 local function CheckIn()
@@ -1748,7 +1750,7 @@ function Module.MainLoop()
         if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
 
-    if mq.gettime() - clockTimer >= 10 then
+    if mq.gettime() - clockTimer >= 1 then
         currZone = mq.TLO.Zone.ID()
         if currZone ~= lastZone then
             lastZone = currZone

@@ -161,14 +161,16 @@ local function sortTable(tbl, sortType)
 				return (a.sequence < b.sequence)
 			end
 		elseif sortType == 'party' then
-			if a.sequence == b.sequence then
-				if a.dps == b.dps then
-					return a.name < b.name
+			if tempSettings.sortParty then
+				if a.sequence == b.sequence then
+					if a.dps == b.dps then
+						return a.name < b.name
+					else
+						return a.dps > b.dps
+					end
 				else
-					return a.dps > b.dps
+					return a.sequence > b.sequence
 				end
-			else
-				return a.sequence > b.sequence
 			end
 		else
 			if settings.Options.sortHistory then
@@ -262,6 +264,7 @@ local function parseCurrentBattle(dur)
 			end
 		end
 	end
+	workingTable = sortTable(damTable, 'combat')
 end
 
 local function npcMeleeCallBack(line, dType, target, dmg)
@@ -298,6 +301,8 @@ local function npcMeleeCallBack(line, dType, target, dmg)
 		sequence  = sequenceCounter,
 	})
 	tableSize = tableSize + 1
+	parseCurrentBattle(os.time() - battleStartTime)
+	workingTable = sortTable(damTable, 'combat')
 end
 
 local function nonMeleeClallBack(line, target, dmg)
@@ -1532,17 +1537,16 @@ function Module.MainLoop()
 		parseCurrentBattle(currentTime - battleStartTime)
 	end
 	cleanTable()
-	workingTable = sortTable(damTable, 'combat')
 	if firstRun then
 		actorsWorking = sortTable(actorsTable, 'party')
 		firstRun = false
 	end
 
-	if tempSettings.sortParty then
-		actorsWorking = sortTable(actorsTable, 'party')
-	else
-		actorsWorking = actorsTable
-	end
+	-- if tempSettings.sortParty then
+	actorsWorking = sortTable(actorsTable, 'party')
+	-- else
+	-- 	actorsWorking = actorsTable
+	-- end
 
 	mq.doevents()
 	-- mq.delay(5)

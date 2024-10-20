@@ -43,7 +43,7 @@ Module.openGUI           = true
 Module.openConfigGUI     = false
 Module.refreshLinkDB     = 10
 Module.mainEcho          = '/say'
-Module.doRefresh         = false
+-- Module.doRefresh         = false
 Module.SettingsFile      = string.format('%s/MyUI/MyChat/%s/%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
 Module.KeyFocus          = false
 Module.KeyName           = 'RightShift'
@@ -78,7 +78,7 @@ local windowNum                                 = 0      --unused will remove la
 local fromConf                                  = false  -- Did we open the edit channel window from the main config window? if we did we will go back to that window after closing.
 local gIcon                                     = Module.Icons.MD_SETTINGS
 local firstPass, forceIndex, doLinks            = true, false, false
-local doRefresh                                 = false
+-- local doRefresh                                 = false
 local mainBuffer                                = {}
 local importFile                                = 'Server_Name/CharName.lua'
 local settingsOld                               = string.format('%s/MyChat_%s_%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
@@ -184,7 +184,7 @@ local function SetUpConsoles(channelID)
         Module.Consoles[channelID].txtAutoScroll = true
         -- ChatWin.Consoles[channelID].enableLinks = ChatWin.Settings[channelID].enableLinks
         Module.Consoles[channelID].console = ImGui.ConsoleWidget.new(channelID .. "##Console")
-        Module.Consoles[channelID].console.fontSize = Module.Settings.Channels[channelID].Scale or 16
+        -- Module.Consoles[channelID].console.fontSize = Module.Settings.Channels[channelID].FontSize or 16
     end
 end
 
@@ -327,13 +327,13 @@ local function loadSettings()
         Module.Settings.Channels[9100] = Module.defaults['Channels'][9100]
     end
     Module.Settings.Channels[9000].enabled = enableSpam
-    if Module.Settings.refreshLinkDB == nil then
-        Module.Settings.refreshLinkDB = Module.defaults.refreshLinkDB
-    end
-    doRefresh = Module.Settings.refreshLinkDB >= 5 or false
-    if Module.Settings.doRefresh == nil then
-        Module.Settings.doRefresh = doRefresh
-    end
+    -- if Module.Settings.refreshLinkDB == nil then
+    --     Module.Settings.refreshLinkDB = Module.defaults.refreshLinkDB
+    -- end
+    -- doRefresh = Module.Settings.refreshLinkDB >= 5 or false
+    -- if Module.Settings.doRefresh == nil then
+    --     Module.Settings.doRefresh = doRefresh
+    -- end
     local i = 1
     for channelID, channelData in pairs(Module.Settings.Channels) do
         -- setup default Echo command channels.
@@ -358,12 +358,6 @@ local function loadSettings()
             Module.Settings.Channels[channelID].locked = false
         end
 
-        if Module.Settings.Channels[channelID].locked == nil then
-            Module.Settings.Channels[channelID].locked = false
-        end
-
-
-
         if Module.Settings.Channels[channelID].TabOrder == nil then
             Module.Settings.Channels[channelID].TabOrder = i
         end
@@ -379,12 +373,21 @@ local function loadSettings()
             Module.Consoles[channelID].console = nil
         end
 
+        -- if Module.Settings.Channels[channelID].Scale ~= nil then
+        --     if Module.Settings.Channels[channelID].Scale <= 8 then
+        --         Module.Settings.Channels[channelID].FontSize = 16
+        --     else
+        --         Module.Settings.Channels[channelID].FontSize = Module.Settings.Channels[channelID].Scale
+        --     end
+        --     Module.Settings.Channels[channelID].Scale = nil
+        -- end
+        -- if not Module.Settings.Channels[channelID].FontSize then
+        --     Module.Settings.Channels[channelID].FontSize = 16
+        -- elseif Module.Settings.Channels[channelID].FontSize < 8 then
+        --     Module.Settings.Channels[channelID].FontSize = 16
+        -- end
+
         SetUpConsoles(channelID)
-        if not Module.Settings.Channels[channelID]['Scale'] then
-            Module.Settings.Channels[channelID]['Scale'] = 16
-        elseif Module.Settings.Channels[channelID]['Scale'] < 8 then
-            Module.Settings.Channels[channelID]['Scale'] = 16
-        end
 
         for eID, eData in pairs(channelData['Events']) do
             if eData.color then
@@ -421,11 +424,14 @@ local function loadSettings()
         i = i + 1
     end
 
-    if Module.Settings.Scale == nil then
-        Module.Settings.Scale = 1.0
+    if Module.Settings.locked == nil then
+        Module.Settings.locked = false
     end
 
-    if Module.Settings.Scale ~= nil then
+    if Module.Settings.timeStamps == nil then
+        Module.Settings.timeStamps = timeStamps
+    end
+    if Module.Settings.Scale == nil then
         Module.Settings.Scale = 1.0
     end
 
@@ -529,12 +535,14 @@ local function CheckGroup(string, line, type)
     gSize = gSize - 1
     local tString = string
     for i = 1, gSize do
-        local class = mq.TLO.Group.Member(i).Class.ShortName() or 'NO GROUP'
-        local name = mq.TLO.Group.Member(i).Name() or 'NO GROUP'
+        local groupMember = mq.TLO.Group.Member(i)
+
+        local class = groupMember.Class.ShortName() or 'NO GROUP'
+        local name = groupMember.Name() or 'NO GROUP'
         if type == 'healer' then
-            class = mq.TLO.Group.Member(i).Class.ShortName() or 'NO GROUP'
+            class = groupMember.Class.ShortName() or 'NO GROUP'
             if (class == 'CLR') or (class == 'DRU') or (class == 'SHM') then
-                name = mq.TLO.Group.Member(i).CleanName() or 'NO GROUP'
+                name = groupMember.CleanName() or 'NO GROUP'
                 tString = string.gsub(string, 'H1', name)
             end
         end
@@ -867,41 +875,10 @@ function Module.EventChatSpam(channelID, line)
 end
 
 ------------------------------------------ GUI's --------------------------------------------
-
----comment
----@param tName string -- name of the theme to load form table
----@return integer, integer -- returns the new counter values
-local function DrawTheme(tName)
-    local StyleCounter = 0
-    local ColorCounter = 0
-    for tID, tData in pairs(Module.Theme.Theme) do
-        if tData.Name == tName then
-            for pID, cData in pairs(Module.Theme.Theme[tID].Color) do
-                ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
-                ColorCounter = ColorCounter + 1
-            end
-            if tData['Style'] ~= nil then
-                if next(tData['Style']) ~= nil then
-                    for sID, sData in pairs(Module.Theme.Theme[tID].Style) do
-                        if sData.Size ~= nil then
-                            ImGui.PushStyleVar(sID, sData.Size)
-                            StyleCounter = StyleCounter + 1
-                        elseif sData.X ~= nil then
-                            ImGui.PushStyleVar(sID, sData.X, sData.Y)
-                            StyleCounter = StyleCounter + 1
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return ColorCounter, StyleCounter
-end
-
 local function DrawConsole(channelID)
     local name = Module.Settings.Channels[channelID].Name .. '##' .. channelID
     local zoom = Module.Consoles[channelID].zoom
-    local scale = Module.Settings.Channels[channelID].Scale
+    -- local scale = Module.Settings.Channels[channelID].FontSize
     local PopOut = Module.Settings.Channels[channelID].PopOut
     -- if zoom and Module.Consoles[channelID].txtBuffer ~= '' then
     --     local footerHeight = 35
@@ -1216,7 +1193,7 @@ local function DrawChatWindow()
             end
 
             Module.console:Render(ImVec2(0, contentSizeY))
-            Module.console.fontSize = Module.Settings.MainFontSize or 16
+            -- Module.console.fontSize = Module.Settings.MainFontSize or 16
             --Command Line
             ImGui.Separator()
             local textFlags = bit32.bor(0,
@@ -1267,11 +1244,10 @@ local function DrawChatWindow()
             if Module.Settings.Channels[channelID].enabled then
                 local name = Module.Settings.Channels[channelID].Name:gsub("^%d+%s*", "") .. '##' .. windowNum
                 local zoom = Module.Consoles[channelID].zoom or false
-                local scale = Module.Settings.Channels[channelID].Scale
                 local links = Module.Settings.Channels[channelID].enableLinks
                 local enableMain = Module.Settings.Channels[channelID].MainEnable
                 local PopOut = Module.Settings.Channels[channelID].PopOut
-                local tNameZ = zoom and 'Disable Zoom' or 'Enable Zoom'
+                -- local tNameZ = zoom and 'Disable Zoom' or 'Enable Zoom'
                 local tNameP = PopOut and 'Disable PopOut' or 'Enable PopOut'
                 local tNameM = enableMain and 'Disable Main' or 'Enable Main'
                 local tNameL = links and 'Disable Links' or 'Enable Links'
@@ -1506,7 +1482,7 @@ function Module.AddChannel(editChanID, isNewChannel)
             [editChanID] = {
                 ['enabled'] = false,
                 ['Name'] = 'new',
-                ['Scale'] = 1.0,
+                ['FontSize'] = 16,
                 ['Echo'] = '/say',
                 ['MainEnable'] = true,
                 ['PopOut'] = false,
@@ -1571,20 +1547,20 @@ function Module.AddChannel(editChanID, isNewChannel)
     -- Slider for adjusting zoom level
     if Module.Consoles[editChanID].console ~= nil then
         local changed = false
-        if ImGui.BeginCombo("Font Size##" .. editChanID, tostring(Module.Consoles[editChanID].console.fontSize)) then
-            for k, data in pairs(fontSizes) do
-                local isSelected = data == Module.Consoles[editChanID].console.fontSize
-                if ImGui.Selectable(tostring(data), isSelected) then
-                    if Module.Consoles[editChanID].console.fontSize ~= data then
-                        Module.Consoles[editChanID].console.fontSize = data
-                        Module.Settings.Channels[editChanID].Scale = Module.Consoles[editChanID].console.fontSize
-                        Module.tempSettings.Channels[editChanID].Scale = Module.Consoles[editChanID].console.fontSize
-                        changed = true
-                    end
-                end
-            end
-            ImGui.EndCombo()
-        end
+        -- if ImGui.BeginCombo("Font Size##" .. editChanID, tostring(Module.Consoles[editChanID].console.fontSize)) then
+        --     for k, data in pairs(fontSizes) do
+        --         local isSelected = data == Module.Consoles[editChanID].console.fontSize
+        --         if ImGui.Selectable(tostring(data), isSelected) then
+        --             if Module.Consoles[editChanID].console.fontSize ~= data then
+        --                 -- Module.Consoles[editChanID].console.fontSize = data
+        --                 Module.Settings.Channels[editChanID].FontSize = Module.Consoles[editChanID].console.fontSize
+        --                 Module.tempSettings.Channels[editChanID].FontSize = Module.Consoles[editChanID].console.fontSize
+        --                 changed = true
+        --             end
+        --         end
+        --     end
+        --     ImGui.EndCombo()
+        -- end
         -- Module.Consoles[editChanID].console.fontSize, changed = ImGui.SliderInt("Font Size", Module.Consoles[editChanID].console.fontSize, 8, 300)
         -- Module.tempSettings.Channels[editChanID].Scale = Module.Consoles[editChanID].console.fontSize
         -- Module.Settings.Channels[editChanID].Scale = Module.Consoles[editChanID].console.fontSize
@@ -2000,20 +1976,20 @@ function Module.Config_GUI(open)
 
         if Module.console ~= nil then
             local changed = false
-            if ImGui.BeginCombo("Main Tab Font Size##" .. editChanID, tostring(Module.console.fontSize)) then
-                for k, data in pairs(fontSizes) do
-                    local isSelected = data == Module.console.fontSize
-                    if ImGui.Selectable(tostring(data), isSelected) then
-                        if Module.console.fontSize ~= data then
-                            Module.console.fontSize = data
-                            Module.Settings.MainFontSize = Module.console.fontSize
+            -- if ImGui.BeginCombo("Main Tab Font Size##" .. editChanID, tostring(Module.console.fontSize)) then
+            --     for k, data in pairs(fontSizes) do
+            --         local isSelected = data == Module.console.fontSize
+            --         if ImGui.Selectable(tostring(data), isSelected) then
+            --             if Module.console.fontSize ~= data then
+            --                 Module.console.fontSize = data
+            --                 Module.Settings.MainFontSize = Module.console.fontSize
 
-                            changed = true
-                        end
-                    end
-                end
-                ImGui.EndCombo()
-            end
+            --                 changed = true
+            --             end
+            --         end
+            --     end
+            --     ImGui.EndCombo()
+            -- end
             if changed then
                 writeSettings(Module.SettingsFile, Module.Settings)
             end
@@ -2029,17 +2005,17 @@ function Module.Config_GUI(open)
             Module.tempSettings.Scale = tmpZoom
         end
 
-        local tmpRefLink = (doRefresh and Module.Settings.refreshLinkDB >= 5) and Module.Settings.refreshLinkDB or 0
-        tmpRefLink = ImGui.InputInt("Refresh Delay##LinkRefresh", tmpRefLink, 5, 5)
-        if tmpRefLink < 0 then tmpRefLink = 0 end
-        if tmpRefLink ~= Module.Settings.refreshLinkDB then
-            -- ChatWin.Settings.refreshLinkDB = tmpRefLink
-            Module.tempSettings.refreshLinkDB = tmpRefLink
-            doRefresh = tmpRefLink >= 5 or false
-        end
-        ImGui.SameLine()
-        local txtOnOff = doRefresh and 'ON' or 'OFF'
-        ImGui.Text(txtOnOff)
+        -- local tmpRefLink = (doRefresh and Module.Settings.refreshLinkDB >= 5) and Module.Settings.refreshLinkDB or 0
+        -- tmpRefLink = ImGui.InputInt("Refresh Delay##LinkRefresh", tmpRefLink, 5, 5)
+        -- if tmpRefLink < 0 then tmpRefLink = 0 end
+        -- if tmpRefLink ~= Module.Settings.refreshLinkDB then
+        --     -- ChatWin.Settings.refreshLinkDB = tmpRefLink
+        --     Module.tempSettings.refreshLinkDB = tmpRefLink
+        --     doRefresh = tmpRefLink >= 5 or false
+        -- end
+        -- ImGui.SameLine()
+        -- local txtOnOff = doRefresh and 'ON' or 'OFF'
+        -- ImGui.Text(txtOnOff)
         eChan = ImGui.InputText("Main Channel Echo##Echo", eChan, 256)
         if eChan ~= Module.Settings.mainEcho then
             Module.Settings.mainEcho = eChan
@@ -2162,7 +2138,7 @@ function Module.createExternConsole(name)
     Module.Settings.Channels[newID] = {
         ['enabled'] = true,
         ['Name'] = name,
-        ['Scale'] = 1.0,
+        ['FontSize'] = 16,
         ['Echo'] = '/say',
         ['MainEnable'] = true,
         ['PopOut'] = false,
@@ -2253,7 +2229,7 @@ local function init()
     -- initialize the console
     if Module.console == nil then
         Module.console = ImGui.ConsoleWidget.new("Chat##Console")
-        Module.console.fontSize = Module.Settings.MainFontSize or 16
+        -- Module.console.fontSize = Module.Settings.MainFontSize or 16
         mainBuffer = {
             [1] = {
                 color = { [1] = 1, [2] = 1, [3] = 1, [4] = 1, },

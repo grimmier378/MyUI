@@ -629,7 +629,7 @@ local function groupWatch(type)
                 end
             end
         end
-        mq.delay(1)
+        -- mq.delay(1)
     end
     return false
 end
@@ -644,7 +644,7 @@ local function CheckInterrupts()
     local invis = false
     if mq.TLO.Me.Sitting() and InterruptSet.stopForSitting then
         local curHP, curMP = mq.TLO.Me.PctHPs(), mq.TLO.Me.PctMana() or 0
-        mq.delay(10)
+        -- mq.delay(10)
         if not interruptInProgress then
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
@@ -845,6 +845,7 @@ local function NavigatePath(name)
         NavSet.ChainPath = NavSet.SelectedPath
         NavSet.ChainStart = true
     end
+    :: StartNav ::
     while NavSet.doNav do
         local tmp = sortPathsTable(zone, name)
 
@@ -872,7 +873,7 @@ local function NavigatePath(name)
             -- coroutine.yield()  -- Yield here to allow updates
             while mq.TLO.Math.Distance(tmpDestLoc)() > NavSet.StopDist do
                 if not NavSet.doNav then
-                    return
+                    goto EndNav
                 end
                 if currZone ~= lastZone then
                     NavSet.SelectedPath = 'None'
@@ -880,11 +881,11 @@ local function NavigatePath(name)
                     intPauseTime = 0
                     InterruptSet.PauseStart = 0
 
-                    return
+                    goto EndNav
                 end
                 if interruptInProgress then
                     coroutine.yield()
-                    if not NavSet.doNav then return end
+                    if not NavSet.doNav then goto EndNav end
                 elseif mq.TLO.Me.Speed() == 0 then
                     mq.delay(1)
                     if not mq.TLO.Me.Sitting() then
@@ -895,16 +896,16 @@ local function NavigatePath(name)
                         tmpDist = mq.TLO.Math.Distance(tmpDestLoc)() or 0
                         status = "Nav to WP #: " .. tmp[i].step .. " Distance: " .. string.format("%.2f", tmpDist)
                         coroutine.yield()
-                        if not NavSet.doNav then return end
+                        if not NavSet.doNav then goto EndNav end
                     end
                 end
-                mq.delay(1)
+                -- mq.delay(1)
                 tmpDestLoc = tmp[i].loc
                 yx = tmpDestLoc:match("^(.-,.-),") -- Match the y,x part of the string
                 tmpDestLoc = tmpDestLoc:sub(1, #yx - 1)
                 tmpDist = mq.TLO.Math.Distance(tmpDestLoc)() or 0
                 coroutine.yield() -- Yield here to allow updates
-                if not NavSet.doNav then return end
+                if not NavSet.doNav then goto EndNav end
             end
             -- mq.cmdf("/nav stop log=off")
             -- status = "Arrived at WP #: "..tmp[i].step
@@ -914,17 +915,17 @@ local function NavigatePath(name)
                 NavSet.doSingle = false
                 status = 'Idle - Arrived at Destination!'
                 NavSet.LoopCount = 0
-                return
+                goto EndNav
             end
             -- Check for Commands to execute at Waypoint
             if tmp[i].cmd ~= '' then
                 table.insert(debugMessages, { Time = os.date("%H:%M:%S"), Zone = zone, Path = name, WP = 'Command', Status = 'Executing Command: ' .. tmp[i].cmd, })
                 if tmp[i].cmd:find("/mypaths stop") then NavSet.doNav = false end
-                mq.delay(1)
+                -- mq.delay(1)
                 mq.cmdf(tmp[i].cmd)
-                mq.delay(1)
+                -- mq.delay(1)
                 coroutine.yield()
-                if not NavSet.doNav then return end
+                if not NavSet.doNav then goto EndNav end
             end
             -- Door Check
             if tmp[i].door and not NavSet.doReverse then
@@ -935,37 +936,35 @@ local function NavigatePath(name)
                 ToggleSwitches()
             end
             -- Check for Delay at Waypoint
+            curWpPauseTime = tmp[i].delay
             if tmp[i].delay > 0 then
                 status = string.format("Paused %s seconds at WP #: %s", tmp[i].delay, tmp[i].step)
                 curWpPauseTime = tmp[i].delay
                 NavSet.PauseStart = os.time()
                 coroutine.yield()
-                if not NavSet.doNav then return end
+                if not NavSet.doNav then goto EndNav end
                 -- coroutine.yield()  -- Yield here to allow updates
             elseif NavSet.WpPause > 0 then
                 status = string.format("Global Paused %s seconds at WP #: %s", NavSet.WpPause, tmp[i].step)
                 curWpPauseTime = NavSet.WpPause
                 NavSet.PauseStart = os.time()
                 coroutine.yield()
-                if not NavSet.doNav then return end
+                if not NavSet.doNav then goto EndNav end
                 -- coroutine.yield()  -- Yield here to allow updates
-            else
-                if not InterruptSet.interruptFound and tmp[i].delay == 0 then
-                    curWpPauseTime = 0
-                    NavSet.PauseStart = os.time()
-                    if not NavSet.doNav then return end
-                end
+                -- else
+                --     if InterruptSet.interruptFound and tmp[i].delay == 0 then
+                --         curWpPauseTime = 0
+                --         NavSet.PauseStart = os.time()
+                --         coroutine.yield()
+                --         if not NavSet.doNav then goto EndNav end
+                --     end
             end
         end
 
         -- Check if we need to loop
 
         if not NavSet.doLoop then
-            NavSet.doNav = false
-            status = 'Idle - Arrived at Destination!'
-            NavSet.LoopCount = 0
-
-            break
+            goto EndNav
         else
             NavSet.LoopCount = NavSet.LoopCount + 1
             table.insert(debugMessages, {
@@ -981,8 +980,13 @@ local function NavigatePath(name)
             if NavSet.doPingPong then
                 NavSet.doReverse = not NavSet.doReverse
             end
+            goto StartNav
         end
     end
+    ::EndNav::
+    NavSet.doNav = false
+    status = 'Idle - Arrived at Destination!'
+    NavSet.LoopCount = 0
 end
 
 local co = coroutine.create(NavigatePath)
@@ -1415,10 +1419,26 @@ function Module.RenderGUI()
                         ImGui.SeparatorText("Select a Path")
                         if not NavSet.doNav then
                             ImGui.SetNextItemWidth(120)
-                            if ImGui.BeginCombo("##SelectPath", NavSet.SelectedPath) then
+                            -- if ImGui.BeginCombo("##SelectPath", NavSet.SelectedPath) then
+                            --     ImGui.SetWindowFontScale(scale)
+                            --     if not Paths[currZone] then Paths[currZone] = {} end
+                            --     for name, data in pairs(Paths[currZone]) do
+                            --         local isSelected = name == NavSet.SelectedPath
+                            --         if ImGui.Selectable(name, isSelected) then
+                            --             NavSet.SelectedPath = name
+                            --         end
+                            --     end
+                            --     ImGui.EndCombo()
+                            -- end
+                            local tmpP = {}
+                            if ImGui.BeginCombo("Path##SelectPath", NavSet.SelectedPath) then
                                 ImGui.SetWindowFontScale(scale)
                                 if not Paths[currZone] then Paths[currZone] = {} end
-                                for name, data in pairs(Paths[currZone]) do
+                                for k, data in pairs(Paths[currZone]) do
+                                    table.insert(tmpP, k)
+                                end
+                                table.sort(tmpP)
+                                for k, name in pairs(tmpP) do
                                     local isSelected = name == NavSet.SelectedPath
                                     if ImGui.Selectable(name, isSelected) then
                                         NavSet.SelectedPath = name
@@ -2858,7 +2878,7 @@ function Module.MainLoop()
     -- check interrupts
     InterruptSet.interruptFound = CheckInterrupts()
     if NavSet.doNav and not NavSet.doPause and not justZoned then
-        mq.delay(1)
+        -- mq.delay(1)
         cTime = os.time()
         local checkTime = InterruptSet.interruptCheck
         -- Module.Utils.PrintOutput('MyUI',nil,"interrupt Checked: %s", checkTime)

@@ -44,11 +44,11 @@ function BMButtonHandlers.GetButtonCooldown(Button, cacheUpdate)
     Button.CachedCoolDownTimer = 0
     Button.CachedToggleLocked  = false
     Button.CachedLastRan       = BMButtonHandlers.GetTimeMS()
+    local myself               = mq.TLO.Me
 
     if Button.TimerType == "Custom Lua" then
         local success
         local result
-
         if Button.Timer and Button.Timer:len() > 0 then
             success, result = btnUtils.EvaluateLua(Button.Timer)
             if not success then
@@ -92,18 +92,18 @@ function BMButtonHandlers.GetButtonCooldown(Button, cacheUpdate)
         Button.CachedCountDown = mq.TLO.FindItem(Button.Cooldown).TimerReady() or 0
         Button.CachedCoolDownTimer = mq.TLO.FindItem(Button.Cooldown).Clicky.TimerID() or 0
     elseif Button.TimerType == "Spell Gem" then
-        Button.CachedCountDown = (mq.TLO.Me.GemTimer(Button.Cooldown)() or 0) / 1000
-        Button.CachedCoolDownTimer = mq.TLO.Me.GemTimer(Button.Cooldown).TotalSeconds() or 0
+        Button.CachedCountDown = (myself.GemTimer(Button.Cooldown)() or 0) / 1000
+        Button.CachedCoolDownTimer = myself.GemTimer(Button.Cooldown).TotalSeconds() or 0
     elseif Button.TimerType == "AA" then
-        Button.CachedCountDown = (mq.TLO.Me.AltAbilityTimer(Button.Cooldown)() or 0) / 1000
-        Button.CachedCoolDownTimer = mq.TLO.Me.AltAbility(Button.Cooldown).MyReuseTime() or 0
+        Button.CachedCountDown = (myself.AltAbilityTimer(Button.Cooldown)() or 0) / 1000
+        Button.CachedCoolDownTimer = myself.AltAbility(Button.Cooldown).MyReuseTime() or 0
     elseif Button.TimerType == "Disc" then
-        Button.CachedCountDown = mq.TLO.Me.CombatAbilityTimer(Button.Cooldown).TotalSeconds() or 0
+        Button.CachedCountDown = myself.CombatAbilityTimer(Button.Cooldown).TotalSeconds() or 0
         Button.CachedCoolDownTimer = (mq.TLO.Spell(Button.Cooldown).RecastTime() or 0) / 1000
     elseif Button.TimerType == "Ability" then
-        if mq.TLO.Me.AbilityTimer and mq.TLO.Me.AbilityTimerTotal then
-            Button.CachedCountDown = (mq.TLO.Me.AbilityTimer(Button.Cooldown)() or 0) / 1000
-            Button.CachedCoolDownTimer = (mq.TLO.Me.AbilityTimerTotal(Button.Cooldown)() or 0) / 1000
+        if myself.AbilityTimer and myself.AbilityTimerTotal then
+            Button.CachedCountDown = (myself.AbilityTimer(Button.Cooldown)() or 0) / 1000
+            Button.CachedCoolDownTimer = (myself.AbilityTimerTotal(Button.Cooldown)() or 0) / 1000
         end
     end
 

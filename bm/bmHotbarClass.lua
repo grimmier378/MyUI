@@ -230,8 +230,8 @@ function BMHotbarClass:RenderHotbar(flags)
 end
 
 function BMHotbarClass:RenderTabs()
-    local lockedIcon = BMSettings:GetCharacterWindow(self.id).Locked and Icons.FA_LOCK .. '##lockTabButton' or
-        Icons.FA_UNLOCK .. '##lockTablButton'
+    local lockedIcon = BMSettings:GetCharacterWindow(self.id).Locked and Module.Icons.FA_LOCK .. '##lockTabButton' or
+        Module.Icons.FA_UNLOCK .. '##lockTablButton'
 
     if BMSettings:GetCharacterWindow(self.id).CompactMode then
         local start_x, start_y = ImGui.GetCursorPos()
@@ -249,7 +249,7 @@ function BMHotbarClass:RenderTabs()
         end
 
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() + (iconPadding))
-        ImGui.Button(Icons.MD_SETTINGS, settingsIconSize, settingsIconSize)
+        ImGui.Button(Module.Icons.MD_SETTINGS, settingsIconSize, settingsIconSize)
         ImGui.PopStyleVar(2)
 
         ImGui.SameLine()
@@ -279,7 +279,7 @@ function BMHotbarClass:RenderTabs()
         end
 
         ImGui.SameLine()
-        ImGui.Button(Icons.MD_SETTINGS, WINDOW_SETTINGS_ICON_SIZE, WINDOW_SETTINGS_ICON_SIZE)
+        ImGui.Button(Module.Icons.MD_SETTINGS, WINDOW_SETTINGS_ICON_SIZE, WINDOW_SETTINGS_ICON_SIZE)
         ImGui.SameLine()
         self:RenderTabContextMenu()
         self:RenderCreateTab()
@@ -343,7 +343,7 @@ function BMHotbarClass:RenderTabs()
                 end
             end
         else
-            ImGui.Text(string.format("No Sets Added! Add one by right-clicking on %s", Icons.MD_SETTINGS))
+            ImGui.Text(string.format("No Sets Added! Add one by right-clicking on %s", Module.Icons.MD_SETTINGS))
         end
         ImGui.EndTabBar()
     end
@@ -733,7 +733,7 @@ function BMHotbarClass:RenderContextMenu(Set, Index, buttonID)
                 BMSettings:GetSettings().Sets[Set][Index] = nil
                 BMSettings:SaveSettings(true)
             end
-            if ImGui.MenuItem(Icons.MD_SHARE) then
+            if ImGui.MenuItem(Module.Icons.MD_SHARE) then
                 BMButtonHandlers.ExportButtonToClipBoard(button)
             end
             btnUtils.Tooltip("Copy contents of this button to share with friends.")
@@ -863,7 +863,7 @@ function BMHotbarClass:RenderImportButtonPopup()
         ImGui.SetWindowSize(math.max(500, ImGui.GetWindowWidth()), math.max(100, ImGui.GetWindowHeight()))
     end
     if self.importObjectPopupOpen and shouldDrawImportPopup then
-        if ImGui.SmallButton(Icons.MD_CONTENT_PASTE) then
+        if ImGui.SmallButton(Module.Icons.MD_CONTENT_PASTE) then
             self.importText = ImGui.GetClipboardText()
             self.importTextChanged = true
         end
@@ -881,7 +881,7 @@ function BMHotbarClass:RenderImportButtonPopup()
             ImGui.PushStyleColor(ImGuiCol.Text, 0.8, 0.02, 0.02, 1.0)
         end
         self.importText, self.importTextChanged = ImGui.InputText(
-            (self.validDecode and Icons.MD_CHECK or Icons.MD_NOT_INTERESTED) .. " Import Code", self.importText,
+            (self.validDecode and Module.Icons.MD_CHECK or Module.Icons.MD_NOT_INTERESTED) .. " Import Code", self.importText,
             ImGuiInputTextFlags.None)
         ImGui.PopStyleColor()
 

@@ -33,7 +33,7 @@ else
 end
 
 ButtonActors           = Module.Actor
-Icons                  = Module.Icons
+Module.Icons           = Module.Icons
 BMSettings             = require('bm.bmSettings').new()
 BMEditPopup            = require('bm.bmEditButtonPopup')
 

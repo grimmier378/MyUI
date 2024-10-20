@@ -130,13 +130,13 @@ function ButtonUtils.RenderOptionToggle(id, text, on)
 
     if on then
         ImGui.PushStyleColor(ImGuiCol.Text, 0.3, 1.0, 0.3, 0.9)
-        if ImGui.Button(Icons.FA_TOGGLE_ON) then
+        if ImGui.Button(Module.Icons.FA_TOGGLE_ON) then
             toggled = true
             state   = false
         end
     else
         ImGui.PushStyleColor(ImGuiCol.Text, 1.0, 0.3, 0.3, 0.8)
-        if ImGui.Button(Icons.FA_TOGGLE_OFF) then
+        if ImGui.Button(Module.Icons.FA_TOGGLE_OFF) then
             toggled = true
             state   = true
         end

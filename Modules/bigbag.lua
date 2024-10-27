@@ -38,6 +38,11 @@ local configFile              = string.format("%s/MyUI/BigBag/%s/%s.lua", mq.con
 local animItems               = mq.FindTextureAnimation("A_DragItem")
 local animBox                 = mq.FindTextureAnimation("A_RecessedBox")
 
+-- Toggles
+local toggleKey               = ''
+local toggleModKey            = ''
+local toggleMouse             = 'Middle'
+
 -- Bag Contents
 local items                   = {}
 local clickies                = {}
@@ -58,6 +63,9 @@ local defaults                = {
 	show_item_background = true,
 	sort_order = { name = false, stack = false, },
 	themeName = "Default",
+	toggleKey = '',
+	toggleModKey = '',
+	toggleMouse = '',
 }
 local function loadSettings()
 	if utils.File.Exists(configFile) then
@@ -72,6 +80,9 @@ local function loadSettings()
 		end
 	end
 
+	toggleKey = settings.toggleKey ~= nil and settings.toggleKey or defaults.toggleKey
+	toggleModKey = settings.toggleModKey ~= nil and settings.toggleModKey or defaults.toggleModKey
+	toggleMouse = settings.toggleMouse ~= nil and settings.toggleMouse or defaults.toggleMouse
 	themeName = settings.themeName ~= nil and settings.themeName or defaults.themeName
 	MIN_SLOTS_WARN = settings.MIN_SLOTS_WARN ~= nil and settings.MIN_SLOTS_WARN or defaults.MIN_SLOTS_WARN
 	show_item_background = settings.show_item_background ~= nil and settings.show_item_background or defaults.show_item_background
@@ -209,6 +220,41 @@ local function display_bag_options()
 		end
 		ImGui.SameLine()
 		help_marker("Minimum number of slots before the warning color is displayed.")
+	end
+
+	if ImGui.CollapsingHeader('Toggle Settings') then
+		ImGui.Text("Toggle Key")
+		ImGui.SameLine()
+		ImGui.SetNextItemWidth(100)
+		toggleKey = ImGui.InputText("##ToggleKey", toggleKey)
+		if toggleKey ~= settings.toggleKey then
+			settings.toggleKey = toggleKey
+			mq.pickle(configFile, settings)
+		end
+		ImGui.SameLine()
+		help_marker("Key to toggle the GUI (A-Z | 0-9 | F1-F12)")
+
+		ImGui.Text("Toggle Mod Key")
+		ImGui.SameLine()
+		ImGui.SetNextItemWidth(100)
+		toggleModKey = ImGui.InputText("##ToggleModKey", toggleModKey)
+		if toggleModKey ~= settings.toggleModKey then
+			settings.toggleModKey = toggleModKey
+			mq.pickle(configFile, settings)
+		end
+		ImGui.SameLine()
+		help_marker("Modifier Key to toggle the GUI (Ctrl | Alt | Shift)")
+
+		ImGui.Text("Toggle Mouse Button")
+		ImGui.SameLine()
+		ImGui.SetNextItemWidth(100)
+		toggleMouse = ImGui.InputText("##ToggleMouse", toggleMouse)
+		if toggleMouse ~= settings.toggleMouse then
+			settings.toggleMouse = toggleMouse
+			mq.pickle(configFile, settings)
+		end
+		ImGui.SameLine()
+		help_marker("Mouse Button to toggle the GUI (Left | Right | Middle)")
 	end
 
 	if ImGui.CollapsingHeader("Theme Settings##BigBag") then
@@ -497,8 +543,19 @@ local function renderBtn()
 			ImGui.EndTooltip()
 		end
 
-		if ImGui.IsMouseClicked(ImGuiMouseButton.Middle) then
-			Module.ShowGUI = not Module.ShowGUI
+		if toggleMouse ~= '' then
+			if ImGui.IsMouseClicked(ImGuiMouseButton[toggleMouse]) then
+				shouldDrawGUI = not shouldDrawGUI
+			end
+		end
+		if toggleModKey ~= '' and toggleKey ~= '' then
+			if ImGui.IsKeyPressed(ImGuiKey[toggleKey]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey]) then
+				shouldDrawGUI = not shouldDrawGUI
+			end
+		elseif toggleModKey == '' and toggleKey ~= '' then
+			if ImGui.IsKeyPressed(ImGuiKey[toggleKey]) then
+				shouldDrawGUI = not shouldDrawGUI
+			end
 		end
 	end
 

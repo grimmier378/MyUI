@@ -433,14 +433,14 @@ local function draw_item_icon(item, iconWidth, iconHeight)
 		ImGui.SetCursorPos((cursor_x + offsetX) - TextSize, cursor_y + offsetY)
 		ImGui.DrawTextureAnimation(animBox, TextSize, 4)
 		ImGui.SetCursorPos((cursor_x + offsetX) - TextSize, cursor_y + offsetY)
-		ImGui.TextUnformatted(tostring(item.Stack()))
+		ImGui.TextColored(ImVec4(0, 1, 1, 1), item.Stack())
 	end
-	local TextSize = ImGui.CalcTextSize(tostring(item.Charges()))
+	local TextSize2 = ImGui.CalcTextSize(tostring(item.Charges()))
 	if item.Charges() >= 1 then
 		ImGui.SetCursorPos((cursor_x + offsetXCharges), cursor_y + offsetYCharges)
-		ImGui.DrawTextureAnimation(animBox, TextSize, 4)
+		ImGui.DrawTextureAnimation(animBox, TextSize2, 4)
 		ImGui.SetCursorPos((cursor_x + offsetXCharges), cursor_y + offsetYCharges)
-		ImGui.TextColored(ImVec4(1, 1, 0, 1), tostring(item.Charges()))
+		ImGui.TextColored(ImVec4(1, 1, 0, 1), item.Charges())
 	end
 	ImGui.SetWindowFontScale(1.0)
 
@@ -607,12 +607,15 @@ local function display_details()
 				ImGui.TableNextColumn()
 				draw_item_icon(item, 20, 20)
 				ImGui.TableNextColumn()
-				ImGui.TextColored(ImVec4(0, 1, 1, 1), item.Name() or 'Unknown')
-				if ImGui.IsItemHovered() then
-					if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
-						mq.cmdf('/executelink %s', item.ItemLink('CLICKABLE')())
-					end
+				ImGui.PushID(string.format("##SelectItem_%s", index))
+				ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(0, 1, 1, 1))
+				local _, itemClicked = ImGui.Selectable(item.Name() or "None", false)
+				if itemClicked then
+					mq.cmdf('/executelink %s', item.ItemLink('CLICKABLE')())
 				end
+				ImGui.PopStyleColor()
+				ImGui.PopID()
+
 				ImGui.TableNextColumn()
 				ImGui.TextColored(ImVec4(0, 1, 0.5, 1), "%0.2f pp", (item.Value() / 1000) or 0)
 				ImGui.TableNextColumn()

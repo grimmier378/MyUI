@@ -395,7 +395,6 @@ function BMSettings:SaveSettings(doBroadcast)
         mq.pickle(mq.configDir .. "/Buttonmaster-Backups/ButtonMaster-backup-" .. os.date("%m-%d-%y-%H-%M-%S") .. ".lua",
             self.settings)
     end
-
     mq.pickle(settings_path, self.settings)
 
     if doBroadcast and mq.TLO.MacroQuest.GameState() == "INGAME" then

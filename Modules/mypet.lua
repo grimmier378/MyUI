@@ -45,6 +45,7 @@ local scale = 1
 local locked, hasThemeZ = false, false
 local petHP, petTarg, petDist, petBuffs, petName, petTargHP, petLvl, petBuffCount = 0, nil, 0, {}, 'No Pet', 0, -1, 0
 local lastCheck = 0
+local myPet = mq.TLO.Pet
 local btnKeys = {
 	"Attack",
 	"Back",
@@ -149,7 +150,7 @@ local function loadTheme()
 end
 
 local function getPetData()
-	if mq.TLO.Pet() == 'NO PET' then
+	if myPet() == 'NO PET' then
 		petBuffs = {}
 		return
 	end
@@ -216,17 +217,16 @@ local function loadSettings()
 end
 
 local function GetButtonStates()
-	local pet = mq.TLO.Pet
-	local stance = mq.TLO.Pet.Stance()
+	local stance = myPet.Stance()
 	btnInfo.follow = stance == 'FOLLOW' and true or false
 	btnInfo.guard = stance == 'GUARD' and true or false
-	btnInfo.sit = mq.TLO.Pet.Sitting() and true or false
-	btnInfo.taunt = mq.TLO.Pet.Taunt() and true or false
-	btnInfo.stop = mq.TLO.Pet.Stop() and true or false
-	btnInfo.hold = mq.TLO.Pet.Hold() and true or false
-	btnInfo.focus = mq.TLO.Pet.Focus() and true or false
-	btnInfo.regroup = mq.TLO.Pet.ReGroup() and true or false
-	btnInfo.ghold = mq.TLO.Pet.GHold() and true or false
+	btnInfo.sit = myPet.Sitting() and true or false
+	btnInfo.taunt = myPet.Taunt() and true or false
+	btnInfo.stop = myPet.Stop() and true or false
+	btnInfo.hold = myPet.Hold() and true or false
+	btnInfo.focus = myPet.Focus() and true or false
+	btnInfo.regroup = myPet.ReGroup() and true or false
+	btnInfo.ghold = myPet.GHold() and true or false
 end
 
 local function DrawInspectableSpellIcon(iconID, bene, name, i)
@@ -329,9 +329,9 @@ function Module.RenderGUI()
 					ImGui.Text("No Pet")
 				else
 					petHP = mq.TLO.Me.Pet.PctHPs() or 0
-					petTarg = mq.TLO.Pet.Target.DisplayName() or nil
-					petTargHP = mq.TLO.Pet.Target.PctHPs() or 0
-					petLvl = mq.TLO.Pet.Level() or -1
+					petTarg = myPet.Target.DisplayName() or nil
+					petTargHP = myPet.Target.PctHPs() or 0
+					petLvl = myPet.Level() or -1
 					if ImGui.BeginTable("##SplitWindow", 2, bit32.bor(ImGuiTableFlags.BordersOuter, ImGuiTableFlags.Resizable, ImGuiTableFlags.Reorderable, ImGuiTableFlags.Hideable), ImVec2(-1, -1)) then
 						ImGui.TableSetupColumn(petName .. "##MainPetInfo", ImGuiTableColumnFlags.None, -1)
 						ImGui.TableSetupColumn("Buffs##PetBuffs", ImGuiTableColumnFlags.None, -1)
@@ -346,7 +346,7 @@ function Module.RenderGUI()
 						ImGui.SameLine()
 						ImGui.Text("Dist:")
 						ImGui.SameLine()
-						petDist = mq.TLO.Pet.Distance() or 0
+						petDist = myPet.Distance() or 0
 
 						if petDist >= 150 then
 							ImGui.TextColored((Module.Colors.color('red')), "%.0f", petDist)
@@ -363,13 +363,13 @@ function Module.RenderGUI()
 						ImGui.EndGroup()
 						if ImGui.IsItemHovered() then
 							if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
-								mq.cmdf("/target id %s", mq.TLO.Pet.ID() or 0)
+								mq.cmdf("/target id %s", myPet.ID() or 0)
 								if mq.TLO.Cursor() ~= nil then
-									Module.Utils.GiveItem(mq.TLO.Pet.ID())
+									Module.Utils.GiveItem(myPet.ID())
 								end
 							end
 						end
-						local conCol = mq.TLO.Pet.Target.ConColor() or 'WHITE'
+						local conCol = myPet.Target.ConColor() or 'WHITE'
 						if conCol == nil then conCol = 'WHITE' end
 						local txCol = settings[Module.Name].ConColors[conCol]
 						ImGui.TextColored(ImVec4(txCol[1], txCol[2], txCol[3], txCol[4]), "%s", petTarg)
@@ -662,7 +662,7 @@ function Module.MainLoop()
 
 	local timeDiff = mq.gettime() - clockTimer
 	if timeDiff > 10 then
-		petName = mq.TLO.Pet.DisplayName() or 'No Pet'
+		petName = myPet.DisplayName() or 'No Pet'
 		local curTime = os.time()
 		-- Process ImGui Window Flag Changes
 		winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoFocusOnAppearing)

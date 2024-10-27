@@ -1243,7 +1243,6 @@ local function DrawChatWindow()
             local channelID = channelData[1]
             if Module.Settings.Channels[channelID].enabled then
                 local name = Module.Settings.Channels[channelID].Name:gsub("^%d+%s*", "") .. '##' .. windowNum
-                local zoom = Module.Consoles[channelID].zoom or false
                 local links = Module.Settings.Channels[channelID].enableLinks
                 local enableMain = Module.Settings.Channels[channelID].MainEnable
                 local PopOut = Module.Settings.Channels[channelID].PopOut

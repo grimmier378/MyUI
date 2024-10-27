@@ -25,8 +25,6 @@
 	TextEditor:Clear() - Clears Text
 	TextEditor:SetSyntax( syntaxName ) - sets the syntax highligher format
 	TextEditor:LoadContents( contents )
-	TextEditor.fontSize = n
-	TextEditor:GetFontSize()
 	TextEditor:.windowFlags = flags
 	TextEditor:IsCursorAtEnd()
 
@@ -53,7 +51,7 @@ local PackageMan        = require('mq.PackageMan')
 local lfs               = PackageMan.Require('luafilesystem', 'lfs')
 local editorWinFlags    = TextEditorWindowFlags.None
 local TextEditor
-local fontSize          = 18
+local nameChanged       = false
 local syntax            = 'lua'
 
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
@@ -83,7 +81,8 @@ Module.IsRunning        = false               -- Keep track of running state. if
 Module.ShowGui          = true
 Module.Icons            = require('mq.ICONS') -- FAWESOME ICONS
 Module.CharLoaded       = mq.TLO.Me.DisplayName()
-
+Module.OriginalCopy     = nil                 -- Store the original copy of the file when loading, so we can easily revert back to it. this will only reset when loading or clearing. so you can save and revert back to the original copy.
+Module.OriginalFile     = nil                 -- Store the original file path when loading, so we can easily revert back to it. this will only reset when loading or clearing. so you can save and revert back to the original copy.
 local function RenderEditor()
 	ImGui.PushFont(ImGui.ConsoleFont)
 	local yPos = ImGui.GetCursorPosY()
@@ -113,10 +112,31 @@ local function CommandHandler(...)
 	local args = { ..., }
 	if args[1] ~= nil then
 		if args[1] == 'exit' or args[1] == 'quit' then
+			Module.ShowGui = false
 			Module.IsRunning = false
 			printf("\ay%s \awis \arExiting\aw...", Module.Name)
 		elseif args[1] == 'show' or args[1] == 'ui' then
 			Module.ShowGui = not Module.ShowGui
+		elseif args[1] == 'clear' then
+			Module.SaveFile = ''
+			Module.SavePath = ''
+			Module.OpenFile = ''
+			TextEditor:Clear()
+			Module.OriginalCopy = nil
+			Module.OriginalFile = nil
+		elseif args[1] == 'save' then
+			if Module.SavePath ~= '' then
+				Module.WriteFile(Module.SavePath, TextEditor.text)
+			else
+				printf("\arNo file to save!")
+			end
+		elseif args[1] == 'revert' then
+			if Module.OriginalCopy == nil then
+				printf("\arNo original copy to revert to!")
+				return
+			end
+			TextEditor:LoadContents(Module.OriginalCopy)
+			Module.SaveFile = Module.OriginalFile
 		end
 	end
 end
@@ -211,17 +231,6 @@ local function DrawFileSelector()
 	end
 end
 
-
-local fontSizes = {}
-for i = 10, 40 do
-	if i % 2 == 0 then
-		table.insert(fontSizes, i)
-		if i == 12 then
-			table.insert(fontSizes, 13) -- this is the default font size so keep it in the list
-		end
-	end
-end
-
 local function Init()
 	-- your Init code here
 	mq.bind('/txtedit', CommandHandler)
@@ -259,12 +268,21 @@ function Module.RenderGUI()
 					if ImGui.MenuItem('Open##' .. Module.Name) then
 						ShowOpenFileSelector = not ShowOpenFileSelector
 					end
+					if Module.OriginalCopy ~= nil then
+						if ImGui.MenuItem('Revert##' .. Module.Name) then
+							TextEditor:LoadContents(Module.OriginalCopy)
+							Module.SaveFile = Module.OriginalFile
+							nameChanged = true
+						end
+					end
 					if Module.SavePath ~= '' then
 						if ImGui.MenuItem('Save##' .. Module.Name) then
-							if Module.SaveFile == '' then
+							if nameChanged then
+								Module.SavePath = Module.SaveFile ~= '' and Module.SaveFile or Module.SavePath
 								Module.WriteFile(Module.SavePath, TextEditor.text)
-							elseif Module.SaveFile ~= '' then
-								Module.SavePath = Module.SaveFile
+								Module.OpenFile = Module.SavePath
+								nameChanged = false
+							else
 								Module.WriteFile(Module.SavePath, TextEditor.text)
 							end
 							Module.SavePath = ''
@@ -326,6 +344,8 @@ function Module.RenderGUI()
 					Module.SavePath = ''
 					Module.OpenFile = ''
 					TextEditor:Clear()
+					Module.OriginalCopy = nil
+					Module.OriginalFile = nil
 				end
 				ImGui.EndMenuBar()
 			end
@@ -342,17 +362,20 @@ function Module.RenderGUI()
 				ImGui.Text('File: ' .. Module.OpenFile)
 			end
 
-			Module.SaveFile = ImGui.InputText('##SaveFile', Module.SaveFile)
-			if Module.SaveFile ~= '' and Module.SaveFile ~= Module.SavePath then
-				Module.SavePath = Module.SaveFile
+			Module.SaveFile, _ = ImGui.InputText('##SaveFile', Module.SaveFile)
+			if _ then
+				if Module.SaveFile ~= '' and Module.SaveFile ~= Module.SavePath then
+					nameChanged = true
+				end
 			end
-
 			if ShowOpenFileSelector then
 				DrawFileSelector()
 				local file = io.open(SelectedFilePath, "r")
 				if file then
 					Module.OpenFile = SelectedFilePath
 					local content = file:read("*a")
+					Module.OriginalFile = SelectedFilePath
+					Module.OriginalCopy = content
 					file:close()
 					TextEditor:LoadContents(content)
 					Module.SavePath = ''

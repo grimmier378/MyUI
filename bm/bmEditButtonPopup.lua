@@ -196,7 +196,7 @@ end
 function BMButtonEditor:RenderButtonEditUI(renderButton, enableShare, enableEdit)
     -- Share Buttton
     if enableShare then
-        if ImGui.Button(Icons.MD_SHARE) then
+        if ImGui.Button(Module.Icons.MD_SHARE) then
             BMButtonHandlers.ExportButtonToClipBoard(renderButton)
         end
         btnUtils.Tooltip("Copy contents of this button to share with friends.")
@@ -285,8 +285,7 @@ function BMButtonEditor:RenderButtonEditUI(renderButton, enableShare, enableEdit
     local footerHeight = 35
     local editHeight = ImGui.GetWindowHeight() - yPos - footerHeight
     ImGui.PushFont(ImGui.ConsoleFont)
-    -- renderButton.Cmd, textChanged = ImGui.InputTextMultiline("##_Cmd_Edit", renderButton.Cmd or "",
-    --     ImVec2(ImGui.GetWindowWidth() * 0.98, editHeight), ImGuiInputTextFlags.AllowTabInput)
+    -- renderButton.Cmd, textChanged = ImGui.InputTextMultiline("##_Cmd_Edit", renderButton.Cmd or "", ImVec2(ImGui.GetWindowWidth() * 0.98, editHeight), ImGuiInputTextFlags.AllowTabInput)
     self.textEditor:Render(ImVec2(ImGui.GetWindowWidth() * 0.98, editHeight))
     local textContents = self.textEditor.text ~= '' and self.textEditor.text or (renderButton.Cmd and renderButton.Cmd or "")
     self.textEditor:LoadContents(textContents)

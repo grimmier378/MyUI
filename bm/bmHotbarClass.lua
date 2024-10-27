@@ -343,7 +343,7 @@ function BMHotbarClass:RenderTabs()
                 end
             end
         else
-            ImGui.Text(string.format("No Sets Added! Add one by right-clicking on %s", Module.Icons.MD_SETTINGS))
+            ImGui.Text("No Sets Added! Add one by right-clicking on %s", Module.Icons.MD_SETTINGS)
         end
         ImGui.EndTabBar()
     end

@@ -376,8 +376,8 @@ local function DrawEditWin(server, target, zone, desc, cmd)
 
 	ImGui.Text("Edit Dialog")
 	ImGui.Separator()
-	ImGui.Text(string.format("Target: %s", target))
-	ImGui.Text(string.format("Zone: %s", zone))
+	ImGui.Text("Target: %s", target)
+	ImGui.Text("Zone: %s", zone)
 	ImGui.SameLine()
 
 	local aZones = (zone == 'allzones')

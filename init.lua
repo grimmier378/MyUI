@@ -56,6 +56,7 @@ local default_list   = {
 	'SillySounds',
 	"AlertMaster",
 	"ThemeZ",
+	"BigBag",
 }
 
 MyUI_DefaultConfig   = {
@@ -109,7 +110,17 @@ local function LoadSettings()
 
 	local newSetting = MyUI_Utils.CheckDefaultSettings(MyUI_DefaultConfig, MyUI_Settings)
 	newSetting = MyUI_Utils.CheckDefaultSettings(MyUI_DefaultConfig.mods_list, MyUI_Settings.mods_list) or newSetting
-
+	local found = false
+	for _, data in ipairs(MyUI_Settings.mods_list) do
+		if data.name == 'BigBag' then
+			found = true
+			break
+		end
+	end
+	if not found then
+		table.insert(MyUI_Settings.mods_list, { name = 'BigBag', enabled = false, })
+		newSetting = true
+	end
 	Minimized = not MyUI_Settings.ShowMain
 	LoadTheme()
 	MyUI_ThemeName = MyUI_Settings.ThemeName

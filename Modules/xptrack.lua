@@ -122,6 +122,7 @@ local DefaultConfig = {
     ['Horizon']           = ImGui_HorizonStep2,
     ['ExpPlotFillLines']  = true,
     ['GraphMultiplier']   = 1,
+    OutputTab             = 'XPTrack',
     LoadTheme             = 'Default',
 
 }
@@ -301,7 +302,7 @@ function Module.RenderGUI()
                     ImGui.TableNextColumn()
                     ImGui.Text("waiting for data...")
                     ImGui.TableNextColumn()
-                    ImGui.Text(string.format("%s", MinTime - (getTime() - TrackXP.StartTime)))
+                    ImGui.Text("%s", MinTime - (getTime() - TrackXP.StartTime))
                 end
                 ImGui.EndTable()
             end
@@ -501,14 +502,14 @@ local function CommandHandler(...)
     local args = { ..., }
     if args[1] == "reset" then
         ClearStats()
-        Module.Utils.PrintOutput('Exp AA pts', false, "\aw[\atXP Track\ax] \aoStats Reset")
+        Module.Utils.PrintOutput('XPTraclk', false, "\aw[\atXP Track\ax] \aoStats Reset")
     elseif args[1] == 'exit' then
         openGUI = false
     end
 end
 
 mq.bind("/xpt", CommandHandler)
-Module.Utils.PrintOutput('Exp AA pts', false, "\aw[\atXP Track\ax] \aoCommand: \ay/xpt \aoArgumentss: \aw[\ayreset\aw|\ayexit\aw]")
+Module.Utils.PrintOutput('XPTraclk', false, "\aw[\atXP Track\ax] \aoCommand: \ay/xpt \aoArgumentss: \aw[\ayreset\aw|\ayexit\aw]")
 
 function Module.MainLoop()
     if loadedExeternally then
@@ -540,7 +541,7 @@ function Module.MainLoop()
         end
         if not OnEmu then
             if CheckExpChanged() then
-                Module.Utils.PrintOutput('Exp AA pts', false,
+                Module.Utils.PrintOutput('XPTraclk', false,
                     "\ayXP Gained: \ag%02.3f%% \aw|| \ayXP Total: \ag%02.3f%% \aw|| \ayStart: \am%d \ayCur: \am%d \ayExp/Sec: \ag%2.3f%%",
                     TrackXP.Experience.Gained / XPTotalDivider,
                     TrackXP.Experience.Total / XPTotalDivider,
@@ -551,13 +552,13 @@ function Module.MainLoop()
             end
 
             if mq.TLO.Me.PctAAExp() > 0 and CheckAAExpChanged() then
-                Module.Utils.PrintOutput('Exp AA pts', false, "\ayAA Gained: \ag%2.2f \aw|| \ayAA Total: \ag%2.2f",
+                Module.Utils.PrintOutput('XPTraclk', false, "\ayAA Gained: \ag%2.2f \aw|| \ayAA Total: \ag%2.2f",
                     TrackXP.AAExperience.Gained / XPTotalDivider / 100,
                     TrackXP.AAExperience.Total / XPTotalDivider / 100)
             end
         else
             if CheckExpChangedEmu() then
-                Module.Utils.PrintOutput('Exp AA pts', false,
+                Module.Utils.PrintOutput('XPTraclk', false,
                     "\ayXP Gained: \ag%02.3f%% \aw|| \ayXP Total: \ag%02.3f%% \aw|| \ayStart: \am%d \ayCur: \am%d \aw|| \ayExp/Min: \ag%2.3f%%  \ayExp/Hr: \ag%2.3f%%",
                     TrackXP.Experience.Gained,
                     TrackXP.Experience.Total,
@@ -568,7 +569,7 @@ function Module.MainLoop()
             end
 
             if mq.TLO.Me.PctAAExp() > 0 and CheckAAExpChangedEmu() then
-                Module.Utils.PrintOutput('Exp AA pts', false, "\ayAA Gained: \ag%2.2f%% \aw|| \ayAA Total: \ag%2.2f%%, \aw|| \ayAA/Min: \ag%2.2f%% \aw|| \ayAA/Hr: \ag%2.1f pts",
+                Module.Utils.PrintOutput('XPTraclk', false, "\ayAA Gained: \ag%2.2f%% \aw|| \ayAA Total: \ag%2.2f%%, \aw|| \ayAA/Min: \ag%2.2f%% \aw|| \ayAA/Hr: \ag%2.1f pts",
                     TrackXP.AAExperience.Gained,
                     TrackXP.AAExperience.Total,
                     (AAXPPerSecond * 60),

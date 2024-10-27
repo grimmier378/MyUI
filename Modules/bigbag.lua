@@ -19,53 +19,67 @@ else
 	Module.Theme = MyUI_Theme
 	Module.ThemeLoader = MyUI_ThemeLoader
 end
-
-Module.ImgPath                = Module.Path .. "images/bag.png"
-local minImg                  = mq.CreateTexture(Module.ImgPath)
+Module.ImgPath                                   = Module.Path .. "images/bag.png"
+local minImg                                     = mq.CreateTexture(Module.ImgPath)
 -- Constants
-local ICON_WIDTH              = 40
-local ICON_HEIGHT             = 40
-local COUNT_X_OFFSET          = 39
-local COUNT_Y_OFFSET          = 23
-local EQ_ICON_OFFSET          = 500
-local BAG_ITEM_SIZE           = 40
-local INVENTORY_DELAY_SECONDS = 2
-local MIN_SLOTS_WARN          = 3
-local FreeSlots               = 0
-local UsedSlots               = 0
-local configFile              = string.format("%s/MyUI/BigBag/%s/%s.lua", mq.configDir, mq.TLO.EverQuest.Server(), mq.TLO.Me.Name())
+local ICON_WIDTH                                 = 40
+local ICON_HEIGHT                                = 40
+local COUNT_X_OFFSET                             = 39
+local COUNT_Y_OFFSET                             = 23
+local EQ_ICON_OFFSET                             = 500
+local BAG_ITEM_SIZE                              = 40
+local INVENTORY_DELAY_SECONDS                    = 2
+local MIN_SLOTS_WARN                             = 3
+local FreeSlots                                  = 0
+local UsedSlots                                  = 0
+local configFile                                 = string.format("%s/MyUI/BigBag/%s/%s.lua", mq.configDir, mq.TLO.EverQuest.Server(), mq.TLO.Me.Name())
 -- EQ Texture Animation references
-local animItems               = mq.FindTextureAnimation("A_DragItem")
-local animBox                 = mq.FindTextureAnimation("A_RecessedBox")
+local animItems                                  = mq.FindTextureAnimation("A_DragItem")
+local animBox                                    = mq.FindTextureAnimation("A_RecessedBox")
 
 -- Toggles
-local toggleKey               = ''
-local toggleModKey            = ''
-local toggleMouse             = 'Middle'
+local toggleKey                                  = ''
+local toggleModKey, toggleModKey2, toggleModKey3 = 'None', 'None', 'None'
+local toggleMouse                                = 'Middle'
 
 -- Bag Contents
-local items                   = {}
-local clickies                = {}
-local needSort                = true
+local items                                      = {}
+local clickies                                   = {}
+local needSort                                   = true
 
 -- Bag Options
-local sort_order              = { name = false, stack = false, }
-local clicked                 = false
+local sort_order                                 = { name = false, stack = false, }
+local clicked                                    = false
 -- GUI Activities
-local show_item_background    = true
-local themeName               = "Default"
-local start_time              = os.time()
-local filter_text             = ""
-local utils                   = require('mq.Utils')
-local settings                = {}
-local defaults                = {
+local show_item_background                       = true
+local themeName                                  = "Default"
+local start_time                                 = os.time()
+local filter_text                                = ""
+local utils                                      = require('mq.Utils')
+local settings                                   = {}
+local defaults                                   = {
 	MIN_SLOTS_WARN = 3,
 	show_item_background = true,
 	sort_order = { name = false, stack = false, },
 	themeName = "Default",
 	toggleKey = '',
-	toggleModKey = '',
-	toggleMouse = '',
+	toggleModKey = 'None',
+	toggleModKey2 = 'None',
+	toggleModKey3 = 'None',
+	toggleMouse = 'None',
+	INVENTORY_DELAY_SECONDS = 2,
+}
+local modKeys                                    = {
+	"None",
+	"Ctrl",
+	"Alt",
+	"Shift",
+}
+local mouseKeys                                  = {
+	"Left",
+	"Right",
+	"Middle",
+	"None",
 }
 local function loadSettings()
 	if utils.File.Exists(configFile) then
@@ -79,14 +93,27 @@ local function loadSettings()
 			Module.Theme = dofile(Module.ThemeFile)
 		end
 	end
-
+	if settings.toggleModKey == '' then settings.toggleModKey = 'None' end
+	if settings.toggleModKey2 == '' then settings.toggleModKey2 = 'None' end
+	if settings.toggleModKey3 == '' then settings.toggleModKey3 = 'None' end
+	INVENTORY_DELAY_SECONDS = settings.INVENTORY_DELAY_SECONDS ~= nil and settings.INVENTORY_DELAY_SECONDS or defaults.INVENTORY_DELAY_SECONDS
 	toggleKey = settings.toggleKey ~= nil and settings.toggleKey or defaults.toggleKey
 	toggleModKey = settings.toggleModKey ~= nil and settings.toggleModKey or defaults.toggleModKey
+	toggleModKey2 = settings.toggleModKey2 ~= nil and settings.toggleModKey2 or defaults.toggleModKey2
+	toggleModKey3 = settings.toggleModKey3 ~= nil and settings.toggleModKey3 or defaults.toggleModKey3
 	toggleMouse = settings.toggleMouse ~= nil and settings.toggleMouse or defaults.toggleMouse
 	themeName = settings.themeName ~= nil and settings.themeName or defaults.themeName
 	MIN_SLOTS_WARN = settings.MIN_SLOTS_WARN ~= nil and settings.MIN_SLOTS_WARN or defaults.MIN_SLOTS_WARN
 	show_item_background = settings.show_item_background ~= nil and settings.show_item_background or defaults.show_item_background
 	sort_order = settings.sort_order ~= nil and settings.sort_order or defaults.sort_order
+	if toggleModKey == 'None' then
+		toggleModKey2 = 'None'
+		settings.toggleModKey2 = 'None'
+	end
+	if toggleModKey2 == 'None' then
+		toggleModKey3 = 'None'
+		settings.toggleModKey3 = 'None'
+	end
 end
 
 local function help_marker(desc)
@@ -116,7 +143,7 @@ end
 
 -- The beast - this routine is what builds our inventory.
 local function create_inventory()
-	if (((os.difftime(os.time(), start_time)) > INVENTORY_DELAY_SECONDS or table.getn(items) == 0) and mq.TLO.Me.FreeInventory() ~= FreeSlots) or clicked then
+	if ((os.difftime(os.time(), start_time)) > INVENTORY_DELAY_SECONDS) or mq.TLO.Me.FreeInventory() ~= FreeSlots or clicked then
 		start_time = os.time()
 		items = {}
 		clickies = {}
@@ -182,6 +209,7 @@ end
 
 -- Display the collapasable menu area above the items
 local function display_bag_options()
+	ImGui.SetWindowFontScale(1.0)
 	if ImGui.CollapsingHeader("Bag Options") then
 		local changed = false
 		sort_order.name, changed = ImGui.Checkbox("Name", sort_order.name)
@@ -220,6 +248,15 @@ local function display_bag_options()
 		end
 		ImGui.SameLine()
 		help_marker("Minimum number of slots before the warning color is displayed.")
+
+		ImGui.SetNextItemWidth(100)
+		INVENTORY_DELAY_SECONDS = ImGui.InputInt("Inventory Refresh Time (s)", INVENTORY_DELAY_SECONDS, 1, 10)
+		if INVENTORY_DELAY_SECONDS ~= settings.INVENTORY_DELAY_SECONDS then
+			settings.INVENTORY_DELAY_SECONDS = INVENTORY_DELAY_SECONDS
+			mq.pickle(configFile, settings)
+		end
+		ImGui.SameLine()
+		help_marker("Time in seconds between inventory refreshes, if # of free slots hasn't changed.")
 	end
 
 	if ImGui.CollapsingHeader('Toggle Settings') then
@@ -233,25 +270,105 @@ local function display_bag_options()
 		end
 		ImGui.SameLine()
 		help_marker("Key to toggle the GUI (A-Z | 0-9 | F1-F12)")
+		if toggleKey ~= '' then
+			ImGui.Text("Toggle Mod Key")
+			ImGui.SameLine()
+			ImGui.SetNextItemWidth(100)
 
-		ImGui.Text("Toggle Mod Key")
-		ImGui.SameLine()
-		ImGui.SetNextItemWidth(100)
-		toggleModKey = ImGui.InputText("##ToggleModKey", toggleModKey)
-		if toggleModKey ~= settings.toggleModKey then
-			settings.toggleModKey = toggleModKey
-			mq.pickle(configFile, settings)
+			local isSelected = false
+			if settings.toggleModKey2 == '' then
+				ImGui.Text("None")
+			else
+				if ImGui.BeginCombo("##ToggleModKey", settings.toggleModKey) then
+					for k, v in pairs(modKeys) do
+						isSelected = v == settings.toggleModKey
+						if ImGui.Selectable(v, isSelected) then
+							settings.toggleModKey = v
+							if v == 'None' then
+								settings.toggleModKey2 = 'None'
+								settings.toggleModKey3 = 'None'
+								toggleModKey2 = settings.toggleModKey2
+								toggleModKey3 = settings.toggleModKey3
+							end
+							toggleModKey = settings.toggleModKey
+							mq.pickle(configFile, settings)
+						end
+					end
+					ImGui.EndCombo()
+				end
+			end
+			ImGui.SameLine()
+			help_marker("Modifier Key to toggle the GUI (Ctrl | Alt | Shift)")
+			if settings.toggleModKey ~= 'None' then
+				ImGui.Text("Toggle Mod Key2")
+				ImGui.SameLine()
+				ImGui.SetNextItemWidth(100)
+
+				local isSelectedMod2 = false
+				if settings.toggleModKey2 == '' then
+					ImGui.Text("None")
+				else
+					if ImGui.BeginCombo("##ToggleModKey2", settings.toggleModKey2) then
+						for k, v in pairs(modKeys) do
+							isSelectedMod2 = v == settings.toggleModKey2
+							if ImGui.Selectable(v, isSelectedMod2) then
+								settings.toggleModKey2 = v
+								if v == 'None' then
+									settings.toggleModKey3 = 'None'
+									toggleModKey3 = settings.toggleModKey3
+								end
+								toggleModKey2 = settings.toggleModKey2
+								mq.pickle(configFile, settings)
+							end
+						end
+						ImGui.EndCombo()
+					end
+				end
+				ImGui.SameLine()
+				help_marker("Modifier Key2 to toggle the GUI (Ctrl | Alt | Shift)")
+
+				if settings.toggleModKey2 ~= 'None' then
+					ImGui.Text("Toggle Mod Key3")
+					ImGui.SameLine()
+					ImGui.SetNextItemWidth(100)
+					local isSelectedMod3 = false
+					if settings.toggleModKey3 == '' then
+						ImGui.Text("None")
+					else
+						if ImGui.BeginCombo("##ToggleModKey3", settings.toggleModKey3) then
+							for k, v in pairs(modKeys) do
+								isSelectedMod3 = v == settings.toggleModKey3
+								if ImGui.Selectable(v, isSelectedMod3) then
+									settings.toggleModKey3 = v
+									toggleModKey3 = settings.toggleModKey3
+									mq.pickle(configFile, settings)
+								end
+							end
+							ImGui.EndCombo()
+						end
+					end
+					ImGui.SameLine()
+					help_marker("Modifier Key3 to toggle the GUI (Ctrl | Alt | Shift)")
+				end
+			end
 		end
-		ImGui.SameLine()
-		help_marker("Modifier Key to toggle the GUI (Ctrl | Alt | Shift)")
-
 		ImGui.Text("Toggle Mouse Button")
 		ImGui.SameLine()
 		ImGui.SetNextItemWidth(100)
-		toggleMouse = ImGui.InputText("##ToggleMouse", toggleMouse)
-		if toggleMouse ~= settings.toggleMouse then
-			settings.toggleMouse = toggleMouse
-			mq.pickle(configFile, settings)
+		local isSelectedMouse = false
+		if settings.toggleMouse == '' then
+			ImGui.Text("None")
+		else
+			if ImGui.BeginCombo("##ToggleMouseButton", settings.toggleMouse) then
+				for k, v in pairs(mouseKeys) do
+					isSelectedMouse = v == settings.toggleMouse
+					if ImGui.Selectable(v, isSelectedMouse) then
+						settings.toggleMouse = v
+						mq.pickle(configFile, settings)
+					end
+				end
+				ImGui.EndCombo()
+			end
 		end
 		ImGui.SameLine()
 		help_marker("Mouse Button to toggle the GUI (Left | Right | Middle)")
@@ -291,7 +408,9 @@ end
 local function draw_item_icon(item, iconWidth, iconHeight)
 	-- Capture original cursor position
 	local cursor_x, cursor_y = ImGui.GetCursorPos()
-	local offsetX, offsetY = iconWidth - 1, iconHeight / 2
+	local offsetX, offsetY = iconWidth - 1, iconHeight / 1.5
+	local offsetXCharges, offsetYCharges = 2, offsetY / 2 -- Draw the background box
+
 	-- Draw the background box
 	if show_item_background then
 		ImGui.DrawTextureAnimation(animBox, iconWidth, iconHeight)
@@ -315,6 +434,13 @@ local function draw_item_icon(item, iconWidth, iconHeight)
 		ImGui.DrawTextureAnimation(animBox, TextSize, 4)
 		ImGui.SetCursorPos((cursor_x + offsetX) - TextSize, cursor_y + offsetY)
 		ImGui.TextUnformatted(tostring(item.Stack()))
+	end
+	local TextSize = ImGui.CalcTextSize(tostring(item.Charges()))
+	if item.Charges() >= 1 then
+		ImGui.SetCursorPos((cursor_x + offsetXCharges), cursor_y + offsetYCharges)
+		ImGui.DrawTextureAnimation(animBox, TextSize, 4)
+		ImGui.SetCursorPos((cursor_x + offsetXCharges), cursor_y + offsetYCharges)
+		ImGui.TextColored(ImVec4(1, 1, 0, 1), tostring(item.Charges()))
 	end
 	ImGui.SetWindowFontScale(1.0)
 
@@ -359,20 +485,16 @@ local function draw_item_icon(item, iconWidth, iconHeight)
 		if item.ItemSlot2() == -1 then
 			mq.cmd("/itemnotify " .. item.ItemSlot() .. " leftmouseup")
 		else
-			print(item.ItemSlot2())
+			-- print(item.ItemSlot2())
 			mq.cmd("/itemnotify in " .. to_pack(item.ItemSlot()) .. " " .. to_bag_slot(item.ItemSlot2()) .. " leftmouseup")
 		end
 	end
-
-	-- Right-click mouse works on bag items like in-game action
-	if ImGui.IsItemClicked(ImGuiMouseButton.Right) then
-		if ImGui.IsKeyPressed(ImGuiMod.Ctrl) then
-			local link = item.ItemLink('CLICKABLE')()
-			mq.cmdf('/executelink %s', link)
-		else
-			mq.cmdf('/useitem "%s"', item.Name())
-			clicked = true
-		end
+	if ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsItemClicked(ImGuiMouseButton.Right) then
+		local link = item.ItemLink('CLICKABLE')()
+		mq.cmdf('/executelink %s', link)
+	elseif ImGui.IsItemClicked(ImGuiMouseButton.Right) then
+		mq.cmdf('/useitem "%s"', item.Name())
+		clicked = true
 	end
 	local function mouse_over_bag_window()
 		local window_x, window_y = ImGui.GetWindowPos()
@@ -458,7 +580,7 @@ end
 
 local function display_details()
 	ImGui.SetWindowFontScale(1.0)
-	if ImGui.BeginTable("Details", 7, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.Resizable, ImGuiTableFlags.Hideable, ImGuiTableFlags.Reorderable)) then
+	if ImGui.BeginTable("Details", 7, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.ScrollY, ImGuiTableFlags.Resizable, ImGuiTableFlags.Hideable, ImGuiTableFlags.Reorderable)) then
 		ImGui.TableSetupColumn('Icon', ImGuiTableColumnFlags.WidthStretch)
 		ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthFixed, 100)
 		ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthStretch)
@@ -466,6 +588,7 @@ local function display_details()
 		ImGui.TableSetupColumn('Worn EFX', ImGuiTableColumnFlags.WidthStretch)
 		ImGui.TableSetupColumn('Clicky', ImGuiTableColumnFlags.WidthStretch)
 		ImGui.TableSetupColumn('Charges', ImGuiTableColumnFlags.WidthStretch)
+		ImGui.TableSetupScrollFreeze(0, 1)
 		ImGui.TableHeadersRow()
 		for index, _ in ipairs(items) do
 			if string.match(string.lower(items[index].Name()), string.lower(filter_text)) then
@@ -506,14 +629,6 @@ local function display_details()
 	end
 end
 
-local function apply_style()
-	ImGui.PushStyleColor(ImGuiCol.Button, .62, .53, .79, .40)
-	ImGui.PushStyleColor(ImGuiCol.ButtonHovered, 1, 1, 1, .87)
-	ImGui.PushStyleColor(ImGuiCol.ResizeGrip, .62, .53, .79, .40)
-	ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered, .62, .53, .79, 1)
-	ImGui.PushStyleColor(ImGuiCol.ResizeGripActive, .62, .53, .79, 1)
-end
-
 local function renderBtn()
 	-- apply_style()
 	local colorCount, styleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
@@ -543,18 +658,26 @@ local function renderBtn()
 			ImGui.EndTooltip()
 		end
 
-		if toggleMouse ~= '' then
+		if toggleMouse ~= 'None' then
 			if ImGui.IsMouseClicked(ImGuiMouseButton[toggleMouse]) then
-				shouldDrawGUI = not shouldDrawGUI
+				Module.ShowGUI = not Module.ShowGUI
 			end
 		end
-		if toggleModKey ~= '' and toggleKey ~= '' then
+		if toggleModKey ~= 'None' and toggleKey ~= '' and toggleModKey2 == 'None' and toggleModKey3 == 'None' then
 			if ImGui.IsKeyPressed(ImGuiKey[toggleKey]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey]) then
-				shouldDrawGUI = not shouldDrawGUI
+				Module.ShowGUI = not Module.ShowGUI
 			end
-		elseif toggleModKey == '' and toggleKey ~= '' then
+		elseif toggleModKey ~= 'None' and toggleKey ~= '' and toggleModKey2 ~= 'None' and toggleModKey3 == 'None' then
+			if ImGui.IsKeyPressed(ImGuiKey[toggleKey]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey2]) then
+				Module.ShowGUI = not Module.ShowGUI
+			end
+		elseif toggleModKey ~= 'None' and toggleKey ~= '' and toggleModKey2 ~= 'None' and toggleModKey3 ~= 'None' then
+			if ImGui.IsKeyPressed(ImGuiKey[toggleKey]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey2]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey3]) then
+				Module.ShowGUI = not Module.ShowGUI
+			end
+		elseif toggleModKey == 'None' and toggleKey ~= '' then
 			if ImGui.IsKeyPressed(ImGuiKey[toggleKey]) then
-				shouldDrawGUI = not shouldDrawGUI
+				Module.ShowGUI = not Module.ShowGUI
 			end
 		end
 	end
@@ -563,44 +686,51 @@ local function renderBtn()
 	ImGui.End()
 end
 --- ImGui Program Loop
+
+local function RenderTabs()
+	local colorCount, styleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
+
+	local open, show = ImGui.Begin(string.format("Big Bag"), true, ImGuiWindowFlags.NoScrollbar)
+	if not open then
+		show = false
+		Module.ShowGUI = false
+	end
+	if show then
+		display_bag_utilities()
+		ImGui.SetWindowFontScale(1.25)
+		ImGui.Text(string.format("Used/Free Slots "))
+		ImGui.SameLine()
+		ImGui.TextColored(FreeSlots > MIN_SLOTS_WARN and ImVec4(0.354, 1.000, 0.000, 0.500) or ImVec4(1.000, 0.354, 0.0, 0.5), "(%s/%s)", UsedSlots, FreeSlots)
+		if ImGui.BeginTabBar("BagTabs") then
+			if ImGui.BeginTabItem("Items") then
+				display_bag_content()
+				ImGui.EndTabItem()
+			end
+			if ImGui.BeginTabItem('Clickies') then
+				display_clickies()
+				ImGui.EndTabItem()
+			end
+			if ImGui.BeginTabItem('Details') then
+				display_details()
+				ImGui.EndTabItem()
+			end
+			if ImGui.BeginTabItem('Settings') then
+				display_bag_options()
+				ImGui.EndTabItem()
+			end
+			ImGui.EndTabBar()
+		end
+
+		display_item_on_cursor()
+	end
+	Module.ThemeLoader.EndTheme(colorCount, styleCount)
+	ImGui.End()
+end
+
 function Module.RenderGUI()
 	if not Module.IsRunning then return end
 	if Module.ShowGUI then
-		local colorCount, styleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
-
-		local open, show = ImGui.Begin(string.format("Big Bag"), true, ImGuiWindowFlags.NoScrollbar)
-		if not open then
-			show = false
-			Module.ShowGUI = false
-		end
-		if show then
-			display_bag_utilities()
-			display_bag_options()
-			ImGui.SetWindowFontScale(1.25)
-			ImGui.SetCursorPosY(ImGui.GetCursorPosY() - 20)
-			ImGui.Text(string.format("Used/Free Slots "))
-			ImGui.SameLine()
-			ImGui.TextColored(FreeSlots > MIN_SLOTS_WARN and ImVec4(0.354, 1.000, 0.000, 0.500) or ImVec4(1.000, 0.354, 0.0, 0.5), "(%s/%s)", UsedSlots, FreeSlots)
-			if ImGui.BeginTabBar("BagTabs") then
-				if ImGui.BeginTabItem("Items") then
-					display_bag_content()
-					ImGui.EndTabItem()
-				end
-				if ImGui.BeginTabItem('Clickies') then
-					display_clickies()
-					ImGui.EndTabItem()
-				end
-				if ImGui.BeginTabItem('Details') then
-					display_details()
-					ImGui.EndTabItem()
-				end
-				ImGui.EndTabBar()
-			end
-
-			display_item_on_cursor()
-		end
-		Module.ThemeLoader.EndTheme(colorCount, styleCount)
-		ImGui.End()
+		RenderTabs()
 	end
 
 	renderBtn()

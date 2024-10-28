@@ -418,7 +418,7 @@ function Module.RenderGUI()
                         imgui.PushID(groupData[i].Name)
                         imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
                         imgui.Text("%s (%s)", groupData[i].Name, groupData[i].Level)
-                        ImGui.SameLine()
+                        ImGui.SameLine(0.0, 0.5)
                         local combatState = groupData[i].State
                         if combatState == 'DEBUFFED' then
                             Module.Utils.DrawStatusIcon('A_PWCSDebuff', 'pwcs', 'You are Debuffed and need a cure before resting.', iconSize)
@@ -433,7 +433,8 @@ function Module.RenderGUI()
                         else
                             Module.Utils.DrawStatusIcon(3996, 'item', ' ', iconSize)
                         end
-
+                        ImGui.SameLine(0.0, 0.5)
+                        ImGui.TextColored(ImVec4(1, 1, 0, 1), groupData[i].Pts)
                         if not compact[groupData[i].Name] then
                             imgui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(1, 0.9, 0.4, 0.5))
                             imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
@@ -450,19 +451,19 @@ function Module.RenderGUI()
                         -- end of subgrouped Elements for tooltip begin tooltip
                         if ImGui.IsItemHovered() and TempSettings.showTooltip then
                             imgui.BeginTooltip()
-                            local tTipTxt = "\t\t" .. groupData[i].Name
-                            imgui.TextColored(ImVec4(1, 1, 1, 1), tTipTxt)
+                            -- local tTipTxt = "\t\t" .. groupData[i].Name
+                            imgui.TextColored(ImVec4(1, 1, 1, 1), "\t\t%s", groupData[i].Name)
                             imgui.Separator()
-                            tTipTxt = string.format("Exp:\t\t\t%.2f %%", groupData[i].PctExp)
-                            imgui.TextColored(ImVec4(1, 0.9, 0.4, 1), tTipTxt)
-                            tTipTxt = string.format("AA Exp: \t%.2f %%", groupData[i].PctExpAA)
-                            imgui.TextColored(ImVec4(0.2, 0.9, 0.9, 1), tTipTxt)
-                            tTipTxt = string.format("Avail:  \t\t%d", groupData[i].Pts)
-                            imgui.TextColored(ImVec4(0, 1, 0, 1), tTipTxt)
-                            tTipTxt = string.format("Spent:\t\t%d", groupData[i].PtsSpent)
-                            imgui.TextColored(ImVec4(0.9, 0.4, 0.4, 1), tTipTxt)
-                            tTipTxt = string.format("Total:\t\t%d", groupData[i].PtsTotal)
-                            imgui.TextColored(ImVec4(0.8, 0.0, 0.8, 1.0), tTipTxt)
+                            -- tTipTxt = string.format("Exp:\t\t\t%.2f %%", groupData[i].PctExp)
+                            imgui.TextColored(ImVec4(1, 0.9, 0.4, 1), "Exp:\t\t\t%.2f %%", groupData[i].PctExp)
+                            -- tTipTxt = string.format("AA Exp: \t%.2f %%", groupData[i].PctExpAA)
+                            imgui.TextColored(ImVec4(0.2, 0.9, 0.9, 1), "AA Exp: \t%.2f %%", groupData[i].PctExpAA)
+                            -- tTipTxt = string.format("Avail:  \t\t%d", groupData[i].Pts)
+                            imgui.TextColored(ImVec4(0, 1, 0, 1), "Avail:  \t\t%d", groupData[i].Pts)
+                            -- tTipTxt = string.format("Spent:\t\t%d", groupData[i].PtsSpent)
+                            imgui.TextColored(ImVec4(0.9, 0.4, 0.4, 1), "Spent:\t\t%d", groupData[i].PtsSpent)
+                            -- tTipTxt = string.format("Total:\t\t%d", groupData[i].PtsTotal)
+                            imgui.TextColored(ImVec4(0.8, 0.0, 0.8, 1.0), "Total:\t\t%d", groupData[i].PtsTotal)
                             imgui.EndTooltip()
                         end
                         if imgui.IsItemHovered() then

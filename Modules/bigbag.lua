@@ -76,8 +76,6 @@ local modKeys                                    = {
 	"Shift",
 }
 local mouseKeys                                  = {
-	"Left",
-	"Right",
 	"Middle",
 	"None",
 }
@@ -96,6 +94,7 @@ local function loadSettings()
 	if settings.toggleModKey == '' then settings.toggleModKey = 'None' end
 	if settings.toggleModKey2 == '' then settings.toggleModKey2 = 'None' end
 	if settings.toggleModKey3 == '' then settings.toggleModKey3 = 'None' end
+	if settings.toggleMouse == '' then settings.toggleMouse = 'None' end
 	INVENTORY_DELAY_SECONDS = settings.INVENTORY_DELAY_SECONDS ~= nil and settings.INVENTORY_DELAY_SECONDS or defaults.INVENTORY_DELAY_SECONDS
 	toggleKey = settings.toggleKey ~= nil and settings.toggleKey or defaults.toggleKey
 	toggleModKey = settings.toggleModKey ~= nil and settings.toggleModKey or defaults.toggleModKey
@@ -217,6 +216,7 @@ local function display_bag_options()
 			needSort = true
 			settings.sort_order.name = sort_order.name
 			mq.pickle(configFile, settings)
+			clicked = true
 		end
 		ImGui.SameLine()
 		help_marker("Order items from your inventory sorted by the name of the item.")
@@ -227,6 +227,7 @@ local function display_bag_options()
 			needSort = true
 			settings.sort_order.stack = sort_order.stack
 			mq.pickle(configFile, settings)
+			clicked = true
 		end
 		ImGui.SameLine()
 		help_marker("Order items with the largest stacks appearing first.")
@@ -364,6 +365,7 @@ local function display_bag_options()
 					isSelectedMouse = v == settings.toggleMouse
 					if ImGui.Selectable(v, isSelectedMouse) then
 						settings.toggleMouse = v
+						toggleMouse = settings.toggleMouse
 						mq.pickle(configFile, settings)
 					end
 				end
@@ -632,6 +634,33 @@ local function display_details()
 	end
 end
 
+local function BigButtonTooltip()
+	local toggleModes = ''
+	if toggleModKey ~= 'None' and toggleModKey2 == 'None' and toggleModKey3 == 'None' and toggleKey ~= '' then
+		toggleModes = string.format("%s + %s", toggleModKey, toggleKey)
+	elseif toggleModKey ~= 'None' and toggleModKey2 ~= 'None' and toggleModKey3 == 'None' and toggleKey ~= '' then
+		toggleModes = string.format("%s + %s + %s", toggleModKey, toggleModKey2, toggleKey)
+	elseif toggleModKey ~= 'None' and toggleModKey2 ~= 'None' and toggleModKey3 ~= 'None' and toggleKey ~= '' then
+		toggleModes = string.format("%s + %s + %s + %s", toggleModKey, toggleModKey2, toggleModKey3, toggleKey)
+	elseif toggleModKey == 'None' and toggleKey ~= '' then
+		toggleModes = string.format("%s", toggleKey)
+	end
+
+	ImGui.BeginTooltip()
+	ImGui.Text("Click to Toggle Big Bag")
+	ImGui.TextColored(ImVec4(1, 1, 0, 1), "%s", toggleModes)
+	ImGui.SameLine()
+	ImGui.Text("to Toggle GUI")
+	if toggleMouse ~= 'None' then
+		ImGui.TextColored(ImVec4(1.000, 0.671, 0.257, 0.500), "%s  Mouse Button", toggleMouse)
+		ImGui.SameLine()
+		ImGui.Text(" to Toggle GUI")
+	end
+	ImGui.Text(string.format("Used/Free Slots "))
+	ImGui.SameLine()
+	ImGui.TextColored(FreeSlots > MIN_SLOTS_WARN and ImVec4(0.354, 1.000, 0.000, 0.500) or ImVec4(1.000, 0.354, 0.0, 0.5), "(%s/%s)", UsedSlots, FreeSlots)
+	ImGui.EndTooltip()
+end
 local function renderBtn()
 	-- apply_style()
 	local colorCount, styleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
@@ -652,13 +681,7 @@ local function renderBtn()
 			Module.ShowGUI = not Module.ShowGUI
 		end
 		if ImGui.IsItemHovered() then
-			ImGui.BeginTooltip()
-			ImGui.TextUnformatted("Click to Toggle Big Bag")
-			ImGui.TextUnformatted("Middle Mouse Click to Toggle GUI")
-			ImGui.Text(string.format("Used/Free Slots "))
-			ImGui.SameLine()
-			ImGui.TextColored(FreeSlots > MIN_SLOTS_WARN and ImVec4(0.354, 1.000, 0.000, 0.500) or ImVec4(1.000, 0.354, 0.0, 0.5), "(%s/%s)", UsedSlots, FreeSlots)
-			ImGui.EndTooltip()
+			BigButtonTooltip()
 		end
 
 		if toggleMouse ~= 'None' then

@@ -287,6 +287,27 @@ local function DrawContextMenu()
 	end
 end
 
+local function RenderMini()
+	local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
+	local openMini, showMini = ImGui.Begin(MyUI_ScriptName .. "##Mini" .. MyUI_CharLoaded, true,
+		bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar))
+
+	if not openMini then
+		MyUI_IsRunning = false
+	end
+	if showMini then
+		if ImGui.ImageButton("MyUI", MyUI_Grimmier_Img:GetTextureID(), ImVec2(30, 30)) then
+			MyUI_Settings.ShowMain = not MyUI_Settings.ShowMain
+		end
+	end
+	if ImGui.BeginPopupContextWindow() then
+		DrawContextMenu()
+		ImGui.EndPopup()
+	end
+	MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
+	ImGui.End()
+end
+
 local function MyUI_Render()
 	if MyUI_InitPctComplete < 100 and MyUI_NumModsEnabled > 0 then
 		RenderLoader()
@@ -420,30 +441,7 @@ local function MyUI_Render()
 			ImGui.End()
 		end
 
-		if Minimized then
-			local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
-
-			local open_gui, show_gui = ImGui.Begin(MyUI_ScriptName .. "##Mini" .. MyUI_CharLoaded, true,
-				bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar))
-
-			if not open_gui then
-				MyUI_Settings.ShowMain = false
-				Minimized = true
-				mq.pickle(MyUI_SettingsFile, MyUI_Settings)
-			end
-			if show_gui then
-				if ImGui.ImageButton("MyUI", MyUI_Grimmier_Img:GetTextureID(), ImVec2(30, 30)) then
-					MyUI_Settings.ShowMain = true
-					Minimized = false
-				end
-			end
-			if ImGui.BeginPopupContextWindow() then
-				DrawContextMenu()
-				ImGui.EndPopup()
-			end
-			MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
-			ImGui.End()
-		end
+		RenderMini()
 
 		RenderModules()
 	end

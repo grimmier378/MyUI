@@ -290,7 +290,44 @@ local function resizeConsoleFonts()
     -- end
 end
 
+local function RenderMini()
+    local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
+
+    ImGui.SetNextWindowSize(100, 100, ImGuiCond.FirstUseEver)
+    ImGui.SetNextWindowPos(500, 700, ImGuiCond.FirstUseEver)
+    local openMini, showMini = ImGui.Begin("Chat Relay Mini##" .. Module.CharLoaded, true, bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar))
+    if not openMini then
+        Module.IsRunning = false
+    end
+    if showMini then
+        if not settings[Module.DisplayName].ShowOnNewMessage and NewMessage then
+            if ImGui.ImageButton("ChatRelay", minImg:GetTextureID(), ImVec2(settings[Module.DisplayName].IconSize, settings[Module.DisplayName].IconSize), ImVec2(0.0, 0.0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), ImVec4(1, 0, 0, 1)) then
+                showMain = not showMain
+            end
+        else
+            if ImGui.ImageButton("ChatRelay", minImg:GetTextureID(), ImVec2(settings[Module.DisplayName].IconSize, settings[Module.DisplayName].IconSize)) then
+                showMain = not showMain
+            end
+        end
+
+        if ImGui.BeginPopupContextWindow() then
+            if ImGui.MenuItem("exit") then
+                Module.IsRunning = false
+            end
+            if ImGui.MenuItem("config") then
+                showConfig = true
+            end
+            ImGui.EndPopup()
+        end
+    end
+    Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
+
+    ImGui.End()
+end
+
 function Module.RenderGUI()
+    if not Module.IsRunning then return end
+
     if showMain then
         Minimized = false
         NewMessage = false
@@ -427,42 +464,7 @@ function Module.RenderGUI()
         ImGui.End()
     end
 
-    if Minimized then
-        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
-
-        ImGui.SetNextWindowSize(100, 100, ImGuiCond.FirstUseEver)
-        ImGui.SetNextWindowPos(500, 700, ImGuiCond.FirstUseEver)
-        local openMini, showMini = ImGui.Begin("Chat Relay Mini##" .. Module.CharLoaded, true, bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar))
-        if not openMini then
-            Minimized = false
-        end
-        if showMini then
-            if not settings[Module.DisplayName].ShowOnNewMessage and NewMessage then
-                if ImGui.ImageButton("ChatRelay", minImg:GetTextureID(), ImVec2(settings[Module.DisplayName].IconSize, settings[Module.DisplayName].IconSize), ImVec2(0.0, 0.0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), ImVec4(1, 0, 0, 1)) then
-                    showMain = true
-                    Minimized = false
-                end
-            else
-                if ImGui.ImageButton("ChatRelay", minImg:GetTextureID(), ImVec2(settings[Module.DisplayName].IconSize, settings[Module.DisplayName].IconSize)) then
-                    showMain = true
-                    Minimized = false
-                end
-            end
-
-            if ImGui.BeginPopupContextWindow() then
-                -- if ImGui.MenuItem("exit") then
-                --     mq.exit()
-                -- end
-                if ImGui.MenuItem("config") then
-                    showConfig = true
-                end
-                ImGui.EndPopup()
-            end
-        end
-        Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
-
-        ImGui.End()
-    end
+    RenderMini()
 
     if showConfig then
         local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)

@@ -10,6 +10,7 @@ function ColorList.color(color_name)
     if (color_name == 'red') then return ImVec4(0.9, 0.1, 0.1, 1) end
     if (color_name == 'pink') then return ImVec4(0.9, 0.4, 0.4, 0.8) end
     if (color_name == 'orange') then return ImVec4(0.78, 0.20, 0.05, 0.8) end
+    if (color_name == 'tangarine') then return ImVec4(1.000, 0.557, 0.000, 1.000) end
     if (color_name == 'yellow') then return ImVec4(1, 1, 0, 1) end
     if (color_name == 'yellow2') then return ImVec4(0.7, 0.6, 0.1, 0.7) end
     if (color_name == 'white') then return ImVec4(1, 1, 1, 1) end

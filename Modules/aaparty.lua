@@ -17,6 +17,7 @@ if not loadedExeternally then
     Module.Mode        = 'driver'
     Module.ThemeFile   = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
     Module.Theme       = {}
+    Module.Colors      = require('lib.colors')
 else
     Module.Utils       = MyUI_Utils
     Module.ThemeLoader = MyUI_ThemeLoader
@@ -25,6 +26,7 @@ else
     Module.Mode        = MyUI_Mode
     Module.ThemeFile   = MyUI_ThemeFile
     Module.Theme       = MyUI_Theme
+    Module.Colors      = MyUI_Colors
 end
 local myself                                                            = mq.TLO.Me
 
@@ -416,25 +418,38 @@ function Module.RenderGUI()
                         ImGui.BeginGroup()
                         -- Start of subgrouped Elements for tooltip
                         imgui.PushID(groupData[i].Name)
-                        imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
-                        imgui.Text("%s (%s)", groupData[i].Name, groupData[i].Level)
-                        ImGui.SameLine(0.0, 0.5)
-                        local combatState = groupData[i].State
-                        if combatState == 'DEBUFFED' then
-                            Module.Utils.DrawStatusIcon('A_PWCSDebuff', 'pwcs', 'You are Debuffed and need a cure before resting.', iconSize)
-                        elseif combatState == 'ACTIVE' then
-                            Module.Utils.DrawStatusIcon('A_PWCSStanding', 'pwcs', 'You are not in combat and may rest at any time.', iconSize)
-                        elseif combatState == 'COOLDOWN' then
-                            Module.Utils.DrawStatusIcon('A_PWCSTimer', 'pwcs', 'You are recovering from combat and can not reset yet', iconSize)
-                        elseif combatState == 'RESTING' then
-                            Module.Utils.DrawStatusIcon('A_PWCSRegen', 'pwcs', 'You are Resting.', iconSize)
-                        elseif combatState == 'COMBAT' then
-                            Module.Utils.DrawStatusIcon('A_PWCSInCombat', 'pwcs', 'You are in Combat.', iconSize)
-                        else
-                            Module.Utils.DrawStatusIcon(3996, 'item', ' ', iconSize)
+                        -- imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
+                        if ImGui.BeginTable('##data', 3, bit32.bor(ImGuiTableFlags.NoBordersInBody)) then
+                            local widthMax = ImGui.GetContentRegionAvail()
+
+                            ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthFixed, 95)
+                            ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthFixed, iconSize)
+                            ImGui.TableSetupColumn("Pts", ImGuiTableColumnFlags.WidthFixed, 25)
+                            ImGui.TableNextRow()
+                            ImGui.TableNextColumn()
+                            imgui.Text(groupData[i].Name)
+                            imgui.SameLine()
+                            imgui.TextColored(Module.Colors.color('tangarine'), groupData[i].Level)
+                            ImGui.TableNextColumn()
+                            local combatState = groupData[i].State
+                            if combatState == 'DEBUFFED' then
+                                Module.Utils.DrawStatusIcon('A_PWCSDebuff', 'pwcs', 'You are Debuffed and need a cure before resting.', iconSize)
+                            elseif combatState == 'ACTIVE' then
+                                Module.Utils.DrawStatusIcon('A_PWCSStanding', 'pwcs', 'You are not in combat and may rest at any time.', iconSize)
+                            elseif combatState == 'COOLDOWN' then
+                                Module.Utils.DrawStatusIcon('A_PWCSTimer', 'pwcs', 'You are recovering from combat and can not reset yet', iconSize)
+                            elseif combatState == 'RESTING' then
+                                Module.Utils.DrawStatusIcon('A_PWCSRegen', 'pwcs', 'You are Resting.', iconSize)
+                            elseif combatState == 'COMBAT' then
+                                Module.Utils.DrawStatusIcon('A_PWCSInCombat', 'pwcs', 'You are in Combat.', iconSize)
+                            else
+                                Module.Utils.DrawStatusIcon(3996, 'item', ' ', iconSize)
+                            end
+                            ImGui.TableNextColumn()
+                            ImGui.TextColored(Module.Colors.color('green'), groupData[i].Pts)
+                            ImGui.EndTable()
                         end
-                        ImGui.SameLine(0.0, 0.5)
-                        ImGui.TextColored(ImVec4(1, 1, 0, 1), groupData[i].Pts)
+
                         if not compact[groupData[i].Name] then
                             imgui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(1, 0.9, 0.4, 0.5))
                             imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)

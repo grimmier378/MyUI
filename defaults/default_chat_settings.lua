@@ -1773,6 +1773,6 @@ return {
 	['LoadTheme'] = 'Default',
 	['Scale'] = 1,
 	['mainEcho'] = '/gu',
-	['keyName'] = 'RightShift',
+	['keyName'] = 'RightCtrl',
 	['keyFocus'] = false,
 }

@@ -55,12 +55,12 @@ if not loadedExeternally then
 	-- for local standalone use we will need to load in the global MyUI_ variables and functions. and make sure to include the files as needed inside of the scripts folder.
 	-- Comment/Uncomment the items below as needed
 	MyUI_Utils       = require('lib.common') -- common functions for use in other scripts
-	MyUI_Icons       = require('mq.ICONS')  -- FAWESOME ICONS
+	MyUI_Icons       = require('mq.ICONS') -- FAWESOME ICONS
 	-- MyUI_Actor         = require('actors') -- Actors if needed
 	-- MyUI_Base64        = require('lib.base64') -- Ensure you have a base64 module available
 	-- MyUI_PackageMan    = require('mq.PackageMan')
 	-- MyUI_SQLite3       = MyUI_PackageMan.Require('lsqlite3')
-	MyUI_Colors      = require('lib.colors')      -- color table for GUI returns ImVec4
+	MyUI_Colors      = require('lib.colors')    -- color table for GUI returns ImVec4
 	MyUI_ThemeLoader = require('lib.theme_loader') -- Load the theme loader
 	-- MyUI_AbilityPicker = require('lib.AbilityPicker') -- Ability Picker
 

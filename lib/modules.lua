@@ -39,7 +39,6 @@ end
 
 function Module.load(module_name)
 	Module.checkExternal(module_name)
-	package.loaded["modules." .. module_name:lower()] = nil
 	local modPath = mq.luaDir .. "/MyUI/modules/" .. module_name:lower() .. ".lua"
 	local moduleName = dofile(modPath)
 	if moduleName then

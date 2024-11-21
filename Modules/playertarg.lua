@@ -15,24 +15,34 @@ Module.IsRunning = false
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
 if not loadedExeternally then
-    MyUI_Utils = require('lib.common')
-    MyUI_Icons = require('mq.ICONS')
-    MyUI_Colors = require('lib.colors')
-    MyUI_CharLoaded = mq.TLO.Me.DisplayName()
-    MyUI_Server = mq.TLO.MacroQuest.Server()
+    Module.Utils = require('lib.common')
+    Module.Icons = require('mq.ICONS')
+    Module.Colors = require('lib.colors')
+    Module.CharLoaded = mq.TLO.Me.DisplayName()
+    Module.Server = mq.TLO.MacroQuest.Server()
+    Module.ThemeFile = string.format('%s/MyUI/ThemeZ.lua', mq.configDir)
+    Module.Theme = {}
+    Module.ThemeLoader = require('lib.theme_loader')
+else
+    Module.Utils = MyUI_Utils
+    Module.Icons = MyUI_Icons
+    Module.Colors = MyUI_Colors
+    Module.CharLoaded = MyUI_CharLoaded
+    Module.Server = MyUI_Server
+    Module.ThemeFile = MyUI_ThemeFile
+    Module.Theme = MyUI_Theme
+    Module.ThemeLoader = MyUI_ThemeLoader
 end
 
-local gIcon = MyUI_Icons.MD_SETTINGS
+local gIcon = Module.Icons.MD_SETTINGS
 -- set variables
 local pulse = true
 local iconSize, progressSize = 26, 10
 local flashAlpha, FontScale, cAlpha = 1, 1, 255
 local ShowGUI, locked, flashBorder, rise, cRise = true, false, true, true, false
 local openConfigGUI, openGUI = false, true
-local themeFile = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
-local configFileOld = mq.configDir .. '/MyUI_Configs.lua'
-local configFile = string.format('%s/MyUI/PlayerTarg/%s/%s.lua', mq.configDir, MyUI_Server, MyUI_CharLoaded)
-local ColorCount, ColorCountConf, StyleCount, StyleCountConf = 0, 0, 0, 0
+local configFileOld = mq.configDir .. '/Module.Configs.lua'
+local configFile = string.format('%s/MyUI/PlayerTarg/%s/%s.lua', mq.configDir, Module.Server, Module.CharLoaded)
 local themeName = 'Default'
 local pulseSpeed = 5
 local combatPulseSpeed = 10
@@ -60,7 +70,7 @@ local targFlag = bit32.bor(ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoScrol
 
 --Tables
 
-local defaults, settings, themeRowBG, themeBorderBG, theme = {}, {}, {}, {}, {}
+local defaults, settings, themeRowBG, themeBorderBG = {}, {}, {}, {}
 themeRowBG = { 1, 1, 1, 0, }
 themeBorderBG = { 1, 1, 1, 1, }
 
@@ -103,17 +113,16 @@ local function GetInfoToolTip()
 end
 
 local function loadTheme()
-    if MyUI_Utils.File.Exists(themeFile) then
-        theme = dofile(themeFile)
+    if Module.Utils.File.Exists(Module.ThemeFile) then
+        Module.Theme = dofile(Module.ThemeFile)
     else
-        theme = require('defaults.themes')
+        Module.Theme = require('defaults.themes')
     end
-    themeName = theme.LoadTheme or 'notheme'
 end
 
 local function loadSettings()
-    if not MyUI_Utils.File.Exists(configFile) then
-        if MyUI_Utils.File.Exists(configFileOld) then
+    if not Module.Utils.File.Exists(configFile) then
+        if Module.Utils.File.Exists(configFileOld) then
             local tmpOld = {}
             tmpOld = dofile(configFileOld)
             for k, v in pairs(tmpOld) do
@@ -135,12 +144,12 @@ local function loadSettings()
             settings[Module.Name] = defaults
         end
     end
-
-    loadTheme()
-
+    if not loadedExeternally then
+        loadTheme()
+    end
     local newSetting = false
 
-    newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings[Module.Name]) or newSetting
+    newSetting = Module.Utils.CheckDefaultSettings(defaults, settings[Module.Name]) or newSetting
 
     if settings[Module.Name].iconSize ~= nil then
         settings[Module.Name].IconSize = settings[Module.Name].iconSize
@@ -174,7 +183,7 @@ end
 
 local function pulseGeneric(speed, alpha, rising, lastTime, frameTime, maxAlpha, minAlpha)
     if speed == 0 then return alpha, rising, lastTime end
-    local currentTime = os.time()
+    local currentTime = mq.gettime()
     if currentTime - lastTime < frameTime then
         return alpha, rising, lastTime -- exit if not enough time has passed
     end
@@ -192,9 +201,8 @@ local function pulseGeneric(speed, alpha, rising, lastTime, frameTime, maxAlpha,
     return alpha, rising, lastTime
 end
 
-local lastTime, lastTimeCombat = os.time(), os.time()
-local frameTime, frameTimeCombat = 1 / 60, 1 / 120
-
+local lastTime, lastTimeCombat = mq.gettime(), mq.gettime()
+local frameTime, frameTimeCombat = 33, 16
 local function pulseIcon(speed)
     flashAlpha, rise, lastTime = pulseGeneric(speed, flashAlpha, rise, lastTime, frameTime, 200, 10)
     if speed == 0 then flashAlpha = 0 end
@@ -207,15 +215,15 @@ end
 
 
 ---comment
----@param tName string -- name of the theme to load form table
----@param window string -- name of the window to apply the theme to
+---@param tName string -- name of the Module.Theme to load form table
+---@param window string -- name of the window to apply the Module.Theme to
 ---@return integer, integer -- returns the new counter values
 local function DrawTheme(tName, window)
     local StyleCounter = 0
     local ColorCounter = 0
-    for tID, tData in pairs(theme.Theme) do
+    for tID, tData in pairs(Module.Theme.Theme) do
         if tData.Name == tName then
-            for pID, cData in pairs(theme.Theme[tID].Color) do
+            for pID, cData in pairs(Module.Theme.Theme[tID].Color) do
                 if window == 'main' then
                     if cData.PropertyName == 'Border' then
                         themeBorderBG = { cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4], }
@@ -263,7 +271,7 @@ local function DrawTheme(tName, window)
             end
             if tData['Style'] ~= nil then
                 if next(tData['Style']) ~= nil then
-                    for sID, sData in pairs(theme.Theme[tID].Style) do
+                    for sID, sData in pairs(Module.Theme.Theme[tID].Style) do
                         if sData.Size ~= nil then
                             ImGui.PushStyleVar(sID, sData.Size)
                             StyleCounter = StyleCounter + 1
@@ -289,7 +297,7 @@ end
 local function DrawInspectableSpellIcon(iconID, spell, i)
     local cursor_x, cursor_y = ImGui.GetCursorPos()
     local beniColor = IM_COL32(0, 20, 180, 190) -- blue benificial default color
-    MyUI_Utils.Animation_Spell:SetTextureCell(iconID or 0)
+    Module.Utils.Animation_Spell:SetTextureCell(iconID or 0)
     local caster = spell.Caster() or '?'        -- the caster of the Spell
     if not spell.Beneficial() then
         beniColor = IM_COL32(255, 0, 0, 190)    --red detrimental
@@ -301,9 +309,9 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
         ImGui.GetCursorScreenPosVec() + iconSize, beniColor)
     ImGui.SetCursorPos(cursor_x + 3, cursor_y + 3)
     if caster == mq.TLO.Me.DisplayName() and spell.Beneficial() then
-        ImGui.DrawTextureAnimation(MyUI_Utils.Animation_Spell, iconSize - 6, iconSize - 6, true)
+        ImGui.DrawTextureAnimation(Module.Utils.Animation_Spell, iconSize - 6, iconSize - 6, true)
     else
-        ImGui.DrawTextureAnimation(MyUI_Utils.Animation_Spell, iconSize - 5, iconSize - 5)
+        ImGui.DrawTextureAnimation(Module.Utils.Animation_Spell, iconSize - 5, iconSize - 5)
     end
     ImGui.SetCursorPos(cursor_x + 2, cursor_y + 2)
     local sName = spell.Name() or '??'
@@ -315,17 +323,18 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
             ImGui.GetCursorScreenPosVec() + iconSize - 4, flashColor)
     end
     ImGui.SetCursorPos(cursor_x, cursor_y)
+    local target = mq.TLO.Target
     ImGui.InvisibleButton(sName, ImVec2(iconSize, iconSize), bit32.bor(ImGuiButtonFlags.MouseButtonRight))
     if ImGui.IsItemHovered() then
         if (ImGui.IsMouseReleased(1)) then
             spell.Inspect()
         end
         if ImGui.BeginTooltip() then
-            ImGui.TextColored(MyUI_Colors.color('yellow'), '%s', sName)
-            ImGui.TextColored(MyUI_Colors.color('green'), '%s', mq.TLO.Target.Buff(i).Duration.TimeHMS() or '')
+            ImGui.TextColored(Module.Colors.color('yellow'), '%s', sName)
+            ImGui.TextColored(Module.Colors.color('green'), '%s', target.Buff(i).Duration.TimeHMS() or '')
             ImGui.Text('Cast By: ')
             ImGui.SameLine()
-            ImGui.TextColored(MyUI_Colors.color('light blue'), '%s', caster)
+            ImGui.TextColored(Module.Colors.color('light blue'), '%s', caster)
             ImGui.EndTooltip()
         end
     end
@@ -333,6 +342,7 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 end
 
 local function targetBuffs(count)
+    local target = mq.TLO.Target
     local iconsDrawn = 0
     -- Width and height of each texture
     local windowWidth = ImGui.GetWindowContentRegionWidth()
@@ -347,11 +357,11 @@ local function targetBuffs(count)
     if flashAlpha == 25 then rise = true end
     ImGui.BeginGroup()
     ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 0, 0)
-    if mq.TLO.Target.BuffCount() ~= nil then
+    if target.BuffCount() ~= nil then
         for i = 1, count do
-            local sIcon = mq.TLO.Target.Buff(i).SpellIcon() or 0
-            if mq.TLO.Target.Buff(i) ~= nil then
-                DrawInspectableSpellIcon(sIcon, mq.TLO.Target.Buff(i), i)
+            local sIcon = target.Buff(i).SpellIcon() or 0
+            if target.Buff(i) ~= nil then
+                DrawInspectableSpellIcon(sIcon, target.Buff(i), i)
                 iconsDrawn = iconsDrawn + 1
             end
             -- Check if we've reached the max icons for the row, if so reset counter and new line
@@ -374,9 +384,8 @@ end
 -- GUI
 local function PlayerTargConf_GUI()
     if not openConfigGUI then return end
-    ColorCountConf = 0
-    StyleCountConf = 0
-    ColorCountConf, StyleCountConf = DrawTheme(themeName, 'config')
+
+    local ColorCountConf, StyleCountConf = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
     local open, showConfigGUI = ImGui.Begin("PlayerTarg Conf##" .. Module.Name, true,
         bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
 
@@ -403,12 +412,14 @@ local function PlayerTargConf_GUI()
             ImGui.Text("Cur Theme: %s", themeName)
             -- Combo Box Load Theme
             if ImGui.BeginCombo("Load Theme##" .. Module.Name, themeName) then
-                for k, data in pairs(theme.Theme) do
+                for k, data in pairs(Module.Theme.Theme) do
                     local isSelected = data.Name == themeName
                     if ImGui.Selectable(data.Name, isSelected) then
-                        theme.LoadTheme = data.Name
-                        themeName = theme.LoadTheme
-                        settings[Module.Name].LoadTheme = themeName
+                        if settings[Module.Name].LoadTheme ~= data.Name then
+                            themeName = data.Name
+                            settings[Module.Name].LoadTheme = themeName
+                            mq.pickle(configFile, settings)
+                        end
                     end
                 end
                 ImGui.EndCombo()
@@ -416,6 +427,25 @@ local function PlayerTargConf_GUI()
 
             if ImGui.Button('Reload Theme File') then
                 loadTheme()
+            end
+
+            ImGui.SameLine()
+            if loadedExeternally then
+                if ImGui.Button('Edit ThemeZ') then
+                    if MyUI_Modules.ThemeZ ~= nil then
+                        if MyUI_Modules.ThemeZ.IsRunning then
+                            MyUI_Modules.ThemeZ.ShowGui = true
+                        else
+                            MyUI_TempSettings.ModuleChanged = true
+                            MyUI_TempSettings.ModuleName = 'ThemeZ'
+                            MyUI_TempSettings.ModuleEnabled = true
+                        end
+                    else
+                        MyUI_TempSettings.ModuleChanged = true
+                        MyUI_TempSettings.ModuleName = 'ThemeZ'
+                        MyUI_TempSettings.ModuleEnabled = true
+                    end
+                end
             end
 
             settings[Module.Name].MouseOver = ImGui.Checkbox('Mouse Over', settings[Module.Name].MouseOver)
@@ -492,7 +522,7 @@ local function PlayerTargConf_GUI()
 
             testValue = ImGui.SliderInt("Test HP##" .. Module.Name, testValue, 0, 100)
 
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, testValue)))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorHpMin, colorHpMax, testValue)))
             ImGui.ProgressBar((testValue / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test')
             ImGui.PopStyleColor()
 
@@ -505,7 +535,7 @@ local function PlayerTargConf_GUI()
             colorMpMax = ImGui.ColorEdit4("Mana Max Color##" .. Module.Name, colorMpMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
 
             testValue2 = ImGui.SliderInt("Test MP##" .. Module.Name, testValue2, 0, 100)
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorMpMin, colorMpMax, testValue2)))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorMpMin, colorMpMax, testValue2)))
             ImGui.ProgressBar((testValue2 / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test2')
             ImGui.PopStyleColor()
         end
@@ -526,7 +556,7 @@ local function PlayerTargConf_GUI()
             colorBreathMax = ImGui.ColorEdit4("Breath Max Color##" .. Module.Name, colorBreathMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
             local testValue3 = 100
             testValue3 = ImGui.SliderInt("Test Breath##" .. Module.Name, testValue3, 0, 100)
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorBreathMin, colorBreathMax, testValue3)))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorBreathMin, colorBreathMax, testValue3)))
             ImGui.ProgressBar((testValue3 / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test3')
             ImGui.PopStyleColor()
         end
@@ -553,8 +583,7 @@ local function PlayerTargConf_GUI()
         end
     end
 
-    if StyleCountConf > 0 then ImGui.PopStyleVar(StyleCountConf) end
-    if ColorCountConf > 0 then ImGui.PopStyleColor(ColorCountConf) end
+    Module.ThemeLoader.EndTheme(ColorCountConf, StyleCountConf)
     ImGui.SetWindowFontScale(1)
     ImGui.End()
 end
@@ -568,30 +597,31 @@ local function findXTarSlot(id)
 end
 
 local function drawTarget()
-    if (mq.TLO.Target() ~= nil) then
+    local target = mq.TLO.Target
+    if (target() ~= nil) then
         ImGui.BeginGroup()
         ImGui.SetWindowFontScale(FontScale)
-        local targetName = mq.TLO.Target.CleanName() or '?'
-        local xSlot = findXTarSlot(mq.TLO.Target.ID()) or 0
-        local tC = MyUI_Utils.GetConColor(mq.TLO.Target) or "WHITE"
+        local targetName = target.CleanName() or '?'
+        local xSlot = findXTarSlot(target.ID()) or 0
+        local tC = Module.Utils.GetConColor(target) or "WHITE"
         if tC == 'red' then tC = 'pink' end
-        local tClass = mq.TLO.Target.Class.ShortName() == 'UNKNOWN CLASS' and MyUI_Icons.MD_HELP_OUTLINE or
-            mq.TLO.Target.Class.ShortName()
-        local tLvl = mq.TLO.Target.Level() or 0
-        local tBodyType = mq.TLO.Target.Body.Name() or '?'
+        local tClass = target.Class.ShortName() == 'UNKNOWN CLASS' and Module.Icons.MD_HELP_OUTLINE or
+            target.Class.ShortName()
+        local tLvl = target.Level() or 0
+        local tBodyType = target.Body.Name() or '?'
         --Target Health Bar
         ImGui.BeginGroup()
         if settings[Module.Name].DynamicHP then
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, mq.TLO.Target.PctHPs())))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorHpMin, colorHpMax, target.PctHPs())))
         else
-            if mq.TLO.Target.PctHPs() < 25 then
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('orange')))
+            if target.PctHPs() < 25 then
+                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('orange')))
             else
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('red')))
+                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
             end
         end
         local yPos = ImGui.GetCursorPosY() - 2
-        ImGui.ProgressBar(((tonumber(mq.TLO.Target.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), ProgressSizeTarget, '##' .. mq.TLO.Target.PctHPs())
+        ImGui.ProgressBar(((tonumber(target.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), ProgressSizeTarget, '##' .. target.PctHPs())
         ImGui.PopStyleColor()
 
         if ImGui.IsItemHovered() then
@@ -616,18 +646,18 @@ local function drawTarget()
             -- Distance in the second column
             ImGui.TableSetColumnIndex(1)
 
-            ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color(tC))
+            ImGui.PushStyleColor(ImGuiCol.Text, Module.Colors.color(tC))
             if tC == 'pink' then
-                ImGui.Text('   ' .. MyUI_Icons.MD_WARNING)
+                ImGui.Text('   ' .. Module.Icons.MD_WARNING)
             else
-                ImGui.Text('   ' .. MyUI_Icons.MD_LENS)
+                ImGui.Text('   ' .. Module.Icons.MD_LENS)
             end
             ImGui.PopStyleColor()
 
             ImGui.SameLine(ImGui.GetColumnWidth() - 35)
-            ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('yellow'))
+            ImGui.PushStyleColor(ImGuiCol.Text, Module.Colors.color('yellow'))
 
-            ImGui.Text(tostring(math.floor(mq.TLO.Target.Distance() or 0)) .. 'm')
+            ImGui.Text(tostring(math.floor(target.Distance() or 0)) .. 'm')
             ImGui.PopStyleColor()
             -- Second Row: Class, Level, and Aggro%
             ImGui.TableNextRow()
@@ -637,7 +667,7 @@ local function drawTarget()
             -- Aggro% text in the second column
             ImGui.TableSetColumnIndex(1)
 
-            ImGui.Text(tostring(mq.TLO.Target.PctHPs()) .. '%')
+            ImGui.Text(tostring(target.PctHPs()) .. '%')
             ImGui.EndTable()
         end
         ImGui.EndGroup()
@@ -645,33 +675,33 @@ local function drawTarget()
         ImGui.Separator()
         --Aggro % Bar
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 8, 1)
-        if (mq.TLO.Target.Aggressive) then
+        if (target.Aggressive) then
             yPos = ImGui.GetCursorPosY() - 2
             ImGui.BeginGroup()
-            if mq.TLO.Target.PctAggro() < 100 then
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('orange')))
+            if target.PctAggro() < 100 then
+                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('orange')))
             else
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('purple')))
+                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
             end
-            ImGui.ProgressBar(((tonumber(mq.TLO.Target.PctAggro() or 0)) / 100), ImGui.GetContentRegionAvail(), progressSize,
+            ImGui.ProgressBar(((tonumber(target.PctAggro() or 0)) / 100), ImGui.GetContentRegionAvail(), progressSize,
                 '##pctAggro')
             ImGui.PopStyleColor()
             --Secondary Aggro Person
 
-            if (mq.TLO.Target.SecondaryAggroPlayer() ~= nil) then
+            if (target.SecondaryAggroPlayer() ~= nil) then
                 ImGui.SetCursorPosY(yPos)
                 ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 5)
-                ImGui.Text("%s", mq.TLO.Target.SecondaryAggroPlayer())
+                ImGui.Text("%s", target.SecondaryAggroPlayer())
             end
             --Aggro % Label middle of bar
             ImGui.SetCursorPosY(yPos)
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + ((ImGui.GetWindowWidth() / 2) - 8))
 
-            ImGui.Text("%d", mq.TLO.Target.PctAggro())
-            if (mq.TLO.Target.SecondaryAggroPlayer() ~= nil) then
+            ImGui.Text("%d", target.PctAggro())
+            if (target.SecondaryAggroPlayer() ~= nil) then
                 ImGui.SetCursorPosY(yPos)
                 ImGui.SetCursorPosX(ImGui.GetWindowWidth() - 40)
-                ImGui.Text("%d", mq.TLO.Target.SecondaryPctAggro())
+                ImGui.Text("%d", target.SecondaryPctAggro())
             end
             ImGui.EndGroup()
         else
@@ -682,15 +712,15 @@ local function drawTarget()
         ImGui.EndGroup()
         if ImGui.IsItemHovered() and ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
             if mq.TLO.Cursor() then
-                MyUI_Utils.GiveItem(mq.TLO.Target.ID() or 0)
+                Module.Utils.GiveItem(target.ID() or 0)
             end
         end
         --Target Buffs
-        if tonumber(mq.TLO.Target.BuffCount()) > 0 then
+        if tonumber(target.BuffCount()) > 0 then
             local windowWidth, windowHeight = ImGui.GetContentRegionAvail()
             -- Begin a scrollable child
             ImGui.BeginChild("TargetBuffsScrollRegion", ImVec2(windowWidth, windowHeight), ImGuiChildFlags.Border)
-            targetBuffs(tonumber(mq.TLO.Target.BuffCount()))
+            targetBuffs(tonumber(target.BuffCount()))
             ImGui.EndChild()
             -- End the scrollable region
         end
@@ -700,28 +730,29 @@ local function drawTarget()
 end
 
 function Module.RenderGUI()
-    ColorCount = 0
-    StyleCount = 0
     local flags = winFlag
     -- Default window size
+    local target = mq.TLO.Target
     ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
-    ColorCount, StyleCount = DrawTheme(themeName, 'main')
+    local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme, settings[Module.Name].MouseOver, mouseHud, settings[Module.Name].WinTransparency)
     if locked then
         flags = bit32.bor(ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.MenuBar, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoScrollWithMouse)
     end
     if ShowGUI then
-        local open, show = ImGui.Begin(MyUI_CharLoaded .. "##Target", true, flags)
+        local open, show = ImGui.Begin(Module.CharLoaded .. "##Target", true, flags)
         if not open then
             ShowGUI = false
         end
         if show then
             mouseHud = ImGui.IsWindowHovered(ImGuiHoveredFlags.ChildWindows)
+            pulseIcon(pulseSpeed)
+            pulseCombat(combatPulseSpeed)
 
             -- ImGui.BeginGroup()
             if ImGui.BeginMenuBar() then
                 -- if ZoomLvl > 1.25 then ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, 4,7) end
-                local lockedIcon = locked and MyUI_Icons.FA_LOCK .. '##lockTabButton_MyChat' or
-                    MyUI_Icons.FA_UNLOCK .. '##lockTablButton_MyChat'
+                local lockedIcon = locked and Module.Icons.FA_LOCK .. '##lockTabButton_MyChat' or
+                    Module.Icons.FA_UNLOCK .. '##lockTablButton_MyChat'
                 if ImGui.Button(lockedIcon) then
                     --ImGuiWindowFlags.NoMove
                     locked = not locked
@@ -735,7 +766,7 @@ function Module.RenderGUI()
                 if ImGui.Button(gIcon .. '##PlayerTarg') then
                     openConfigGUI = not openConfigGUI
                 end
-                local splitIcon = splitTarget and MyUI_Icons.FA_TOGGLE_ON .. '##PtargSplit' or MyUI_Icons.FA_TOGGLE_OFF .. '##PtargSplit'
+                local splitIcon = splitTarget and Module.Icons.FA_TOGGLE_ON .. '##PtargSplit' or Module.Icons.FA_TOGGLE_OFF .. '##PtargSplit'
                 if ImGui.Button(splitIcon) then
                     splitTarget = not splitTarget
                     settings = dofile(configFile)
@@ -802,45 +833,45 @@ function Module.RenderGUI()
                 local combatState = mq.TLO.Me.CombatState()
                 if mq.TLO.Me.Poisoned() and mq.TLO.Me.Diseased() then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
-                    MyUI_Utils.DrawStatusIcon(2579, 'item', 'Diseased and Posioned', iconSize)
+                    Module.Utils.DrawStatusIcon(2579, 'item', 'Diseased and Posioned', iconSize)
                 elseif mq.TLO.Me.Poisoned() then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
-                    MyUI_Utils.DrawStatusIcon(42, 'spell', 'Posioned', iconSize)
+                    Module.Utils.DrawStatusIcon(42, 'spell', 'Posioned', iconSize)
                 elseif mq.TLO.Me.Diseased() then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
-                    MyUI_Utils.DrawStatusIcon(41, 'spell', 'Diseased', iconSize)
+                    Module.Utils.DrawStatusIcon(41, 'spell', 'Diseased', iconSize)
                 elseif mq.TLO.Me.Dotted() then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
-                    MyUI_Utils.DrawStatusIcon(5987, 'item', 'Dotted', iconSize)
+                    Module.Utils.DrawStatusIcon(5987, 'item', 'Dotted', iconSize)
                 elseif mq.TLO.Me.Cursed() then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
-                    MyUI_Utils.DrawStatusIcon(5759, 'item', 'Cursed', iconSize)
+                    Module.Utils.DrawStatusIcon(5759, 'item', 'Cursed', iconSize)
                 elseif mq.TLO.Me.Corrupted() then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
-                    MyUI_Utils.DrawStatusIcon(5758, 'item', 'Corrupted', iconSize)
+                    Module.Utils.DrawStatusIcon(5758, 'item', 'Corrupted', iconSize)
                 end
                 ImGui.SameLine(ImGui.GetColumnWidth() - 25)
                 if combatState == 'DEBUFFED' then
-                    MyUI_Utils.DrawStatusIcon('A_PWCSDebuff', 'pwcs', 'You are Debuffed and need a cure before resting.', iconSize)
+                    Module.Utils.DrawStatusIcon('A_PWCSDebuff', 'pwcs', 'You are Debuffed and need a cure before resting.', iconSize)
                 elseif combatState == 'ACTIVE' then
-                    MyUI_Utils.DrawStatusIcon('A_PWCSStanding', 'pwcs', 'You are not in combat and may rest at any time.', iconSize)
+                    Module.Utils.DrawStatusIcon('A_PWCSStanding', 'pwcs', 'You are not in combat and may rest at any time.', iconSize)
                 elseif combatState == 'COOLDOWN' then
-                    MyUI_Utils.DrawStatusIcon('A_PWCSTimer', 'pwcs', 'You are recovering from combat and can not reset yet', iconSize)
+                    Module.Utils.DrawStatusIcon('A_PWCSTimer', 'pwcs', 'You are recovering from combat and can not reset yet', iconSize)
                 elseif combatState == 'RESTING' then
-                    MyUI_Utils.DrawStatusIcon('A_PWCSRegen', 'pwcs', 'You are Resting.', iconSize)
+                    Module.Utils.DrawStatusIcon('A_PWCSRegen', 'pwcs', 'You are Resting.', iconSize)
                 elseif combatState == 'COMBAT' then
-                    MyUI_Utils.DrawStatusIcon('A_PWCSInCombat', 'pwcs', 'You are in Combat.', iconSize)
+                    Module.Utils.DrawStatusIcon('A_PWCSInCombat', 'pwcs', 'You are in Combat.', iconSize)
                 else
-                    MyUI_Utils.DrawStatusIcon(3996, 'item', ' ', iconSize)
+                    Module.Utils.DrawStatusIcon(3996, 'item', ' ', iconSize)
                 end
                 -- Visiblity
                 ImGui.TableSetColumnIndex(1)
-                if mq.TLO.Target() ~= nil then
+                if target() ~= nil then
                     ImGui.SetWindowFontScale(FontScale)
-                    if mq.TLO.Target.LineOfSight() then
-                        ImGui.TextColored(ImVec4(0, 1, 0, 1), MyUI_Icons.MD_VISIBILITY)
+                    if target.LineOfSight() then
+                        ImGui.TextColored(ImVec4(0, 1, 0, 1), Module.Icons.MD_VISIBILITY)
                     else
-                        ImGui.TextColored(ImVec4(0.9, 0, 0, 1), MyUI_Icons.MD_VISIBILITY_OFF)
+                        ImGui.TextColored(ImVec4(0.9, 0, 0, 1), Module.Icons.MD_VISIBILITY_OFF)
                     end
                     ImGui.SetWindowFontScale(1)
                 end
@@ -851,15 +882,15 @@ function Module.RenderGUI()
                 ImGui.Text('')
                 if mq.TLO.Group.MainTank.ID() == mq.TLO.Me.ID() then
                     ImGui.SameLine()
-                    MyUI_Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
+                    Module.Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
                 end
                 if mq.TLO.Group.MainAssist.ID() == mq.TLO.Me.ID() then
                     ImGui.SameLine()
-                    MyUI_Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
+                    Module.Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
                 end
                 if mq.TLO.Group.Puller.ID() == mq.TLO.Me.ID() then
                     ImGui.SameLine()
-                    MyUI_Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
+                    Module.Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
                 end
                 ImGui.SameLine()
                 --  ImGui.SameLine()
@@ -891,20 +922,20 @@ function Module.RenderGUI()
             local yPos = ImGui.GetCursorPosY()
 
             if settings[Module.Name].DynamicHP then
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorHpMin, colorHpMax, mq.TLO.Me.PctHPs())))
+                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorHpMin, colorHpMax, mq.TLO.Me.PctHPs())))
             else
                 if mq.TLO.Me.PctHPs() <= 0 then
-                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('purple')))
+                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
                 elseif mq.TLO.Me.PctHPs() < 15 then
                     if pulse then
-                        ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('orange')))
+                        ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('orange')))
                         if not mq.TLO.Me.CombatState() == 'COMBAT' then pulse = false end
                     else
-                        ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('red')))
+                        ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
                         if not mq.TLO.Me.CombatState() == 'COMBAT' then pulse = true end
                     end
                 else
-                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('red')))
+                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
                 end
             end
             ImGui.ProgressBar(((tonumber(mq.TLO.Me.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), progressSize, '##pctHps')
@@ -918,9 +949,9 @@ function Module.RenderGUI()
             --My Mana Bar
             if (tonumber(mq.TLO.Me.MaxMana()) > 0) then
                 if settings[Module.Name].DynamicMP then
-                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorMpMin, colorMpMax, mq.TLO.Me.PctMana())))
+                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorMpMin, colorMpMax, mq.TLO.Me.PctMana())))
                 else
-                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('light blue2')))
+                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('light blue2')))
                 end
                 ImGui.ProgressBar(((tonumber(mq.TLO.Me.PctMana() or 0)) / 100), ImGui.GetContentRegionAvail(), progressSize, '##pctMana')
                 ImGui.PopStyleColor()
@@ -932,7 +963,7 @@ function Module.RenderGUI()
             end
             local yPos = ImGui.GetCursorPosY()
             --My Endurance bar
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Colors.color('yellow2')))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('yellow2')))
             ImGui.ProgressBar(((tonumber(mq.TLO.Me.PctEndurance() or 0)) / 100), ImGui.GetContentRegionAvail(), progressSize, '##pctEndurance')
             ImGui.PopStyleColor()
             ImGui.SetCursorPosY(yPos - 1)
@@ -955,17 +986,17 @@ function Module.RenderGUI()
             end
             ImGui.PopStyleVar(2)
         end
-        if StyleCount > 0 then ImGui.PopStyleVar(StyleCount) end
-        if ColorCount > 0 then ImGui.PopStyleColor(ColorCount) end
 
+        Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
         ImGui.End()
     end
 
-    if splitTarget and mq.TLO.Target() ~= nil then
-        local colorCountTarget, styleCountTarget = DrawTheme(themeName, 'targ')
+    if splitTarget and target() ~= nil then
+        local colorCountTarget, styleCountTarget = Module.ThemeLoader.StartTheme(themeName, Module.Theme, settings[Module.Name].MouseOver, mouseHudTarg,
+            settings[Module.Name].WinTransparency)
         local tmpFlag = targFlag
         if locked then tmpFlag = bit32.bor(targFlag, ImGuiWindowFlags.NoMove) end
-        local openT, showT = ImGui.Begin("Target##TargetPopout" .. MyUI_CharLoaded, true, tmpFlag)
+        local openT, showT = ImGui.Begin("Target##TargetPopout" .. Module.CharLoaded, true, tmpFlag)
         if showT then
             if ImGui.IsWindowHovered(ImGuiHoveredFlags.ChildWindows) then
                 mouseHudTarg = true
@@ -978,8 +1009,7 @@ function Module.RenderGUI()
             ImGui.PopStyleVar(2)
         end
 
-        if styleCountTarget > 0 then ImGui.PopStyleVar(styleCountTarget) end
-        if colorCountTarget > 0 then ImGui.PopStyleColor(colorCountTarget) end
+        Module.ThemeLoader.EndTheme(colorCountTarget, styleCountTarget)
 
         ImGui.End()
     end
@@ -990,10 +1020,10 @@ function Module.RenderGUI()
         if not showTitleBreath then bFlags = bit32.bor(bFlags, ImGuiWindowFlags.NoTitleBar) end
 
 
-        local ColorCountBreath, StyleCountBreath = DrawTheme(themeName, 'breath')
+        local ColorCountBreath, StyleCountBreath = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
         ImGui.SetNextWindowSize(ImVec2(150, 55), ImGuiCond.FirstUseEver)
         ImGui.SetNextWindowPos(ImGui.GetMousePosVec(), ImGuiCond.FirstUseEver)
-        local openBreath, showBreath = ImGui.Begin('Breath##MyBreathWin_' .. MyUI_CharLoaded, true, bFlags)
+        local openBreath, showBreath = ImGui.Begin('Breath##MyBreathWin_' .. Module.CharLoaded, true, bFlags)
         if not openBreath then
             breathBarShow = false
         end
@@ -1001,7 +1031,7 @@ function Module.RenderGUI()
             ImGui.SetWindowFontScale(FontScale)
 
             local yPos = ImGui.GetCursorPosY()
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (MyUI_Utils.CalculateColor(colorBreathMin, colorBreathMax, breathPct)))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorBreathMin, colorBreathMax, breathPct)))
             ImGui.ProgressBar((breathPct / 100), ImGui.GetContentRegionAvail(), progressSize, '##pctBreath')
             ImGui.PopStyleColor()
             if ImGui.BeginPopupContextItem("##MySpells_CastWin") then
@@ -1016,8 +1046,7 @@ function Module.RenderGUI()
             end
             ImGui.SetWindowFontScale(1)
         end
-        if StyleCountBreath > 0 then ImGui.PopStyleVar(StyleCountBreath) end
-        if ColorCountBreath > 0 then ImGui.PopStyleColor(ColorCountBreath) end
+        Module.ThemeLoader.EndTheme(ColorCountBreath, StyleCountBreath)
         ImGui.End()
     end
 
@@ -1049,18 +1078,16 @@ function Module.MainLoop()
     end
 
     local timeDiff = mq.gettime() - clockTimer
-    if timeDiff > 10 then
-        pulseIcon(pulseSpeed)
-        pulseCombat(combatPulseSpeed)
+    -- if timeDiff > 3 then
 
-        ---@diagnostic disable-next-line: undefined-field
-        breathPct = mq.TLO.Me.PctAirSupply() or 100
-        if breathPct < 100 then
-            breathBarShow = true
-        else
-            breathBarShow = false
-        end
+    ---@diagnostic disable-next-line: undefined-field
+    breathPct = mq.TLO.Me.PctAirSupply() or 100
+    if breathPct < 100 then
+        breathBarShow = true
+    else
+        breathBarShow = false
     end
+    -- end
 end
 
 function Module.LocalLoop()

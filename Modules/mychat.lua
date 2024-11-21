@@ -1471,10 +1471,10 @@ function Module.AddChannel(editChanID, isNewChannel)
         end
     end
 
+
     if Module.tempSettings.Channels[editChanID] then
         channelData = Module.tempSettings.Channels
-    elseif
-        isNewChannel then
+    else
         channelData = {
             [editChanID] = {
                 ['enabled'] = false,
@@ -2041,7 +2041,10 @@ function Module.Edit_GUI(open)
     if not open then Module.openEditGUI = false end
     if showEdit then
         ImGui.SetWindowFontScale(Module.Settings.Scale)
-        Module.AddChannel(editChanID, addChannel)
+
+        Module.createExternConsole(string.format("New Channel %s", editChanID))
+        Module.AddChannel(editChanID, false)
+
         ImGui.SameLine()
         -- Close Button
         if ImGui.Button('Close') then

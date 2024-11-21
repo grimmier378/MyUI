@@ -28,7 +28,6 @@ MyUI_Guild           = mq.TLO.Me.Guild()
 
 local MyActor        = MyUI_Actor.register('myui', function(message) end)
 local mods           = {}
-local Minimized      = false
 
 MyUI_InitPctComplete = 0
 MyUI_NumModsEnabled  = 0
@@ -57,6 +56,7 @@ local default_list   = {
 	"AlertMaster",
 	"ThemeZ",
 	"BigBag",
+	"XPTrack",
 }
 
 MyUI_DefaultConfig   = {
@@ -80,6 +80,8 @@ MyUI_DefaultConfig   = {
 		[13] = { name = 'AAParty', enabled = false, },
 		[14] = { name = 'AlertMaster', enabled = false, },
 		[15] = { name = 'ThemeZ', enabled = false, },
+		[16] = { name = 'BigBag', enabled = false, },
+		[17] = { name = 'XPTrack', enabled = false, },
 	},
 }
 MyUI_Settings        = {}
@@ -109,19 +111,21 @@ local function LoadSettings()
 	end
 
 	local newSetting = MyUI_Utils.CheckDefaultSettings(MyUI_DefaultConfig, MyUI_Settings)
-	newSetting = MyUI_Utils.CheckDefaultSettings(MyUI_DefaultConfig.mods_list, MyUI_Settings.mods_list) or newSetting
-	local found = false
-	for _, data in ipairs(MyUI_Settings.mods_list) do
-		if data.name == 'BigBag' then
-			found = true
-			break
+	-- newSetting = MyUI_Utils.CheckDefaultSettings(MyUI_DefaultConfig.mods_list, MyUI_Settings.mods_list) or newSetting
+	for _, v in pairs(default_list) do
+		local found = false
+		for _, data in ipairs(MyUI_Settings.mods_list) do
+			if data.name == v then
+				found = true
+				break
+			end
+		end
+		if not found then
+			table.insert(MyUI_Settings.mods_list, { name = v, enabled = false, })
+			newSetting = true
 		end
 	end
-	if not found then
-		table.insert(MyUI_Settings.mods_list, { name = 'BigBag', enabled = false, })
-		newSetting = true
-	end
-	Minimized = not MyUI_Settings.ShowMain
+
 	LoadTheme()
 	MyUI_ThemeName = MyUI_Settings.ThemeName
 	if newSetting then

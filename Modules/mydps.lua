@@ -717,6 +717,9 @@ local function DrawColorOptions()
 		end
 		ImGui.SeparatorText("Window Background Color")
 		settings.Options.bgColor = ImGui.ColorEdit4("Background Color", settings.Options.bgColor, bit32.bor(ImGuiColorEditFlags.NoInputs, ImGuiColorEditFlags.AlphaBar))
+		if tempSettings.bgColor ~= settings.Options.bgColor then
+			tempSettings.bgColor = settings.Options.bgColor
+		end
 		ImGui.SameLine()
 		ImGui.HelpMarker("Set the background color of the window.")
 		ImGui.SameLine()

@@ -1,6 +1,7 @@
 ---@diagnostic disable: inject-field, undefined-global
 local mq                = require('mq')
 local ImGui             = require('ImGui')
+local zep               = require('Zep')
 
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 local Module            = {}
@@ -53,6 +54,7 @@ Module.Settings          = {
 }
 Module.console           = nil
 Module.commandBuffer     = ''
+Module.commandHistory    = {}
 Module.timeStamps        = true
 Module.doLinks           = false
 -- Consoles
@@ -181,9 +183,10 @@ local function SetUpConsoles(channelID)
             },
         }
         Module.Consoles[channelID].CommandBuffer = ''
+        Module.Consoles[channelID].CommandHistory = {}
         Module.Consoles[channelID].txtAutoScroll = true
         -- ChatWin.Consoles[channelID].enableLinks = ChatWin.Settings[channelID].enableLinks
-        Module.Consoles[channelID].console = ImGui.ConsoleWidget.new(channelID .. "##Console")
+        Module.Consoles[channelID].console = zep.Console.new(channelID .. "##Console")
         -- Module.Consoles[channelID].console.fontSize = Module.Settings.Channels[channelID].FontSize or 16
     end
 end
@@ -194,7 +197,7 @@ local function ResetConsoles()
         SetUpConsoles(channelID)
     end
     Module.console = nil
-    Module.console = ImGui.ConsoleWidget.new("MainConsole")
+    Module.console = zep.Console.new("MainConsole")
 end
 
 ---Takes in a table and re-numbers the Indicies to be concurrent
@@ -874,120 +877,115 @@ function Module.EventChatSpam(channelID, line)
     end
 end
 
+local historyUpdated = false
+local focusKeyboard = false
 ------------------------------------------ GUI's --------------------------------------------
 local function DrawConsole(channelID)
-    local name = Module.Settings.Channels[channelID].Name .. '##' .. channelID
-    local zoom = Module.Consoles[channelID].zoom
-    -- local scale = Module.Settings.Channels[channelID].FontSize
-    local PopOut = Module.Settings.Channels[channelID].PopOut
-    -- if zoom and Module.Consoles[channelID].txtBuffer ~= '' then
-    --     local footerHeight = 35
-    --     local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
-    --     contentSizeY = contentSizeY - footerHeight
+    local settings = Module.Settings.Channels[channelID]
+    local console = Module.Consoles[channelID]
+    local name = settings.Name .. '##' .. channelID
+    local PopOut = settings.PopOut
 
-    --     if ImGui.BeginChild("ZoomScrollRegion##" .. channelID, contentSizeX, contentSizeY, ImGuiWindowFlags.HorizontalScrollbar) then
-    --         if ImGui.BeginTable('##channelID_' .. channelID, 1, bit32.bor(ImGuiTableFlags.NoBordersInBody, ImGuiTableFlags.RowBg)) then
-    --             ImGui.SetWindowFontScale(Module.Settings.Scale)
-    --             ImGui.TableSetupColumn("##txt" .. channelID, ImGuiTableColumnFlags.NoHeaderLabel)
-    --             --- draw rows ---
-
-    --             ImGui.TableNextRow()
-    --             ImGui.TableSetColumnIndex(0)
-    --             ImGui.SetWindowFontScale(scale)
-
-    --             for line, data in pairs(Module.Consoles[channelID].txtBuffer) do
-    --                 ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(data.color[1], data.color[2], data.color[3], data.color[4]))
-    --                 if ImGui.Selectable("##selectable" .. line, false, ImGuiSelectableFlags.None) then end
-    --                 ImGui.SameLine()
-    --                 ImGui.TextWrapped(data.text)
-    --                 if ImGui.IsItemHovered() and ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsKeyDown(ImGuiKey.C) then
-    --                     ImGui.LogToClipboard()
-    --                     ImGui.LogText(data.text)
-    --                     ImGui.LogFinish()
-    --                 end
-    --                 ImGui.TableNextRow()
-    --                 ImGui.TableSetColumnIndex(0)
-    --                 ImGui.PopStyleColor()
-    --             end
-
-
-
-    --             --Scroll to the bottom if autoScroll is enabled
-    --             local autoScroll = Module.Consoles[channelID].txtAutoScroll
-    --             if autoScroll then
-    --                 ImGui.SetScrollHereY()
-    --                 Module.Consoles[channelID].bottomPosition = ImGui.GetCursorPosY()
-    --             end
-
-    --             local bottomPosition = Module.Consoles[channelID].bottomPosition or 0
-    --             -- Detect manual scroll
-    --             local lastScrollPos = Module.Consoles[channelID].lastScrollPos or 0
-    --             local scrollPos = ImGui.GetScrollY()
-
-    --             if scrollPos < lastScrollPos then
-    --                 Module.Consoles[channelID].txtAutoScroll = false -- Turn off autoscroll if scrolled up manually
-    --             elseif scrollPos >= bottomPosition - (30 * scale) then
-    --                 Module.Consoles[channelID].txtAutoScroll = true
-    --             end
-
-    --             lastScrollPos = scrollPos
-    --             Module.Consoles[channelID].lastScrollPos = lastScrollPos
-
-    --             ImGui.EndTable()
-    --         end
-    --     end
-    --     ImGui.EndChild()
-    -- else
     local footerHeight = 35
     local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
     contentSizeY = contentSizeY - footerHeight
-    Module.Consoles[channelID].console:Render(ImVec2(0, contentSizeY))
-    -- end
-    --Command Line
+
+    -- Render console output
+    console.console:Render(ImVec2(0, contentSizeY))
+
+    -- Separator for command input
     ImGui.Separator()
-    local textFlags = bit32.bor(0,
-        ImGuiInputTextFlags.EnterReturnsTrue
-    -- not implemented yet
-    -- ImGuiInputTextFlags.CallbackCompletion,
-    -- ImGuiInputTextFlags.CallbackHistory
+
+    -- Input text field flags
+    local textFlags = bit32.bor(
+        ImGuiInputTextFlags.EnterReturnsTrue,
+        ImGuiInputTextFlags.CallbackCompletion,
+        ImGuiInputTextFlags.CallbackHistory
     )
-    local contentSizeX, _ = ImGui.GetContentRegionAvail()
+
+    -- Position and style adjustments
     ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
     ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 2)
-    ImGui.PushItemWidth(contentSizeX)
+    ImGui.PushItemWidth(ImGui.GetContentRegionAvail())
     ImGui.PushStyleColor(ImGuiCol.FrameBg, ImVec4(0, 0, 0, 0))
-    --ImGui.PushFont(ImGui.ConsoleFont)
+
+    -- Input text field
+    local cmdBuffer = settings.commandBuffer or ""
     local accept = false
-    local cmdBuffer = Module.Settings.Channels[channelID].commandBuffer
+    local posX, posY = ImGui.GetCursorPos()
     cmdBuffer, accept = ImGui.InputText('##Input##' .. name, cmdBuffer, textFlags)
-    --ImGui.PopFont()
     ImGui.PopStyleColor()
     ImGui.PopItemWidth()
+
+    -- Tooltip for additional console info
     if ImGui.IsItemHovered() then
         ImGui.BeginTooltip()
-        ImGui.Text(Module.Settings.Channels[channelID].Echo)
+        ImGui.Text(settings.Echo)
         if PopOut then
-            ImGui.Text(Module.Settings.Channels[channelID].Name)
-            local sizeBuff = string.format("Buffer Size: %s lines.", tostring(getNextID(Module.Consoles[channelID].txtBuffer) - 1))
-            ImGui.Text(sizeBuff)
+            ImGui.Text(settings.Name)
+            local bufferSize = string.format("Buffer Size: %s lines.", tostring(getNextID(console.txtBuffer) - 1))
+            ImGui.Text(bufferSize)
         end
         ImGui.EndTooltip()
     end
+
+    -- Handle command execution
     if accept then
         Module.ChannelExecCommand(cmdBuffer, channelID)
-        cmdBuffer = ''
-        Module.Settings.Channels[channelID].commandBuffer = cmdBuffer
-        setFocus = true
+        cmdBuffer = ""
+        settings.commandBuffer = cmdBuffer
+        ImGui.SetKeyboardFocusHere(-1) -- Reset focus for seamless interaction
     end
-    if Module.KeyFocus and not ImGui.IsItemFocused() and ImGui.IsKeyPressed(ImGuiKey[Module.KeyName]) then
-        setFocus = true
+
+    -- Draw the context menu for command history
+    if ImGui.BeginPopupContextItem("Command History##ContextMenu") then
+        if #Module.Consoles[channelID].CommandHistory > 0 then
+            ImGui.Text("Command History")
+            ImGui.Separator()
+
+            -- Display history in reverse order (latest command first)
+            for i = #Module.Consoles[channelID].CommandHistory, 1, -1 do
+                local command = Module.Consoles[channelID].CommandHistory[i]
+                if ImGui.Selectable(command) then
+                    -- Fill the input field with the selected command
+                    settings.commandBuffer = command
+                    cmdBuffer = command
+                    historyUpdated = true
+                end
+            end
+        else
+            ImGui.Text("No Command History")
+        end
+        ImGui.EndPopup()
     end
-    ImGui.SetItemDefaultFocus()
-    if setFocus then
-        setFocus = false
+
+    -- if ImGui.IsItemHovered() then
+    --     -- Navigate command history
+    --     if ImGui.IsKeyPressed(ImGuiKey.UpArrow) and ImGui.IsKeyDown(ImGuiMod.Ctrl) then
+    --         settings.commandBuffer = Module.NavigateCommandHistory(channelID, "up")
+    --         cmdBuffer = settings.commandBuffer
+    --         historyUpdated = true
+    --     end
+    --     if ImGui.IsKeyPressed(ImGuiKey.DownArrow) and ImGui.IsKeyDown(ImGuiMod.Ctrl) then
+    --         settings.commandBuffer = Module.NavigateCommandHistory(channelID, "down")
+    --         cmdBuffer = settings.commandBuffer
+    --         historyUpdated = true
+    --     end
+    -- end
+
+    if focusKeyboard then
+        local textSizeX, _ = ImGui.CalcTextSize(cmdBuffer)
+        ImGui.SetCursorPos(posX + textSizeX * ImGui.GetIO().FontGlobalScale, posY)
+        ImGui.SetKeyboardFocusHere(-1)
+        focusKeyboard = false
+    end
+
+    -- Keyboard focus handling
+    if Module.KeyFocus and ImGui.IsKeyPressed(ImGuiKey[Module.KeyName]) then
         ImGui.SetKeyboardFocusHere(-1)
     end
 end
+
 
 local function DrawChatWindow()
     -- Main menu bar
@@ -1197,10 +1195,10 @@ local function DrawChatWindow()
             --Command Line
             ImGui.Separator()
             local textFlags = bit32.bor(0,
-                ImGuiInputTextFlags.EnterReturnsTrue
-            -- not implemented yet
-            -- ImGuiInputTextFlags.CallbackCompletion,
-            -- ImGuiInputTextFlags.CallbackHistory
+                ImGuiInputTextFlags.EnterReturnsTrue,
+                -- not implemented yet
+                ImGuiInputTextFlags.CallbackCompletion,
+                ImGuiInputTextFlags.CallbackHistory
             )
 
             local contentSizeX, _ = ImGui.GetContentRegionAvail()
@@ -1208,10 +1206,10 @@ local function DrawChatWindow()
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 2)
             ImGui.PushItemWidth(contentSizeX)
             ImGui.PushStyleColor(ImGuiCol.FrameBg, ImVec4(0, 0, 0, 0))
-            --  ImGui.PushFont(ImGui.ConsoleFont)
+            ImGui.PushFont(ImGui.ConsoleFont)
             local accept = false
             Module.commandBuffer, accept = ImGui.InputText('##Input##' .. windowNum, Module.commandBuffer, textFlags)
-            -- ImGui.PopFont()
+            ImGui.PopFont()
             ImGui.PopStyleColor()
             ImGui.PopItemWidth()
             if accept then
@@ -1220,7 +1218,7 @@ local function DrawChatWindow()
                 setFocus = true
             end
             ImGui.SetItemDefaultFocus()
-            if Module.KeyFocus and not ImGui.IsItemFocused() and ImGui.IsKeyPressed(ImGuiKey[Module.KeyName]) then
+            if Module.KeyFocus and ImGui.IsKeyPressed(ImGuiKey[Module.KeyName]) then --and not ImGui.IsItemFocused()
                 setFocus = true
             end
             if setFocus then
@@ -1326,9 +1324,9 @@ local function DrawChatWindow()
 
                         ImGui.EndTabItem()
                     end
-                    if ImGui.IsItemHovered() then
-                        tabToolTip()
-                    end
+                    -- if ImGui.IsItemHovered() then
+                    --     tabToolTip()
+                    -- end
                 end
             end
         end
@@ -2062,6 +2060,54 @@ function Module.StringTrim(s)
     return s:gsub("^%s*(.-)%s*$", "%1")
 end
 
+function Module.InitCommandHistory(channelID)
+    local console = Module.Consoles[channelID]
+    if not console.CommandHistory then
+        console.CommandHistory = {}
+    end
+    if not console.HistoryIndex then
+        console.HistoryIndex = 0
+    end
+end
+
+-- Add command to history
+function Module.AddToCommandHistory(channelID, command)
+    Module.InitCommandHistory(channelID)
+    local console = Module.Consoles[channelID]
+    table.insert(console.CommandHistory, command)
+    -- Reset history index to avoid conflicts
+
+    while #console.CommandHistory > 10 do
+        table.remove(console.CommandHistory, 1) -- Remove the oldest command
+    end
+
+    console.HistoryIndex = #console.CommandHistory + 1
+end
+
+-- Navigate command history (up or down)
+function Module.NavigateCommandHistory(channelID, direction)
+    Module.InitCommandHistory(channelID)
+    local console = Module.Consoles[channelID]
+
+    if #console.CommandHistory == 0 then
+        return ""
+    end
+
+    -- Adjust history index based on direction
+    if direction == "up" then
+        console.HistoryIndex = math.max(1, console.HistoryIndex - 1)
+    elseif direction == "down" then
+        console.HistoryIndex = math.min(#console.CommandHistory + 1, console.HistoryIndex + 1)
+    end
+
+    -- Return the selected command or empty string if at the end
+    if console.HistoryIndex <= #console.CommandHistory then
+        return console.CommandHistory[console.HistoryIndex]
+    else
+        return ""
+    end
+end
+
 ---comments
 ---@param text string -- the incomming line of text from the command prompt
 function Module.ExecCommand(text)
@@ -2090,6 +2136,7 @@ function Module.ExecCommand(text)
         else
             Module.console:AppendText(IM_COL32(255, 0, 0), "Unknown command: '%s'", text)
         end
+        table.insert(Module.commandHistory, text)
     end
 end
 
@@ -2122,6 +2169,7 @@ function Module.ChannelExecCommand(text, channelID)
         else
             Module.console:AppendText(IM_COL32(255, 0, 0), "Unknown command: '%s'", text)
         end
+        Module.AddToCommandHistory(channelID, text)
     end
 end
 
@@ -2227,7 +2275,7 @@ local function init()
 
     -- initialize the console
     if Module.console == nil then
-        Module.console = ImGui.ConsoleWidget.new("Chat##Console")
+        Module.console = zep.Console.new("Chat##Console")
         -- Module.console.fontSize = Module.Settings.MainFontSize or 16
         mainBuffer = {
             [1] = {
@@ -2267,6 +2315,10 @@ function Module.MainLoop()
     if os.time() - lastTime > 5 then
         Module.SortChannels()
         lastTime = os.time()
+    end
+    if historyUpdated then
+        historyUpdated = false
+        focusKeyboard = true
     end
     mq.doevents()
 end

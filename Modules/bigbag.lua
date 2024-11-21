@@ -19,8 +19,6 @@ else
 	Module.Theme = MyUI_Theme
 	Module.ThemeLoader = MyUI_ThemeLoader
 end
-Module.ImgPath                                   = Module.Path .. "images/bag.png"
-local minImg                                     = mq.CreateTexture(Module.ImgPath)
 -- Constants
 local ICON_WIDTH                                 = 40
 local ICON_HEIGHT                                = 40
@@ -28,14 +26,16 @@ local COUNT_X_OFFSET                             = 39
 local COUNT_Y_OFFSET                             = 23
 local EQ_ICON_OFFSET                             = 500
 local BAG_ITEM_SIZE                              = 40
-local INVENTORY_DELAY_SECONDS                    = 2
+local INVENTORY_DELAY_SECONDS                    = 30
 local MIN_SLOTS_WARN                             = 3
 local FreeSlots                                  = 0
 local UsedSlots                                  = 0
+local do_process_coin                            = false
 local configFile                                 = string.format("%s/MyUI/BigBag/%s/%s.lua", mq.configDir, mq.TLO.EverQuest.Server(), mq.TLO.Me.Name())
 -- EQ Texture Animation references
 local animItems                                  = mq.FindTextureAnimation("A_DragItem")
 local animBox                                    = mq.FindTextureAnimation("A_RecessedBox")
+local animMini                                   = mq.FindTextureAnimation("A_DragItem")
 
 -- Toggles
 local toggleKey                                  = ''
@@ -45,18 +45,24 @@ local toggleMouse                                = 'Middle'
 -- Bag Contents
 local items                                      = {}
 local clickies                                   = {}
+local augments                                   = {}
 local needSort                                   = true
+local coin_type                                  = 0
+local coin_qty                                   = ''
 
 -- Bag Options
 local sort_order                                 = { name = false, stack = false, }
 local clicked                                    = false
 -- GUI Activities
 local show_item_background                       = true
+local show_qty_win                               = false
 local themeName                                  = "Default"
 local start_time                                 = os.time()
 local filter_text                                = ""
 local utils                                      = require('mq.Utils')
 local settings                                   = {}
+local MySelf                                     = mq.TLO.Me
+local myCopper, mySilver, myGold, myPlat         = 0, 0, 0, 0
 local defaults                                   = {
 	MIN_SLOTS_WARN = 3,
 	show_item_background = true,
@@ -113,6 +119,11 @@ local function loadSettings()
 		toggleModKey3 = 'None'
 		settings.toggleModKey3 = 'None'
 	end
+
+	myCopper = MySelf.Copper() or 0
+	mySilver = MySelf.Silver() or 0
+	myGold = MySelf.Gold() or 0
+	myPlat = MySelf.Platinum() or 0
 end
 
 local function help_marker(desc)
@@ -140,12 +151,136 @@ local function sort_inventory()
 	end
 end
 
+local function process_coin()
+	local coinSlot = string.format("InventoryWindow/IW_Money%s", coin_type)
+	mq.TLO.Window('InventoryWindow').DoOpen()
+	mq.delay(1500, function() return mq.TLO.Window('InventoryWindow').Open() end)
+	mq.TLO.Window(coinSlot).LeftMouseUp()
+	while mq.TLO.Window("QuantityWnd/QTYW_SliderInput").Text() ~= coin_qty do
+		mq.TLO.Window("QuantityWnd/QTYW_SliderInput").SetText(coin_qty)
+		mq.delay(200, function() return mq.TLO.Window("QuantityWnd/QTYW_SliderInput").Text() == coin_qty end)
+	end
+	while mq.TLO.Window("QuantityWnd").Open() do
+		mq.TLO.Window("QuantityWnd/QTYW_Accept_Button").LeftMouseUp()
+		mq.delay(200, function() return not mq.TLO.Window("QuantityWnd").Open() end)
+	end
+	mq.TLO.Window('InventoryWindow').DoClose()
+end
+
+local function draw_qty_win()
+	local label = ''
+	if show_qty_win then
+		local labelHint = "Available: "
+		if coin_type == 0 then
+			labelHint = labelHint .. myPlat
+			label = 'Plat'
+		elseif coin_type == 1 then
+			labelHint = labelHint .. myGold
+			label = 'Gold'
+		elseif coin_type == 2 then
+			labelHint = labelHint .. mySilver
+			label = 'Silver'
+		elseif coin_type == 3 then
+			labelHint = labelHint .. myCopper
+			label = 'Copper'
+		end
+		ImGui.SetNextWindowPos(ImGui.GetMousePosOnOpeningCurrentPopupVec(), ImGuiCond.Appearing)
+		local open, show = ImGui.Begin("Quantity##" .. coin_type, true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.NoDocking, ImGuiWindowFlags.AlwaysAutoResize))
+		if not open then
+			show_qty_win = false
+		end
+		if show then
+			ImGui.Text("Enter %s Qty", label)
+			ImGui.Separator()
+			coin_qty = ImGui.InputTextWithHint("##Qty", labelHint, coin_qty)
+			if ImGui.Button("OK##qty") then
+				show_qty_win = false
+				do_process_coin = true
+			end
+			ImGui.SameLine()
+			if ImGui.Button("Cancel##qty") then
+				show_qty_win = false
+			end
+		end
+		ImGui.End()
+	end
+end
+
+local function draw_currency()
+	animItems:SetTextureCell(644 - EQ_ICON_OFFSET)
+	ImGui.DrawTextureAnimation(animItems, 20, 20)
+	ImGui.SameLine()
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", myPlat)
+	if ImGui.IsItemHovered() then
+		ImGui.BeginTooltip()
+		ImGui.Text("%s Platinum", myPlat)
+		ImGui.EndTooltip()
+		if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
+			show_qty_win = true
+			coin_type = 0
+		end
+	end
+
+	ImGui.SameLine()
+
+	animItems:SetTextureCell(645 - EQ_ICON_OFFSET)
+	ImGui.DrawTextureAnimation(animItems, 20, 20)
+	ImGui.SameLine()
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", myGold)
+	if ImGui.IsItemHovered() then
+		ImGui.BeginTooltip()
+		ImGui.Text("%s Gold", myGold)
+		ImGui.EndTooltip()
+		if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
+			show_qty_win = true
+			coin_type = 1
+		end
+	end
+
+	ImGui.SameLine()
+
+	animItems:SetTextureCell(646 - EQ_ICON_OFFSET)
+	ImGui.DrawTextureAnimation(animItems, 20, 20)
+	ImGui.SameLine()
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", mySilver)
+	if ImGui.IsItemHovered() then
+		ImGui.BeginTooltip()
+		ImGui.Text("%s Silver", mySilver)
+		ImGui.EndTooltip()
+		if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
+			show_qty_win = true
+			coin_type = 2
+		end
+	end
+
+	ImGui.SameLine()
+
+	animItems:SetTextureCell(647 - EQ_ICON_OFFSET)
+	ImGui.DrawTextureAnimation(animItems, 20, 20)
+	ImGui.SameLine()
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", myCopper)
+	if ImGui.IsItemHovered() then
+		ImGui.BeginTooltip()
+		ImGui.Text("%s Copper", myCopper)
+		ImGui.EndTooltip()
+		if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
+			show_qty_win = true
+			coin_type = 3
+		end
+	end
+end
+
 -- The beast - this routine is what builds our inventory.
 local function create_inventory()
 	if ((os.difftime(os.time(), start_time)) > INVENTORY_DELAY_SECONDS) or mq.TLO.Me.FreeInventory() ~= FreeSlots or clicked then
 		start_time = os.time()
 		items = {}
 		clickies = {}
+		augments = {}
+		myCopper = MySelf.Copper() or 0
+		mySilver = MySelf.Silver() or 0
+		myGold = MySelf.Gold() or 0
+		myPlat = MySelf.Platinum() or 0
 		local tmpUsedSlots = 0
 		for i = 1, 22, 1 do
 			local slot = mq.TLO.Me.Inventory(i)
@@ -165,6 +300,9 @@ local function create_inventory()
 						if slot.Item(j).Clicky() then
 							table.insert(clickies, slot.Item(j))
 						end
+						if slot.Item(j).AugType() > 0 then
+							table.insert(augments, slot.Item(j))
+						end
 					end
 				end
 			elseif slot.ID() ~= nil then
@@ -172,6 +310,9 @@ local function create_inventory()
 				tmpUsedSlots = tmpUsedSlots + 1
 				if slot.Clicky() then
 					table.insert(clickies, slot)
+				end
+				if slot.AugType() > 0 then
+					table.insert(augments, slot)
 				end
 			end
 		end
@@ -435,14 +576,14 @@ local function draw_item_icon(item, iconWidth, iconHeight)
 		ImGui.SetCursorPos((cursor_x + offsetX) - TextSize, cursor_y + offsetY)
 		ImGui.DrawTextureAnimation(animBox, TextSize, 4)
 		ImGui.SetCursorPos((cursor_x + offsetX) - TextSize, cursor_y + offsetY)
-		ImGui.TextColored(ImVec4(0, 1, 1, 1), item.Stack())
+		ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", item.Stack())
 	end
 	local TextSize2 = ImGui.CalcTextSize(tostring(item.Charges()))
 	if item.Charges() >= 1 then
 		ImGui.SetCursorPos((cursor_x + offsetXCharges), cursor_y + offsetYCharges)
 		ImGui.DrawTextureAnimation(animBox, TextSize2, 4)
 		ImGui.SetCursorPos((cursor_x + offsetXCharges), cursor_y + offsetYCharges)
-		ImGui.TextColored(ImVec4(1, 1, 0, 1), item.Charges())
+		ImGui.TextColored(ImVec4(1, 1, 0, 1), "%s", item.Charges())
 	end
 	ImGui.SetWindowFontScale(1.0)
 
@@ -497,17 +638,6 @@ local function draw_item_icon(item, iconWidth, iconHeight)
 	elseif ImGui.IsItemClicked(ImGuiMouseButton.Right) then
 		mq.cmdf('/useitem "%s"', item.Name())
 		clicked = true
-	end
-	local function mouse_over_bag_window()
-		local window_x, window_y = ImGui.GetWindowPos()
-		local mouse_x, mouse_y = ImGui.GetMousePos()
-		local window_size_x, window_size_y = ImGui.GetWindowSize()
-		return (mouse_x > window_x and mouse_y > window_y) and (mouse_x < window_x + window_size_x and mouse_y < window_y + window_size_y)
-	end
-
-	-- Autoinventory any items on the cursor if you click in the bag UI
-	if ImGui.IsMouseClicked(ImGuiMouseButton.Left) and mq.TLO.Cursor() and mouse_over_bag_window() then
-		mq.cmd("/autoinventory")
 	end
 end
 
@@ -580,9 +710,31 @@ local function display_clickies()
 	ImGui.PopStyleVar()
 end
 
+local function display_augments()
+	ImGui.SetWindowFontScale(1.0)
+
+	ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
+	local bag_window_width = ImGui.GetWindowWidth()
+	local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
+	local temp_bag_cols = 1
+
+	for index, _ in ipairs(augments) do
+		if string.match(string.lower(augments[index].Name()), string.lower(filter_text)) then
+			draw_item_icon(augments[index], ICON_WIDTH, ICON_HEIGHT)
+			if bag_cols > temp_bag_cols then
+				temp_bag_cols = temp_bag_cols + 1
+				ImGui.SameLine()
+			else
+				temp_bag_cols = 1
+			end
+		end
+	end
+	ImGui.PopStyleVar()
+end
+
 local function display_details()
 	ImGui.SetWindowFontScale(1.0)
-	if ImGui.BeginTable("Details", 7, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.ScrollY, ImGuiTableFlags.Resizable, ImGuiTableFlags.Hideable, ImGuiTableFlags.Reorderable)) then
+	if ImGui.BeginTable("Details", 8, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.ScrollY, ImGuiTableFlags.Resizable, ImGuiTableFlags.Hideable, ImGuiTableFlags.Reorderable)) then
 		ImGui.TableSetupColumn('Icon', ImGuiTableColumnFlags.WidthStretch)
 		ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthFixed, 100)
 		ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthStretch)
@@ -590,6 +742,7 @@ local function display_details()
 		ImGui.TableSetupColumn('Worn EFX', ImGuiTableColumnFlags.WidthStretch)
 		ImGui.TableSetupColumn('Clicky', ImGuiTableColumnFlags.WidthStretch)
 		ImGui.TableSetupColumn('Charges', ImGuiTableColumnFlags.WidthStretch)
+		ImGui.TableSetupColumn('Augment', ImGuiTableColumnFlags.WidthStretch)
 		ImGui.TableSetupScrollFreeze(0, 1)
 		ImGui.TableHeadersRow()
 		for index, _ in ipairs(items) do
@@ -628,6 +781,12 @@ local function display_details()
 				ImGui.TextColored(ImVec4(0, 1, 1, 1), clicky)
 				ImGui.TableNextColumn()
 				ImGui.Text("%s", lbl)
+				ImGui.TableNextColumn()
+				if item.AugType() > 0 then
+					ImGui.TextColored(ImVec4(0, 1, 0, 1), 'Yes')
+				else
+					ImGui.Text('No')
+				end
 			end
 		end
 		ImGui.EndTable()
@@ -664,24 +823,26 @@ end
 local function renderBtn()
 	-- apply_style()
 	local colorCount, styleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
-	if FreeSlots > MIN_SLOTS_WARN then
-		ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetStyleColor(ImGuiCol.Button))
-		ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImGui.GetStyleColor(ImGuiCol.ButtonHovered))
-	else
-		ImGui.PushStyleColor(ImGuiCol.Button, 1.000, 0.354, 0.0, 0.2)
-		ImGui.PushStyleColor(ImGuiCol.ButtonHovered, 1.000, 0.204, 0.0, 0.4)
-	end
+
 	local openBtn, showBtn = ImGui.Begin(string.format("Big Bag##Mini"), true, bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoCollapse))
 	if not openBtn then
 		showBtn = false
 	end
 
 	if showBtn then
-		if ImGui.ImageButton("BigBag##btn", minImg:GetTextureID(), ImVec2(30, 30)) then
-			Module.ShowGUI = not Module.ShowGUI
+		if FreeSlots > MIN_SLOTS_WARN then
+			animMini:SetTextureCell(3635 - EQ_ICON_OFFSET)
+			ImGui.DrawTextureAnimation(animMini, 34, 34, true)
+		else
+			animMini:SetTextureCell(3632 - EQ_ICON_OFFSET)
+			ImGui.DrawTextureAnimation(animMini, 34, 34, true)
 		end
+
 		if ImGui.IsItemHovered() then
 			BigButtonTooltip()
+			if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
+				Module.ShowGUI = not Module.ShowGUI
+			end
 		end
 
 		if toggleMouse ~= 'None' then
@@ -727,28 +888,71 @@ local function RenderTabs()
 		ImGui.Text(string.format("Used/Free Slots "))
 		ImGui.SameLine()
 		ImGui.TextColored(FreeSlots > MIN_SLOTS_WARN and ImVec4(0.354, 1.000, 0.000, 0.500) or ImVec4(1.000, 0.354, 0.0, 0.5), "(%s/%s)", UsedSlots, FreeSlots)
-		if ImGui.BeginTabBar("BagTabs") then
-			if ImGui.BeginTabItem("Items") then
-				display_bag_content()
-				ImGui.EndTabItem()
+
+		draw_currency()
+
+		ImGui.SeparatorText('Inventory / Destroy Area')
+		local sizeX = ImGui.GetWindowWidth()
+
+		if ImGui.BeginChild('CoinArea', ImVec2((sizeX / 2) - 10, 40), ImGuiChildFlags.Border) then
+			ImGui.TextDisabled("Inventory Coin/Item")
+		end
+		ImGui.EndChild()
+		if ImGui.IsItemHovered() and ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
+			mq.cmd("/autoinventory")
+		end
+
+		ImGui.SameLine()
+
+		ImGui.PushStyleColor(ImGuiCol.ChildBg, ImVec4(0.2, 0, 0, 1))
+		if ImGui.BeginChild('DestroyArea', ImVec2((sizeX / 2) - 15, 40), ImGuiChildFlags.Border) then
+			ImGui.TextDisabled("Destroy Item")
+		end
+		ImGui.EndChild()
+		ImGui.PopStyleColor()
+		if ImGui.IsItemHovered() and mq.TLO.Cursor() then
+			if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
+				mq.cmd("/destroy")
 			end
-			if ImGui.BeginTabItem('Clickies') then
-				display_clickies()
-				ImGui.EndTabItem()
+		end
+
+		ImGui.Separator()
+		if ImGui.BeginChild("BagTabs") then
+			if ImGui.BeginTabBar("##BagTabs") then
+				if ImGui.BeginTabItem("Items") then
+					display_bag_content()
+					ImGui.EndTabItem()
+				end
+				if ImGui.BeginTabItem('Clickies') then
+					display_clickies()
+					ImGui.EndTabItem()
+				end
+				if ImGui.BeginTabItem('Augments') then
+					display_augments()
+					ImGui.EndTabItem()
+				end
+				if ImGui.BeginTabItem('Details') then
+					display_details()
+					ImGui.EndTabItem()
+				end
+				if ImGui.BeginTabItem('Settings') then
+					display_bag_options()
+					ImGui.EndTabItem()
+				end
+				ImGui.EndTabBar()
 			end
-			if ImGui.BeginTabItem('Details') then
-				display_details()
-				ImGui.EndTabItem()
+		end
+		ImGui.EndChild()
+		if ImGui.IsItemHovered() and mq.TLO.Cursor() then
+			-- Autoinventory any items on the cursor if you click in the bag UI
+			if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
+				mq.cmd("/autoinventory")
 			end
-			if ImGui.BeginTabItem('Settings') then
-				display_bag_options()
-				ImGui.EndTabItem()
-			end
-			ImGui.EndTabBar()
 		end
 
 		display_item_on_cursor()
 	end
+	ImGui.SetWindowFontScale(1)
 	Module.ThemeLoader.EndTheme(colorCount, styleCount)
 	ImGui.End()
 end
@@ -760,6 +964,8 @@ function Module.RenderGUI()
 	end
 
 	renderBtn()
+
+	draw_qty_win()
 end
 
 local function init()
@@ -803,6 +1009,10 @@ function Module.MainLoop()
 	if needSort then
 		sort_inventory()
 		needSort = false
+	end
+	if do_process_coin then
+		process_coin()
+		do_process_coin = false
 	end
 end
 

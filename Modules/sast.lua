@@ -49,12 +49,13 @@ local function checkAdv()
 end
 
 local function checkExp()
-	if ExpWIN.Child('DZ_CurrentDZValue').Text() ~= '' then
+	local checkText = ExpWIN.Child('DZ_CurrentDZValue').Text() or ''
+	if checkText ~= '' then
 		exp = true
-		return string.format(ExpWIN.Child('DZ_CurrentDZValue').Text())
+		return checkText
 	else
 		exp = false
-		return tostring('No Expedition Started')
+		return 'No Expedition Started'
 	end
 end
 

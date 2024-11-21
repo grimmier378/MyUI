@@ -458,6 +458,11 @@ local function loadSettings()
     if Module.Settings.mainEcho == nil then
         Module.Settings.mainEcho = '/say'
     end
+
+    if Module.Settings.MainFontSize == nil then
+        Module.Settings.MainFontSize = 16
+    end
+
     eChan = Module.Settings.mainEcho
     Module.Settings.doLinks = true
     forceIndex = false
@@ -1184,20 +1189,6 @@ local function DrawChatWindow()
 
                 ImGui.EndPopup()
             end
-            if not zoomMain then
-                Module.console:Render(ImVec2(0, contentSizeY))
-                --Command Line
-                ImGui.Separator()
-                local textFlags = bit32.bor(0,
-                    ImGuiInputTextFlags.EnterReturnsTrue
-                -- not implemented yet
-                -- ImGuiInputTextFlags.CallbackCompletion,
-                -- ImGuiInputTextFlags.CallbackHistory
-                )
-            else
-                footerHeight = 35
-                contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
-                contentSizeY = contentSizeY - footerHeight
 
             Module.console:Render(ImVec2(0, contentSizeY))
             -- Module.console.fontSize = Module.Settings.MainFontSize or 16
@@ -1209,6 +1200,7 @@ local function DrawChatWindow()
                 ImGuiInputTextFlags.CallbackCompletion,
                 ImGuiInputTextFlags.CallbackHistory
             )
+
             local contentSizeX, _ = ImGui.GetContentRegionAvail()
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 2)

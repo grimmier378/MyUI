@@ -685,7 +685,6 @@ function Module.EventChat(channelID, eventName, line, spam)
                             end
                         elseif string.find(fString, 'N3') then
                             local npc, npcName = CheckNPC(line)
-                            print(npcName)
                             if npc then
                                 fString = string.gsub(fString, 'N3', npcName or 'None')
                             end

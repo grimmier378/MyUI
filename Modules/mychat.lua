@@ -574,6 +574,8 @@ local function CheckNPC(line)
         name = string.sub(line, 1, string.find(line, "says") - 2)
     elseif string.find(line, "whispers,") then
         name = string.sub(line, 1, string.find(line, "whispers") - 2)
+    elseif string.find(line, "says to you,") then
+        name = string.sub(line, 1, string.find(line, "says to you") - 2)
     elseif string.find(line, "shouts,") then
         name = string.sub(line, 1, string.find(line, "shouts") - 2)
     elseif string.find(line, "slashes") then
@@ -683,7 +685,7 @@ function Module.EventChat(channelID, eventName, line, spam)
                             end
                         elseif string.find(fString, 'N3') then
                             local npc, npcName = CheckNPC(line)
-                            -- print(npcName)
+                            print(npcName)
                             if npc then
                                 fString = string.gsub(fString, 'N3', npcName or 'None')
                             end
@@ -1622,7 +1624,7 @@ function Module.AddChannel(editChanID, isNewChannel)
         Module.tempFiltColors[editChanID] = nil
         Module.tempFilterStrings[editChanID] = nil
 
-        isNewChannel = true
+        isNewChannel = false
         ResetEvents()
         resetEvnts = true
         Module.openEditGUI = false

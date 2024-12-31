@@ -660,7 +660,6 @@ local function DrawInspectableSpellIcon(iconID, spell, slotNum, view)
     if iconID == 0 and view ~= 'table' then
         ImGui.SetWindowFontScale(1)
         ImGui.TextDisabled("%d", slotNum)
-        ImGui.SetWindowFontScale(1)
         ImGui.PushID(tostring(iconID) .. slotNum .. "_invis_btn")
         ImGui.SetCursorPos(cursor_x, cursor_y)
         ImGui.InvisibleButton("slot" .. tostring(slotNum), ImVec2(Module.iconSize, Module.iconSize), bit32.bor(ImGuiButtonFlags.MouseButtonRight))
@@ -699,6 +698,7 @@ local function BoxBuffs(id, sorted, view)
     local boxBuffs = (sorted == 'alpha' and Module.boxes[id].SortedBuffsA) or (sorted == 'dur' and Module.boxes[id].SortedBuffsD) or Module.boxes[id].Buffs
     local buffSlots = Module.boxes[id].BuffSlots or 0
     local sizeX, sizeY = ImGui.GetContentRegionAvail()
+    local rowMax = math.floor(ImGui.GetColumnWidth(-1) / (Module.iconSize)) or 1
 
     -------------------------------------------- Buffs Section ---------------------------------
     if not Module.SplitWin then sizeY = math.floor(sizeY * 0.7) else sizeY = 0.0 end
@@ -707,11 +707,11 @@ local function BoxBuffs(id, sorted, view)
     elseif view ~= 'table' and Module.ShowScroll then
         ImGui.BeginChild("Buffs##" .. boxChar .. view, ImVec2(sizeX, sizeY), ImGuiChildFlags.Border)
     elseif view == 'table' then
-        ImGui.BeginChild("Buffs##" .. boxChar, ImVec2(ImGui.GetColumnWidth(-1), 0.0), bit32.bor(ImGuiChildFlags.AutoResizeY, ImGuiChildFlags.AlwaysAutoResize),
+        ImGui.BeginChild("Buffs##" .. boxChar, ImVec2(ImGui.GetColumnWidth(-1), 0.0),
+            bit32.bor(ImGuiChildFlags.AutoResizeY, ImGuiChildFlags.AlwaysAutoResize),
             bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.AlwaysAutoResize))
     end
     local startNum, slot = 1, 1
-    local rowMax = math.floor(ImGui.GetColumnWidth(-1) / (Module.iconSize)) or 1
     local rowCount = 0
 
     for i = startNum, buffSlots do
@@ -836,7 +836,7 @@ local function BoxBuffs(id, sorted, view)
             end
             ImGui.EndTooltip()
         end
-        if view == 'table' and drawn then
+        if view == 'table' and drawn and boxBuffs[i] ~= nil then
             if rowCount < rowMax then
                 ImGui.SameLine(0, 0.5)
             else
@@ -855,6 +855,8 @@ local function BoxSongs(id, sorted, view)
     local boxChar = Module.boxes[id].Name or '?'
     local boxSongs = (sorted == 'alpha' and Module.boxes[id].SortedSongsA) or (sorted == 'dur' and Module.boxes[id].SortedSongsD) or Module.boxes[id].Songs
     local sCount = Module.boxes[id].SongCount or 0
+    local maxSongRow = math.floor(ImGui.GetColumnWidth(-1) / (Module.iconSize)) or 1
+
     local sizeX, sizeY = ImGui.GetContentRegionAvail()
     sizeX, sizeY = math.floor(sizeX), 0.0
 
@@ -864,11 +866,11 @@ local function BoxSongs(id, sorted, view)
     elseif view ~= 'table' and not Module.ShowScroll then
         ImGui.BeginChild("Songs##" .. boxChar, ImVec2(sizeX, sizeY), ImGuiChildFlags.Border, ImGuiWindowFlags.NoScrollbar)
     elseif view == 'table' then
-        ImGui.BeginChild("Songs##" .. boxChar, ImVec2(ImGui.GetColumnWidth(-1), 0.0), bit32.bor(ImGuiChildFlags.AutoResizeY, ImGuiChildFlags.AlwaysAutoResize),
+        ImGui.BeginChild("Songs##" .. boxChar, ImVec2(ImGui.GetColumnWidth(-1), 0.0),
+            bit32.bor(ImGuiChildFlags.AutoResizeY, ImGuiChildFlags.AlwaysAutoResize),
             bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.AlwaysAutoResize))
     end
     local rowCounterS = 0
-    local maxSongRow = math.floor(ImGui.GetColumnWidth(-1) / (Module.iconSize)) or 1
     local counterSongs = 0
     for i = 1, maxSongs do
         if counterSongs > sCount then break end
@@ -913,7 +915,6 @@ local function BoxSongs(id, sorted, view)
                         DrawInspectableSpellIcon(boxSongs[i].Icon, boxSongs[i], i, view)
                         rowCounterS = rowCounterS + 1
                     end
-
                     counterSongs = counterSongs + 1
                 end
             end
@@ -974,7 +975,7 @@ local function BoxSongs(id, sorted, view)
             end
             ImGui.EndTooltip()
         end
-        if view == 'table' then
+        if view == 'table' and boxSongs[i] ~= nil then
             if rowCounterS < maxSongRow then
                 ImGui.SameLine(0, 0.5)
             else

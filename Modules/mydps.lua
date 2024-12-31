@@ -31,6 +31,12 @@ local damTable, settings = {}, {}
 local winFlags = bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoTitleBar)
 local started = false
 local clickThrough = false
+local showDataWin = false
+local dataWinData = {
+	data = {},
+	seq = nil,
+	labelName = nil,
+}
 local tableSize = 0
 local sequenceCounter, battleCounter = 0, 0
 local dpsStartTime = os.time()
@@ -593,6 +599,82 @@ local color = {
 	white  = ImVec4(1, 1, 1, 1),
 }
 
+local function ShowData(labelName, data, seq)
+	if not showDataWin then return end
+	local open, show = ImGui.Begin("Battle Details", true, ImGuiWindowFlags.AlwaysAutoResize)
+	if not open then
+		dataWinData = {
+			data = {},
+			seq = nil,
+			labelName = nil,
+		}
+		showDataWin = false
+	end
+	if show then
+		ImGui.Text("Battle Details %s", labelName)
+		ImGui.Separator()
+		ImGui.BeginTable("Battle Details", 2, ImGuiTableFlags.Borders)
+		ImGui.TableNextRow()
+
+		ImGui.TableNextColumn()
+		ImGui.Text("Name:")
+
+		ImGui.TableNextColumn()
+		ImGui.TextColored(color.yellow, " %s", labelName)
+
+		ImGui.TableNextColumn()
+		ImGui.Text("Battle:")
+
+		ImGui.TableNextColumn()
+		ImGui.TextColored(color.teal, "%s", seq)
+
+		ImGui.TableNextColumn()
+		ImGui.Text("Duration:")
+
+		ImGui.TableNextColumn()
+		ImGui.TextColored(color.orange, "%s", cleanNumber(data.dur, 0, true))
+
+		ImGui.TableNextColumn()
+		ImGui.Text("DPS:")
+
+		ImGui.TableNextColumn()
+		ImGui.TextColored(color.green, "%s", cleanNumber(data.dps, 1, true))
+
+		ImGui.TableNextColumn()
+		ImGui.Text("Avg Dmg:")
+
+		ImGui.TableNextColumn()
+		ImGui.TextColored(color.red, "%s", cleanNumber(data.avg, 1, true))
+
+		ImGui.TableNextColumn()
+		ImGui.Text("Crit Dmg:")
+
+		ImGui.TableNextColumn()
+		ImGui.TextColored(color.yellow, "%s", cleanNumber(data.crit, 2))
+
+		ImGui.TableNextColumn()
+		ImGui.Text("Dots:")
+
+		ImGui.TableNextColumn()
+		ImGui.TextColored(color.orange, "%s", cleanNumber(data.dot, 2))
+
+		ImGui.TableNextColumn()
+		ImGui.Text("Crit Heals:")
+
+		ImGui.TableNextColumn()
+		ImGui.TextColored(color.teal, "%s", cleanNumber(data.critHeals, 1))
+
+		ImGui.TableNextColumn()
+		ImGui.Text("Total Damage:")
+
+		ImGui.TableNextColumn()
+		ImGui.TextColored(color.orange, "%s", cleanNumber(data.dmg, 2))
+
+		ImGui.EndTable()
+	end
+	ImGui.End()
+end
+
 local function DrawHistory(tbl)
 	if settings.Options.showHistory ~= tempSettings.showHistory then
 		settings.Options.showHistory = tempSettings.showHistory
@@ -622,21 +704,22 @@ local function DrawHistory(tbl)
 				local textColor = color.white
 				ImGui.TableNextRow()
 				ImGui.TableNextColumn()
-				textColor = data.name == Module.CharLoaded and color.teal or color.white
-				ImGui.TextColored(textColor, "%s", data.name ~= nil and data.name or Module.CharLoaded)
-				if ImGui.IsItemHovered() then
-					ImGui.SetTooltip("Name: %s\nBattle: %s\nDPS: %s\nDuration: %s\nAverage: %s\nCrit Dmg: %s\nDots: %s\nCrit Heals: %s\nTotal: %s",
-						data.name, seq, cleanNumber(data.dps, 1, true), data.dur, cleanNumber(data.avg, 1, true), cleanNumber(data.crit, 2),
-						cleanNumber(data.dot, 2), cleanNumber(data.critHeals, 1), cleanNumber(data.dmg, 2))
+				local labelName = data.name ~= nil and data.name or Module.CharLoaded
+				textColor = labelName == Module.CharLoaded and color.teal or color.white
+				ImGui.PushStyleColor(ImGuiCol.Text, textColor)
+				local selected, pressed = false, false
+				selected, pressed = ImGui.Selectable(labelName, selected, ImGuiSelectableFlags.SpanAllColumns)
+				if pressed then
+					showDataWin = false
+					dataWinData["data"] = data
+					dataWinData["seq"] = seq
+					dataWinData['labelName'] = labelName
+					showDataWin = true
 				end
+				ImGui.PopStyleColor()
 				ImGui.TableNextColumn()
 				textColor = seq == "Current" and color.yellow or color.orange
 				ImGui.TextColored(textColor, "%s", seq)
-				if ImGui.IsItemHovered() then
-					ImGui.SetTooltip("Name: %s\nBattle: %s\nDPS: %s\nDuration: %s\nAverage: %s\nCrit Dmg: %s\nDots: %s\nCrit Heals: %s\nTotal: %s",
-						data.name, seq, cleanNumber(data.dps, 1, true), data.dur, cleanNumber(data.avg, 1, true), cleanNumber(data.crit, 2),
-						cleanNumber(data.dot, 2), cleanNumber(data.critHeals, 1), cleanNumber(data.dmg, 2))
-				end
 				ImGui.TableNextColumn()
 				ImGui.Text(cleanNumber(data.dps, 1, true))
 				ImGui.TableNextColumn()
@@ -651,11 +734,6 @@ local function DrawHistory(tbl)
 				ImGui.Text(cleanNumber(data.critHeals, 1))
 				ImGui.TableNextColumn()
 				ImGui.Text(cleanNumber(data.dmg, 2))
-				if ImGui.IsItemHovered() then
-					ImGui.SetTooltip("Name: %s\nBattle: %s\nDPS: %s\nDuration: %s\nAverage: %s\nCrit Dmg: %s\nDots: %s\nCrit Heals: %s\nTotal: %s",
-						data.name, seq, cleanNumber(data.dps, 1, true), data.dur, cleanNumber(data.avg, 1, true), cleanNumber(data.crit, 2),
-						cleanNumber(data.dot, 2), cleanNumber(data.critHeals, 1), cleanNumber(data.dmg, 2))
-				end
 			end
 			ImGui.EndTable()
 		end
@@ -959,6 +1037,10 @@ function Module.RenderGUI()
 		end
 		Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
 		ImGui.End()
+	end
+
+	if showDataWin and dataWinData.labelName ~= nil then
+		ShowData(dataWinData.labelName, dataWinData.data, dataWinData.seq)
 	end
 end
 
@@ -1564,7 +1646,6 @@ function Module.MainLoop()
 		actorsWorking = sortTable(actorsTable, 'party')
 		firstRun = false
 	end
-
 	-- if tempSettings.sortParty then
 	actorsWorking = sortTable(actorsTable, 'party')
 	-- else

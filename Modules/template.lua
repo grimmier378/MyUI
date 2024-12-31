@@ -68,7 +68,7 @@ if not loadedExeternally then
 	MyUI_CharLoaded  = mq.TLO.Me.DisplayName()
 	MyUI_Server      = mq.TLO.EverQuest.Server()
 	MyUI_Build       = mq.TLO.MacroQuest.BuildName()
-	MyUI_Guild       = mq.TLO.Me.Guild()
+	MyUI_Guild       = mq.TLO.Me.Guild() or "none"
 end
 
 

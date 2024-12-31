@@ -24,7 +24,7 @@ MyUI_Grimmier_Img    = MyUI_Utils.SetImage(MyUI_Path .. "images/GrimGUI.png")
 MyUI_CharLoaded      = mq.TLO.Me.DisplayName()
 MyUI_Server          = mq.TLO.EverQuest.Server()
 MyUI_Build           = mq.TLO.MacroQuest.BuildName()
-MyUI_Guild           = mq.TLO.Me.Guild()
+MyUI_Guild           = mq.TLO.Me.Guild() or "none"
 
 local MyActor        = MyUI_Actor.register('myui', function(message) end)
 local mods           = {}
@@ -453,6 +453,7 @@ end
 
 local function MyUI_Main()
 	while MyUI_IsRunning do
+		if mq.TLO.EverQuest.GameState() ~= "INGAME" then mq.exit() end
 		mq.doevents()
 		ProcessModuleChanges()
 		for idx, data in ipairs(MyUI_Settings.mods_list) do

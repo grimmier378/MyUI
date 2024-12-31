@@ -58,6 +58,7 @@ local show_item_background                       = true
 local show_qty_win                               = false
 local themeName                                  = "Default"
 local start_time                                 = os.time()
+local coin_timer                                 = os.time()
 local filter_text                                = ""
 local utils                                      = require('mq.Utils')
 local settings                                   = {}
@@ -165,6 +166,7 @@ local function process_coin()
 		mq.delay(200, function() return not mq.TLO.Window("QuantityWnd").Open() end)
 	end
 	mq.TLO.Window('InventoryWindow').DoClose()
+	coin_qty = ''
 end
 
 local function draw_qty_win()
@@ -270,6 +272,13 @@ local function draw_currency()
 	end
 end
 
+local function UpdateCoin()
+	myCopper = MySelf.Copper() or 0
+	mySilver = MySelf.Silver() or 0
+	myGold = MySelf.Gold() or 0
+	myPlat = MySelf.Platinum() or 0
+end
+
 -- The beast - this routine is what builds our inventory.
 local function create_inventory()
 	if ((os.difftime(os.time(), start_time)) > INVENTORY_DELAY_SECONDS) or mq.TLO.Me.FreeInventory() ~= FreeSlots or clicked then
@@ -277,10 +286,6 @@ local function create_inventory()
 		items = {}
 		clickies = {}
 		augments = {}
-		myCopper = MySelf.Copper() or 0
-		mySilver = MySelf.Silver() or 0
-		myGold = MySelf.Gold() or 0
-		myPlat = MySelf.Platinum() or 0
 		local tmpUsedSlots = 0
 		for i = 1, 22, 1 do
 			local slot = mq.TLO.Me.Inventory(i)
@@ -823,7 +828,7 @@ end
 local function renderBtn()
 	-- apply_style()
 	local colorCount, styleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
-
+	ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, ImVec2(9, 9))
 	local openBtn, showBtn = ImGui.Begin(string.format("Big Bag##Mini"), true, bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoCollapse))
 	if not openBtn then
 		showBtn = false
@@ -868,7 +873,7 @@ local function renderBtn()
 			end
 		end
 	end
-
+	ImGui.PopStyleVar()
 	Module.ThemeLoader.EndTheme(colorCount, styleCount)
 	ImGui.End()
 end
@@ -1013,6 +1018,10 @@ function Module.MainLoop()
 	if do_process_coin then
 		process_coin()
 		do_process_coin = false
+	end
+	if os.time() - coin_timer > 2 then
+		UpdateCoin()
+		coin_timer = os.time()
 	end
 end
 

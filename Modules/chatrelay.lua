@@ -20,7 +20,7 @@ if not loadedExeternally then
     Module.ThemeLoader = require('lib.theme_loader')
     Module.Actor       = require('actors')
     Module.CharLoaded  = mq.TLO.Me.DisplayName()
-    Module.Guild       = mq.TLO.Me.Guild()
+    Module.Guild       = mq.TLO.Me.Guild() or "none"
     Module.Server      = mq.TLO.MacroQuest.Server()
     Module.Mode        = 'driver'
     Module.ThemeFile   = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
@@ -64,9 +64,9 @@ local defaults                          = {
     AutoSize         = false,
     ShowTooltip      = true,
     RelayTells       = true,
-    RelayGuild       = true,
+    RelayGuild       = false,
     MaxRow           = 1,
-    EscapeToMin      = false,
+    EscapeToMin      = true,
     AlphaSort        = false,
     ShowOnNewMessage = true,
     IconSize         = 30,

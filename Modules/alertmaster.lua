@@ -71,7 +71,22 @@ local groupCmd = '/dgae ' -- assumes DanNet, if EQBC found we switch to '/bcca /
 local angle = 0
 local CharConfig = 'Char_' .. mq.TLO.Me.DisplayName() .. '_Config'
 local CharCommands = 'Char_' .. mq.TLO.Me.DisplayName() .. '_Commands'
-local defaultConfig = { delay = 1, remindNPC = 5, remind = 30, aggro = false, pcs = true, spawns = true, gms = true, announce = false, ignoreguild = true, beep = false, popup = false, distmid = 600, distfar = 1200, locked = false, }
+local defaultConfig = {
+	delay = 1,
+	remindNPC = 5,
+	remind = 30,
+	aggro = false,
+	pcs = true,
+	spawns = true,
+	gms = true,
+	announce = false,
+	ignoreguild = true,
+	beep = false,
+	popup = false,
+	distmid = 600,
+	distfar = 1200,
+	locked = false,
+}
 local tSafeZones, spawnAlerts, spawnsSpawnMaster, settings = {}, {}, {}, {}
 local npcs, tAnnounce, tPlayers, tSpawns, tGMs = {}, {}, {}, {}, {}
 local alertTime, numAlerts = 0, 0

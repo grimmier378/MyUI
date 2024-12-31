@@ -515,6 +515,9 @@ local function DrawConfigWin()
 		ImGui.TableSetupColumn("##DialogDB_Config_Save", ImGuiTableColumnFlags.WidthFixed, 120)
 		ImGui.TableHeadersRow()
 		local id = 1
+		if Dialog[Module.Server] == nil then
+			Dialog[Module.Server] = {}
+		end
 		if Dialog[Module.Server][tmpTarget] == nil then
 			Dialog[Module.Server][tmpTarget] = { allzones = {}, [currZoneShort] = {}, }
 			newTarget = true

@@ -1239,7 +1239,7 @@ local function DrawChatWindow()
         -- Begin other tabs
         -- for tabNum = 1 , #ChatWin.Settings.Channels do
         for _, channelData in ipairs(sortedChannels) do
-            local channelID = channelData[1]
+            local channelID = channelData[1] or 0
             if Module.Settings.Channels[channelID].enabled then
                 local name = Module.Settings.Channels[channelID].Name:gsub("^%d+%s*", "") .. '##' .. windowNum
                 local links = Module.Settings.Channels[channelID].enableLinks
@@ -1462,12 +1462,14 @@ function Module.AddChannel(editChanID, isNewChannel)
     if not Module.tempEventStrings[editChanID][editEventID] then Module.tempEventStrings[editChanID][editEventID] = {} end
 
     if not isNewChannel then
-        for eID, eData in pairs(Module.tempSettings.Channels[editChanID].Events) do
-            if not Module.tempFiltColors[editChanID][eID] then Module.tempFiltColors[editChanID][eID] = {} end
-            for fID, fData in pairs(eData.Filters) do
-                if not Module.tempFiltColors[editChanID][eID][fID] then Module.tempFiltColors[editChanID][eID][fID] = {} end
-                -- if not tempFiltColors[editChanID][eID][fID] then tempFiltColors[editChanID][eID][fID] = {} end
-                Module.tempFiltColors[editChanID][eID][fID] = fData.color or { 1, 1, 1, 1, }
+        if Module.tempSettings.Channels[editChanID] ~= nil then
+            for eID, eData in pairs(Module.tempSettings.Channels[editChanID].Events) do
+                if not Module.tempFiltColors[editChanID][eID] then Module.tempFiltColors[editChanID][eID] = {} end
+                for fID, fData in pairs(eData.Filters) do
+                    if not Module.tempFiltColors[editChanID][eID][fID] then Module.tempFiltColors[editChanID][eID][fID] = {} end
+                    -- if not tempFiltColors[editChanID][eID][fID] then tempFiltColors[editChanID][eID][fID] = {} end
+                    Module.tempFiltColors[editChanID][eID][fID] = fData.color or { 1, 1, 1, 1, }
+                end
             end
         end
     end
@@ -1520,7 +1522,7 @@ function Module.AddChannel(editChanID, isNewChannel)
     end
     ---------------- Buttons Sliders and Channel Name ------------------------
     ImGui.SetWindowFontScale(Module.Settings.Scale)
-    if lastChan == 0 then
+    if isNewChannel then
         --print(channelData.Name)
         if not Module.tempEventStrings[editChanID].Name then
             Module.tempEventStrings[editChanID].Name = channelData[editChanID].Name
@@ -1608,7 +1610,6 @@ function Module.AddChannel(editChanID, isNewChannel)
         Module.openEditGUI = false
         Module.tempFilterStrings, Module.tempEventStrings, Module.tempChanColors, Module.tempFiltColors, Module.hString, channelData = {}, {}, {}, {}, {}, {}
         if fromConf then Module.openConfigGUI = true end
-        return
     end
     ImGui.SameLine()
     if ImGui.Button("DELETE Channel##" .. editChanID) then
@@ -1628,7 +1629,6 @@ function Module.AddChannel(editChanID, isNewChannel)
         resetEvnts = true
         Module.openEditGUI = false
         Module.openConfigGUI = false
-        return
     end
     ImGui.SameLine()
     if ImGui.Button(' Close ##_close') then
@@ -1649,142 +1649,147 @@ function Module.AddChannel(editChanID, isNewChannel)
     ImGui.SeparatorText('Events and Filters')
     if ImGui.BeginChild("Details##") then
         ------------------------------ table -------------------------------------
-        if channelData[editChanID].Events ~= nil then
-            for eventID, eventDetails in ipairs(channelData[editChanID].Events) do
-                if Module.hString[eventID] == nil then Module.hString[eventID] = string.format(channelData[editChanID].Name .. ' : ' .. eventDetails.eventString) end
-                if ImGui.CollapsingHeader(Module.hString[eventID]) then
-                    local contentSizeX = ImGui.GetWindowContentRegionWidth()
-                    ImGui.SetWindowFontScale(Module.Settings.Scale)
-                    if ImGui.BeginChild('Events##' .. eventID, contentSizeX, 0.0, bit32.bor(ImGuiChildFlags.Border, ImGuiChildFlags.AutoResizeY)) then
-                        if ImGui.BeginTable("Channel Events##" .. editChanID, 4, bit32.bor(ImGuiTableFlags.NoHostExtendX)) then
-                            ImGui.SetWindowFontScale(Module.Settings.Scale)
-                            ImGui.TableSetupColumn("ID's##_", ImGuiTableColumnFlags.WidthAlwaysAutoResize, 100)
-                            ImGui.TableSetupColumn("Strings", ImGuiTableColumnFlags.WidthStretch, 150)
-                            ImGui.TableSetupColumn("Color", ImGuiTableColumnFlags.WidthFixed, 50)
-                            ImGui.TableSetupColumn("##Delete", ImGuiTableColumnFlags.WidthAlwaysAutoResize, 50)
-                            ImGui.TableHeadersRow()
-                            ImGui.TableNextRow()
-                            ImGui.TableSetColumnIndex(0)
+        if channelData[editChanID] ~= nil then
+            if channelData[editChanID].Events ~= nil then
+                for eventID, eventDetails in ipairs(channelData[editChanID].Events) do
+                    if Module.hString[eventID] == nil then Module.hString[eventID] = string.format(channelData[editChanID].Name .. ' : ' .. eventDetails.eventString) end
+                    if ImGui.CollapsingHeader(Module.hString[eventID]) then
+                        local contentSizeX = ImGui.GetWindowContentRegionWidth()
+                        ImGui.SetWindowFontScale(Module.Settings.Scale)
+                        if ImGui.BeginChild('Events##' .. eventID, contentSizeX, 0.0, bit32.bor(ImGuiChildFlags.Border, ImGuiChildFlags.AutoResizeY)) then
+                            if ImGui.BeginTable("Channel Events##" .. editChanID, 4, bit32.bor(ImGuiTableFlags.NoHostExtendX)) then
+                                ImGui.SetWindowFontScale(Module.Settings.Scale)
+                                ImGui.TableSetupColumn("ID's##_", ImGuiTableColumnFlags.WidthAlwaysAutoResize, 100)
+                                ImGui.TableSetupColumn("Strings", ImGuiTableColumnFlags.WidthStretch, 150)
+                                ImGui.TableSetupColumn("Color", ImGuiTableColumnFlags.WidthFixed, 50)
+                                ImGui.TableSetupColumn("##Delete", ImGuiTableColumnFlags.WidthAlwaysAutoResize, 50)
+                                ImGui.TableHeadersRow()
+                                ImGui.TableNextRow()
+                                ImGui.TableSetColumnIndex(0)
 
-                            if ImGui.Button('Add Filter') then
-                                newFilter = true
-                                if newFilter then
-                                    --printf("eID: %s", eventID )
-                                    if not channelData[editChanID].Events[eventID].Filters then
-                                        channelData[editChanID].Events[eventID].Filters = {}
-                                    end
-                                    local maxFilterId = getNextID(channelData[editChanID].Events[eventID]['Filters'])
-                                    --printf("fID: %s",maxFilterId)
-                                    channelData[editChanID]['Events'][eventID].Filters[maxFilterId] = {
-                                        ['filterString'] = 'new',
-                                        ['color'] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1, },
-                                    }
-                                    newFilter = false
-                                end
-                            end
-                            if ImGui.IsItemHovered() then
-                                ImGui.BeginTooltip()
-                                ImGui.Text('You can add TOKENs to your filters in place for character names.\n')
-                                ImGui.Text('LIST OF TOKENS')
-                                ImGui.Text('M3\t = Your Name')
-                                ImGui.Text('M1\t = Main Assist Name')
-                                ImGui.Text('PT1\t = Your Pet Name')
-                                ImGui.Text('PT3\t = Any Members Pet Name')
-                                ImGui.Text('GP1\t = Party Members Name')
-                                ImGui.Text('TK1\t = Main Tank Name')
-                                ImGui.Text('RL\t = Raid Leader Name')
-                                ImGui.Text('H1\t = Group Healer (DRU, CLR, or SHM)')
-                                ImGui.Text('G1 - G5\t = Party Members Name in Group Slot 1-5')
-                                ImGui.Text('N3\t = NPC Name')
-                                ImGui.Text('P3\t = PC Name')
-                                ImGui.Text('NO2\t = Ignore the If matched\n Place this in front of a token or word and it if matched it will ignore the line.')
-                                ImGui.EndTooltip()
-                            end
-
-                            ImGui.TableSetColumnIndex(1)
-
-                            if not Module.tempEventStrings[editChanID][eventID] then Module.tempEventStrings[editChanID][eventID] = eventDetails end
-                            tmpString = Module.tempEventStrings[editChanID][eventID].eventString
-                            local bufferKey = editChanID .. "_" .. tostring(eventID)
-                            tmpString = ImGui.InputText("Event String##EventString" .. bufferKey, tmpString, 256)
-                            Module.hString[eventID] = Module.hString[eventID]
-                            if Module.tempEventStrings[editChanID][eventID].eventString ~= tmpString then Module.tempEventStrings[editChanID][eventID].eventString = tmpString end
-
-                            ImGui.TableSetColumnIndex(2)
-
-                            if not Module.tempChanColors[editChanID][eventID] then
-                                Module.tempChanColors[editChanID][eventID] = eventDetails.Filters[0].color or { 1.0, 1.0, 1.0, 1.0, } -- Default to white with full opacity
-                            end
-
-                            Module.tempChanColors[editChanID][eventID] = ImGui.ColorEdit4("##Color" .. bufferKey, Module.tempChanColors[editChanID][eventID], MyColorFlags)
-                            ImGui.TableSetColumnIndex(3)
-                            if ImGui.Button("Delete##" .. bufferKey) then
-                                -- Delete the event
-                                Module.tempSettings.Channels[editChanID].Events[eventID] = nil
-                                Module.tempEventStrings[editChanID][eventID] = nil
-                                Module.tempChanColors[editChanID][eventID] = nil
-                                Module.tempFiltColors[editChanID][eventID] = nil
-                                Module.tempFilterStrings[editChanID][eventID] = nil
-                                ResetEvents()
-                            end
-                            ImGui.TableNextRow()
-                            ImGui.TableSetColumnIndex(0)
-                            ImGui.SeparatorText('')
-                            ImGui.TableSetColumnIndex(1)
-                            ImGui.SeparatorText('Filters')
-                            ImGui.TableSetColumnIndex(2)
-                            ImGui.SeparatorText('')
-                            ImGui.TableSetColumnIndex(3)
-                            ImGui.SeparatorText('')
-                            --------------- Filters ----------------------
-                            for filterID, filterData in ipairs(eventDetails.Filters) do
-                                if filterID > 0 then --and filterData.filterString ~= '' then
-                                    ImGui.TableNextRow()
-                                    ImGui.TableSetColumnIndex(0)
-                                    ImGui.Text("fID: %s", tostring(filterID))
-                                    ImGui.TableSetColumnIndex(1)
-                                    if not Module.tempFilterStrings[editChanID][eventID] then
-                                        Module.tempFilterStrings[editChanID][eventID] = {}
-                                    end
-                                    if not Module.tempFilterStrings[editChanID][eventID][filterID] then
-                                        Module.tempFilterStrings[editChanID][eventID][filterID] = filterData.filterString
-                                    end
-                                    local tempFilter = Module.tempFilterStrings[editChanID][eventID][filterID]
-                                    -- Display the filter string input field
-                                    local tmpKey = string.format("%s_%s", eventID, filterID)
-                                    tempFilter, _ = ImGui.InputText("Filter String##_" .. tmpKey, tempFilter)
-                                    -- Update the filter string in tempFilterStrings
-                                    if Module.tempFilterStrings[editChanID][eventID][filterID] ~= tempFilter then
-                                        Module.tempFilterStrings[editChanID][eventID][filterID] = tempFilter
-                                    end
-                                    ImGui.TableSetColumnIndex(2)
-                                    if not Module.tempFiltColors[editChanID][eventID] then Module.tempFiltColors[editChanID][eventID] = {} end
-                                    if not Module.tempFiltColors[editChanID][eventID][filterID] then Module.tempFiltColors[editChanID][eventID][filterID] = filterData.color or {} end
-                                    local tmpColor = {}
-                                    tmpColor = filterData['color']
-                                    -- Display the color picker for the filter
-                                    filterData['color'] = ImGui.ColorEdit4("##Color_" .. filterID, tmpColor, MyColorFlags)
-                                    if Module.tempFiltColors[editChanID][eventID][filterID] ~= tmpColor then Module.tempFiltColors[editChanID][eventID][filterID] = tmpColor end
-                                    ImGui.TableSetColumnIndex(3)
-                                    if ImGui.Button("Delete##_" .. filterID) then
-                                        -- Delete the Filter
-                                        Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID] = nil
-                                        --printf("chanID: %s, eID: %s, fID: %s",editChanID,eventID,filterID)
-                                        Module.tempFilterStrings[editChanID][eventID][filterID] = nil
-                                        Module.tempChanColors[editChanID][eventID][filterID] = nil
-                                        Module.tempFiltColors[editChanID][eventID][filterID] = nil
-                                        ResetEvents()
+                                if ImGui.Button('Add Filter') then
+                                    newFilter = true
+                                    if newFilter then
+                                        --printf("eID: %s", eventID )
+                                        if not channelData[editChanID].Events[eventID].Filters then
+                                            channelData[editChanID].Events[eventID].Filters = {}
+                                        end
+                                        local maxFilterId = getNextID(channelData[editChanID].Events[eventID]['Filters'])
+                                        --printf("fID: %s",maxFilterId)
+                                        channelData[editChanID]['Events'][eventID].Filters[maxFilterId] = {
+                                            ['filterString'] = 'new',
+                                            ['color'] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1, },
+                                        }
+                                        newFilter = false
                                     end
                                 end
+                                if ImGui.IsItemHovered() then
+                                    ImGui.BeginTooltip()
+                                    ImGui.Text('You can add TOKENs to your filters in place for character names.\n')
+                                    ImGui.Text('LIST OF TOKENS')
+                                    ImGui.Text('M3\t = Your Name')
+                                    ImGui.Text('M1\t = Main Assist Name')
+                                    ImGui.Text('PT1\t = Your Pet Name')
+                                    ImGui.Text('PT3\t = Any Members Pet Name')
+                                    ImGui.Text('GP1\t = Party Members Name')
+                                    ImGui.Text('TK1\t = Main Tank Name')
+                                    ImGui.Text('RL\t = Raid Leader Name')
+                                    ImGui.Text('H1\t = Group Healer (DRU, CLR, or SHM)')
+                                    ImGui.Text('G1 - G5\t = Party Members Name in Group Slot 1-5')
+                                    ImGui.Text('N3\t = NPC Name')
+                                    ImGui.Text('P3\t = PC Name')
+                                    ImGui.Text('NO2\t = Ignore the If matched\n Place this in front of a token or word and it if matched it will ignore the line.')
+                                    ImGui.EndTooltip()
+                                end
+
+                                ImGui.TableSetColumnIndex(1)
+
+                                if not Module.tempEventStrings[editChanID][eventID] then Module.tempEventStrings[editChanID][eventID] = eventDetails end
+                                tmpString = Module.tempEventStrings[editChanID][eventID].eventString
+                                local bufferKey = editChanID .. "_" .. tostring(eventID)
+                                tmpString = ImGui.InputText("Event String##EventString" .. bufferKey, tmpString, 256)
+                                Module.hString[eventID] = Module.hString[eventID]
+                                if Module.tempEventStrings[editChanID][eventID].eventString ~= tmpString then Module.tempEventStrings[editChanID][eventID].eventString = tmpString end
+
+                                ImGui.TableSetColumnIndex(2)
+
+                                if not Module.tempChanColors[editChanID][eventID] then
+                                    Module.tempChanColors[editChanID][eventID] = eventDetails.Filters[0].color or { 1.0, 1.0, 1.0, 1.0, } -- Default to white with full opacity
+                                end
+
+                                Module.tempChanColors[editChanID][eventID] = ImGui.ColorEdit4("##Color" .. bufferKey, Module.tempChanColors[editChanID][eventID], MyColorFlags)
+                                ImGui.TableSetColumnIndex(3)
+                                if ImGui.Button("Delete##" .. bufferKey) then
+                                    -- Delete the event
+                                    Module.tempSettings.Channels[editChanID].Events[eventID] = nil
+                                    Module.tempEventStrings[editChanID][eventID] = nil
+                                    Module.tempChanColors[editChanID][eventID] = nil
+                                    Module.tempFiltColors[editChanID][eventID] = nil
+                                    Module.tempFilterStrings[editChanID][eventID] = nil
+                                    ResetEvents()
+                                end
+                                ImGui.TableNextRow()
+                                ImGui.TableSetColumnIndex(0)
+                                ImGui.SeparatorText('')
+                                ImGui.TableSetColumnIndex(1)
+                                ImGui.SeparatorText('Filters')
+                                ImGui.TableSetColumnIndex(2)
+                                ImGui.SeparatorText('')
+                                ImGui.TableSetColumnIndex(3)
+                                ImGui.SeparatorText('')
+                                --------------- Filters ----------------------
+                                for filterID, filterData in ipairs(eventDetails.Filters) do
+                                    if filterID > 0 then --and filterData.filterString ~= '' then
+                                        ImGui.TableNextRow()
+                                        ImGui.TableSetColumnIndex(0)
+                                        ImGui.Text("fID: %s", tostring(filterID))
+                                        ImGui.TableSetColumnIndex(1)
+                                        if not Module.tempFilterStrings[editChanID][eventID] then
+                                            Module.tempFilterStrings[editChanID][eventID] = {}
+                                        end
+                                        if not Module.tempFilterStrings[editChanID][eventID][filterID] then
+                                            Module.tempFilterStrings[editChanID][eventID][filterID] = filterData.filterString
+                                        end
+                                        local tempFilter = Module.tempFilterStrings[editChanID][eventID][filterID]
+                                        -- Display the filter string input field
+                                        local tmpKey = string.format("%s_%s", eventID, filterID)
+                                        tempFilter, _ = ImGui.InputText("Filter String##_" .. tmpKey, tempFilter)
+                                        -- Update the filter string in tempFilterStrings
+                                        if Module.tempFilterStrings[editChanID][eventID][filterID] ~= tempFilter then
+                                            Module.tempFilterStrings[editChanID][eventID][filterID] = tempFilter
+                                        end
+                                        ImGui.TableSetColumnIndex(2)
+                                        if not Module.tempFiltColors[editChanID][eventID] then Module.tempFiltColors[editChanID][eventID] = {} end
+                                        if not Module.tempFiltColors[editChanID][eventID][filterID] then
+                                            Module.tempFiltColors[editChanID][eventID][filterID] = filterData.color or
+                                                {}
+                                        end
+                                        local tmpColor = {}
+                                        tmpColor = filterData['color']
+                                        -- Display the color picker for the filter
+                                        filterData['color'] = ImGui.ColorEdit4("##Color_" .. filterID, tmpColor, MyColorFlags)
+                                        if Module.tempFiltColors[editChanID][eventID][filterID] ~= tmpColor then Module.tempFiltColors[editChanID][eventID][filterID] = tmpColor end
+                                        ImGui.TableSetColumnIndex(3)
+                                        if ImGui.Button("Delete##_" .. filterID) then
+                                            -- Delete the Filter
+                                            Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID] = nil
+                                            --printf("chanID: %s, eID: %s, fID: %s",editChanID,eventID,filterID)
+                                            Module.tempFilterStrings[editChanID][eventID][filterID] = nil
+                                            Module.tempChanColors[editChanID][eventID][filterID] = nil
+                                            Module.tempFiltColors[editChanID][eventID][filterID] = nil
+                                            ResetEvents()
+                                        end
+                                    end
+                                end
+                                ImGui.EndTable()
                             end
-                            ImGui.EndTable()
                         end
+                        ImGui.EndChild()
+                    else
+                        Module.hString[eventID] = string.format(channelData[editChanID].Name .. ' : ' .. eventDetails.eventString)
                     end
-                    ImGui.EndChild()
-                else
-                    Module.hString[eventID] = string.format(channelData[editChanID].Name .. ' : ' .. eventDetails.eventString)
+                    lastChan = 0
                 end
-                lastChan = 0
             end
         end
     end
@@ -1898,7 +1903,7 @@ function Module.Config_GUI(open)
             end
         end
         ImGui.SameLine()
-        -- Close Button
+
         if ImGui.Button('Close') then
             Module.openConfigGUI = false
             editChanID = 0
@@ -2022,7 +2027,11 @@ function Module.Config_GUI(open)
         end
         ImGui.SeparatorText('Channels and Events Overview')
         table.sort(Module.tempSettings.Channels, function(a, b)
-            return a.Name < b.Name
+            if a ~= nil and b ~= nil then
+                return a.Name < b.Name
+            else
+                return false
+            end
         end)
         buildConfig()
     end
@@ -2043,8 +2052,8 @@ function Module.Edit_GUI(open)
     if showEdit then
         ImGui.SetWindowFontScale(Module.Settings.Scale)
 
-        Module.createExternConsole(string.format("New Channel %s", editChanID))
-        Module.AddChannel(editChanID, false)
+        if addChannel then Module.createExternConsole(string.format("New Channel %s", editChanID)) end
+        Module.AddChannel(editChanID, addChannel)
 
         ImGui.SameLine()
         -- Close Button

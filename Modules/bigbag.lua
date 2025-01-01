@@ -20,51 +20,51 @@ else
 	Module.ThemeLoader = MyUI_ThemeLoader
 end
 -- Constants
-local ICON_WIDTH                                 = 40
-local ICON_HEIGHT                                = 40
-local COUNT_X_OFFSET                             = 39
-local COUNT_Y_OFFSET                             = 23
-local EQ_ICON_OFFSET                             = 500
-local BAG_ITEM_SIZE                              = 40
-local INVENTORY_DELAY_SECONDS                    = 30
-local MIN_SLOTS_WARN                             = 3
-local FreeSlots                                  = 0
-local UsedSlots                                  = 0
-local do_process_coin                            = false
-local configFile                                 = string.format("%s/MyUI/BigBag/%s/%s.lua", mq.configDir, mq.TLO.EverQuest.Server(), mq.TLO.Me.Name())
+local ICON_WIDTH                                          = 40
+local ICON_HEIGHT                                         = 40
+local COUNT_X_OFFSET                                      = 39
+local COUNT_Y_OFFSET                                      = 23
+local EQ_ICON_OFFSET                                      = 500
+local BAG_ITEM_SIZE                                       = 40
+local INVENTORY_DELAY_SECONDS                             = 30
+local MIN_SLOTS_WARN                                      = 3
+local FreeSlots                                           = 0
+local UsedSlots                                           = 0
+local do_process_coin                                     = false
+local configFile                                          = string.format("%s/MyUI/BigBag/%s/%s.lua", mq.configDir, mq.TLO.EverQuest.Server(), mq.TLO.Me.Name())
 -- EQ Texture Animation references
-local animItems                                  = mq.FindTextureAnimation("A_DragItem")
-local animBox                                    = mq.FindTextureAnimation("A_RecessedBox")
-local animMini                                   = mq.FindTextureAnimation("A_DragItem")
+local animItems                                           = mq.FindTextureAnimation("A_DragItem")
+local animBox                                             = mq.FindTextureAnimation("A_RecessedBox")
+local animMini                                            = mq.FindTextureAnimation("A_DragItem")
 
 -- Toggles
-local toggleKey                                  = ''
-local toggleModKey, toggleModKey2, toggleModKey3 = 'None', 'None', 'None'
-local toggleMouse                                = 'Middle'
+local toggleKey                                           = ''
+local toggleModKey, toggleModKey2, toggleModKey3          = 'None', 'None', 'None'
+local toggleMouse                                         = 'Middle'
 
 -- Bag Contents
-local items                                      = {}
-local clickies                                   = {}
-local augments                                   = {}
-local needSort                                   = true
-local coin_type                                  = 0
-local coin_qty                                   = ''
+local items                                               = {}
+local clickies                                            = {}
+local augments                                            = {}
+local needSort                                            = true
+local coin_type                                           = 0
+local coin_qty                                            = ''
 
 -- Bag Options
-local sort_order                                 = { name = false, stack = false, }
-local clicked                                    = false
+local sort_order                                          = { name = false, stack = false, }
+local clicked                                             = false
 -- GUI Activities
-local show_item_background                       = true
-local show_qty_win                               = false
-local themeName                                  = "Default"
-local start_time                                 = os.time()
-local coin_timer                                 = os.time()
-local filter_text                                = ""
-local utils                                      = require('mq.Utils')
-local settings                                   = {}
-local MySelf                                     = mq.TLO.Me
-local myCopper, mySilver, myGold, myPlat         = 0, 0, 0, 0
-local defaults                                   = {
+local show_item_background                                = true
+local show_qty_win                                        = false
+local themeName                                           = "Default"
+local start_time                                          = os.time()
+local coin_timer                                          = os.time()
+local filter_text                                         = ""
+local utils                                               = require('mq.Utils')
+local settings                                            = {}
+local MySelf                                              = mq.TLO.Me
+local myCopper, mySilver, myGold, myPlat, myWeight, myStr = 0, 0, 0, 0, 0, 0
+local defaults                                            = {
 	MIN_SLOTS_WARN = 3,
 	show_item_background = true,
 	sort_order = { name = false, stack = false, },
@@ -76,13 +76,13 @@ local defaults                                   = {
 	toggleMouse = 'None',
 	INVENTORY_DELAY_SECONDS = 2,
 }
-local modKeys                                    = {
+local modKeys                                             = {
 	"None",
 	"Ctrl",
 	"Alt",
 	"Shift",
 }
-local mouseKeys                                  = {
+local mouseKeys                                           = {
 	"Middle",
 	"None",
 }
@@ -410,9 +410,9 @@ local function display_bag_options()
 		ImGui.Text("Toggle Key")
 		ImGui.SameLine()
 		ImGui.SetNextItemWidth(100)
-		toggleKey = ImGui.InputText("##ToggleKey", toggleKey)
+		toggleKey = ImGui.InputText("##ToggleKey", toggleKey, ImGuiInputTextFlags.CharsUppercase)
 		if toggleKey ~= settings.toggleKey then
-			settings.toggleKey = toggleKey
+			settings.toggleKey = toggleKey:upper()
 			mq.pickle(configFile, settings)
 		end
 		ImGui.SameLine()
@@ -851,7 +851,7 @@ local function renderBtn()
 		end
 
 		if toggleMouse ~= 'None' then
-			if ImGui.IsMouseClicked(ImGuiMouseButton[toggleMouse]) then
+			if ImGui.IsMouseReleased(ImGuiMouseButton[toggleMouse]) then
 				Module.ShowGUI = not Module.ShowGUI
 			end
 		end
@@ -893,7 +893,10 @@ local function RenderTabs()
 		ImGui.Text(string.format("Used/Free Slots "))
 		ImGui.SameLine()
 		ImGui.TextColored(FreeSlots > MIN_SLOTS_WARN and ImVec4(0.354, 1.000, 0.000, 0.500) or ImVec4(1.000, 0.354, 0.0, 0.5), "(%s/%s)", UsedSlots, FreeSlots)
-
+		ImGui.SameLine()
+		ImGui.Text("Weight")
+		ImGui.SameLine()
+		ImGui.TextColored(myWeight > myStr and ImVec4(1.000, 0.254, 0.0, 1.0) or ImVec4(0, 1, 1, 1), "%d / %d", myWeight, myStr)
 		draw_currency()
 
 		ImGui.SeparatorText('Inventory / Destroy Area')
@@ -1023,6 +1026,8 @@ function Module.MainLoop()
 		UpdateCoin()
 		coin_timer = os.time()
 	end
+	myWeight = MySelf.CurrentWeight()
+	myStr = MySelf.STR()
 end
 
 function Module.Unload()

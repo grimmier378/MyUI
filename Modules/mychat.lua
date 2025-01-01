@@ -1475,7 +1475,7 @@ function Module.AddChannel(editChanID, isNewChannel)
     end
 
 
-    if Module.tempSettings.Channels[editChanID] then
+    if Module.tempSettings.Channels[editChanID] ~= nil then
         channelData = Module.tempSettings.Channels
     else
         channelData = {
@@ -1522,7 +1522,7 @@ function Module.AddChannel(editChanID, isNewChannel)
     end
     ---------------- Buttons Sliders and Channel Name ------------------------
     ImGui.SetWindowFontScale(Module.Settings.Scale)
-    if isNewChannel then
+    if not isNewChannel then
         --print(channelData.Name)
         if not Module.tempEventStrings[editChanID].Name then
             Module.tempEventStrings[editChanID].Name = channelData[editChanID].Name

@@ -1246,7 +1246,7 @@ function Module.RenderGUI()
                 if ImGui.IsItemHovered() then
                     ImGui.SetTooltip("Settings")
                 end
-                ImGui.SameLine()
+
                 local lIcon = locked and Module.Icons.FA_LOCK or Module.Icons.FA_UNLOCK
 
                 if ImGui.MenuItem(lIcon) then
@@ -1258,7 +1258,6 @@ function Module.RenderGUI()
                 if ImGui.IsItemHovered() then
                     ImGui.SetTooltip("Toggle Lock Window")
                 end
-                ImGui.SameLine()
 
                 if ImGui.MenuItem(Module.Icons.FA_BUG) then
                     if not DEBUG then DEBUG = true end
@@ -1267,7 +1266,6 @@ function Module.RenderGUI()
                 if ImGui.IsItemHovered() then
                     ImGui.SetTooltip("Debug")
                 end
-                ImGui.SameLine()
 
                 if ImGui.MenuItem(Module.Icons.MD_TV) then
                     showHUD = not showHUD
@@ -1275,7 +1273,7 @@ function Module.RenderGUI()
                 if ImGui.IsItemHovered() then
                     ImGui.SetTooltip("Toggle Heads Up Display")
                 end
-                ImGui.SameLine(ImGui.GetWindowWidth() - 30)
+                ImGui.SetCursorPosX(ImGui.GetWindowWidth() - 30)
 
                 if ImGui.MenuItem(Module.Icons.FA_WINDOW_CLOSE) then
                     Module.IsRunning = false

@@ -44,6 +44,7 @@ local themeName                                                  = 'Default'
 local defaults, settings, debugMessages                          = {}, {}, {}
 local Paths, ChainedPaths                                        = {}, {}
 local newPath                                                    = ''
+local saveChainName                                              = ''
 local curTime                                                    = os.time()
 local lastTime                                                   = curTime
 local deleteWP, deleteWPStep                                     = false, 0
@@ -79,6 +80,7 @@ local NavSet                                                     = {
     RecordMinDist    = 25,
     PreviousDoNav    = false,
     PausedActiveGN   = false,
+    SelectedChain    = 'None',
 }
 
 local InterruptSet                                               = {
@@ -121,10 +123,11 @@ local args                                                       = { ..., }
 local configFileOld                                              = string.format('%s/MyUI/%s/%s_Configs.lua', mq.configDir, Module.Name, Module.Name)
 local configFile                                                 = string.format('%s/MyUI/%s/%s_Configs.lua', mq.configDir, Module.Name, Module.Name)
 local pathsFile                                                  = string.format('%s/MyUI/%s/%s_Paths.lua', mq.configDir, Module.Name, Module.Name)
+local chainFile                                                  = string.format('%s/MyUI/%s/%s_Chains.lua', mq.configDir, Module.Name, Module.Name)
 local themezDir                                                  = mq.luaDir .. '/themez/init.lua'
 -- SQL information
 local PathDB                                                     = string.format('%s/MyUI/%s/%s.db', mq.configDir, Module.Name, Module.Name)
-
+local SavedChains                                                = {}
 -- Default Settings
 defaults                                                         = {
     Scale                 = 1.0,
@@ -275,6 +278,24 @@ local function loadPaths()
     end
 end
 
+local function saveChain(chain_name)
+    if chain_name == '' then return end
+    if #ChainedPaths < 1 then
+        return
+    end
+    if SavedChains[chain_name] == nil then
+        SavedChains[chain_name] = {}
+    end
+    SavedChains[chain_name] = ChainedPaths
+    mq.pickle(chainFile, SavedChains)
+end
+
+local function loadSavedChain(chain_name)
+    if SavedChains[chain_name] ~= nil then
+        ChainedPaths = SavedChains[chain_name]
+    end
+end
+
 local function loadSettings()
     local newSetting = false -- Check if we need to save the settings file
 
@@ -296,6 +317,13 @@ local function loadSettings()
         end
     end
 
+    if not Module.Utils.File.Exists(chainFile) then
+        SavedChains = {}
+        mq.pickle(chainFile, SavedChains)
+    else
+        SavedChains = dofile(chainFile)
+    end
+    print(#SavedChains)
     -- Check if the settings are missing and use defaults if they are
     newSetting = Module.Utils.CheckDefaultSettings(defaults, settings[Module.Name])
     newSetting = Module.Utils.CheckDefaultSettings(InterruptSet, settings[Module.Name].Interrupts) or newSetting
@@ -1616,9 +1644,40 @@ function Module.RenderGUI()
                                 ImGui.SetWindowFontScale(scale)
                                 ImGui.SetTooltip("Add " .. currZone .. ": " .. NavSet.SelectedPath .. " to Chain")
                             end
+
                             if #ChainedPaths > 0 then
                                 NavSet.ChainLoop = ImGui.Checkbox('Loop Chain', NavSet.ChainLoop)
+                                ImGui.SameLine()
+                                saveChainName = ImGui.InputTextWithHint("##ChainName", "Chain Name", saveChainName)
+                                ImGui.SameLine()
+                                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
+                                if ImGui.Button(Module.Icons.MD_SAVE) then
+                                    if saveChainName ~= '' then
+                                        saveChain(saveChainName)
+                                        saveChainName = ''
+                                    end
+                                end
+                                ImGui.PopStyleColor()
                             end
+                            if SavedChains ~= nil then
+                                if ImGui.BeginCombo("##SelectChain", NavSet.SelectedChain) then
+                                    ImGui.SetWindowFontScale(scale)
+                                    for name, data in pairs(SavedChains) do
+                                        local isSelected = name == NavSet.SelectedChain
+                                        if ImGui.Selectable(name, isSelected) then
+                                            NavSet.SelectedChain = name
+                                        end
+                                    end
+                                    ImGui.EndCombo()
+                                end
+                                ImGui.SameLine()
+                                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
+                                if ImGui.Button(Module.Icons.MD_PLAYLIST_ADD .. "##LoadChain") then
+                                    loadSavedChain(NavSet.SelectedChain)
+                                end
+                                ImGui.PopStyleColor()
+                            end
+
                             local tmpCZ, tmpCP = {}, {}
                             for name, data in pairs(Paths) do
                                 table.insert(tmpCZ, name)
@@ -2576,6 +2635,12 @@ local function bind(...)
             settings[Module.Name].PauseStops = tonumber(action)
             mq.pickle(configFile, settings)
             NavSet.WpPause = settings[Module.Name].PauseStops
+        elseif key == 'chainsave' and action ~= nil and action ~= '' then
+            if #ChainedPaths > 0 then
+                saveChain(action)
+            end
+        elseif key == 'chainload' and action ~= nil and action ~= '' then
+            loadSavedChain(action)
         end
     elseif #args == 3 then
         if Paths[zone]["'" .. path .. "'"] ~= nil then

@@ -40,6 +40,7 @@ local winFlags                                                          = bit32.
 local checkIn                                                           = os.time()
 local currZone, lastZone
 local PctAA, SettingAA, PtsAA, PtsSpent, PtsTotal, PtsAALast, LastState = 0, '0', 0, 0, 0, 0, ""
+local PctAirSupply                                                      = 100
 local firstRun                                                          = true
 local hasThemeZ                                                         = Module.Utils.File.Exists(themezDir)
 local settings                                                          = {}
@@ -213,6 +214,7 @@ local function MessageHandler()
         local dowhat      = MemberEntry.DoWhat or 'N/A'
         local dowho       = MemberEntry.DoWho or 'N/A'
         local check       = MemberEntry.Check or os.time()
+        local pctAir      = MemberEntry.PctAir or 100
         local found       = false
         if MailBoxShow then
             table.insert(mailBox, { Name = who, Subject = subject, Check = check, DoWho = dowho, DoWhat = dowhat, When = os.date("%H:%M:%S"), })
@@ -268,6 +270,7 @@ local function MessageHandler()
                         groupData[i].Level = lvlWho
                         groupData[i].Check = check
                         groupData[i].State = MemberEntry.State
+                        groupData[i].PctAir = pctAir
                         if groupData[i].LastPts ~= pts then
                             if who ~= Module.CharLoaded and AAPartyMode == 'driver' and groupData[i].LastPts < pts then
                                 Module.Utils.PrintOutput('MyUI', true, "%s gained an AA, now has %d unspent", who, pts)
@@ -294,6 +297,7 @@ local function MessageHandler()
                             LastPts = pts,
                             State = MemberEntry.State,
                             Check = check,
+                            PctAir = pctAir,
                         })
                 end
             else
@@ -312,6 +316,7 @@ local function MessageHandler()
                         LastPts = pts,
                         State = MemberEntry.State,
                         Check = check,
+                        PctAir = pctAir,
                     })
             end
         end
@@ -330,6 +335,7 @@ local function getMyAA()
     local tmpPctXP     = myself.PctExp() or 0
     local tmpLvl       = myself.Level() or 0
     local cState       = myself.CombatState() or ""
+    local tmpAirSupply = myself.PctAirSupply() or 100
     if firstRun or (PctAA ~= tmpExpAA or SettingAA ~= tmpSettingAA or PtsAA ~= tmpPts or
             PtsSpent ~= tmpPtsSpent or PtsTotal ~= tmpPtsTotal or tmpLvl ~= MeLevel or tmpPctXP ~= PctExp or cState ~= LastState) then
         PctAA = tmpExpAA
@@ -339,6 +345,7 @@ local function getMyAA()
         PtsSpent = tmpPtsSpent
         MeLevel = tmpLvl
         PctExp = tmpPctXP
+        PctAir = tmpAirSupply
         changed = true
     end
     if not changed and CheckIn() then
@@ -408,10 +415,12 @@ function Module.RenderGUI()
                                 -- ImGui.SetCursorPosY(currentY)
                             end
                         end
-                        local childY = 68
-                        if not expand[groupData[i].Name] then childY = 42 end
+                        local modY = groupData[i].PctAir < 100 and 8 or 0
+
+                        local childY = 68 + modY
+                        if not expand[groupData[i].Name] then childY = 42 + modY end
                         if compact[groupData[i].Name] then childY = 25 end
-                        if compact[groupData[i].Name] and expand[groupData[i].Name] then childY = 51 end
+                        if compact[groupData[i].Name] and expand[groupData[i].Name] then childY = 53 end
                         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 2, 2)
                         imgui.BeginChild(groupData[i].Name, 145, childY, bit32.bor(ImGuiChildFlags.Border, ImGuiChildFlags.AutoResizeY), ImGuiWindowFlags.NoScrollbar)
                         -- Start of grouped Whole Elements
@@ -452,13 +461,23 @@ function Module.RenderGUI()
 
                         if not compact[groupData[i].Name] then
                             imgui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(1, 0.9, 0.4, 0.5))
-                            imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
+                            -- imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
                             imgui.ProgressBar(groupData[i].PctExp / 100, ImVec2(137, 5), "##PctXP" .. groupData[i].Name)
                             imgui.PopStyleColor()
+
                             imgui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(0.2, 0.9, 0.9, 0.5))
-                            imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
+                            -- imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
                             imgui.ProgressBar(groupData[i].PctExpAA / 100, ImVec2(137, 5), "##AAXP" .. groupData[i].Name)
                             imgui.PopStyleColor()
+
+                            if groupData[i].PctAir < 100 then
+                                imgui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(0.877, 0.492, 0.170, 1.000))
+                                -- imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
+                                imgui.ProgressBar(groupData[i].PctAir / 100, ImVec2(137, 5), "##Air" .. groupData[i].Name)
+                                imgui.PopStyleColor()
+
+                                if ImGui.IsItemHovered() then imgui.SetTooltip("Air Supply: %s%%", groupData[i].PctAir) end
+                            end
                         end
 
                         imgui.PopID()

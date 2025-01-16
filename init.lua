@@ -275,13 +275,23 @@ end
 
 local function DrawContextMenu()
 	if mq.TLO.Plugin('MQ2DanNet').IsLoaded() then
-		if ImGui.MenuItem('Start Clients') then
+		if ImGui.MenuItem('Start MyGroup Clients') then
+			mq.cmd('/dgge /lua run myui client')
+		end
+		if ImGui.MenuItem('Stop MyGroup Clients') then
+			mq.cmd('/dgge /myui quit')
+		end
+		if ImGui.MenuItem('Stop MyGroup ALL') then
+			mq.cmd('/dgge /myui quit')
+		end
+		ImGui.Separator()
+		if ImGui.MenuItem('Start AllGroups Clients') then
 			mq.cmd('/dge all /lua run myui client')
 		end
-		if ImGui.MenuItem('Stop Clients') then
+		if ImGui.MenuItem('Stop AllGroups Clients') then
 			mq.cmd('/dge all /myui quit')
 		end
-		if ImGui.MenuItem('Stop ALL') then
+		if ImGui.MenuItem('Stop EVERYONE') then
 			mq.cmd('/dgae /myui quit')
 		end
 	end

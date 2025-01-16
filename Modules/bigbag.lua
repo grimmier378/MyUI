@@ -553,12 +553,12 @@ end
 
 ---Draws the individual item icon in the bag.
 ---@param item item The item object
-local function draw_item_icon(item, iconWidth, iconHeight)
+local function draw_item_icon(item, iconWidth, iconHeight, drawID)
 	-- Capture original cursor position
 	local cursor_x, cursor_y = ImGui.GetCursorPos()
 	local offsetX, offsetY = iconWidth - 1, iconHeight / 1.5
 	local offsetXCharges, offsetYCharges = 2, offsetY / 2 -- Draw the background box
-
+	ImGui.PushID(drawID)
 	-- Draw the background box
 	if show_item_background then
 		ImGui.DrawTextureAnimation(animBox, iconWidth, iconHeight)
@@ -606,6 +606,7 @@ local function draw_item_icon(item, iconWidth, iconHeight)
 	end
 	ImGui.Button(btn_label(item), iconWidth, iconHeight)
 	ImGui.PopStyleColor(3)
+	ImGui.PopID()
 
 	-- Tooltip
 	if ImGui.IsItemHovered() then
@@ -681,7 +682,7 @@ local function display_bag_content()
 
 	for index, _ in ipairs(items) do
 		if string.match(string.lower(items[index].Name()), string.lower(filter_text)) then
-			draw_item_icon(items[index], ICON_WIDTH, ICON_HEIGHT)
+			draw_item_icon(items[index], ICON_WIDTH, ICON_HEIGHT, index)
 			if bag_cols > temp_bag_cols then
 				temp_bag_cols = temp_bag_cols + 1
 				ImGui.SameLine()
@@ -751,6 +752,7 @@ local function display_details()
 		ImGui.TableSetupScrollFreeze(0, 1)
 		ImGui.TableHeadersRow()
 		for index, _ in ipairs(items) do
+			ImGui.PushID(index)
 			if string.match(string.lower(items[index].Name()), string.lower(filter_text)) then
 				local item = items[index]
 				local clicky = item.Clicky() or 'No'
@@ -793,6 +795,7 @@ local function display_details()
 					ImGui.Text('No')
 				end
 			end
+			ImGui.PopID()
 		end
 		ImGui.EndTable()
 	end

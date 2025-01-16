@@ -17,6 +17,7 @@ end
 local defaults = require('defaults.themes')
 local theme = {}
 local settingsFile = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
+local themeFileOld = string.format('%s/MyThemeZ.lua', mq.configDir)
 local themeName = 'Default'
 local tmpName = 'Default'
 local themeID = 0
@@ -55,7 +56,8 @@ local function loadSettings()
 	end
 	themeName = theme.LoadTheme or themeName
 	tmpName = themeName
-	writeSettings(settingsFile, theme)
+	writeSettings(themeFileOld, theme)
+
 	-- Deep copy theme into tempSettings
 	-- tempSettings = deepcopy(theme)
 	tempSettings = theme
@@ -76,7 +78,7 @@ local function loadSettings()
 		end
 	end
 
-	if styleFlag then writeSettings(settingsFile, tempSettings) end
+	if styleFlag then writeSettings(themeFileOld, tempSettings) end
 end
 
 
@@ -337,7 +339,7 @@ function Module.RenderGUI()
 					loadedID = nID
 				end
 				themeName = tmpName
-				writeSettings(settingsFile, tempSettings)
+				writeSettings(themeFileOld, tempSettings)
 				theme = Module.Utils.Deepcopy(tempSettings)
 			end
 
@@ -373,7 +375,7 @@ function Module.RenderGUI()
 						tmpName = themeName
 					end
 				end
-				writeSettings(settingsFile, tempSettings)
+				writeSettings(themeFileOld, tempSettings)
 				-- theme = deepcopy(tempSettings)
 				theme = tempSettings
 			end

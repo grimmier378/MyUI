@@ -278,23 +278,35 @@ local function DrawContextMenu()
 		if ImGui.MenuItem('Start MyGroup Clients') then
 			mq.cmd('/dgge /lua run myui client')
 		end
+		ImGui.Spacing()
 		if ImGui.MenuItem('Stop MyGroup Clients') then
 			mq.cmd('/dgge /myui quit')
 		end
+		ImGui.Spacing()
+
 		if ImGui.MenuItem('Stop MyGroup ALL') then
-			mq.cmd('/dgge /myui quit')
+			mq.cmd('/dgga /myui quit')
 		end
+		ImGui.Spacing()
+
 		ImGui.Separator()
+
 		if ImGui.MenuItem('Start AllGroups Clients') then
 			mq.cmd('/dge all /lua run myui client')
 		end
+		ImGui.Spacing()
+
 		if ImGui.MenuItem('Stop AllGroups Clients') then
 			mq.cmd('/dge all /myui quit')
 		end
+		ImGui.Spacing()
+
 		if ImGui.MenuItem('Stop EVERYONE') then
 			mq.cmd('/dgae /myui quit')
 		end
 	end
+	ImGui.Spacing()
+
 	ImGui.Separator()
 	if ImGui.MenuItem('Exit') then
 		MyUI_IsRunning = false

@@ -331,6 +331,9 @@ local function create_inventory()
 	end
 end
 
+local function create_bank()
+end
+
 -- Converts between ItemSlot and /itemnotify pack numbers
 local function to_pack(slot_number)
 	return "pack" .. tostring(slot_number - 22)

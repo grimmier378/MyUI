@@ -1317,11 +1317,16 @@ local function DrawAlertRuleRow(entry)
 		end
 	end
 	ImGui.TableSetColumnIndex(1)
+	ImGui.PushStyleColor(ImGuiCol.Text, Module.Colors.color(entry.MobConColor))
+	ImGui.Text(entry.MobLvl)
+	ImGui.PopStyleColor()
+
+	ImGui.TableSetColumnIndex(2)
 	local distance = math.floor(spawn.Distance() or 0)
 	ImGui.PushStyleColor(ImGuiCol.Text, ColorDistance(distance))
 	ImGui.Text('\t' .. tostring(distance))
 	ImGui.PopStyleColor()
-	ImGui.TableSetColumnIndex(2)
+	ImGui.TableSetColumnIndex(3)
 	--if DoDrawArrow then
 	angle = getRelativeDirection(sHeadingTo) or 0
 	local cursorScreenPos = ImGui.GetCursorScreenPosVec()
@@ -1849,9 +1854,10 @@ local function BuildAlertRows() -- Build the Button Rows for the GUI Window
 	if zone_id == Zone.ID() then
 		-- Start a new table for alerts
 		local sizeX = ImGui.GetContentRegionAvail() - 4
-		if ImGui.BeginTable("AlertTable", 3, Module.GUI_Alert.Table.Flags) then
+		if ImGui.BeginTable("AlertTable", 4, Module.GUI_Alert.Table.Flags) then
 			ImGui.TableSetupScrollFreeze(0, 1)
 			ImGui.TableSetupColumn("Name", bit32.bor(ImGuiTableColumnFlags.DefaultSort, ImGuiTableColumnFlags.WidthFixed), 90, Module.GUI_Alert.Table.Column_ID.MobName)
+			ImGui.TableSetupColumn("Lvl", bit32.bor(ImGuiTableColumnFlags.DefaultSort, ImGuiTableColumnFlags.WidthFixed), 30, Module.GUI_Alert.Table.Column_ID.MobLvl)
 			ImGui.TableSetupColumn("Dist", bit32.bor(ImGuiTableColumnFlags.DefaultSort, ImGuiTableColumnFlags.WidthFixed), 50, Module.GUI_Alert.Table.Column_ID.MobDist)
 			ImGui.TableSetupColumn("Dir", bit32.bor(ImGuiTableColumnFlags.NoResize, ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.NoSort), 30,
 				Module.GUI_Alert.Table.Column_ID.MobDirection)

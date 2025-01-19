@@ -39,8 +39,8 @@ local PctExp                                                            = myself
 local winFlags                                                          = bit32.bor(ImGuiWindowFlags.None)
 local checkIn                                                           = os.time()
 local currZone, lastZone
+local lastAirValue                                                      = 100
 local PctAA, SettingAA, PtsAA, PtsSpent, PtsTotal, PtsAALast, LastState = 0, '0', 0, 0, 0, 0, ""
-local PctAirSupply                                                      = 100
 local firstRun                                                          = true
 local hasThemeZ                                                         = Module.Utils.File.Exists(themezDir)
 local settings                                                          = {}
@@ -188,6 +188,7 @@ local function GenerateContent(who, sub, what)
         PtsSpent = PtsSpent,
         Check    = checkIn,
         State    = cState,
+        PctAir   = myself.PctAirSupply(),
     }
 end
 
@@ -335,9 +336,10 @@ local function getMyAA()
     local tmpPctXP     = myself.PctExp() or 0
     local tmpLvl       = myself.Level() or 0
     local cState       = myself.CombatState() or ""
-    local tmpAirSupply = myself.PctAirSupply() or 100
+    local tmpAirSupply = myself.PctAirSupply()
+
     if firstRun or (PctAA ~= tmpExpAA or SettingAA ~= tmpSettingAA or PtsAA ~= tmpPts or
-            PtsSpent ~= tmpPtsSpent or PtsTotal ~= tmpPtsTotal or tmpLvl ~= MeLevel or tmpPctXP ~= PctExp or cState ~= LastState) then
+            PtsSpent ~= tmpPtsSpent or PtsTotal ~= tmpPtsTotal or tmpLvl ~= MeLevel or tmpPctXP ~= PctExp or cState ~= LastState or tmpAirSupply ~= lastAirValue) then
         PctAA = tmpExpAA
         SettingAA = tmpSettingAA
         PtsAA = tmpPts
@@ -346,6 +348,9 @@ local function getMyAA()
         MeLevel = tmpLvl
         PctExp = tmpPctXP
         PctAir = tmpAirSupply
+        if tmpAirSupply ~= lastAirValue then
+            lastAirValue = tmpAirSupply
+        end
         changed = true
     end
     if not changed and CheckIn() then
@@ -415,8 +420,9 @@ function Module.RenderGUI()
                                 -- ImGui.SetCursorPosY(currentY)
                             end
                         end
-                        local modY = groupData[i].PctAir < 100 and 8 or 0
+                        local modY = 0
 
+                        if (groupData[i].PctAir < 100) then modY = 10 end
                         local childY = 68 + modY
                         if not expand[groupData[i].Name] then childY = 42 + modY end
                         if compact[groupData[i].Name] then childY = 25 end

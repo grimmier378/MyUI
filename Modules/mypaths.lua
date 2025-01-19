@@ -1629,12 +1629,14 @@ function Module.RenderGUI()
                         ImGui.Separator()
                         if ImGui.CollapsingHeader("Chain Paths##") then
                             if NavSet.SelectedPath ~= 'None' then
+                                ImGui.PushID(NavSet.SelectedPath)
                                 ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
                                 if ImGui.Button(Module.Icons.MD_PLAYLIST_ADD .. " [" .. NavSet.SelectedPath .. "]##") then
                                     if not ChainedPaths then ChainedPaths = {} end
                                     table.insert(ChainedPaths, { Zone = currZone, Path = NavSet.SelectedPath, Type = 'Normal', })
                                 end
                                 ImGui.PopStyleColor()
+                                ImGui.PopID()
                             else
                                 ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.500, 0.500, 0.500, 1.000))
                                 ImGui.Button(Module.Icons.MD_PLAYLIST_ADD .. "##Dummy")
@@ -1928,8 +1930,8 @@ function Module.RenderGUI()
                                     ImGui.SetTooltip("Clear Waypoints")
                                 end
                                 ImGui.SameLine()
-                                ImGui.SetNextItemWidth(80)
-                                NavSet.RecordDelay = ImGui.InputInt("Record Delay##" .. Module.Name, NavSet.RecordDelay, 1, 10)
+                                ImGui.SetNextItemWidth(100)
+                                NavSet.RecordDelay = ImGui.InputInt("Rec Delay##" .. Module.Name, NavSet.RecordDelay, 1, 10)
                             end
                             ImGui.Separator()
                         end

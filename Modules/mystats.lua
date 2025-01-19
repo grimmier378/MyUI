@@ -57,7 +57,7 @@ end
 function Module.GetStats()
 	local stats = {}
 	table.insert(stats, 1, { ['HP'] = string.format("%s / %s", MySelf.CurrentHPs() or 0, MySelf.MaxHPs() or 0), })
-	table.insert(stats, 2, { ['Regen'] = string.format("%s + %s", MySelf.HPRegen() or 0, MySelf.HPRegenBonus() or 0), })
+	table.insert(stats, 2, { ['Regen'] = string.format("%s + %s", (MySelf.HPRegen() or 0) + 20, MySelf.HPRegenBonus() or 0), })
 
 	table.insert(stats, 3, { ['Mana'] = string.format("%s / %s", MySelf.CurrentMana() or 0, MySelf.MaxMana() or 0), })
 	table.insert(stats, 4, { ['Mana Regen'] = string.format("%s + %s", MySelf.ManaRegen() or 0, MySelf.ManaRegenBonus() or 0), })

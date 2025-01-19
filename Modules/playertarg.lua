@@ -1067,6 +1067,7 @@ local function init()
         mq.imgui.init('GUI_Target', Module.RenderGUI)
         Module.LocalLoop()
     end
+    if not mq.TLO.Plugin("MQ2Cast").IsLoaded() then mq.cmd("/plugin MQ2Cast") end
 end
 
 local clockTimer = mq.gettime()

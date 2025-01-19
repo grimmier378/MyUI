@@ -879,6 +879,8 @@ function Module.Unload()
 end
 
 local function Init()
+	if not mq.TLO.Plugin("MQ2Cast").IsLoaded() then mq.cmd("/plugin MQ2Cast") end
+
 	if mq.TLO.Me.MaxMana() == 0 then
 		Module.Utils.PrintOutput(nil, true, "You are not a caster!")
 		Module.IsRunning = false

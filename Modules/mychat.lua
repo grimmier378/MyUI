@@ -39,6 +39,7 @@ Module.tempChanColors    = {}
 Module.tempFiltColors    = {}
 Module.hString           = {}
 Module.TLOConsoles       = {}
+Module.LogFile           = string.format('%s/MyUI/MyChat/%s/%s.log', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
 Module.SHOW              = true
 Module.openGUI           = true
 Module.openConfigGUI     = false
@@ -88,6 +89,8 @@ local cleanImport                               = false
 local enableSpam, resetConsoles                 = false, false
 local eChan                                     = '/say'
 local fontSizes                                 = {}
+local logFileHandle                             = nil
+
 local keyboardKeys                              = {
     [1]  = 'GraveAccent',
     [2]  = 'Enter',
@@ -170,6 +173,21 @@ local function getNextID(table)
         end
     end
     return maxChannelId + 1
+end
+
+local function openLogFile()
+    if not logFileHandle then
+        logFileHandle = io.open(Module.LogFile, "a")
+    end
+end
+
+local function writeLogToFile(line)
+    openLogFile()
+    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+    if logFileHandle then
+        logFileHandle:write(string.format("[%s] %s\n", timestamp, line))
+        logFileHandle:flush() -- Ensure the output is immediately written to the file
+    end
 end
 
 ---Build the consoles for each channel based on ChannelID
@@ -461,6 +479,10 @@ local function loadSettings()
 
     if Module.Settings.MainFontSize == nil then
         Module.Settings.MainFontSize = 16
+    end
+
+    if Module.Settings.LogCommands == nil then
+        Module.Settings.LogCommands = false
     end
 
     eChan = Module.Settings.mainEcho
@@ -1022,6 +1044,7 @@ local function DrawChatWindow()
             _, LocalEcho = ImGui.MenuItem('Local echo##' .. windowNum, nil, LocalEcho)
             _, timeStamps = ImGui.MenuItem('Time Stamps##' .. windowNum, nil, timeStamps)
             _, Module.KeyFocus = ImGui.MenuItem('Enter Focus##' .. windowNum, nil, Module.KeyFocus)
+            _, Module.Settings.LogCommands = ImGui.MenuItem('Log Commands##' .. windowNum, nil, Module.Settings.LogCommands)
             if Module.KeyFocus ~= Module.Settings.keyFocus then
                 Module.Settings.keyFocus = Module.KeyFocus
                 writeSettings(Module.SettingsFile, Module.Settings)
@@ -2095,6 +2118,9 @@ function Module.AddToCommandHistory(channelID, command)
     end
 
     console.HistoryIndex = #console.CommandHistory + 1
+    if Module.Settings.LogCommands then
+        writeLogToFile(command)
+    end
 end
 
 -- Navigate command history (up or down)
@@ -2150,6 +2176,9 @@ function Module.ExecCommand(text)
             Module.console:AppendText(IM_COL32(255, 0, 0), "Unknown command: '%s'", text)
         end
         table.insert(Module.commandHistory, text)
+    end
+    if Module.Settings.LogCommands then
+        writeLogToFile(text)
     end
 end
 
@@ -2333,6 +2362,15 @@ function Module.MainLoop()
         historyUpdated = false
         focusKeyboard = true
     end
+    if Module.Settings.LogCommands then
+        openLogFile()
+    else
+        if logFileHandle then
+            logFileHandle:close()
+            logFileHandle = nil
+        end
+    end
+
     mq.doevents()
 end
 

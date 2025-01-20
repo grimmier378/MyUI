@@ -673,7 +673,7 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 		ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", item.Stack())
 	end
 	local TextSize2 = ImGui.CalcTextSize(tostring(item.Charges()))
-	if item.Charges() >= 1 then
+	if item.Charges() >= 1 and item.Clicky() then
 		ImGui.SetCursorPos((cursor_x + offsetXCharges), cursor_y + offsetYCharges)
 		ImGui.DrawTextureAnimation(animBox, TextSize2, 4)
 		ImGui.SetCursorPos((cursor_x + offsetXCharges), cursor_y + offsetYCharges)
@@ -888,7 +888,7 @@ local function display_details()
 				local lbl = 'Infinite'
 				if charges == -1 then
 					lbl = 'Infinite'
-				elseif charges == 0 then
+				elseif charges == 0 or clicky == 'No' then
 					lbl = 'None'
 				else
 					lbl = charges

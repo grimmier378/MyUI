@@ -617,6 +617,7 @@ local function DrawSelf()
         if mySelf.Pet() ~= 'NO PET' then
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('green2')))
             ImGui.ProgressBar(((tonumber(mySelf.Pet.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), 5 * Scale, '##PetHpSelf')
+            ImGui.PopStyleColor()
             if ImGui.IsItemHovered() then
                 ImGui.SetTooltip('%s\n%d%% health', mySelf.Pet.DisplayName(), mySelf.Pet.PctHPs())
                 if ImGui.IsMouseClicked(0) then
@@ -1049,7 +1050,7 @@ end
 local function CommandHandler(...)
     local args = { ..., }
 
-    if args[1] == 'ui' then
+    if args[1] == 'ui' or args[1] == 'gui' or args[1] == 'show' then
         showGroupWindow = not showGroupWindow
     end
 end

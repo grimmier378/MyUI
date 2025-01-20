@@ -1,8 +1,6 @@
 local mq                = require("mq")
 local ImGui             = require("ImGui")
 local Module            = {}
-local openGUI           = true
-local shouldDrawGUI     = true
 Module.Name             = "BigBag"
 Module.IsRunning        = false
 Module.ShowGUI          = false
@@ -46,6 +44,8 @@ local toggleMouse                                         = 'Middle'
 local items                                               = {}
 local clickies                                            = {}
 local augments                                            = {}
+local bank_items                                          = {}
+local bank_augments                                       = {}
 local needSort                                            = true
 local coin_type                                           = 0
 local coin_qty                                            = ''
@@ -64,6 +64,7 @@ local utils                                               = require('mq.Utils')
 local settings                                            = {}
 local MySelf                                              = mq.TLO.Me
 local myCopper, mySilver, myGold, myPlat, myWeight, myStr = 0, 0, 0, 0, 0, 0
+local bankCopper, bankSilver, bankGold, bankPlat          = 0, 0, 0, 0
 local defaults                                            = {
 	MIN_SLOTS_WARN = 3,
 	show_item_background = true,
@@ -143,10 +144,13 @@ local function sort_inventory()
 	-- Various Sorting
 	if sort_order.name and sort_order.stack then
 		table.sort(items, function(a, b) return a.Stack() > b.Stack() or (a.Stack() == b.Stack() and a.Name() < b.Name()) end)
+		table.sort(bank_items, function(a, b) return a.Stack() > b.Stack() or (a.Stack() == b.Stack() and a.Name() < b.Name()) end)
 	elseif sort_order.stack then
 		table.sort(items, function(a, b) return a.Stack() > b.Stack() end)
+		table.sort(bank_items, function(a, b) return a.Stack() > b.Stack() end)
 	elseif sort_order.name then
 		table.sort(items, function(a, b) return a.Name() < b.Name() end)
+		table.sort(bank_items, function(a, b) return a.Name() < b.Name() end)
 		-- else
 		-- table.sort(items)
 	end
@@ -272,14 +276,94 @@ local function draw_currency()
 	end
 end
 
+local function draw_bank_coin()
+	ImGui.SeparatorText("Money in Bank:")
+	animItems:SetTextureCell(644 - EQ_ICON_OFFSET)
+	ImGui.DrawTextureAnimation(animItems, 20, 20)
+	ImGui.SameLine()
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), " %s", bankPlat)
+	if ImGui.IsItemHovered() then
+		ImGui.BeginTooltip()
+		ImGui.Text("%s Platinum", bankPlat)
+		ImGui.EndTooltip()
+	end
+
+	ImGui.SameLine()
+
+	animItems:SetTextureCell(645 - EQ_ICON_OFFSET)
+	ImGui.DrawTextureAnimation(animItems, 20, 20)
+	ImGui.SameLine()
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", bankGold)
+	if ImGui.IsItemHovered() then
+		ImGui.BeginTooltip()
+		ImGui.Text("%s Gold", bankGold)
+		ImGui.EndTooltip()
+	end
+
+	ImGui.SameLine()
+
+	animItems:SetTextureCell(646 - EQ_ICON_OFFSET)
+	ImGui.DrawTextureAnimation(animItems, 20, 20)
+	ImGui.SameLine()
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", bankSilver)
+	if ImGui.IsItemHovered() then
+		ImGui.BeginTooltip()
+		ImGui.Text("%s Silver", bankSilver)
+		ImGui.EndTooltip()
+	end
+
+	ImGui.SameLine()
+
+	animItems:SetTextureCell(647 - EQ_ICON_OFFSET)
+	ImGui.DrawTextureAnimation(animItems, 20, 20)
+	ImGui.SameLine()
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", bankCopper)
+	if ImGui.IsItemHovered() then
+		ImGui.BeginTooltip()
+		ImGui.Text("%s Copper", bankCopper)
+		ImGui.EndTooltip()
+	end
+	ImGui.SeparatorText('Items in Bank:')
+end
+
 local function UpdateCoin()
 	myCopper = MySelf.Copper() or 0
 	mySilver = MySelf.Silver() or 0
 	myGold = MySelf.Gold() or 0
 	myPlat = MySelf.Platinum() or 0
+	bankCopper = MySelf.CopperBank() or 0
+	bankSilver = MySelf.SilverBank() or 0
+	bankGold = MySelf.GoldBank() or 0
+	bankPlat = MySelf.PlatinumBank() or 0
 end
 
 -- The beast - this routine is what builds our inventory.
+
+local function create_bank()
+	start_time = os.time()
+	bank_items = {}
+	bank_augments = {}
+	for i = 1, 24, 1 do
+		local slot = mq.TLO.Me.Bank(i)
+		if slot.Container() and slot.Container() > 0 then
+			for j = 1, (slot.Container()), 1 do
+				if (slot.Item(j)()) then
+					table.insert(bank_items, slot.Item(j))
+					if slot.Item(j).AugType() > 0 then
+						table.insert(bank_augments, slot.Item(j))
+					end
+				end
+			end
+		elseif slot.ID() ~= nil then
+			table.insert(bank_items, slot) -- We have an item in a bag slot
+			if slot.AugType() > 0 then
+				table.insert(bank_augments, slot)
+			end
+		end
+	end
+	needSort = true
+end
+
 local function create_inventory()
 	if ((os.difftime(os.time(), start_time)) > INVENTORY_DELAY_SECONDS) or mq.TLO.Me.FreeInventory() ~= FreeSlots or clicked then
 		start_time = os.time()
@@ -328,11 +412,11 @@ local function create_inventory()
 		FreeSlots = mq.TLO.Me.FreeInventory()
 		needSort = true
 		clicked = false
+		create_bank()
 	end
 end
 
-local function create_bank()
-end
+
 
 -- Converts between ItemSlot and /itemnotify pack numbers
 local function to_pack(slot_number)
@@ -358,116 +442,90 @@ end
 -- Display the collapasable menu area above the items
 local function display_bag_options()
 	ImGui.SetWindowFontScale(1.0)
-	if ImGui.CollapsingHeader("Bag Options") then
-		local changed = false
-		sort_order.name, changed = ImGui.Checkbox("Name", sort_order.name)
-		if changed then
-			needSort = true
-			settings.sort_order.name = sort_order.name
-			mq.pickle(configFile, settings)
-			clicked = true
-		end
-		ImGui.SameLine()
-		help_marker("Order items from your inventory sorted by the name of the item.")
-
-		local pressed = false
-		sort_order.stack, pressed = ImGui.Checkbox("Stack", sort_order.stack)
-		if pressed then
-			needSort = true
-			settings.sort_order.stack = sort_order.stack
-			mq.pickle(configFile, settings)
-			clicked = true
-		end
-		ImGui.SameLine()
-		help_marker("Order items with the largest stacks appearing first.")
-
-		local pressed2 = false
-		show_item_background, pressed2 = ImGui.Checkbox("Show Slot Background", show_item_background)
-		if pressed2 then
-			settings.show_item_background = show_item_background
-			mq.pickle(configFile, settings)
-		end
-		ImGui.SameLine()
-		help_marker("Removes the background texture to give your bag a cool modern look.")
-
-		ImGui.SetNextItemWidth(100)
-		MIN_SLOTS_WARN = ImGui.InputInt("Min Slots Warning", MIN_SLOTS_WARN, 1, 10)
-		if MIN_SLOTS_WARN ~= settings.MIN_SLOTS_WARN then
-			settings.MIN_SLOTS_WARN = MIN_SLOTS_WARN
-			mq.pickle(configFile, settings)
-		end
-		ImGui.SameLine()
-		help_marker("Minimum number of slots before the warning color is displayed.")
-
-		ImGui.SetNextItemWidth(100)
-		INVENTORY_DELAY_SECONDS = ImGui.InputInt("Inventory Refresh Time (s)", INVENTORY_DELAY_SECONDS, 1, 10)
-		if INVENTORY_DELAY_SECONDS ~= settings.INVENTORY_DELAY_SECONDS then
-			settings.INVENTORY_DELAY_SECONDS = INVENTORY_DELAY_SECONDS
-			mq.pickle(configFile, settings)
-		end
-		ImGui.SameLine()
-		help_marker("Time in seconds between inventory refreshes, if # of free slots hasn't changed.")
-	end
-
-	if ImGui.CollapsingHeader('Toggle Settings') then
-		ImGui.Text("Toggle Key")
-		ImGui.SameLine()
-		ImGui.SetNextItemWidth(100)
-		toggleKey = ImGui.InputText("##ToggleKey", toggleKey, ImGuiInputTextFlags.CharsUppercase)
-		if toggleKey ~= settings.toggleKey then
-			settings.toggleKey = toggleKey:upper()
-			mq.pickle(configFile, settings)
-		end
-		ImGui.SameLine()
-		help_marker("Key to toggle the GUI (A-Z | 0-9 | F1-F12)")
-		if toggleKey ~= '' then
-			ImGui.Text("Toggle Mod Key")
-			ImGui.SameLine()
-			ImGui.SetNextItemWidth(100)
-
-			local isSelected = false
-			if settings.toggleModKey2 == '' then
-				ImGui.Text("None")
-			else
-				if ImGui.BeginCombo("##ToggleModKey", settings.toggleModKey) then
-					for k, v in pairs(modKeys) do
-						isSelected = v == settings.toggleModKey
-						if ImGui.Selectable(v, isSelected) then
-							settings.toggleModKey = v
-							if v == 'None' then
-								settings.toggleModKey2 = 'None'
-								settings.toggleModKey3 = 'None'
-								toggleModKey2 = settings.toggleModKey2
-								toggleModKey3 = settings.toggleModKey3
-							end
-							toggleModKey = settings.toggleModKey
-							mq.pickle(configFile, settings)
-						end
-					end
-					ImGui.EndCombo()
-				end
+	if ImGui.BeginChild("OptionsChild") then
+		if ImGui.CollapsingHeader("Bag Options") then
+			local changed = false
+			sort_order.name, changed = ImGui.Checkbox("Name", sort_order.name)
+			if changed then
+				needSort = true
+				settings.sort_order.name = sort_order.name
+				mq.pickle(configFile, settings)
+				clicked = true
 			end
 			ImGui.SameLine()
-			help_marker("Modifier Key to toggle the GUI (Ctrl | Alt | Shift)")
-			if settings.toggleModKey ~= 'None' then
-				ImGui.Text("Toggle Mod Key2")
+			help_marker("Order items from your inventory sorted by the name of the item.")
+
+			local pressed = false
+			sort_order.stack, pressed = ImGui.Checkbox("Stack", sort_order.stack)
+			if pressed then
+				needSort = true
+				settings.sort_order.stack = sort_order.stack
+				mq.pickle(configFile, settings)
+				clicked = true
+			end
+			ImGui.SameLine()
+			help_marker("Order items with the largest stacks appearing first.")
+
+			local pressed2 = false
+			show_item_background, pressed2 = ImGui.Checkbox("Show Slot Background", show_item_background)
+			if pressed2 then
+				settings.show_item_background = show_item_background
+				mq.pickle(configFile, settings)
+			end
+			ImGui.SameLine()
+			help_marker("Removes the background texture to give your bag a cool modern look.")
+
+			ImGui.SetNextItemWidth(100)
+			MIN_SLOTS_WARN = ImGui.InputInt("Min Slots Warning", MIN_SLOTS_WARN, 1, 10)
+			if MIN_SLOTS_WARN ~= settings.MIN_SLOTS_WARN then
+				settings.MIN_SLOTS_WARN = MIN_SLOTS_WARN
+				mq.pickle(configFile, settings)
+			end
+			ImGui.SameLine()
+			help_marker("Minimum number of slots before the warning color is displayed.")
+
+			ImGui.SetNextItemWidth(100)
+			INVENTORY_DELAY_SECONDS = ImGui.InputInt("Inventory Refresh Time (s)", INVENTORY_DELAY_SECONDS, 1, 10)
+			if INVENTORY_DELAY_SECONDS ~= settings.INVENTORY_DELAY_SECONDS then
+				settings.INVENTORY_DELAY_SECONDS = INVENTORY_DELAY_SECONDS
+				mq.pickle(configFile, settings)
+			end
+			ImGui.SameLine()
+			help_marker("Time in seconds between inventory refreshes, if # of free slots hasn't changed.")
+		end
+
+		if ImGui.CollapsingHeader('Toggle Settings') then
+			ImGui.Text("Toggle Key")
+			ImGui.SameLine()
+			ImGui.SetNextItemWidth(100)
+			toggleKey = ImGui.InputText("##ToggleKey", toggleKey, ImGuiInputTextFlags.CharsUppercase)
+			if toggleKey ~= settings.toggleKey then
+				settings.toggleKey = toggleKey:upper()
+				mq.pickle(configFile, settings)
+			end
+			ImGui.SameLine()
+			help_marker("Key to toggle the GUI (A-Z | 0-9 | F1-F12)")
+			if toggleKey ~= '' then
+				ImGui.Text("Toggle Mod Key")
 				ImGui.SameLine()
 				ImGui.SetNextItemWidth(100)
 
-				local isSelectedMod2 = false
+				local isSelected = false
 				if settings.toggleModKey2 == '' then
 					ImGui.Text("None")
 				else
-					if ImGui.BeginCombo("##ToggleModKey2", settings.toggleModKey2) then
+					if ImGui.BeginCombo("##ToggleModKey", settings.toggleModKey) then
 						for k, v in pairs(modKeys) do
-							isSelectedMod2 = v == settings.toggleModKey2
-							if ImGui.Selectable(v, isSelectedMod2) then
-								settings.toggleModKey2 = v
+							isSelected = v == settings.toggleModKey
+							if ImGui.Selectable(v, isSelected) then
+								settings.toggleModKey = v
 								if v == 'None' then
+									settings.toggleModKey2 = 'None'
 									settings.toggleModKey3 = 'None'
+									toggleModKey2 = settings.toggleModKey2
 									toggleModKey3 = settings.toggleModKey3
 								end
-								toggleModKey2 = settings.toggleModKey2
+								toggleModKey = settings.toggleModKey
 								mq.pickle(configFile, settings)
 							end
 						end
@@ -475,22 +533,26 @@ local function display_bag_options()
 					end
 				end
 				ImGui.SameLine()
-				help_marker("Modifier Key2 to toggle the GUI (Ctrl | Alt | Shift)")
-
-				if settings.toggleModKey2 ~= 'None' then
-					ImGui.Text("Toggle Mod Key3")
+				help_marker("Modifier Key to toggle the GUI (Ctrl | Alt | Shift)")
+				if settings.toggleModKey ~= 'None' then
+					ImGui.Text("Toggle Mod Key2")
 					ImGui.SameLine()
 					ImGui.SetNextItemWidth(100)
-					local isSelectedMod3 = false
-					if settings.toggleModKey3 == '' then
+
+					local isSelectedMod2 = false
+					if settings.toggleModKey2 == '' then
 						ImGui.Text("None")
 					else
-						if ImGui.BeginCombo("##ToggleModKey3", settings.toggleModKey3) then
+						if ImGui.BeginCombo("##ToggleModKey2", settings.toggleModKey2) then
 							for k, v in pairs(modKeys) do
-								isSelectedMod3 = v == settings.toggleModKey3
-								if ImGui.Selectable(v, isSelectedMod3) then
-									settings.toggleModKey3 = v
-									toggleModKey3 = settings.toggleModKey3
+								isSelectedMod2 = v == settings.toggleModKey2
+								if ImGui.Selectable(v, isSelectedMod2) then
+									settings.toggleModKey2 = v
+									if v == 'None' then
+										settings.toggleModKey3 = 'None'
+										toggleModKey3 = settings.toggleModKey3
+									end
+									toggleModKey2 = settings.toggleModKey2
 									mq.pickle(configFile, settings)
 								end
 							end
@@ -498,51 +560,75 @@ local function display_bag_options()
 						end
 					end
 					ImGui.SameLine()
-					help_marker("Modifier Key3 to toggle the GUI (Ctrl | Alt | Shift)")
+					help_marker("Modifier Key2 to toggle the GUI (Ctrl | Alt | Shift)")
+
+					if settings.toggleModKey2 ~= 'None' then
+						ImGui.Text("Toggle Mod Key3")
+						ImGui.SameLine()
+						ImGui.SetNextItemWidth(100)
+						local isSelectedMod3 = false
+						if settings.toggleModKey3 == '' then
+							ImGui.Text("None")
+						else
+							if ImGui.BeginCombo("##ToggleModKey3", settings.toggleModKey3) then
+								for k, v in pairs(modKeys) do
+									isSelectedMod3 = v == settings.toggleModKey3
+									if ImGui.Selectable(v, isSelectedMod3) then
+										settings.toggleModKey3 = v
+										toggleModKey3 = settings.toggleModKey3
+										mq.pickle(configFile, settings)
+									end
+								end
+								ImGui.EndCombo()
+							end
+						end
+						ImGui.SameLine()
+						help_marker("Modifier Key3 to toggle the GUI (Ctrl | Alt | Shift)")
+					end
 				end
 			end
+			ImGui.Text("Toggle Mouse Button")
+			ImGui.SameLine()
+			ImGui.SetNextItemWidth(100)
+			local isSelectedMouse = false
+			if settings.toggleMouse == '' then
+				ImGui.Text("None")
+			else
+				if ImGui.BeginCombo("##ToggleMouseButton", settings.toggleMouse) then
+					for k, v in pairs(mouseKeys) do
+						isSelectedMouse = v == settings.toggleMouse
+						if ImGui.Selectable(v, isSelectedMouse) then
+							settings.toggleMouse = v
+							toggleMouse = settings.toggleMouse
+							mq.pickle(configFile, settings)
+						end
+					end
+					ImGui.EndCombo()
+				end
+			end
+			ImGui.SameLine()
+			help_marker("Mouse Button to toggle the GUI (Left | Right | Middle)")
 		end
-		ImGui.Text("Toggle Mouse Button")
-		ImGui.SameLine()
-		ImGui.SetNextItemWidth(100)
-		local isSelectedMouse = false
-		if settings.toggleMouse == '' then
-			ImGui.Text("None")
-		else
-			if ImGui.BeginCombo("##ToggleMouseButton", settings.toggleMouse) then
-				for k, v in pairs(mouseKeys) do
-					isSelectedMouse = v == settings.toggleMouse
-					if ImGui.Selectable(v, isSelectedMouse) then
-						settings.toggleMouse = v
-						toggleMouse = settings.toggleMouse
+
+		if ImGui.CollapsingHeader("Theme Settings##BigBag") then
+			ImGui.Text("Cur Theme: %s", themeName)
+			-- Combo Box Load Theme
+			if ImGui.BeginCombo("Load Theme##BigBag", themeName) then
+				for k, data in pairs(Module.Theme.Theme) do
+					local isSelected = data.Name == themeName
+					if ImGui.Selectable(data.Name, isSelected) then
+						settings.themeName = data.Name
+						themeName = settings.themeName
 						mq.pickle(configFile, settings)
 					end
 				end
 				ImGui.EndCombo()
 			end
 		end
-		ImGui.SameLine()
-		help_marker("Mouse Button to toggle the GUI (Left | Right | Middle)")
 	end
-
-	if ImGui.CollapsingHeader("Theme Settings##BigBag") then
-		ImGui.Text("Cur Theme: %s", themeName)
-		-- Combo Box Load Theme
-		if ImGui.BeginCombo("Load Theme##BigBag", themeName) then
-			for k, data in pairs(Module.Theme.Theme) do
-				local isSelected = data.Name == themeName
-				if ImGui.Selectable(data.Name, isSelected) then
-					settings.themeName = data.Name
-					themeName = settings.themeName
-					mq.pickle(configFile, settings)
-				end
-			end
-			ImGui.EndCombo()
-		end
-	end
-	ImGui.Separator()
-	ImGui.NewLine()
+	ImGui.EndChild()
 end
+
 
 -- Helper to create a unique hidden label for each button.  The uniqueness is
 -- necessary for drag and drop to work correctly.
@@ -556,7 +642,7 @@ end
 
 ---Draws the individual item icon in the bag.
 ---@param item item The item object
-local function draw_item_icon(item, iconWidth, iconHeight, drawID)
+local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 	-- Capture original cursor position
 	local cursor_x, cursor_y = ImGui.GetCursorPos()
 	local offsetX, offsetY = iconWidth - 1, iconHeight / 1.5
@@ -627,26 +713,34 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID)
 			ImGui.TextColored(ImVec4(0, 1, 1, 1), "Charges: %s", charges >= 0 and charges or 'Infinite')
 		end
 		ImGui.SeparatorText("Click Actions")
-		ImGui.Text("Right Click to use item")
-		ImGui.Text("Left Click Pick Up item")
+		if clickable then
+			ImGui.Text("Right Click to use item")
+			ImGui.Text("Left Click Pick Up item")
+		end
 		ImGui.Text("Ctrl + Right Click to Inspect Item")
 		ImGui.EndTooltip()
 	end
-
-	if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
-		if item.ItemSlot2() == -1 then
-			mq.cmd("/itemnotify " .. item.ItemSlot() .. " leftmouseup")
-		else
-			-- print(item.ItemSlot2())
-			mq.cmd("/itemnotify in " .. to_pack(item.ItemSlot()) .. " " .. to_bag_slot(item.ItemSlot2()) .. " leftmouseup")
+	if clickable then
+		if ImGui.IsItemClicked(ImGuiMouseButton.Left) and not mq.TLO.Me.Casting() then
+			if item.ItemSlot2() == -1 then
+				mq.cmd("/itemnotify " .. item.ItemSlot() .. " leftmouseup")
+			else
+				-- print(item.ItemSlot2())
+				mq.cmd("/itemnotify in " .. to_pack(item.ItemSlot()) .. " " .. to_bag_slot(item.ItemSlot2()) .. " leftmouseup")
+			end
 		end
-	end
-	if ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsItemClicked(ImGuiMouseButton.Right) then
-		local link = item.ItemLink('CLICKABLE')()
-		mq.cmdf('/executelink %s', link)
-	elseif ImGui.IsItemClicked(ImGuiMouseButton.Right) then
-		mq.cmdf('/useitem "%s"', item.Name())
-		clicked = true
+		if ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsItemClicked(ImGuiMouseButton.Right) then
+			local link = item.ItemLink('CLICKABLE')()
+			mq.cmdf('/executelink %s', link)
+		elseif ImGui.IsItemClicked(ImGuiMouseButton.Right) and not mq.TLO.Me.Casting() then
+			mq.cmdf('/useitem "%s"', item.Name())
+			clicked = true
+		end
+	else
+		if ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsItemClicked(ImGuiMouseButton.Right) then
+			local link = item.ItemLink('CLICKABLE')()
+			mq.cmdf('/executelink %s', link)
+		end
 	end
 end
 
@@ -677,68 +771,99 @@ end
 local function display_bag_content()
 	-- create_inventory()
 	ImGui.SetWindowFontScale(1.0)
+	if ImGui.BeginChild("BagContent", 0.0, 0.0) then
+		ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
+		local bag_window_width = ImGui.GetWindowWidth()
+		local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
+		local temp_bag_cols = 1
 
-	ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
-	local bag_window_width = ImGui.GetWindowWidth()
-	local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
-	local temp_bag_cols = 1
-
-	for index, _ in ipairs(items) do
-		if string.match(string.lower(items[index].Name()), string.lower(filter_text)) then
-			draw_item_icon(items[index], ICON_WIDTH, ICON_HEIGHT, index)
-			if bag_cols > temp_bag_cols then
-				temp_bag_cols = temp_bag_cols + 1
-				ImGui.SameLine()
-			else
-				temp_bag_cols = 1
+		for index, _ in ipairs(items) do
+			if string.match(string.lower(items[index].Name()), string.lower(filter_text)) then
+				draw_item_icon(items[index], ICON_WIDTH, ICON_HEIGHT, 'inv' .. index, true)
+				if bag_cols > temp_bag_cols then
+					temp_bag_cols = temp_bag_cols + 1
+					ImGui.SameLine()
+				else
+					temp_bag_cols = 1
+				end
 			end
 		end
+		ImGui.PopStyleVar()
 	end
-	ImGui.PopStyleVar()
+	ImGui.EndChild()
+end
+
+local function display_bank_content()
+	-- create_inventory()
+	ImGui.SetWindowFontScale(1.0)
+	if ImGui.BeginChild("BankContent", 0.0, 0.0) then
+		ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
+		local bag_window_width = ImGui.GetWindowWidth()
+		local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
+		local temp_bag_cols = 1
+
+		for index, _ in ipairs(bank_items) do
+			if string.match(string.lower(bank_items[index].Name()), string.lower(filter_text)) then
+				draw_item_icon(bank_items[index], ICON_WIDTH, ICON_HEIGHT, 'bank' .. index, false)
+				if bag_cols > temp_bag_cols then
+					temp_bag_cols = temp_bag_cols + 1
+					ImGui.SameLine()
+				else
+					temp_bag_cols = 1
+				end
+			end
+		end
+		ImGui.PopStyleVar()
+	end
+	ImGui.EndChild()
 end
 
 local function display_clickies()
 	ImGui.SetWindowFontScale(1.0)
+	if ImGui.BeginChild("BagClickies", 0.0, 0.0) then
+		ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
+		local bag_window_width = ImGui.GetWindowWidth()
+		local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
+		local temp_bag_cols = 1
 
-	ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
-	local bag_window_width = ImGui.GetWindowWidth()
-	local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
-	local temp_bag_cols = 1
-
-	for index, _ in ipairs(clickies) do
-		if string.match(string.lower(clickies[index].Name()), string.lower(filter_text)) then
-			draw_item_icon(clickies[index], ICON_WIDTH, ICON_HEIGHT)
-			if bag_cols > temp_bag_cols then
-				temp_bag_cols = temp_bag_cols + 1
-				ImGui.SameLine()
-			else
-				temp_bag_cols = 1
+		for index, _ in ipairs(clickies) do
+			if string.match(string.lower(clickies[index].Name()), string.lower(filter_text)) then
+				draw_item_icon(clickies[index], ICON_WIDTH, ICON_HEIGHT, 'clicky' .. index, true)
+				if bag_cols > temp_bag_cols then
+					temp_bag_cols = temp_bag_cols + 1
+					ImGui.SameLine()
+				else
+					temp_bag_cols = 1
+				end
 			end
 		end
+		ImGui.PopStyleVar()
 	end
-	ImGui.PopStyleVar()
+	ImGui.EndChild()
 end
 
 local function display_augments()
 	ImGui.SetWindowFontScale(1.0)
+	if ImGui.BeginChild("BagAugments", 0.0, 0.0) then
+		ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
+		local bag_window_width = ImGui.GetWindowWidth()
+		local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
+		local temp_bag_cols = 1
 
-	ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
-	local bag_window_width = ImGui.GetWindowWidth()
-	local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
-	local temp_bag_cols = 1
-
-	for index, _ in ipairs(augments) do
-		if string.match(string.lower(augments[index].Name()), string.lower(filter_text)) then
-			draw_item_icon(augments[index], ICON_WIDTH, ICON_HEIGHT)
-			if bag_cols > temp_bag_cols then
-				temp_bag_cols = temp_bag_cols + 1
-				ImGui.SameLine()
-			else
-				temp_bag_cols = 1
+		for index, _ in ipairs(augments) do
+			if string.match(string.lower(augments[index].Name()), string.lower(filter_text)) then
+				draw_item_icon(augments[index], ICON_WIDTH, ICON_HEIGHT, 'augments' .. index, true)
+				if bag_cols > temp_bag_cols then
+					temp_bag_cols = temp_bag_cols + 1
+					ImGui.SameLine()
+				else
+					temp_bag_cols = 1
+				end
 			end
 		end
+		ImGui.PopStyleVar()
 	end
-	ImGui.PopStyleVar()
+	ImGui.EndChild()
 end
 
 local function display_details()
@@ -770,7 +895,7 @@ local function display_details()
 				end
 				ImGui.TableNextRow()
 				ImGui.TableNextColumn()
-				draw_item_icon(item, 20, 20)
+				draw_item_icon(item, 20, 20, 'details' .. index, true)
 				ImGui.TableNextColumn()
 				ImGui.PushID(string.format("##SelectItem_%s", index))
 				ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(0, 1, 1, 1))
@@ -908,7 +1033,7 @@ local function RenderTabs()
 		ImGui.SeparatorText('Inventory / Destroy Area')
 		local sizeX = ImGui.GetWindowWidth()
 
-		if ImGui.BeginChild('CoinArea', ImVec2((sizeX / 2) - 10, 40), ImGuiChildFlags.Border) then
+		if ImGui.BeginChild('AutoInvArea', ImVec2((sizeX / 2) - 10, 40), ImGuiChildFlags.Border) then
 			ImGui.TextDisabled("Inventory Coin/Item")
 		end
 		ImGui.EndChild()
@@ -949,6 +1074,11 @@ local function RenderTabs()
 					display_details()
 					ImGui.EndTabItem()
 				end
+				if ImGui.BeginTabItem("Bank") then
+					draw_bank_coin()
+					display_bank_content()
+					ImGui.EndTabItem()
+				end
 				if ImGui.BeginTabItem('Settings') then
 					display_bag_options()
 					ImGui.EndTabItem()
@@ -964,7 +1094,7 @@ local function RenderTabs()
 			end
 		end
 
-		display_item_on_cursor()
+		-- display_item_on_cursor()
 	end
 	ImGui.SetWindowFontScale(1)
 	Module.ThemeLoader.EndTheme(colorCount, styleCount)
@@ -986,7 +1116,6 @@ local function init()
 	Module.IsRunning = true
 	loadSettings()
 	create_inventory()
-
 	mq.bind("/bigbag", Module.CommandHandler)
 
 	if not loadedExeternally then

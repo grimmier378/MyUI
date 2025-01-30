@@ -38,7 +38,7 @@ else
     Module.ThemeFile   = MyUI_ThemeFile
     Module.Theme       = MyUI_Theme
 end
-
+Module.myClass                                                   = mq.TLO.Me.Class.ShortName()
 -- Variables
 local themeName                                                  = 'Default'
 local defaults, settings, debugMessages                          = {}, {}, {}
@@ -671,7 +671,7 @@ local function CheckInterrupts()
     local flag = false
     local invis = false
     if mq.TLO.Me.Sitting() and InterruptSet.stopForSitting then
-        local curHP, curMP = mq.TLO.Me.PctHPs(), mq.TLO.Me.PctMana() or 0
+        local curHP, curMP, curEndur = mq.TLO.Me.PctHPs(), mq.TLO.Me.PctMana(), mq.TLO.Me.PctEndurance or 0
         -- mq.delay(10)
         if not interruptInProgress then
             mq.cmdf("/nav stop log=off")
@@ -685,10 +685,13 @@ local function CheckInterrupts()
 
         flag = true
 
-        if curHP >= 99 and curMP >= 99 and settings[Module.Name].AutoStand then
-            mq.TLO.Me.Stand()
-            status = 'Idle'
-            flag = false
+
+        if settings[Module.Name].AutoStand then
+            if curHP >= 99 and (manaClass[Module.myClass] and curMP >= 99) and curEndur > 50 then
+                mq.TLO.Me.Stand()
+                status = 'Idle'
+                flag = false
+            end
         end
     elseif mq.TLO.Window('LootWnd').Open() and InterruptSet.stopForLoot then
         if not interruptInProgress then
@@ -1650,6 +1653,8 @@ function Module.RenderGUI()
                             if #ChainedPaths > 0 then
                                 NavSet.ChainLoop = ImGui.Checkbox('Loop Chain', NavSet.ChainLoop)
                                 ImGui.SameLine()
+
+                                ImGui.SetNextItemWidth(100)
                                 saveChainName = ImGui.InputTextWithHint("##ChainName", "Chain Name", saveChainName)
                                 ImGui.SameLine()
                                 ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))

@@ -275,36 +275,54 @@ end
 
 local function DrawContextMenu()
 	if mq.TLO.Plugin('MQ2DanNet').IsLoaded() then
+		ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('teal'))
 		if ImGui.MenuItem('Start MyGroup Clients') then
 			mq.cmd('/dgge /lua run myui client')
 		end
+		ImGui.PopStyleColor()
+
 		ImGui.Spacing()
+
+		ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('tangarine'))
 		if ImGui.MenuItem('Stop MyGroup Clients') then
 			mq.cmd('/dgge /myui quit')
 		end
+		ImGui.PopStyleColor()
+
 		ImGui.Spacing()
 
+		ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('pink2'))
 		if ImGui.MenuItem('Stop MyGroup ALL') then
 			mq.cmd('/dgga /myui quit')
 		end
+		ImGui.PopStyleColor()
+
 		ImGui.Spacing()
 
 		ImGui.Separator()
 
+		ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('teal'))
 		if ImGui.MenuItem('Start AllGroups Clients') then
 			mq.cmd('/dge all /lua run myui client')
 		end
 		ImGui.Spacing()
 
+		ImGui.PopStyleColor()
+
+		ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('tangarine'))
 		if ImGui.MenuItem('Stop AllGroups Clients') then
 			mq.cmd('/dge all /myui quit')
 		end
+		ImGui.PopStyleColor()
 		ImGui.Spacing()
 
+		ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('pink2'))
 		if ImGui.MenuItem('Stop EVERYONE') then
 			mq.cmd('/dgae /myui quit')
 		end
+		ImGui.PopStyleColor()
 	end
+
 	ImGui.Spacing()
 
 	ImGui.Separator()

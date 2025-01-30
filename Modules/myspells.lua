@@ -43,7 +43,7 @@ else
 	Module.ThemeFile = MyUI_ThemeFile
 	Module.Theme = MyUI_Theme
 end
-
+local isCaster = true
 local picker = Module.AbilityPicker.new()
 local pickerOpen = false
 local bIcon = Module.Icons.FA_BOOK
@@ -549,263 +549,265 @@ function Module.RenderGUI()
 	if not aSize then winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse) end
 	if locked then winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoMove) end
 	if not showTitle then winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoTitleBar) end
-	local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
-	local open, show = ImGui.Begin(bIcon .. '##MySpells_' .. Module.CharLoaded, true, winFlags)
-	if not open then
-		Module.IsRunning = false
-	end
-	if show then
-		-- Calculate maxRow to account for window padding and element size
-		local windowWidth = ImGui.GetWindowWidth() or 100
-		maxRow = math.floor(windowWidth / (scale * 44))
-		if aSize then
-			maxRow = settings[Module.Name].maxRow
+	if isCaster then
+		local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
+		local open, show = ImGui.Begin(bIcon .. '##MySpells_' .. Module.CharLoaded, true, winFlags)
+		if not open then
+			Module.IsRunning = false
 		end
-		currentTime = os.time()
-		rowCount = 0
+		if show then
+			-- Calculate maxRow to account for window padding and element size
+			local windowWidth = ImGui.GetWindowWidth() or 100
+			maxRow = math.floor(windowWidth / (scale * 44))
+			if aSize then
+				maxRow = settings[Module.Name].maxRow
+			end
+			currentTime = os.time()
+			rowCount = 0
 
-		if ImGui.BeginPopupContextItem("##MySpells_theme") then
-			if ImGui.MenuItem("Configure") then
-				configWindowShow = not configWindowShow
-			end
-			local aLabel = aSize and 'Disable Auto Size' or 'Enable Auto Size'
-			if ImGui.MenuItem(aLabel) then
-				aSize = not aSize
-				if aSize then
-					settings[Module.Name].maxRow = maxRow
-				end
-				settings[Module.Name].AutoSize = aSize
-				mq.pickle(configFile, settings)
-			end
-			local lockLabel = locked and 'Unlock' or 'Lock'
-			if ImGui.MenuItem(lockLabel) then
-				locked = not locked
-				settings[Module.Name].locked = locked
-				mq.pickle(configFile, settings)
-			end
-			local titleBarLabel = showTitle and 'Hide Title Bar' or 'Show Title Bar'
-			if ImGui.MenuItem(titleBarLabel) then
-				showTitle = not showTitle
-				settings[Module.Name].ShowTitleBar = showTitle
-				mq.pickle(configFile, settings)
-			end
-			ImGui.EndPopup()
-		end
-		ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 0, 0)
-		for i = 1, numGems do
-			ImGui.BeginChild("##SpellGem" .. i, ImVec2(scale * 40, scale * 33), bit32.bor(ImGuiChildFlags.AlwaysUseWindowPadding),
-				bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
-			if spellBar[i] ~= nil then
-				if spellBar[i].sID > -1 then
-					DrawInspectableSpellIcon(spellBar[i].sIcon, spellBar[i], i)
-					if ImGui.BeginPopupContextItem("##SpellGem" .. i) then
-						if ImGui.IsKeyDown(ImGuiMod.Ctrl) then ImGui.CloseCurrentPopup() end
-						if ImGui.MenuItem("Memorize") then
-							if pickerOpen == true then
-								memSpell = -1
-								picker:SetClose()
-								pickerOpen = false
-								picker:ClearSelection()
-							end
-							memSpell = i
-						end
-						if ImGui.MenuItem("Inspect") then
-							mq.cmdf("/altkey /notify CastSpellWnd CSPW_Spell%s leftmouseup", i - 1)
-						end
-						if ImGui.MenuItem("Clear") then
-							mq.cmdf("/nomodkey /altkey /notify CastSpellWnd CSPW_Spell%s rightmouseup", i - 1)
-						end
-						ImGui.EndPopup()
-					end
-					if ImGui.IsItemHovered() then
-						ImGui.SetTooltip(string.format("%d) %s", i, spellBar[i].sName))
-						if ImGui.IsMouseReleased(0) then
-							mq.cmdf("/cast %s", i)
-							casting = true
-							spellBar[i].sClicked = os.time()
-						elseif ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsMouseReleased(1) then
-							mq.cmdf("/nomodkey /altkey /notify CastSpellWnd CSPW_Spell%s rightmouseup", i - 1)
-						end
-					end
-					if not casting and interrupted then
-						spellBar[i].sClicked = -1
-						interrupted = false
-					end
-				else
-					DrawInspectableSpellIcon(-1, spellBar[i], i)
-					if ImGui.IsItemHovered() then
-						ImGui.SetTooltip("Empty")
-						if ImGui.IsMouseReleased(1) then
-							if pickerOpen == true then
-								memSpell = -1
-								picker:SetClose()
-								pickerOpen = false
-								picker:ClearSelection()
-							end
-							memSpell = i
-						end
-					end
-				end
-			end
-			ImGui.EndChild()
-			rowCount = rowCount + 1
-
-			if rowCount < maxRow then
-				ImGui.SameLine()
-			else
-				rowCount = 0
-			end
-		end
-		ImGui.PopStyleVar()
-		if memSpell ~= -1 and not picker.Draw then -- and not pickerOpen then
-			ImGui.SetNextWindowPos(ImGui.GetMousePosOnOpeningCurrentPopupVec(), ImGuiCond.Appearing)
-			picker:SetOpen()
-			pickerOpen = true
-		end
-
-		if picker.Selected then
-			local selected = picker.Selected or {}
-			if selected.Type == 'Spell' then
-				mq.cmdf("/memspell %d \"%s\"", memSpell, selected.Name)
-				memSpell = -1
-				picker:SetClose()
-				pickerOpen = false
-				picker:ClearSelection()
-			end
-		end
-		picker:DrawAbilityPicker()
-
-		ImGui.BeginChild("##SpellBook", ImVec2(40 * scale, scale * 40), bit32.bor(ImGuiChildFlags.AlwaysUseWindowPadding),
-			bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
-		local cursor_x, cursor_y = ImGui.GetCursorPos()
-
-		if mq.TLO.Window('SpellBookWnd').Open() then
-			ImGui.SetCursorPos(cursor_x, cursor_y)
-			ImGui.Image(openBook:GetTextureID(), ImVec2(scale * 39, scale * 22))
-			if ImGui.IsItemHovered() then
-				ImGui.SetTooltip("Close Spell Book")
-				if ImGui.IsMouseReleased(0) then
-					mq.TLO.Window('SpellBookWnd').DoClose()
-				end
-			end
-		else
-			ImGui.SetCursorPos(cursor_x, cursor_y)
-			ImGui.Image(closedBook:GetTextureID(), ImVec2(39 * scale, scale * 22))
-			if ImGui.IsItemHovered() then
-				ImGui.SetTooltip("Open Spell Book")
-				if ImGui.IsMouseReleased(0) then
-					mq.TLO.Window('SpellBookWnd').DoOpen()
-				end
-			end
-		end
-
-		if ImGui.BeginPopupContextWindow("##SpellBook") then
-			ImGui.Text(gIcon)
-			if ImGui.IsItemHovered() then
-				ImGui.SetTooltip("Config")
-				if ImGui.IsMouseReleased(0) then
+			if ImGui.BeginPopupContextItem("##MySpells_theme") then
+				if ImGui.MenuItem("Configure") then
 					configWindowShow = not configWindowShow
-					ImGui.CloseCurrentPopup()
 				end
-			end
-			ImGui.SameLine()
-			local rIcon = aSize and Module.Icons.FA_EXPAND or Module.Icons.FA_COMPRESS
-			ImGui.Text(rIcon)
-			if ImGui.IsItemHovered() then
-				local label = aSize and "Disable Auto Size" or "Enable Auto Size"
-				ImGui.SetTooltip(label)
-				if ImGui.IsMouseReleased(0) then
+				local aLabel = aSize and 'Disable Auto Size' or 'Enable Auto Size'
+				if ImGui.MenuItem(aLabel) then
 					aSize = not aSize
-
 					if aSize then
 						settings[Module.Name].maxRow = maxRow
 					end
 					settings[Module.Name].AutoSize = aSize
 					mq.pickle(configFile, settings)
-					ImGui.CloseCurrentPopup()
 				end
-			end
-			ImGui.SameLine()
-			local lIcon = locked and Module.Icons.FA_LOCK or Module.Icons.FA_UNLOCK
-			ImGui.Text(lIcon)
-			if ImGui.IsItemHovered() then
-				local label = locked and "Unlock" or "Lock"
-				ImGui.SetTooltip(label)
-				if ImGui.IsMouseReleased(0) then
+				local lockLabel = locked and 'Unlock' or 'Lock'
+				if ImGui.MenuItem(lockLabel) then
 					locked = not locked
-
 					settings[Module.Name].locked = locked
 					mq.pickle(configFile, settings)
-					ImGui.CloseCurrentPopup()
 				end
-			end
-			ImGui.SameLine()
-			local tIcon = showTitle and Module.Icons.FA_EYE_SLASH or Module.Icons.FA_EYE
-			ImGui.Text(tIcon)
-			if ImGui.IsItemHovered() then
-				local label = showTitle and "Hide Title Bar" or "Show Title Bar"
-				ImGui.SetTooltip(label)
-				if ImGui.IsMouseReleased(0) then
+				local titleBarLabel = showTitle and 'Hide Title Bar' or 'Show Title Bar'
+				if ImGui.MenuItem(titleBarLabel) then
 					showTitle = not showTitle
 					settings[Module.Name].ShowTitleBar = showTitle
 					mq.pickle(configFile, settings)
-					ImGui.CloseCurrentPopup()
 				end
+				ImGui.EndPopup()
 			end
-			ImGui.SeparatorText("Save Set")
-			ImGui.SetNextItemWidth(150)
-			tmpName = ImGui.InputText("##SetName", tmpName)
-			ImGui.SameLine()
-			if ImGui.Button("Save Set") then
-				if tmpName ~= '' then
-					setName = tmpName
-					SaveSet(setName)
-					ImGui.CloseCurrentPopup()
-				end
-			end
-			ImGui.SeparatorText("Load Set")
-			ImGui.SetNextItemWidth(150)
-			if ImGui.BeginCombo("##LoadSet", setName) then
-				for k, data in pairs(settings[Module.Name][Module.CharLoaded].Sets) do
-					local isSelected = k == setName
-					if ImGui.Selectable(k, isSelected) then
-						setName = k
+			ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 0, 0)
+			for i = 1, numGems do
+				ImGui.BeginChild("##SpellGem" .. i, ImVec2(scale * 40, scale * 33), bit32.bor(ImGuiChildFlags.AlwaysUseWindowPadding),
+					bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
+				if spellBar[i] ~= nil then
+					if spellBar[i].sID > -1 then
+						DrawInspectableSpellIcon(spellBar[i].sIcon, spellBar[i], i)
+						if ImGui.BeginPopupContextItem("##SpellGem" .. i) then
+							if ImGui.IsKeyDown(ImGuiMod.Ctrl) then ImGui.CloseCurrentPopup() end
+							if ImGui.MenuItem("Memorize") then
+								if pickerOpen == true then
+									memSpell = -1
+									picker:SetClose()
+									pickerOpen = false
+									picker:ClearSelection()
+								end
+								memSpell = i
+							end
+							if ImGui.MenuItem("Inspect") then
+								mq.cmdf("/altkey /notify CastSpellWnd CSPW_Spell%s leftmouseup", i - 1)
+							end
+							if ImGui.MenuItem("Clear") then
+								mq.cmdf("/nomodkey /altkey /notify CastSpellWnd CSPW_Spell%s rightmouseup", i - 1)
+							end
+							ImGui.EndPopup()
+						end
+						if ImGui.IsItemHovered() then
+							ImGui.SetTooltip(string.format("%d) %s", i, spellBar[i].sName))
+							if ImGui.IsMouseReleased(0) then
+								mq.cmdf("/cast %s", i)
+								casting = true
+								spellBar[i].sClicked = os.time()
+							elseif ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsMouseReleased(1) then
+								mq.cmdf("/nomodkey /altkey /notify CastSpellWnd CSPW_Spell%s rightmouseup", i - 1)
+							end
+						end
+						if not casting and interrupted then
+							spellBar[i].sClicked = -1
+							interrupted = false
+						end
+					else
+						DrawInspectableSpellIcon(-1, spellBar[i], i)
+						if ImGui.IsItemHovered() then
+							ImGui.SetTooltip("Empty")
+							if ImGui.IsMouseReleased(1) then
+								if pickerOpen == true then
+									memSpell = -1
+									picker:SetClose()
+									pickerOpen = false
+									picker:ClearSelection()
+								end
+								memSpell = i
+							end
+						end
 					end
 				end
-				ImGui.EndCombo()
-			end
-			ImGui.SameLine()
-			if ImGui.Button("Load Set") then
-				if setName ~= 'None' then
-					loadSet = true
+				ImGui.EndChild()
+				rowCount = rowCount + 1
+
+				if rowCount < maxRow then
+					ImGui.SameLine()
+				else
+					rowCount = 0
 				end
-				ImGui.CloseCurrentPopup()
+			end
+			ImGui.PopStyleVar()
+			if memSpell ~= -1 and not picker.Draw then -- and not pickerOpen then
+				ImGui.SetNextWindowPos(ImGui.GetMousePosOnOpeningCurrentPopupVec(), ImGuiCond.Appearing)
+				picker:SetOpen()
+				pickerOpen = true
 			end
 
-			if setName ~= 'None' then
-				if ImGui.Button("Delete Set") then
-					settings[Module.Name][Module.CharLoaded].Sets[setName] = nil
-					mq.pickle(configFile, settings)
-					setName = 'None'
-					tmpName = ''
-					ImGui.CloseCurrentPopup()
+			if picker.Selected then
+				local selected = picker.Selected or {}
+				if selected.Type == 'Spell' then
+					mq.cmdf("/memspell %d \"%s\"", memSpell, selected.Name)
+					memSpell = -1
+					picker:SetClose()
+					pickerOpen = false
+					picker:ClearSelection()
+				end
+			end
+			picker:DrawAbilityPicker()
+
+			ImGui.BeginChild("##SpellBook", ImVec2(40 * scale, scale * 40), bit32.bor(ImGuiChildFlags.AlwaysUseWindowPadding),
+				bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
+			local cursor_x, cursor_y = ImGui.GetCursorPos()
+
+			if mq.TLO.Window('SpellBookWnd').Open() then
+				ImGui.SetCursorPos(cursor_x, cursor_y)
+				ImGui.Image(openBook:GetTextureID(), ImVec2(scale * 39, scale * 22))
+				if ImGui.IsItemHovered() then
+					ImGui.SetTooltip("Close Spell Book")
+					if ImGui.IsMouseReleased(0) then
+						mq.TLO.Window('SpellBookWnd').DoClose()
+					end
+				end
+			else
+				ImGui.SetCursorPos(cursor_x, cursor_y)
+				ImGui.Image(closedBook:GetTextureID(), ImVec2(39 * scale, scale * 22))
+				if ImGui.IsItemHovered() then
+					ImGui.SetTooltip("Open Spell Book")
+					if ImGui.IsMouseReleased(0) then
+						mq.TLO.Window('SpellBookWnd').DoOpen()
+					end
+				end
+			end
+
+			if ImGui.BeginPopupContextWindow("##SpellBook") then
+				ImGui.Text(gIcon)
+				if ImGui.IsItemHovered() then
+					ImGui.SetTooltip("Config")
+					if ImGui.IsMouseReleased(0) then
+						configWindowShow = not configWindowShow
+						ImGui.CloseCurrentPopup()
+					end
 				end
 				ImGui.SameLine()
+				local rIcon = aSize and Module.Icons.FA_EXPAND or Module.Icons.FA_COMPRESS
+				ImGui.Text(rIcon)
+				if ImGui.IsItemHovered() then
+					local label = aSize and "Disable Auto Size" or "Enable Auto Size"
+					ImGui.SetTooltip(label)
+					if ImGui.IsMouseReleased(0) then
+						aSize = not aSize
+
+						if aSize then
+							settings[Module.Name].maxRow = maxRow
+						end
+						settings[Module.Name].AutoSize = aSize
+						mq.pickle(configFile, settings)
+						ImGui.CloseCurrentPopup()
+					end
+				end
+				ImGui.SameLine()
+				local lIcon = locked and Module.Icons.FA_LOCK or Module.Icons.FA_UNLOCK
+				ImGui.Text(lIcon)
+				if ImGui.IsItemHovered() then
+					local label = locked and "Unlock" or "Lock"
+					ImGui.SetTooltip(label)
+					if ImGui.IsMouseReleased(0) then
+						locked = not locked
+
+						settings[Module.Name].locked = locked
+						mq.pickle(configFile, settings)
+						ImGui.CloseCurrentPopup()
+					end
+				end
+				ImGui.SameLine()
+				local tIcon = showTitle and Module.Icons.FA_EYE_SLASH or Module.Icons.FA_EYE
+				ImGui.Text(tIcon)
+				if ImGui.IsItemHovered() then
+					local label = showTitle and "Hide Title Bar" or "Show Title Bar"
+					ImGui.SetTooltip(label)
+					if ImGui.IsMouseReleased(0) then
+						showTitle = not showTitle
+						settings[Module.Name].ShowTitleBar = showTitle
+						mq.pickle(configFile, settings)
+						ImGui.CloseCurrentPopup()
+					end
+				end
+				ImGui.SeparatorText("Save Set")
+				ImGui.SetNextItemWidth(150)
+				tmpName = ImGui.InputText("##SetName", tmpName)
+				ImGui.SameLine()
+				if ImGui.Button("Save Set") then
+					if tmpName ~= '' then
+						setName = tmpName
+						SaveSet(setName)
+						ImGui.CloseCurrentPopup()
+					end
+				end
+				ImGui.SeparatorText("Load Set")
+				ImGui.SetNextItemWidth(150)
+				if ImGui.BeginCombo("##LoadSet", setName) then
+					for k, data in pairs(settings[Module.Name][Module.CharLoaded].Sets) do
+						local isSelected = k == setName
+						if ImGui.Selectable(k, isSelected) then
+							setName = k
+						end
+					end
+					ImGui.EndCombo()
+				end
+				ImGui.SameLine()
+				if ImGui.Button("Load Set") then
+					if setName ~= 'None' then
+						loadSet = true
+					end
+					ImGui.CloseCurrentPopup()
+				end
+
+				if setName ~= 'None' then
+					if ImGui.Button("Delete Set") then
+						settings[Module.Name][Module.CharLoaded].Sets[setName] = nil
+						mq.pickle(configFile, settings)
+						setName = 'None'
+						tmpName = ''
+						ImGui.CloseCurrentPopup()
+					end
+					ImGui.SameLine()
+				end
+
+				if ImGui.Button("Clear Gems") then
+					clearAll = true
+					ImGui.CloseCurrentPopup()
+				end
+
+				ImGui.EndPopup()
 			end
 
-			if ImGui.Button("Clear Gems") then
-				clearAll = true
-				ImGui.CloseCurrentPopup()
-			end
-
-			ImGui.EndPopup()
+			ImGui.SetWindowFontScale(1)
+			ImGui.EndChild()
 		end
-
-		ImGui.SetWindowFontScale(1)
-		ImGui.EndChild()
+		Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
+		ImGui.End()
 	end
-	Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
-	ImGui.End()
 
 	if configWindowShow then
 		DrawConfigWin()
@@ -835,7 +837,7 @@ function Module.RenderGUI()
 				ImGui.BeginChild("##CastBar", ImVec2(-1, -1), bit32.bor(ImGuiChildFlags.None),
 					bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
 				local diff = os.time() - startCastTime
-				local remaining = mq.TLO.Me.CastTimeLeft() <= castTime and mq.TLO.Me.CastTimeLeft() or 0
+				local remaining = mq.TLO.Me.CastTimeLeft() --<= castTime and mq.TLO.Me.CastTimeLeft() or 0
 				-- if remaining < 0 then remaining = 0 end
 				local colorHpMin = { 0.0, 1.0, 0.0, 1.0, }
 				local colorHpMax = { 1.0, 0.0, 0.0, 1.0, }
@@ -876,15 +878,22 @@ function Module.Unload()
 	mq.unevent("int_spell")
 	mq.unevent("fiz_spell")
 	mq.unevent("cast_start")
+	mq.unbind("/myspells")
+end
+
+function Module.CommandHandler(...)
+	local args = { ..., }
+	if args[1] == 'config' then
+		configWindowShow = not configWindowShow
+	end
 end
 
 local function Init()
 	if not mq.TLO.Plugin("MQ2Cast").IsLoaded() then mq.cmd("/plugin MQ2Cast") end
 
 	if mq.TLO.Me.MaxMana() == 0 then
+		isCaster = false
 		Module.Utils.PrintOutput(nil, true, "You are not a caster!")
-		Module.IsRunning = false
-		return
 	end
 	loadSettings()
 	if Module.Utils.File.Exists(themezDir) then
@@ -901,6 +910,7 @@ local function Init()
 		mq.imgui.init('GUI_MySpells', Module.RenderGUI)
 		Module.LocalLoop()
 	end
+	mq.bind("/myspells", Module.CommandHandler)
 end
 
 function Module.MainLoop()

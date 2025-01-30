@@ -61,7 +61,7 @@ local TimeToAA             = "<Unknown>"
 local Resolution           = 15   -- seconds
 local MaxExpSecondsToStore = 3600 --3600
 local MaxHorizon           = 3600 --3600
-local MinTime              = 30
+local MinTime              = 10
 
 local offset               = 1
 local horizon_or_less      = 60
@@ -74,6 +74,8 @@ local ImGui_HorizonStep3   = 30 * 60
 local ImGui_HorizonStep4   = 60 * 60
 local needSave             = false
 local debug                = false
+local showStats            = true
+local showGraph            = false
 
 -- timezone calcs
 ---@diagnostic disable-next-line: param-type-mismatch
@@ -194,7 +196,7 @@ function Module.RenderGUI()
         Module.IsRunning = false
         return
     end
-    openGUI, shouldDrawGUI = ImGui.Begin('xpTrack##' .. Module.CharLoaded, openGUI)
+    openGUI, shouldDrawGUI = ImGui.Begin('xpTrack##' .. Module.CharLoaded, openGUI, ImGuiWindowFlags.NoScrollbar)
     local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(Module.Settings.LoadTheme, Module.Theme)
     if shouldDrawGUI then
         ImGui.SameLine()
@@ -208,6 +210,16 @@ function Module.RenderGUI()
             ImGui.SetTooltip("Reset Stats")
         end
         ImGui.SameLine()
+        local label = showStats and "Show Conf" or "Show Stats"
+        if ImGui.Button(label) then
+            showStats = not showStats
+            showGraph = false
+        end
+        ImGui.SameLine()
+        if ImGui.Button("Show Graph") then
+            showGraph = true
+            showStats = false
+        end
         ImGui.TextColored(ImVec4(0, 1, 1, 1), "Current ")
         ImGui.SameLine()
         ImGui.TextColored(ImVec4(0.352, 0.970, 0.399, 1.000), "XP: %2.3f%%", mq.TLO.Me.PctExp())
@@ -215,7 +227,13 @@ function Module.RenderGUI()
             ImGui.SameLine()
             ImGui.TextColored(ImVec4(0.983, 0.729, 0.290, 1.000), "  AA XP: %2.3f%% ", mq.TLO.Me.PctAAExp())
         end
-        if ImGui.CollapsingHeader("Exp Stats") then
+        if waitfordata then
+            ImGui.Separator()
+            ImGui.Text("waiting for data...")
+            ImGui.SameLine()
+            ImGui.Text("%s", MinTime - (getTime() - TrackXP.StartTime))
+        end
+        if showStats then
             if ImGui.BeginTable("ExpStats", 2, bit32.bor(ImGuiTableFlags.Borders)) then
                 ImGui.TableSetupColumn("Exp Stats", ImGuiTableColumnFlags.WidthFixed, 120)
                 ImGui.TableSetupColumn("Values", ImGuiTableColumnFlags.WidthStretch)
@@ -298,51 +316,13 @@ function Module.RenderGUI()
                         ImGui.TableNextColumn()
                         ImGui.TextColored(ImVec4(0.983, 0.729, 0.290, 1.000), "%s", TimeToAA)
                     end
-                else
-                    ImGui.TableNextColumn()
-                    ImGui.Text("waiting for data...")
-                    ImGui.TableNextColumn()
-                    ImGui.Text("%s", MinTime - (getTime() - TrackXP.StartTime))
                 end
                 ImGui.EndTable()
             end
-
-            local ordMagDiff = 10 ^
-                math.floor(math.abs(math.log(
-                    (CurMaxExpPerSec > 0 and CurMaxExpPerSec or 1) / (GoalMaxExpPerSec > 0 and GoalMaxExpPerSec or 1), 10)))
-
-            -- converge on new max recalc min and maxes
-            if CurMaxExpPerSec < GoalMaxExpPerSec then
-                CurMaxExpPerSec = CurMaxExpPerSec + ordMagDiff
-            end
-
-            if CurMaxExpPerSec > GoalMaxExpPerSec then
-                CurMaxExpPerSec = CurMaxExpPerSec - ordMagDiff
-            end
-        end
-        if ImGui.CollapsingHeader("XP Plot") then
-            if ImPlot.BeginPlot("Experience Tracker") then
-                ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time)
-                if multiplier == 1 then
-                    ImPlot.SetupAxes("Local Time", "Exp ")
-                else
-                    ImPlot.SetupAxes("Local Time", string.format("reg. Exp in %sths", multiplier))
-                end
-                if not waitfordata then
-                    ImPlot.SetupAxisLimits(ImAxis.X1, getTime() - Module.Settings.ExpSecondsToStore, getTime(), ImGuiCond.Always)
-                    ImPlot.SetupAxisLimits(ImAxis.Y1, 1, CurMaxExpPerSec, ImGuiCond.Always)
-                    ImPlot.PushStyleVar(ImPlotStyleVar.FillAlpha, 0.35)
-                    RenderShaded("Exp", XPEvents.Exp, XPEvents.AA)
-                    RenderShaded("AA", XPEvents.AA, XPEvents.Exp)
-                    ImPlot.PopStyleVar()
-                end
-                ImPlot.EndPlot()
-            end
-        end
-
-        if not waitfordata then
-            -- because interacting with the settings while waiting for data will cause a crash
-            if ImGui.CollapsingHeader("Config Options") then
+        elseif not showGraph then
+            ImGui.SeparatorText("Config Options")
+            if not waitfordata then
+                -- because interacting with the settings while waiting for data will cause a crash
                 Module.Settings.ExpSecondsToStore, pressed = ImGui.SliderInt("Exp observation period",
                     Module.Settings.ExpSecondsToStore, 60, MaxExpSecondsToStore, "%d s")
 
@@ -391,8 +371,7 @@ function Module.RenderGUI()
                     needSave = true
                 end
             end
-        end
-        if ImGui.CollapsingHeader('Theme') then
+            ImGui.SeparatorText('Themes')
             ImGui.Text("Cur Theme: %s", Module.themeName)
             -- Combo Box Load Theme
             if ImGui.BeginCombo("Load Theme##XPTrack", Module.themeName) then
@@ -407,6 +386,36 @@ function Module.RenderGUI()
                     end
                 end
                 ImGui.EndCombo()
+            end
+        elseif showGraph and not waitfordata then
+            local ordMagDiff = 10 ^
+                math.floor(math.abs(math.log(
+                    (CurMaxExpPerSec > 0 and CurMaxExpPerSec or 1) / (GoalMaxExpPerSec > 0 and GoalMaxExpPerSec or 1), 10)))
+
+            -- converge on new max recalc min and maxes
+            if CurMaxExpPerSec < GoalMaxExpPerSec then
+                CurMaxExpPerSec = CurMaxExpPerSec + ordMagDiff
+            end
+
+            if CurMaxExpPerSec > GoalMaxExpPerSec then
+                CurMaxExpPerSec = CurMaxExpPerSec - ordMagDiff
+            end
+            if ImPlot.BeginPlot("Experience Tracker") then
+                ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time)
+                if multiplier == 1 then
+                    ImPlot.SetupAxes("Local Time", "Exp ")
+                else
+                    ImPlot.SetupAxes("Local Time", string.format("reg. Exp in %sths", multiplier))
+                end
+                if not waitfordata then
+                    ImPlot.SetupAxisLimits(ImAxis.X1, getTime() - Module.Settings.ExpSecondsToStore, getTime(), ImGuiCond.Always)
+                    ImPlot.SetupAxisLimits(ImAxis.Y1, 1, CurMaxExpPerSec, ImGuiCond.Always)
+                    ImPlot.PushStyleVar(ImPlotStyleVar.FillAlpha, 0.35)
+                    RenderShaded("Exp", XPEvents.Exp, XPEvents.AA)
+                    RenderShaded("AA", XPEvents.AA, XPEvents.Exp)
+                    ImPlot.PopStyleVar()
+                end
+                ImPlot.EndPlot()
             end
         end
     end

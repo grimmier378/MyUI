@@ -52,6 +52,7 @@ local colorMpMax = { 0.231, 0.707, 0.938, 1.000, }
 local colorMpMin = { 0.600, 0.231, 0.938, 1.000, }
 local colorBreathMin = { 0.600, 0.231, 0.938, 1.000, }
 local colorBreathMax = { 0.231, 0.707, 0.938, 1.000, }
+local targetTextColor = { 1, 1, 1, 1, }
 local testValue, testValue2 = 100, 100
 local splitTarget = false
 local mouseHud, mouseHudTarg = false, false
@@ -100,6 +101,7 @@ defaults = {
     WinTransparency = 1.0,
     ProgressSize = 10,
     ProgressSizeTarget = 30,
+    TargetTextColor = { 1, 1, 1, 1, },
 }
 
 -- Functions
@@ -177,6 +179,7 @@ local function loadSettings()
     FontScale = settings[Module.Name].Scale
     themeName = settings[Module.Name].LoadTheme
     ProgressSizeTarget = settings[Module.Name].ProgressSizeTarget
+    targetTextColor = settings[Module.Name].TargetTextColor
 
     if newSetting then mq.pickle(configFile, settings) end
 end
@@ -539,6 +542,11 @@ local function PlayerTargConf_GUI()
             ImGui.ProgressBar((testValue2 / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test2')
             ImGui.PopStyleColor()
         end
+
+        ImGui.Spacing()
+
+        targetTextColor = ImGui.ColorEdit4("Target Text Color##" .. Module.Name, targetTextColor, bit32.bor(ImGuiColorEditFlags.NoInputs))
+
         ImGui.Spacing()
 
         -- breath bar settings
@@ -579,6 +587,7 @@ local function PlayerTargConf_GUI()
             settings[Module.Name].doPulse = pulse
             settings[Module.Name].pulseSpeed = pulseSpeed
             settings[Module.Name].combatPulseSpeed = combatPulseSpeed
+            settings[Module.Name].TargetTextColor = targetTextColor
             mq.pickle(configFile, settings)
         end
     end
@@ -639,9 +648,9 @@ local function drawTarget()
             -- Name and CON in the first column
 
             if xSlot > 0 and settings[Module.Name].showXtar then
-                ImGui.Text("X#%s %s", xSlot, targetName)
+                ImGui.TextColored(ImVec4(targetTextColor[1], targetTextColor[2], targetTextColor[3], targetTextColor[4]), "X#%s %s", xSlot, targetName)
             else
-                ImGui.Text("%s", targetName)
+                ImGui.TextColored(ImVec4(targetTextColor[1], targetTextColor[2], targetTextColor[3], targetTextColor[4]), "%s", targetName)
             end
             -- Distance in the second column
             ImGui.TableSetColumnIndex(1)
@@ -663,11 +672,11 @@ local function drawTarget()
             ImGui.TableNextRow()
             ImGui.TableSetColumnIndex(0) -- Class and Level in the first column
 
-            ImGui.Text(tostring(tLvl) .. ' ' .. tClass .. '\t' .. tBodyType)
+            ImGui.TextColored(ImVec4(targetTextColor[1], targetTextColor[2], targetTextColor[3], targetTextColor[4]), tostring(tLvl) .. ' ' .. tClass .. '\t' .. tBodyType)
             -- Aggro% text in the second column
             ImGui.TableSetColumnIndex(1)
 
-            ImGui.Text(tostring(target.PctHPs()) .. '%')
+            ImGui.TextColored(ImVec4(targetTextColor[1], targetTextColor[2], targetTextColor[3], targetTextColor[4]), tostring(target.PctHPs()) .. '%')
             ImGui.EndTable()
         end
         ImGui.EndGroup()
@@ -697,7 +706,7 @@ local function drawTarget()
             ImGui.SetCursorPosY(yPos)
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + ((ImGui.GetWindowWidth() / 2) - 8))
 
-            ImGui.Text("%d", target.PctAggro())
+            ImGui.TextColored(ImVec4(targetTextColor[1], targetTextColor[2], targetTextColor[3], targetTextColor[4]), "%d", target.PctAggro())
             if (target.SecondaryAggroPlayer() ~= nil) then
                 ImGui.SetCursorPosY(yPos)
                 ImGui.SetCursorPosX(ImGui.GetWindowWidth() - 40)

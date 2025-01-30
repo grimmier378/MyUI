@@ -34,6 +34,8 @@ Module.defaults          = Module.Utils.Library.Include('defaults.default_chat_s
 Module.tempSettings      = {}
 Module.eventNames        = {}
 Module.tempFilterStrings = {}
+Module.tempFilterEnabled = {}
+Module.tempFilterHidden  = {}
 Module.tempEventStrings  = {}
 Module.tempChanColors    = {}
 Module.tempFiltColors    = {}
@@ -419,11 +421,12 @@ local function loadSettings()
                     Module.Settings.Channels[channelID]['Events'][eID].enabled = true
                 end
                 if not Module.Settings.Channels[channelID]['Events'][eID]['Filters'][0] then
-                    Module.Settings.Channels[channelID]['Events'][eID]['Filters'][0] = { filterString = '', color = {}, }
+                    Module.Settings.Channels[channelID]['Events'][eID]['Filters'][0] = { filterString = '', color = {}, enabled = true, }
                 end
                 Module.Settings.Channels[channelID]['Events'][eID]['Filters'][0].color = eData.color
                 eData.color = nil
             end
+            if eData.enabled == nil then eData.enabled = true end
             for fID, fData in pairs(eData.Filters) do
                 if fData.filterString == 'TANK' then
                     Module.Settings.Channels[channelID].Events[eID].Filters[fID].filterString = 'TK1'
@@ -440,6 +443,15 @@ local function loadSettings()
                 elseif fData.filterString == 'ME' then
                     Module.Settings.Channels[channelID].Events[eID].Filters[fID].filterString = 'M3'
                 end
+                if fData.enabled == nil then
+                    Module.Settings.Channels[channelID].Events[eID].Filters[fID].enabled = true
+                end
+                if fData.hidden == nil then
+                    Module.Settings.Channels[channelID].Events[eID].Filters[fID].hidden = false
+                end
+                Module.tempFilterHidden[channelID] = {}
+                Module.tempFilterHidden[channelID][eID] = {}
+                Module.tempFilterHidden[channelID][eID][fID] = Module.Settings.Channels[channelID].Events[eID].Filters[fID].hidden
             end
         end
         i = i + 1
@@ -587,8 +599,8 @@ end
 ---@return string @ the NPC name if found
 local function CheckNPC(line)
     local name = ''
-    if string.find(line, " pet tells you") then
-        name = string.sub(line, 1, string.find(line, " pet tells you") - 1)
+    if string.find(line, "pet tells you") then
+        name = string.sub(line, 1, string.find(line, "pet tells you") - 1)
         return true, name
     elseif string.find(line, "tells you,") then
         name = string.sub(line, 1, string.find(line, "tells you") - 2)
@@ -618,18 +630,31 @@ local function CheckNPC(line)
         name = string.sub(line, 1, string.find(line, "backstabs") - 1)
     elseif string.find(line, "bites") then
         name = string.sub(line, 1, string.find(line, "bites") - 1)
+    elseif string.find(line, "begins") then
+        name = string.sub(line, 1, string.find(line, "begins") - 1)
     else
         return false, name
     end
+    -- printf("CheckNPC: \at%s", name)
     -- print(check)
     name = name:gsub(" $", "")
     local check = string.format("npc =\"%s\"", name)
+    local check2 = string.format("pet =\"%s\"", name)
+    local check3 = string.format("npc \"%s\"", name)
+
     if mq.TLO.SpawnCount(check)() ~= nil then
-        --printf("Count: %s Check: %s",mq.TLO.SpawnCount(check)(),check)
         if mq.TLO.SpawnCount(check)() ~= 0 then
             return true, name
-        else
-            return false, name
+        end
+    end
+    if mq.TLO.SpawnCount(check2)() ~= nil then
+        if mq.TLO.SpawnCount(check2)() ~= 0 then
+            return true, name
+        end
+    end
+    if mq.TLO.SpawnCount(check3)() ~= nil then
+        if mq.TLO.SpawnCount(check3)() ~= 0 then
+            return true, name
         end
     end
     return false, name
@@ -650,6 +675,7 @@ function Module.EventChat(channelID, eventName, line, spam)
     -- if spam then print('Called from Spam') end
     local eventDetails = Module.eventNames[eventName]
     if not eventDetails then return false end
+    if not eventDetails.enabled then return false end
 
     if Module.Consoles[channelID] then
         local txtBuffer = Module.Consoles[channelID].txtBuffer            -- Text buffer for the channel ID we are working with.
@@ -667,8 +693,10 @@ function Module.EventChat(channelID, eventName, line, spam)
                 fMatch = false
                 if eventDetails.Filters[fID] ~= nil then
                     local fData = eventDetails.Filters[fID]
-                    if fID > 0 then
+
+                    if fID > 0 and fData.enabled then
                         haveFilters = true
+
                         local fString = fData.filterString -- String value we are filtering for
                         if string.find(fString, 'NO2') then
                             fString = string.gsub(fString, 'NO2', '')
@@ -733,10 +761,11 @@ function Module.EventChat(channelID, eventName, line, spam)
                             colorVec = fData.color
                             fMatch = true
                         end
-                        if fMatch and negMatch then
+                        if fMatch and (negMatch or fData.hidden) then
                             fMatch = false
                             negMatch = false
                             matchCount = 0
+                            haveFilters = true
                             goto found_match
                         end
                         if fMatch then
@@ -745,6 +774,7 @@ function Module.EventChat(channelID, eventName, line, spam)
                         end
                     end
                 end
+                ::next_filter::
             end
             ::found_match::
             --print(tostring(#eventDetails.Filters))
@@ -1479,19 +1509,25 @@ function Module.AddChannel(editChanID, isNewChannel)
     if not Module.tempEventStrings[editChanID] then Module.tempEventStrings[editChanID] = {} end
     if not Module.tempChanColors then Module.tempChanColors = {} end
     if not Module.tempFiltColors[editChanID] then Module.tempFiltColors[editChanID] = {} end
+    if not Module.tempFilterEnabled[editChanID] then Module.tempFilterEnabled[editChanID] = {} end
     if not Module.tempChanColors[editChanID] then Module.tempChanColors[editChanID] = {} end
     if not Module.tempFilterStrings[editChanID] then Module.tempFilterStrings[editChanID] = {} end
     if not Module.tempEventStrings[editChanID] then channelData[editChanID] = {} end
     if not Module.tempEventStrings[editChanID][editEventID] then Module.tempEventStrings[editChanID][editEventID] = {} end
+    if not Module.tempFilterHidden[editChanID] then Module.tempFilterHidden[editChanID] = {} end
 
     if not isNewChannel then
         if Module.tempSettings.Channels[editChanID] ~= nil then
             for eID, eData in pairs(Module.tempSettings.Channels[editChanID].Events) do
                 if not Module.tempFiltColors[editChanID][eID] then Module.tempFiltColors[editChanID][eID] = {} end
+                if not Module.tempFilterEnabled[editChanID][eID] then Module.tempFilterEnabled[editChanID][eID] = {} end
+                if not Module.tempFilterHidden[editChanID][eID] then Module.tempFilterHidden[editChanID][eID] = {} end
                 for fID, fData in pairs(eData.Filters) do
                     if not Module.tempFiltColors[editChanID][eID][fID] then Module.tempFiltColors[editChanID][eID][fID] = {} end
                     -- if not tempFiltColors[editChanID][eID][fID] then tempFiltColors[editChanID][eID][fID] = {} end
                     Module.tempFiltColors[editChanID][eID][fID] = fData.color or { 1, 1, 1, 1, }
+                    Module.tempFilterEnabled[editChanID][eID][fID] = Module.Settings.Channels[editChanID].Events[eID].Filters[fID].enabled
+                    Module.tempFilterHidden[editChanID][eID][fID] = Module.Settings.Channels[editChanID].Events[eID].Filters[fID].hidden
                 end
             end
         end
@@ -1516,9 +1552,10 @@ function Module.AddChannel(editChanID, isNewChannel)
                         ['eventString'] = 'new',
                         ['Filters'] = {
                             [0] = {
-                                ['filter_enabled'] = true,
                                 ['filterString'] = '',
                                 ['color'] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1, },
+                                ['enabled'] = true,
+                                ['hidden'] = false,
                             },
                         },
                     },
@@ -1538,6 +1575,8 @@ function Module.AddChannel(editChanID, isNewChannel)
                 [0] = {
                     ['filterString'] = '',
                     ['color'] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1, },
+                    ['enabled'] = true,
+                    ['hidden'] = false,
                 },
             },
         }
@@ -1603,6 +1642,7 @@ function Module.AddChannel(editChanID, isNewChannel)
         Module.tempSettings.Channels[editChanID].Name = Module.tempEventStrings[editChanID].Name or "New Channel"
         Module.tempSettings.Channels[editChanID].enabled = true
         Module.tempSettings.Channels[editChanID].MainEnable = Module.tempSettings.Channels[editChanID].MainEnable
+
         local channelEvents = Module.tempSettings.Channels[editChanID].Events
         for eventId, eventData in pairs(Module.tempEventStrings[editChanID]) do
             -- Skip 'Name' key used for the channel name
@@ -1616,11 +1656,16 @@ function Module.AddChannel(editChanID, isNewChannel)
                     channelEvents[eventId].Filters = {}
                     for filterID, filterData in pairs(Module.tempFilterStrings[editChanID][eventId] or {}) do
                         local tempFString = filterData or 'New'
+                        -- local tmpEnable = Module.tempFilterEnabled[editChanID][eventId][filterID] ~= nil and Module.tempFilterEnabled[editChanID][eventId][filterID] or true
+
                         --print(filterData.." : "..tempFString)
+                        -- printf("Filter Enabled: %s", Module.tempFilterEnabled[editChanID][eventId][filterID])
                         if tempFString == '' or tempFString == nil then tempFString = 'New' end
                         channelEvents[eventId].Filters[filterID] = {
                             filterString = tempFString,
                             color = Module.tempFiltColors[editChanID][eventId][filterID] or { 1.0, 1.0, 1.0, 1.0, }, -- Default to white with full opacity if color not found
+                            enabled = Module.tempFilterEnabled[editChanID][eventId][filterID],
+                            hidden = Module.tempFilterHidden[editChanID][eventId][filterID],
                         }
                     end
                 end
@@ -1631,7 +1676,8 @@ function Module.AddChannel(editChanID, isNewChannel)
         ResetEvents()
         resetEvnts = true
         Module.openEditGUI = false
-        Module.tempFilterStrings, Module.tempEventStrings, Module.tempChanColors, Module.tempFiltColors, Module.hString, channelData = {}, {}, {}, {}, {}, {}
+        Module.tempFilterStrings, Module.tempEventStrings, Module.tempChanColors, Module.tempFilterHidden,
+        Module.tempFilterEnabled, Module.tempFiltColors, Module.hString, channelData = {}, {}, {}, {}, {}, {}, {}, {}
         if fromConf then Module.openConfigGUI = true end
     end
     ImGui.SameLine()
@@ -1646,6 +1692,8 @@ function Module.AddChannel(editChanID, isNewChannel)
         Module.tempChanColors[editChanID] = nil
         Module.tempFiltColors[editChanID] = nil
         Module.tempFilterStrings[editChanID] = nil
+        Module.tempFilterEnabled[editChanID] = nil
+        Module.tempFilterHidden[editChanID] = nil
 
         isNewChannel = false
         ResetEvents()
@@ -1702,6 +1750,8 @@ function Module.AddChannel(editChanID, isNewChannel)
                                         channelData[editChanID]['Events'][eventID].Filters[maxFilterId] = {
                                             ['filterString'] = 'new',
                                             ['color'] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1, },
+                                            ['enabled'] = true,
+                                            ['hidden'] = false,
                                         }
                                         newFilter = false
                                     end
@@ -1739,6 +1789,8 @@ function Module.AddChannel(editChanID, isNewChannel)
                                 if not Module.tempChanColors[editChanID][eventID] then
                                     Module.tempChanColors[editChanID][eventID] = eventDetails.Filters[0].color or { 1.0, 1.0, 1.0, 1.0, } -- Default to white with full opacity
                                 end
+
+
 
                                 Module.tempChanColors[editChanID][eventID] = ImGui.ColorEdit4("##Color" .. bufferKey, Module.tempChanColors[editChanID][eventID], MyColorFlags)
                                 ImGui.TableSetColumnIndex(3)
@@ -1781,6 +1833,29 @@ function Module.AddChannel(editChanID, isNewChannel)
                                         if Module.tempFilterStrings[editChanID][eventID][filterID] ~= tempFilter then
                                             Module.tempFilterStrings[editChanID][eventID][filterID] = tempFilter
                                         end
+                                        ImGui.SameLine()
+                                        if Module.tempFilterEnabled[editChanID][eventID] == nil then Module.tempFilterEnabled[editChanID][eventID] = {} end
+                                        local tmpEnabl = Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['enabled']
+                                        tmpEnabl, _ = ImGui.Checkbox("Enabled##_" .. tmpKey, tmpEnabl)
+                                        if Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['enabled'] ~= tmpEnabl then
+                                            Module.tempFilterEnabled[editChanID][eventID][filterID] = tmpEnabl
+                                            Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['enabled'] = tmpEnabl
+                                            Module.Settings = Module.tempSettings
+                                            mq.pickle(Module.SettingsFile, Module.Settings)
+                                        end
+                                        ImGui.SameLine()
+                                        if Module.tempFilterHidden[editChanID][eventID] == nil then Module.tempFilterHidden[editChanID][eventID] = {} end
+                                        local tmpHidden = Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['hidden']
+                                        local hiddenLabel = tmpHidden and Module.Icons.FA_EYE_SLASH or Module.Icons.FA_EYE
+                                        hiddenLabel = hiddenLabel .. "##_" .. tmpKey
+                                        tmpHidden, _ = ImGui.Checkbox(hiddenLabel, tmpHidden)
+                                        if Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['hidden'] ~= tmpHidden then
+                                            Module.tempFilterHidden[editChanID][eventID][filterID] = tmpHidden
+                                            Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['hidden'] = tmpHidden
+                                            Module.Settings = Module.tempSettings
+                                            mq.pickle(Module.SettingsFile, Module.Settings)
+                                        end
+
                                         ImGui.TableSetColumnIndex(2)
                                         if not Module.tempFiltColors[editChanID][eventID] then Module.tempFiltColors[editChanID][eventID] = {} end
                                         if not Module.tempFiltColors[editChanID][eventID][filterID] then
@@ -1830,7 +1905,8 @@ local function buildConfig()
                     ImGui.SetWindowFontScale(Module.Settings.Scale)
                     if ImGui.BeginChild('Channels##' .. channelID, contentSizeX, 0.0, bit32.bor(ImGuiChildFlags.Border, ImGuiChildFlags.AutoResizeY, ImGuiChildFlags.AlwaysAutoResize)) then
                         -- Begin a table for events within this channel
-                        if ImGui.BeginTable("ChannelEvents_" .. channelData.Name, 4, bit32.bor(ImGuiTableFlags.Resizable, ImGuiTableFlags.RowBg, ImGuiTableFlags.Borders, ImGui.GetWindowWidth() - 5)) then
+
+                        if ImGui.BeginTable("ChannelEvents_" .. channelData.Name, 4, bit32.bor(ImGuiTableFlags.Resizable, ImGuiTableFlags.RowBg, ImGuiTableFlags.Borders)) then
                             ImGui.SetWindowFontScale(Module.Settings.Scale)
                             -- Set up table columns once
                             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 50)
@@ -1842,7 +1918,6 @@ local function buildConfig()
                             for eventId, eventDetails in pairs(channelData.Events) do
                                 local bufferKey = channelID .. "_" .. tostring(eventId)
                                 local name = channelData.Name
-                                local bufferKey = channelID .. "_" .. tostring(eventId)
                                 local channelKey = "##ChannelName" .. channelID
                                 ImGui.TableNextRow()
                                 ImGui.TableSetColumnIndex(0)
@@ -2189,7 +2264,7 @@ function Module.ChannelExecCommand(text, channelID)
         Module.console:AppendText(IM_COL32(128, 128, 128), "> %s", text)
     end
 
-    local eChan = '/say'
+    eChan = '/say'
     -- todo: implement history
     if string.len(text) > 0 then
         text = Module.StringTrim(text)
@@ -2240,7 +2315,7 @@ function Module.createExternConsole(name)
                 ['eventString'] = 'new',
                 ['Filters'] = {
                     [0] = {
-                        ['filter_enabled'] = true,
+                        ['enabled'] = true,
                         ['filterString'] = '',
                         ['color'] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1, },
                     },

@@ -63,6 +63,7 @@ local filter_text                                         = ""
 local utils                                               = require('mq.Utils')
 local settings                                            = {}
 local MySelf                                              = mq.TLO.Me
+local MyClass                                             = MySelf.Class()
 local myCopper, mySilver, myGold, myPlat, myWeight, myStr = 0, 0, 0, 0, 0, 0
 local bankCopper, bankSilver, bankGold, bankPlat          = 0, 0, 0, 0
 local defaults                                            = {
@@ -721,7 +722,8 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 		ImGui.EndTooltip()
 	end
 	if clickable then
-		if ImGui.IsItemClicked(ImGuiMouseButton.Left) and not mq.TLO.Me.Casting() then
+		if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
+			if mq.TLO.Me.Casting() ~= nil or MyClass == 'BRD' then return end
 			if item.ItemSlot2() == -1 then
 				mq.cmd("/itemnotify " .. item.ItemSlot() .. " leftmouseup")
 			else
@@ -732,7 +734,8 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 		if ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsItemClicked(ImGuiMouseButton.Right) then
 			local link = item.ItemLink('CLICKABLE')()
 			mq.cmdf('/executelink %s', link)
-		elseif ImGui.IsItemClicked(ImGuiMouseButton.Right) and not mq.TLO.Me.Casting() then
+		elseif ImGui.IsItemClicked(ImGuiMouseButton.Right) then
+			if mq.TLO.Me.Casting() ~= nil or MyClass == 'BRD' then return end
 			mq.cmdf('/useitem "%s"', item.Name())
 			clicked = true
 		end

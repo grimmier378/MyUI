@@ -259,6 +259,15 @@ function CommonUtils.GiveItem(target_id)
 	end
 end
 
+function CommonUtils.MaskName(name)
+	if mq.TLO.Anonymous() then end
+	local maskedName = name
+	if maskedName ~= nil then
+		maskedName = maskedName:gsub("([A-Za-z])", "X")
+	end
+	return maskedName
+end
+
 -- --- File Picker Dialog Stuff --
 
 -- CommonUtils.SelectedFilePath = string.format('%s/', mq.TLO.MacroQuest.Path()) -- Default config folder path prefix

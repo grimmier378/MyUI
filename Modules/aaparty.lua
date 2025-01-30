@@ -257,6 +257,19 @@ local function MessageHandler()
                 end
             end
         end
+        if subject == 'Set' then
+            if dowho ~= 'N/A' then
+                if MemberEntry.DoWho == Module.CharLoaded then
+                    if dowhat == 'min' then
+                        mq.cmd('/alt on 0')
+                        return
+                    elseif dowhat == 'max' then
+                        mq.cmd('/alt on 100')
+                        return
+                    end
+                end
+            end
+        end
         if subject ~= 'Action' then
             -- Process the rest of the message into the groupData table.
             if #groupData > 0 then
@@ -522,8 +535,15 @@ function Module.RenderGUI()
                             imgui.SetCursorPosX(ImGui.GetCursorPosX() + 12)
                             if imgui.Button("<##Decrease" .. groupData[i].Name) then
                                 if aaActor ~= nil then
-                                    aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
-                                    aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
+                                    if ImGui.IsKeyDown(ImGuiMod.Ctrl) then
+                                        aaActor:send({ mailbox = 'aa_party', script = 'aaparty', },
+                                            { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'min', })
+                                        aaActor:send({ mailbox = 'aa_party', script = 'myui', },
+                                            { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'min', })
+                                    else
+                                        aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
+                                        aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
+                                    end
                                 end
                             end
                             imgui.SameLine()
@@ -547,8 +567,15 @@ function Module.RenderGUI()
 
                             if imgui.Button(">##Increase" .. groupData[i].Name) then
                                 if aaActor ~= nil then
-                                    aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(groupData[i].Name, 'Action', 'More'))
-                                    aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(groupData[i].Name, 'Action', 'More'))
+                                    if ImGui.IsKeyDown(ImGuiMod.Ctrl) then
+                                        aaActor:send({ mailbox = 'aa_party', script = 'aaparty', },
+                                            { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'max', })
+                                        aaActor:send({ mailbox = 'aa_party', script = 'myui', },
+                                            { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'max', })
+                                    else
+                                        aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(groupData[i].Name, 'Action', 'More'))
+                                        aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(groupData[i].Name, 'Action', 'More'))
+                                    end
                                 end
                             end
                         end

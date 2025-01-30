@@ -119,6 +119,7 @@ Module.defaults                        = {
     ShowMenu = true,
     SortBy = 'none',
     ShowTable = false,
+    HideName = false,
     TimerColor = { 0, 0, 0, 1, },
     UseWindowPositions = false,
     WindowPositions = {
@@ -136,6 +137,8 @@ Module.defaults                        = {
         Songs = { x = 200, y = 300, },
     },
 }
+
+local myClass                          = mq.TLO.Me.Class.ShortName() or 'N/A'
 
 -- Functions
 
@@ -179,6 +182,7 @@ local function GenerateContent(subject, songsTable, buffsTable, doWho, doWhat)
 
     local content = {
         Name = Module.CharLoaded,
+        Class = myClass,
         Buffs = buffsTable,
         Songs = songsTable,
         DoWho = dWho,
@@ -326,8 +330,8 @@ local function GetSong(slot)
 
     songTooltip = string.format("%s) %s (%s)", slot, songName, songDurHMS)
 
-    if Module.songTable[slot + 1] ~= nil then
-        if Module.songTable[slot + 1].ID ~= songID and os.time() - checkIn >= 6 then changed = true end
+    if Module.songTable[slot] ~= nil then
+        if Module.songTable[slot].ID ~= songID and os.time() - checkIn >= 6 then changed = true end
     end
     Module.songTable[slot] = {
         Name = songName,
@@ -429,6 +433,7 @@ local function GetBuffs()
                 if Module.boxes[i].Name == Module.CharLoaded then
                     Module.boxes[i].Buffs = Module.buffTable
                     Module.boxes[i].Songs = Module.songTable
+                    Module.boxes[i].Class = myClass
                     Module.boxes[i].SongCount = mq.TLO.Me.CountSongs() or 0
                     Module.boxes[i].BuffSlots = numSlots
                     Module.boxes[i].BuffCount = mq.TLO.Me.BuffCount() or 0
@@ -447,6 +452,7 @@ local function GetBuffs()
             table.insert(Module.boxes, {
                 Name = Module.CharLoaded,
                 Buffs = Module.buffTable,
+                Class = myClass,
                 Songs = Module.songTable,
                 Check = os.time(),
                 BuffSlots = numSlots,
@@ -461,6 +467,7 @@ local function GetBuffs()
             Module.boxes[1].Buffs = Module.buffTable
             Module.boxes[1].Songs = Module.songTable
             Module.boxes[1].Name = Module.CharLoaded
+            Module.boxes[1].Class = myClass
             Module.boxes[1].BuffCount = mq.TLO.Me.BuffCount() or 0
             Module.boxes[1].SongCount = mq.TLO.Me.CountSongs() or 0
             Module.boxes[1].BuffSlots = numSlots
@@ -482,6 +489,7 @@ local function MessageHandler()
         local charSongs      = MemberEntry.Songs or {}
         local charSlots      = MemberEntry.BuffSlots or 0
         local charCount      = MemberEntry.BuffCount or 0
+        local charClass      = MemberEntry.Class or 'N/A'
         local charSortBuffsA = MemberEntry.SortedBuffsA or {}
         local charSortBuffsD = MemberEntry.SortedBuffsD or {}
         local charSortSongsA = MemberEntry.SortedSongsA or {}
@@ -538,6 +546,7 @@ local function MessageHandler()
             for i = 1, #Module.boxes do
                 if Module.boxes[i].Name == who then
                     Module.boxes[i].Buffs = charBuffs
+                    Module.boxes[i].Class = charClass
                     Module.boxes[i].Songs = charSongs
                     Module.boxes[i].Check = check
                     Module.boxes[i].BuffSlots = charSlots
@@ -557,6 +566,7 @@ local function MessageHandler()
                     Name         = who,
                     Buffs        = charBuffs,
                     Songs        = charSongs,
+                    Class        = charClass,
                     Check        = check,
                     BuffSlots    = charSlots,
                     SongCount    = MemberEntry.SongCount or 0,
@@ -647,6 +657,13 @@ local function loadSettings()
 
     sortType = Module.settings[Module.Name].SortBy
     if newSetting then mq.pickle(configFile, Module.settings) end
+end
+
+local function DrawName(idx)
+    if Module.settings[Module.Name].HideName then
+        return Module.boxes[idx].Class
+    end
+    return Module.boxes[idx].Name
 end
 
 --- comments
@@ -908,17 +925,22 @@ local function BoxSongs(id, sorted, view)
             end
             ImGui.EndGroup()
         else
-            ImGui.BeginGroup()
+            if boxSongs[i] == nil then
+                goto next_song
+            end
             if boxSongs[i] ~= nil then
                 if boxSongs[i].Icon > 0 then
+                    ImGui.BeginGroup()
                     if Module.ShowIcons then
                         DrawInspectableSpellIcon(boxSongs[i].Icon, boxSongs[i], i, view)
                         rowCounterS = rowCounterS + 1
                     end
                     counterSongs = counterSongs + 1
+                    ImGui.EndGroup()
+                else
+                    goto next_song
                 end
             end
-            ImGui.EndGroup()
         end
         if ImGui.BeginPopupContextItem("##Song" .. tostring(i)) then
             if ImGui.MenuItem("Inspect##" .. i) then
@@ -975,13 +997,14 @@ local function BoxSongs(id, sorted, view)
             end
             ImGui.EndTooltip()
         end
-        if view == 'table' and boxSongs[i] ~= nil then
+        if view == 'table' and boxSongs[i] ~= nil and rowCounterS ~= 0 then
             if rowCounterS < maxSongRow then
                 ImGui.SameLine(0, 0.5)
             else
                 rowCounterS = 0
             end
         end
+        ::next_song::
     end
 
     ImGui.EndChild()
@@ -1077,6 +1100,11 @@ function Module.RenderGUI()
                         ImGui.EndMenu()
                     end
 
+                    if ImGui.Selectable("Hide Names") then
+                        Module.settings[Module.Name].HideName = not Module.settings[Module.Name].HideName
+                        mq.pickle(configFile, Module.settings)
+                    end
+
                     ImGui.EndMenu()
                 end
 
@@ -1092,6 +1120,14 @@ function Module.RenderGUI()
                     end
                     ImGui.EndMenu()
                 end
+
+                local pressed = false
+                pressed, showTableView = ImGui.MenuItem(Module.Icons.FA_TABLE, nil, showTableView)
+                if pressed then
+                    Module.settings[Module.Name].TableView = showTableView
+                    mq.pickle(configFile, Module.settings)
+                end
+
                 ImGui.EndMenuBar()
             end
 
@@ -1156,9 +1192,9 @@ function Module.RenderGUI()
                             ImGui.TableNextColumn()
                             ImGui.SetWindowFontScale(Scale)
                             if Module.boxes[i].Name == Module.CharLoaded then
-                                ImGui.TextColored(ImVec4(0, 1, 1, 1), Module.boxes[i].Name)
+                                ImGui.TextColored(ImVec4(0, 1, 1, 1), DrawName(i))
                             else
-                                ImGui.Text(Module.boxes[i].Name)
+                                ImGui.Text(DrawName(i))
                             end
                             ImGui.TableNextColumn()
                             ImGui.SetWindowFontScale(Scale)

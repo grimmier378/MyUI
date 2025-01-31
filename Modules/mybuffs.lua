@@ -12,6 +12,7 @@ Module.timerColor       = {}
 Module.Theme            = {}
 Module.buffTable        = {}
 Module.songTable        = {}
+Module.TempSettings     = {}
 Module.Name             = "MyBuffs"
 Module.IsRunning        = false
 
@@ -28,7 +29,7 @@ Module.ShowText,
 Module.ShowScroll,
 Module.DoPulse          = false, true, true, true, true, true
 Module.iconSize         = 24
-
+Module.MyGroupLeader    = mq.TLO.Group.Leader.CleanName() or 'NoGroup'
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 if not loadedExeternally then
@@ -111,6 +112,7 @@ Module.defaults                        = {
     PulseSpeed = 5,
     ShowScroll = true,
     ShowTitleBar = true,
+    ShowMyGroupOnly = true,
     SplitWin = false,
     SongTimer = 20,
     ShowDebuffs = false,
@@ -185,6 +187,7 @@ local function GenerateContent(subject, songsTable, buffsTable, doWho, doWhat)
         Class = myClass,
         Buffs = buffsTable,
         Songs = songsTable,
+        GroupLeader = Module.MyGroupLeader,
         DoWho = dWho,
         Debuffs = debuffOnMe or nil,
         DoWhat = dWhat,
@@ -546,6 +549,7 @@ local function MessageHandler()
             for i = 1, #Module.boxes do
                 if Module.boxes[i].Name == who then
                     Module.boxes[i].Buffs = charBuffs
+                    Module.boxes[i].GroupLeader = MemberEntry.GroupLeader or 'NoGroup'
                     Module.boxes[i].Class = charClass
                     Module.boxes[i].Songs = charSongs
                     Module.boxes[i].Check = check
@@ -567,6 +571,7 @@ local function MessageHandler()
                     Buffs        = charBuffs,
                     Songs        = charSongs,
                     Class        = charClass,
+                    GroupLeader  = MemberEntry.GroupLeader or 'NoGroup',
                     Check        = check,
                     BuffSlots    = charSlots,
                     SongCount    = MemberEntry.SongCount or 0,
@@ -654,7 +659,7 @@ local function loadSettings()
     themeName = Module.settings[Module.Name].LoadTheme
     winPositions = Module.settings[Module.Name].WindowPositions
     useWinPos = Module.settings[Module.Name].UseWindowPositions
-
+    Module.TempSettings.ShowOnlyGroup = Module.settings[Module.Name].ShowMyGroupOnly
     sortType = Module.settings[Module.Name].SortBy
     if newSetting then mq.pickle(configFile, Module.settings) end
 end
@@ -1189,6 +1194,9 @@ function Module.RenderGUI()
                     if #Module.boxes > 0 then
                         ImGui.SetWindowFontScale(Scale)
                         for i = 1, #Module.boxes do
+                            if Module.TempSettings.ShowOnlyGroup and Module.boxes[i].GroupLeader ~= Module.MyGroupLeader then
+                                goto next
+                            end
                             ImGui.TableNextColumn()
                             ImGui.SetWindowFontScale(Scale)
                             if Module.boxes[i].Name == Module.CharLoaded then
@@ -1202,6 +1210,7 @@ function Module.RenderGUI()
                             ImGui.TableNextColumn()
                             ImGui.SetWindowFontScale(Scale)
                             BoxSongs(i, sortType, 'table')
+                            ::next::
                         end
                         ImGui.SetWindowFontScale(1)
                     end
@@ -1453,7 +1462,6 @@ function Module.RenderGUI()
                 if PulseSpeed ~= tmpPulseSpeed then
                     PulseSpeed = tmpPulseSpeed
                 end
-
                 ImGui.Separator()
                 if ImGui.BeginTable("Toggles##", 2) then
                     ImGui.TableNextColumn()
@@ -1492,7 +1500,8 @@ function Module.RenderGUI()
                     ShowMenu = ImGui.Checkbox('Show Menu', ShowMenu)
                     ImGui.TableNextColumn()
                     showTableView = ImGui.Checkbox('Show Table', showTableView)
-
+                    ImGui.TableNextColumn()
+                    Module.TempSettings.ShowOnlyGroup = ImGui.Checkbox('Show My Group Only', Module.TempSettings.ShowOnlyGroup)
                     ImGui.EndTable()
                 end
             end
@@ -1519,6 +1528,7 @@ function Module.RenderGUI()
                 Module.settings[Module.Name].ShowMenu = ShowMenu
                 Module.settings[Module.Name].ShowMailBox = Module.MailBoxShow
                 Module.settings[Module.Name].ShowTableView = showTableView
+                Module.settings[Module.Name].ShowMyGroupOnly = Module.TempSettings.ShowOnlyGroup
 
                 mq.pickle(configFile, Module.settings)
 
@@ -1786,7 +1796,7 @@ function Module.MainLoop()
         ---@diagnostic disable-next-line: undefined-global
         if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
-
+    Module.MyGroupLeader = mq.TLO.Group.Leader.CleanName() or 'NoGroup'
     if mq.gettime() - clockTimer >= 1 then
         currZone = mq.TLO.Zone.ID()
         if currZone ~= lastZone then

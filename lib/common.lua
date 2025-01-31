@@ -1,7 +1,7 @@
 local mq = require('mq')
 local ImGui = require('ImGui')
 local CommonUtils = require('mq.Utils')
-
+CommonUtils.Colors = require('lib.colors')
 CommonUtils.Animation_Item = mq.FindTextureAnimation('A_DragItem')
 CommonUtils.Animation_Spell = mq.FindTextureAnimation('A_SpellIcons')
 
@@ -359,5 +359,78 @@ end
 -- 		CommonUtils.ShowOpenFileSelector = false
 -- 	end
 -- end
+function CommonUtils.directions(heading)
+	-- convert headings from letter values to degrees
+	local dirToDeg = {
+		N = 0,
+		NEN = 22.5,
+		NE = 45,
+		ENE = 67.5,
+		E = 90,
+		ESE = 112.5,
+		SE = 135,
+		SES = 157.5,
+		S = 180,
+		SWS = 202.5,
+		SW = 225,
+		WSW = 247.5,
+		W = 270,
+		WNW = 292.5,
+		NW = 315,
+		NWN = 337.5,
+	}
+	return dirToDeg[heading] or 0 -- Returns the degree value for the given direction, defaulting to 0 if not found
+end
+
+-- Tighter relative direction code for when I make better arrows.
+function CommonUtils.getRelativeDirection(spawnDir)
+	local meHeading = CommonUtils.directions(mq.TLO.Me.Heading())
+	local spawnHeadingTo = CommonUtils.directions(spawnDir)
+	local difference = spawnHeadingTo - meHeading
+	difference = (difference + 360) % 360
+	return difference
+end
+
+function CommonUtils.RotatePoint(p, cx, cy, degAngle)
+	local radians = math.rad(degAngle)
+	local cosA = math.cos(radians)
+	local sinA = math.sin(radians)
+	local newX = cosA * (p.x - cx) - sinA * (p.y - cy) + cx
+	local newY = sinA * (p.x - cx) + cosA * (p.y - cy) + cy
+	return ImVec2(newX, newY)
+end
+
+function CommonUtils.DrawArrow(topPoint, width, height, color, angle)
+	local draw_list = ImGui.GetWindowDrawList()
+	local p1 = ImVec2(topPoint.x, topPoint.y)
+	local p2 = ImVec2(topPoint.x + width, topPoint.y + height)
+	local p3 = ImVec2(topPoint.x - width, topPoint.y + height)
+	-- center
+	local center_x = (p1.x + p2.x + p3.x) / 3
+	local center_y = (p1.y + p2.y + p3.y) / 3
+	-- rotate
+	angle = angle + .01
+	p1 = RotatePoint(p1, center_x, center_y, angle)
+	p2 = RotatePoint(p2, center_x, center_y, angle)
+	p3 = RotatePoint(p3, center_x, center_y, angle)
+	draw_list:AddTriangleFilled(p1, p2, p3, ImGui.GetColorU32(color))
+end
+
+function CommonUtils.ColorDistance(distance)
+	local DistColorRanges = {
+		orange = 600, -- distance the color changes from green to orange
+		red = 1200, -- distance the color changes from orange to red
+	}
+	if distance < DistColorRanges.orange then
+		-- Green color for Close Range
+		return CommonUtils.Colors.color('green')
+	elseif distance >= DistColorRanges.orange and distance <= DistColorRanges.red then
+		-- Orange color for Mid Range
+		return CommonUtils.Colors.color('orange')
+	else
+		-- Red color for Far Distance
+		return CommonUtils.Colors.color('red')
+	end
+end
 
 return CommonUtils

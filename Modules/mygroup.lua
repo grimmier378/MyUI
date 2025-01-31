@@ -155,6 +155,7 @@ local function DrawGroupMember(id)
     local memberName = member.Name()
     local r, g, b, a = 1, 1, 1, 1
     if member == 'NULL' then return end
+    local dirTo = member.HeadingTo() or '0'
 
     function GetInfoToolTip()
         if groupData[memberName] ~= nil then
@@ -227,7 +228,26 @@ local function DrawGroupMember(id)
             ImGui.SameLine()
             ImGui.Text(memberName)
         end
+        ImGui.SameLine()
+        ImGui.Text(' ')
+        if settings[Module.Name].ShowRoleIcons then
+            if mq.TLO.Group.MainTank.ID() == member.ID() then
+                ImGui.SameLine(0.0, 0)
+                Module.Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
+            end
 
+            if mq.TLO.Group.MainAssist.ID() == member.ID() then
+                ImGui.SameLine(0.0, 0)
+                Module.Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
+            end
+
+            if mq.TLO.Group.Puller.ID() == member.ID() then
+                ImGui.SameLine(0.0, 0)
+                Module.Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
+            end
+
+            ImGui.SameLine()
+        end
         -- Visiblity
 
         ImGui.TableNextColumn()
@@ -236,7 +256,6 @@ local function DrawGroupMember(id)
         else
             ImGui.TextColored(0.9, 0, 0, .5, Module.Icons.MD_VISIBILITY_OFF)
         end
-
         -- Icons
 
         ImGui.TableNextColumn()
@@ -256,6 +275,8 @@ local function DrawGroupMember(id)
                 if velocity == 0 then
                     ImGui.TextColored(Module.Colors.color('green'), Module.Icons.FA_SMILE_O)
                 else
+                    -- local cursorScreenPos = ImGui.GetCursorScreenPosVec()
+                    -- Module.Utils.DrawArrow(ImVec2(cursorScreenPos.x + 10, cursorScreenPos.y), 0.5, 15, distColor, Module.Utils.getRelativeDirection(dirTo) or 0)
                     ImGui.TextColored(Module.Colors.color('yellow'), Module.Icons.MD_DIRECTIONS_RUN)
                     ImGui.SameLine()
                     ImGui.TextColored(Module.Colors.color('teal'), "%0.0f", velocity)
@@ -263,32 +284,14 @@ local function DrawGroupMember(id)
             end
             ImGui.SameLine()
         end
-
-        ImGui.TextColored(Module.Colors.color('softblue'), Module.Icons.FA_LOCATION_ARROW)
-        ImGui.SameLine()
         ImGui.TextColored(distColor, " %d ", math.floor(dist))
-
         ImGui.SameLine()
+        local cursorScreenPos = ImGui.GetCursorPosVec()
+        Module.Utils.DrawArrow(ImVec2(cursorScreenPos.x + 10, cursorScreenPos.y), 5, 15, distColor, Module.Utils.getRelativeDirection(dirTo) or 0)
+        cursorScreenPos = ImGui.GetCursorPosVec()
+        -- ImGui.SetCursorPos(cursorScreenPos.x + 30, cursorScreenPos.y)
+        -- ImGui.TextColored(Module.Colors.color('softblue'), Module.Icons.FA_LOCATION_ARROW)
 
-        ImGui.Text(' ')
-        if settings[Module.Name].ShowRoleIcons then
-            if mq.TLO.Group.MainTank.ID() == member.ID() then
-                ImGui.SameLine()
-                Module.Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
-            end
-
-            if mq.TLO.Group.MainAssist.ID() == member.ID() then
-                ImGui.SameLine()
-                Module.Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
-            end
-
-            if mq.TLO.Group.Puller.ID() == member.ID() then
-                ImGui.SameLine()
-                Module.Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
-            end
-
-            ImGui.SameLine()
-        end
         ImGui.PopStyleVar()
         ImGui.EndGroup()
         if ImGui.IsItemHovered() then

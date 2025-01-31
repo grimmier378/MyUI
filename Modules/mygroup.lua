@@ -199,7 +199,7 @@ local function DrawGroupMember(id)
 
         if mq.TLO.Group.MainAssist.ID() == member.ID() then
             ImGui.SameLine()
-            Module.Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist')
+            Module.Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
         end
 
         if mq.TLO.Group.Puller.ID() == member.ID() then

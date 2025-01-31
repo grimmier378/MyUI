@@ -1963,8 +1963,64 @@ function Module.RenderGUI()
                                             if ImGui.IsItemHovered() then
                                                 ImGui.SetTooltip("Current Waypoint")
                                             end
+                                            if not NavSet.doNav then
+                                                if ImGui.BeginPopupContextItem("WP_" .. tmpTable[i].step) then
+                                                    if ImGui.MenuItem('Nav to WP ' .. tmpTable[i].step) then
+                                                        NavSet.CurrentStepIndex = i
+                                                        NavSet.doNav = true
+                                                        NavSet.doLoop = false
+                                                        NavSet.doSingle = true
+                                                        PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                                                    end
+
+                                                    if ImGui.MenuItem('Start Path Here: WP ' .. tmpTable[i].step) then
+                                                        NavSet.CurrentStepIndex = i
+                                                        NavSet.doNav = true
+                                                        NavSet.doLoop = false
+                                                        NavSet.doSingle = false
+                                                        PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                                                    end
+                                                    if ImGui.MenuItem('Start Loop Here: WP ' .. tmpTable[i].step) then
+                                                        NavSet.CurrentStepIndex = i
+                                                        NavSet.doNav = true
+                                                        NavSet.doLoop = true
+                                                        NavSet.doSingle = false
+                                                        PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                                                    end
+
+                                                    ImGui.EndPopup()
+                                                end
+                                            end
                                         else
                                             ImGui.Text("%s", tmpTable[i].step)
+                                            if not NavSet.doNav then
+                                                if ImGui.BeginPopupContextItem("WP_" .. tmpTable[i].step) then
+                                                    if ImGui.MenuItem('Nav to WP ' .. tmpTable[i].step) then
+                                                        NavSet.CurrentStepIndex = i
+                                                        NavSet.doNav = true
+                                                        NavSet.doLoop = false
+                                                        NavSet.doSingle = true
+                                                        PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                                                    end
+
+                                                    if ImGui.MenuItem('Start Path Here: WP ' .. tmpTable[i].step) then
+                                                        NavSet.CurrentStepIndex = i
+                                                        NavSet.doNav = true
+                                                        NavSet.doLoop = false
+                                                        NavSet.doSingle = false
+                                                        PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                                                    end
+                                                    if ImGui.MenuItem('Start Loop Here: WP ' .. tmpTable[i].step) then
+                                                        NavSet.CurrentStepIndex = i
+                                                        NavSet.doNav = true
+                                                        NavSet.doLoop = true
+                                                        NavSet.doSingle = false
+                                                        PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                                                    end
+
+                                                    ImGui.EndPopup()
+                                                end
+                                            end
                                         end
 
                                         if i == closestWaypointIndex then
@@ -1972,6 +2028,34 @@ function Module.RenderGUI()
                                             ImGui.TextColored(ImVec4(1, 1, 0, 1), Module.Icons.MD_STAR)
                                             if ImGui.IsItemHovered() then
                                                 ImGui.SetTooltip("Closest Waypoint")
+                                            end
+                                            if not NavSet.doNav then
+                                                if ImGui.BeginPopupContextItem("WP_" .. tmpTable[i].step) then
+                                                    if ImGui.MenuItem('Nav to WP ' .. tmpTable[i].step) then
+                                                        NavSet.CurrentStepIndex = i
+                                                        NavSet.doNav = true
+                                                        NavSet.doLoop = false
+                                                        NavSet.doSingle = true
+                                                        PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                                                    end
+
+                                                    if ImGui.MenuItem('Start Path Here: WP ' .. tmpTable[i].step) then
+                                                        NavSet.CurrentStepIndex = i
+                                                        NavSet.doNav = true
+                                                        NavSet.doLoop = false
+                                                        NavSet.doSingle = false
+                                                        PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                                                    end
+                                                    if ImGui.MenuItem('Start Loop Here: WP ' .. tmpTable[i].step) then
+                                                        NavSet.CurrentStepIndex = i
+                                                        NavSet.doNav = true
+                                                        NavSet.doLoop = true
+                                                        NavSet.doSingle = false
+                                                        PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                                                    end
+
+                                                    ImGui.EndPopup()
+                                                end
                                             end
                                         end
                                         -- if tmpTable[i].step == tmpTable[currentStepIndex].step then

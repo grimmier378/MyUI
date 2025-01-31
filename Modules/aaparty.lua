@@ -433,13 +433,13 @@ function Module.RenderGUI()
                                 -- ImGui.SetCursorPosY(currentY)
                             end
                         end
-                        local modY = 0
+                        local modY = 2
 
                         if (groupData[i].PctAir < 100) then modY = 10 end
                         local childY = 68 + modY
                         if not expand[groupData[i].Name] then childY = 42 + modY end
                         if compact[groupData[i].Name] then childY = 25 end
-                        if compact[groupData[i].Name] and expand[groupData[i].Name] then childY = 53 end
+                        if compact[groupData[i].Name] and expand[groupData[i].Name] then childY = 53 + modY end
                         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 2, 2)
                         imgui.BeginChild(groupData[i].Name, 145, childY, bit32.bor(ImGuiChildFlags.Border, ImGuiChildFlags.AutoResizeY), ImGuiWindowFlags.NoScrollbar)
                         -- Start of grouped Whole Elements

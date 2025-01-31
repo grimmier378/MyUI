@@ -271,23 +271,16 @@ local function getTellChat(line, who)
     if string.find(line, " pet tells you") then return end
     if not settings[Module.DisplayName].RelayTells then return end
     local checkNPC = string.format("npc =\"%s\"", who)
+    local check2 = string.format("pet \"%s\"", who)
+
     local master = mq.TLO.Spawn(who).Master.Type() or 'noMaster'
     -- local checkPet = string.format("pcpet %s",who)
     local pet = mq.TLO.Me.Pet.DisplayName() or 'noPet'
-    if (mq.TLO.SpawnCount(checkNPC)() ~= 0 or master == 'PC' or string.find(pet, who)) then return end
+    if (mq.TLO.SpawnCount(checkNPC)() ~= 0 or mq.TLO.SpawnCount(check2)() ~= 0 or master == 'PC' or string.find(pet, who)) then return end
     if RelayActor ~= nil then
         RelayActor:send({ mailbox = 'chat_relay', script = 'chatrelay', }, GenerateContent('Tell', line))
         RelayActor:send({ mailbox = 'chat_relay', script = 'myui', }, GenerateContent('Tell', line))
     end
-end
-
-local function resizeConsoleFonts()
-    -- for k in pairs(guildChat) do
-    --     guildChat[k].fontSize = settings[Module.DisplayName].FontSize
-    -- end
-    -- for k in pairs(tellChat) do
-    --     tellChat[k].fontSize = settings[Module.DisplayName].FontSize
-    -- end
 end
 
 local function RenderMini()

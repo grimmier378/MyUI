@@ -737,7 +737,7 @@ local function DrawMainWin()
 	if not openMain then
 		Module.ShowDialog = false
 	end
-	Module.KeypressHandler:handleKeypress()
+	Module.KeypressHandler:handleKeypress(inputFocus2)
 	inputFocus2 = false
 	if not showMain then
 		Module.ThemeLoader.EndTheme(ColorCount, StyleCount)

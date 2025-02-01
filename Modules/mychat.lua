@@ -3,6 +3,8 @@ local mq                = require('mq')
 local ImGui             = require('ImGui')
 local zep               = require('Zep')
 
+local MAX_HISTORY_COUNT = 100
+
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 local Module            = {}
 if not loadedExeternally then
@@ -57,7 +59,9 @@ Module.Settings          = {
 }
 Module.console           = nil
 Module.commandBuffer     = ''
+--Command History
 Module.commandHistory    = {}
+Module.commandIndex      = nil
 Module.timeStamps        = true
 Module.doLinks           = false
 -- Consoles
@@ -930,6 +934,41 @@ function Module.EventChatSpam(channelID, line)
     end
 end
 
+-- Call back function for InputText. Handles command history and tab completion
+---@param data ImGuiInputTextCallbackData
+local function inputTextCallback(_, data)
+    --Handle command history
+    if data.EventFlag == ImGuiInputTextFlags.CallbackHistory then
+        if data.EventKey == ImGuiKey.UpArrow then
+            -- Move up in history
+            if Module.historyIndex == nil then
+                Module.historyIndex = #Module.commandHistory -- Start from the last command
+            elseif Module.historyIndex > 1 then
+                Module.historyIndex = Module.historyIndex - 1
+            end
+        elseif data.EventKey == ImGuiKey.DownArrow then
+            -- Move down in history
+            if Module.historyIndex ~= nil then
+                if Module.historyIndex < #Module.commandHistory then
+                    Module.historyIndex = Module.historyIndex + 1
+                else
+                    Module.historyIndex = nil -- Reset to empty input
+                end
+            end
+        end
+
+        -- Update the actual command buffer instead of data.Buffer
+        if Module.historyIndex then
+            Module.commandBuffer = Module.commandHistory[Module.historyIndex]
+            data:DeleteChars(0, #data.Buffer)
+            data:InsertChars(0, Module.commandHistory[Module.historyIndex])
+        end
+
+        return 0
+    end
+    return 0
+end
+
 local historyUpdated = false
 local focusKeyboard = false
 ------------------------------------------ GUI's --------------------------------------------
@@ -1038,7 +1077,6 @@ local function DrawConsole(channelID)
         ImGui.SetKeyboardFocusHere(-1)
     end
 end
-
 
 local function DrawChatWindow()
     -- Main menu bar
@@ -1262,12 +1300,21 @@ local function DrawChatWindow()
             ImGui.PushStyleColor(ImGuiCol.FrameBg, ImVec4(0, 0, 0, 0))
             ImGui.PushFont(ImGui.ConsoleFont)
             local accept = false
-            Module.commandBuffer, accept = ImGui.InputText('##Input##' .. windowNum, Module.commandBuffer, textFlags)
+            Module.commandBuffer, accept = ImGui.InputText('##Input##' .. windowNum, Module.commandBuffer, textFlags, inputTextCallback)
             ImGui.PopFont()
             ImGui.PopStyleColor()
             ImGui.PopItemWidth()
             if accept then
+                if #Module.commandHistory == 0 or Module.commandHistory[#Module.commandHistory] ~= Module.commandBuffer then
+                    table.insert(Module.commandHistory, Module.commandBuffer)
+
+                    -- Limit history size
+                    if #Module.commandHistory > MAX_HISTORY_COUNT then
+                        table.remove(Module.commandHistory, 1)
+                    end
+                end
                 Module.ExecCommand(Module.commandBuffer)
+                Module.historyIndex = nil
                 Module.commandBuffer = ''
                 setFocus = true
             end
@@ -2250,7 +2297,6 @@ function Module.ExecCommand(text)
         else
             Module.console:AppendText(IM_COL32(255, 0, 0), "Unknown command: '%s'", text)
         end
-        table.insert(Module.commandHistory, text)
     end
     if Module.Settings.LogCommands then
         writeLogToFile(text)

@@ -410,9 +410,9 @@ function CommonUtils.DrawArrow(topPoint, width, height, color, angle)
 	local center_y = (p1.y + p2.y + p3.y) / 3
 	-- rotate
 	angle = angle + .01
-	p1 = RotatePoint(p1, center_x, center_y, angle)
-	p2 = RotatePoint(p2, center_x, center_y, angle)
-	p3 = RotatePoint(p3, center_x, center_y, angle)
+	p1 = CommonUtils.RotatePoint(p1, center_x, center_y, angle)
+	p2 = CommonUtils.RotatePoint(p2, center_x, center_y, angle)
+	p3 = CommonUtils.RotatePoint(p3, center_x, center_y, angle)
 	draw_list:AddTriangleFilled(p1, p2, p3, ImGui.GetColorU32(color))
 end
 

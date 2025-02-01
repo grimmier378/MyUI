@@ -46,7 +46,6 @@ function KeypressHandler:handleKeypress(textInput)
         -- Handle Escape key separately
         if key == "Escape" and isDown and not wasDown then
             mq.cmd("/keypress esc")
-            printf("Pressed: Escape")
             -- Handle modifier keys separately (we will track their state)
         elseif string.find(key, "Ctrl") or string.find(key, "Shift") or string.find(key, "Alt") then
             self.keyStates[i] = isDown
@@ -58,7 +57,6 @@ function KeypressHandler:handleKeypress(textInput)
             -- Send key press with modifier (if any) or without
             local command = prefix .. key
             mq.cmdf("/keypress %s hold", command)
-            printf("Pressed: %s hold", command)
 
             self.heldPrinted[i] = false -- Reset "held" state tracking
             -- Handle key being held down (print only once)
@@ -71,7 +69,6 @@ function KeypressHandler:handleKeypress(textInput)
             -- Send key release with modifier (if any) or without
             local command = prefix .. key
             mq.cmdf("/keypress %s release", command)
-            printf("Released: %s release", command)
 
             self.heldPrinted[i] = nil
         end

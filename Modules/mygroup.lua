@@ -155,7 +155,6 @@ local function DrawGroupMember(id)
     local memberName = member.Name()
     local r, g, b, a = 1, 1, 1, 1
     if member == 'NULL' then return end
-    local dirTo = member.HeadingTo() or '0'
 
     function GetInfoToolTip()
         if groupData[memberName] ~= nil then
@@ -287,6 +286,7 @@ local function DrawGroupMember(id)
         ImGui.TextColored(distColor, " %d ", math.floor(dist))
         ImGui.SameLine()
         local cursorScreenPos = ImGui.GetCursorPosVec()
+        local dirTo = member.HeadingTo() or '0'
         Module.Utils.DrawArrow(ImVec2(cursorScreenPos.x + 10, cursorScreenPos.y), 5, 15, distColor, Module.Utils.getRelativeDirection(dirTo) or 0)
         cursorScreenPos = ImGui.GetCursorPosVec()
         -- ImGui.SetCursorPos(cursorScreenPos.x + 30, cursorScreenPos.y)

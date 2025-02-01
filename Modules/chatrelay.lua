@@ -271,7 +271,7 @@ local function getTellChat(line, who)
     if string.find(line, " pet tells you") then return end
     if not settings[Module.DisplayName].RelayTells then return end
     local checkNPC = string.format("npc =\"%s\"", who)
-    local check2 = string.format("pet \"%s\"", who)
+    local check2 = string.format("pet =\"%s\"", who)
 
     local master = mq.TLO.Spawn(who).Master.Type() or 'noMaster'
     -- local checkPet = string.format("pcpet %s",who)

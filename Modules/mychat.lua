@@ -30,47 +30,51 @@ else
     Module.ThemesFile = MyUI_ThemeFile
     Module.Theme = MyUI_Theme
 end
-Module.Name              = "MyChat"
-Module.IsRunning         = false
-Module.defaults          = Module.Utils.Library.Include('defaults.default_chat_settings')
-Module.tempSettings      = {}
-Module.eventNames        = {}
-Module.tempFilterStrings = {}
-Module.tempFilterEnabled = {}
-Module.tempFilterHidden  = {}
-Module.tempEventStrings  = {}
-Module.tempChanColors    = {}
-Module.tempFiltColors    = {}
-Module.hString           = {}
-Module.TLOConsoles       = {}
-Module.LogFile           = string.format('%s/MyUI/MyChat/%s/%s.log', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
-Module.SHOW              = true
-Module.openGUI           = true
-Module.openConfigGUI     = false
-Module.refreshLinkDB     = 10
-Module.mainEcho          = '/say'
+Module.Name                                     = "MyChat"
+Module.IsRunning                                = false
+Module.defaults                                 = Module.Utils.Library.Include('defaults.default_chat_settings')
+Module.tempSettings                             = {}
+Module.eventNames                               = {}
+Module.tempFilterStrings                        = {}
+Module.tempFilterEnabled                        = {}
+Module.tempFilterHidden                         = {}
+Module.tempEventStrings                         = {}
+Module.tempChanColors                           = {}
+Module.tempFiltColors                           = {}
+Module.hString                                  = {}
+Module.TLOConsoles                              = {}
+Module.LogFile                                  = string.format('%s/MyUI/MyChat/%s/%s.log', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
+Module.SHOW                                     = true
+Module.openGUI                                  = true
+Module.openConfigGUI                            = false
+Module.refreshLinkDB                            = 10
+Module.mainEcho                                 = '/say'
 -- Module.doRefresh         = false
-Module.SettingsFile      = string.format('%s/MyUI/MyChat/%s/%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
-Module.KeyFocus          = false
-Module.KeyName           = 'RightShift'
-Module.Settings          = {
+Module.SettingsFile                             = string.format('%s/MyUI/MyChat/%s/%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
+Module.KeyFocus                                 = false
+Module.KeyName                                  = 'RightShift'
+Module.Settings                                 = {
     -- Channels
     Channels = {},
 }
-Module.console           = nil
-Module.commandBuffer     = ''
---Command History
-Module.commandHistory    = {}
-Module.commandIndex      = nil
-Module.timeStamps        = true
-Module.doLinks           = false
--- Consoles
-Module.Consoles          = {}
--- Flags
-Module.tabFlags          = bit32.bor(ImGuiTabBarFlags.Reorderable, ImGuiTabBarFlags.FittingPolicyResizeDown, ImGuiTabBarFlags.TabListPopupButton)
-Module.winFlags          = bit32.bor(ImGuiWindowFlags.MenuBar, ImGuiWindowFlags.NoScrollbar)
-Module.PopOutFlags       = bit32.bor(ImGuiWindowFlags.NoScrollbar)
 
+Module.console                                  = nil
+Module.commandBuffer                            = ''
+--Command History and completion
+Module.commandHistory                           = {}
+Module.commandIndex                             = nil
+Module.timeStamps                               = true
+Module.CommandCompletion                        = require('lib.CommandCompletion')
+Module.CompletionIndex                          = 0
+Module.CompletionWord                           = nil
+
+-- Consoles
+Module.doLinks                                  = false
+Module.Consoles                                 = {}
+-- Flags
+Module.tabFlags                                 = bit32.bor(ImGuiTabBarFlags.Reorderable, ImGuiTabBarFlags.FittingPolicyResizeDown, ImGuiTabBarFlags.TabListPopupButton)
+Module.winFlags                                 = bit32.bor(ImGuiWindowFlags.MenuBar, ImGuiWindowFlags.NoScrollbar)
+Module.PopOutFlags                              = bit32.bor(ImGuiWindowFlags.NoScrollbar)
 
 -- local var's
 
@@ -937,8 +941,61 @@ end
 -- Call back function for InputText. Handles command history and tab completion
 ---@param data ImGuiInputTextCallbackData
 local function inputTextCallback(_, data)
-    --Handle command history
-    if data.EventFlag == ImGuiInputTextFlags.CallbackHistory then
+
+    --handle command completion
+    if data.EventFlag == ImGuiInputTextFlags.CallbackCompletion then
+        local buffer = data.Buffer
+        local words = {}
+        for word in buffer:gmatch("%S+") do
+            table.insert(words, word)
+        end
+
+        if (Module.CompletionWord ~= nil) then
+            -- Remove the last word and add CompletionWord instead
+            table.remove(words, #words)                -- Remove the last word
+            table.insert(words, Module.CompletionWord) -- Add CompletionWord at the end
+        end
+
+        local matches = {}
+
+        --match first word(command)
+        if #words == 1 then
+            Module.CompletionWord = words[1]
+            for _, cmd in ipairs(Module.CommandCompletion.Commands) do
+                if cmd:sub(1, #words[1]) == words[1] then
+                    table.insert(matches, cmd)
+                    print(cmd)
+                end
+            end
+            --match last word(parameters)
+        elseif #words > 1 then
+            --[[for _, member in ipairs(Module.CommandCompletion.Group) do
+                if member ~= nil then
+                    table.insert(paramList, member)
+                end
+            end--]]
+            local lastWord = words[#words]
+            Module.CompletionWord = lastWord
+            for _, param in ipairs(Module.CommandCompletion.Zones) do
+                if param:sub(1, #lastWord) == lastWord then
+                    table.insert(matches, param)
+                end
+            end
+        end
+        if #matches > 0 then
+            Module.CompletionIndex = (Module.CompletionIndex or 0) + 1
+            if Module.CompletionIndex > #matches then
+                Module.CompletionIndex = 1 -- Cycle back to first match
+            end
+            words[#words] = matches[Module.CompletionIndex]
+            local tempBuffer = table.concat(words, " ")
+            data:DeleteChars(0, #data.Buffer)
+            data:InsertChars(0, tempBuffer)
+            data.CursorPos = #tempBuffer
+        end
+        --Handle command history
+    elseif data.EventFlag == ImGuiInputTextFlags.CallbackHistory then
+
         if data.EventKey == ImGuiKey.UpArrow then
             -- Move up in history
             if Module.historyIndex == nil then
@@ -962,6 +1019,9 @@ local function inputTextCallback(_, data)
             Module.commandBuffer = Module.commandHistory[Module.historyIndex]
             data:DeleteChars(0, #data.Buffer)
             data:InsertChars(0, Module.commandHistory[Module.historyIndex])
+
+        else
+            data:DeleteChars(0, #data.Buffer)
         end
 
         return 0
@@ -1301,6 +1361,14 @@ local function DrawChatWindow()
             ImGui.PushFont(ImGui.ConsoleFont)
             local accept = false
             Module.commandBuffer, accept = ImGui.InputText('##Input##' .. windowNum, Module.commandBuffer, textFlags, inputTextCallback)
+
+            if (ImGui.IsItemActive()) then
+                if (ImGui.IsKeyPressed(ImGuiKey.Space) or ImGui.IsKeyPressed(ImGuiKey.Backspace)) then
+                    Module.CompletionIndex = 0
+                    Module.CompletionWord = nil
+                end
+            end
+
             ImGui.PopFont()
             ImGui.PopStyleColor()
             ImGui.PopItemWidth()

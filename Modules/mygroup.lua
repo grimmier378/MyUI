@@ -36,6 +36,7 @@ else
     Module.ThemeFile = MyUI_ThemeFile
     Module.Theme = MyUI_Theme
     Module.ThemeLoader = MyUI_ThemeLoader
+    Module.KeypressHandler = MyUI_KeypressHandler
 end
 
 local gIcon              = Module.Icons.MD_SETTINGS
@@ -671,6 +672,7 @@ function Module.RenderGUI()
         ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
         local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme, settings[Module.Name].MouseOver, mouseHover, settings[Module.Name].WinTransparency)
         local openGUI, showMain = ImGui.Begin("My Group##MyGroup" .. mq.TLO.Me.DisplayName(), true, flags)
+        Module.KeypressHandler:handleKeypress()
         if not openGUI then Module.IsRunning = false end
         if showMain then
             mouseHover = ImGui.IsWindowHovered(ImGuiHoveredFlags.ChildWindows)

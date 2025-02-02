@@ -57,6 +57,7 @@ Module.Settings                                 = {
     -- Channels
     Channels = {},
 }
+
 Module.console                                  = nil
 Module.commandBuffer                            = ''
 --Command History and completion
@@ -66,6 +67,7 @@ Module.timeStamps                               = true
 Module.CommandCompletion                        = require('lib.CommandCompletion')
 Module.CompletionIndex                          = 0
 Module.CompletionWord                           = nil
+
 -- Consoles
 Module.doLinks                                  = false
 Module.Consoles                                 = {}
@@ -939,6 +941,7 @@ end
 -- Call back function for InputText. Handles command history and tab completion
 ---@param data ImGuiInputTextCallbackData
 local function inputTextCallback(_, data)
+
     --handle command completion
     if data.EventFlag == ImGuiInputTextFlags.CallbackCompletion then
         local buffer = data.Buffer
@@ -992,6 +995,7 @@ local function inputTextCallback(_, data)
         end
         --Handle command history
     elseif data.EventFlag == ImGuiInputTextFlags.CallbackHistory then
+
         if data.EventKey == ImGuiKey.UpArrow then
             -- Move up in history
             if Module.historyIndex == nil then
@@ -1015,6 +1019,7 @@ local function inputTextCallback(_, data)
             Module.commandBuffer = Module.commandHistory[Module.historyIndex]
             data:DeleteChars(0, #data.Buffer)
             data:InsertChars(0, Module.commandHistory[Module.historyIndex])
+
         else
             data:DeleteChars(0, #data.Buffer)
         end
@@ -1356,12 +1361,14 @@ local function DrawChatWindow()
             ImGui.PushFont(ImGui.ConsoleFont)
             local accept = false
             Module.commandBuffer, accept = ImGui.InputText('##Input##' .. windowNum, Module.commandBuffer, textFlags, inputTextCallback)
+
             if (ImGui.IsItemActive()) then
                 if (ImGui.IsKeyPressed(ImGuiKey.Space) or ImGui.IsKeyPressed(ImGuiKey.Backspace)) then
                     Module.CompletionIndex = 0
                     Module.CompletionWord = nil
                 end
             end
+
             ImGui.PopFont()
             ImGui.PopStyleColor()
             ImGui.PopItemWidth()

@@ -29,7 +29,7 @@ else
     Module.Colors      = MyUI_Colors
 end
 local myself                                                            = mq.TLO.Me
-
+local MyGroupLeader                                                     = mq.TLO.Group.Leader.CleanName() or "NoGroup"
 local themeID                                                           = 1
 local expand, compact                                                   = {}, {}
 local configFile                                                        = mq.configDir .. '/myui/AA_Party_Configs.lua'
@@ -61,6 +61,7 @@ local defaults                                                          = {
     ShowTooltip = true,
     MaxRow = 1,
     AlphaSort = false,
+    MyGroupOnly = true,
 }
 
 local function loadTheme()
@@ -119,6 +120,11 @@ local function loadSettings()
         newSetting = true
     end
 
+    if settings[Module.DisplayName].MyGroupOnly == nil then
+        settings[Module.DisplayName].MyGroupOnly = true
+        newSetting = true
+    end
+
     if not loadedExeternally then
         loadTheme()
     end
@@ -134,6 +140,7 @@ local function loadSettings()
     TempSettings.scale       = settings[Module.DisplayName].Scale
     TempSettings.showTooltip = settings[Module.DisplayName].ShowTooltip
     TempSettings.themeName   = settings[Module.DisplayName].LoadTheme
+    TempSettings.MyGroupOnly = settings[Module.DisplayName].MyGroupOnly
     if newSetting then mq.pickle(configFile, settings) end
 end
 
@@ -175,20 +182,21 @@ local function GenerateContent(who, sub, what)
         firstRun = false
     end
     return {
-        Subject  = Subject,
-        PctExp   = PctExp,
-        PctExpAA = PctAA,
-        Level    = MeLevel,
-        Setting  = SettingAA,
-        DoWho    = doWho,
-        DoWhat   = doWhat,
-        Name     = myself.DisplayName(),
-        Pts      = PtsAA,
-        PtsTotal = PtsTotal,
-        PtsSpent = PtsSpent,
-        Check    = checkIn,
-        State    = cState,
-        PctAir   = myself.PctAirSupply(),
+        Subject     = Subject,
+        PctExp      = PctExp,
+        PctExpAA    = PctAA,
+        Level       = MeLevel,
+        Setting     = SettingAA,
+        GroupLeader = MyGroupLeader,
+        DoWho       = doWho,
+        DoWhat      = doWhat,
+        Name        = myself.DisplayName(),
+        Pts         = PtsAA,
+        PtsTotal    = PtsTotal,
+        PtsSpent    = PtsSpent,
+        Check       = checkIn,
+        State       = cState,
+        PctAir      = myself.PctAirSupply(),
     }
 end
 
@@ -216,6 +224,7 @@ local function MessageHandler()
         local dowho       = MemberEntry.DoWho or 'N/A'
         local check       = MemberEntry.Check or os.time()
         local pctAir      = MemberEntry.PctAir or 100
+        local groupLeader = MemberEntry.GroupLeader or 'N/A'
         local found       = false
         if MailBoxShow then
             table.insert(mailBox, { Name = who, Subject = subject, Check = check, DoWho = dowho, DoWhat = dowhat, When = os.date("%H:%M:%S"), })
@@ -285,6 +294,7 @@ local function MessageHandler()
                         groupData[i].Check = check
                         groupData[i].State = MemberEntry.State
                         groupData[i].PctAir = pctAir
+                        groupData[i].GroupLeader = groupLeader
                         if groupData[i].LastPts ~= pts then
                             if who ~= Module.CharLoaded and AAPartyMode == 'driver' and groupData[i].LastPts < pts then
                                 Module.Utils.PrintOutput('MyUI', true, "%s gained an AA, now has %d unspent", who, pts)
@@ -303,6 +313,7 @@ local function MessageHandler()
                             PctExpAA = aaXP,
                             PctExp = pctXP,
                             DoWho = nil,
+                            GroupLeader = groupLeader,
                             DoWhat = nil,
                             Setting = aaSetting,
                             Pts = pts,
@@ -322,6 +333,7 @@ local function MessageHandler()
                         PctExpAA = aaXP,
                         PctExp = pctXP,
                         DoWho = nil,
+                        GroupLeader = groupLeader,
                         DoWhat = nil,
                         Setting = aaSetting,
                         Pts = pts,
@@ -350,7 +362,7 @@ local function getMyAA()
     local tmpLvl       = myself.Level() or 0
     local cState       = myself.CombatState() or ""
     local tmpAirSupply = myself.PctAirSupply()
-
+    MyGroupLeader      = mq.TLO.Group.Leader.CleanName() or "NoGroup"
     if firstRun or (PctAA ~= tmpExpAA or SettingAA ~= tmpSettingAA or PtsAA ~= tmpPts or
             PtsSpent ~= tmpPtsSpent or PtsTotal ~= tmpPtsTotal or tmpLvl ~= MeLevel or tmpPctXP ~= PctExp or cState ~= LastState or tmpAirSupply ~= lastAirValue) then
         PctAA = tmpExpAA
@@ -415,177 +427,179 @@ function Module.RenderGUI()
                 local currentX, currentY = imgui.GetCursorPosX(), imgui.GetCursorPosY()
                 local itemWidth = 150 -- approximate width
                 local padding = 2     -- padding between items
+                local drawn = 0
                 for i = 1, #groupData do
-                    if i == 1 then currentY = imgui.GetCursorPosY() end
                     if groupData[i] ~= nil then
-                        if expand[groupData[i].Name] == nil then expand[groupData[i].Name] = false end
-                        if compact[groupData[i].Name] == nil then compact[groupData[i].Name] = false end
+                        if (groupData[i].GroupLeader == MyGroupLeader and TempSettings.MyGroupOnly) or not TempSettings.MyGroupOnly then
+                            if expand[groupData[i].Name] == nil then expand[groupData[i].Name] = false end
+                            if compact[groupData[i].Name] == nil then compact[groupData[i].Name] = false end
 
-                        if currentX + itemWidth > windowWidth then
-                            imgui.NewLine()
-                            currentY = imgui.GetCursorPosY()
-                            currentX = imgui.GetCursorPosX()
-                            -- currentY = imgui.GetCursorPosY()
-                            ImGui.SetCursorPosY(currentY - 20)
-                        else
-                            if i > 1 then
-                                imgui.SameLine()
-                                -- ImGui.SetCursorPosY(currentY)
-                            end
-                        end
-                        local modY = 0
-
-                        if (groupData[i].PctAir < 100) then modY = 10 end
-                        local childY = 68 + modY
-                        if not expand[groupData[i].Name] then childY = 42 + modY end
-                        if compact[groupData[i].Name] then childY = 25 end
-                        if compact[groupData[i].Name] and expand[groupData[i].Name] then childY = 53 end
-                        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 2, 2)
-                        imgui.BeginChild(groupData[i].Name, 145, childY, bit32.bor(ImGuiChildFlags.Border, ImGuiChildFlags.AutoResizeY), ImGuiWindowFlags.NoScrollbar)
-                        -- Start of grouped Whole Elements
-                        ImGui.BeginGroup()
-                        -- Start of subgrouped Elements for tooltip
-                        imgui.PushID(groupData[i].Name)
-                        -- imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
-                        if ImGui.BeginTable('##data', 3, bit32.bor(ImGuiTableFlags.NoBordersInBody)) then
-                            local widthMax = ImGui.GetContentRegionAvail()
-
-                            ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthFixed, 95)
-                            ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthFixed, iconSize)
-                            ImGui.TableSetupColumn("Pts", ImGuiTableColumnFlags.WidthFixed, 25)
-                            ImGui.TableNextRow()
-                            ImGui.TableNextColumn()
-                            imgui.Text(groupData[i].Name)
-                            imgui.SameLine()
-                            imgui.TextColored(Module.Colors.color('tangarine'), groupData[i].Level)
-                            ImGui.TableNextColumn()
-                            local combatState = groupData[i].State
-                            if combatState == 'DEBUFFED' then
-                                Module.Utils.DrawStatusIcon('A_PWCSDebuff', 'pwcs', 'You are Debuffed and need a cure before resting.', iconSize)
-                            elseif combatState == 'ACTIVE' then
-                                Module.Utils.DrawStatusIcon('A_PWCSStanding', 'pwcs', 'You are not in combat and may rest at any time.', iconSize)
-                            elseif combatState == 'COOLDOWN' then
-                                Module.Utils.DrawStatusIcon('A_PWCSTimer', 'pwcs', 'You are recovering from combat and can not reset yet', iconSize)
-                            elseif combatState == 'RESTING' then
-                                Module.Utils.DrawStatusIcon('A_PWCSRegen', 'pwcs', 'You are Resting.', iconSize)
-                            elseif combatState == 'COMBAT' then
-                                Module.Utils.DrawStatusIcon('A_PWCSInCombat', 'pwcs', 'You are in Combat.', iconSize)
+                            if currentX + itemWidth > windowWidth then
+                                imgui.NewLine()
+                                currentY = imgui.GetCursorPosY()
+                                currentX = imgui.GetCursorPosX()
+                                -- currentY = imgui.GetCursorPosY()
+                                ImGui.SetCursorPosY(currentY - 20)
                             else
-                                Module.Utils.DrawStatusIcon(3996, 'item', ' ', iconSize)
+                                if drawn > 0 then
+                                    imgui.SameLine()
+                                    -- ImGui.SetCursorPosY(currentY)
+                                end
                             end
-                            ImGui.TableNextColumn()
-                            ImGui.TextColored(Module.Colors.color('green'), groupData[i].Pts)
-                            ImGui.EndTable()
-                        end
+                            local modY = 6
 
-                        if not compact[groupData[i].Name] then
-                            imgui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(1, 0.9, 0.4, 0.5))
+                            if (groupData[i].PctAir < 100) then modY = 10 end
+                            local childY = 68 + modY
+                            if not expand[groupData[i].Name] then childY = 42 + modY end
+                            if compact[groupData[i].Name] then childY = 25 end
+                            if compact[groupData[i].Name] and expand[groupData[i].Name] then childY = 53 + modY end
+                            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 2, 2)
+                            imgui.BeginChild(groupData[i].Name, 145, childY, bit32.bor(ImGuiChildFlags.Border, ImGuiChildFlags.AutoResizeY), ImGuiWindowFlags.NoScrollbar)
+                            -- Start of grouped Whole Elements
+                            ImGui.BeginGroup()
+                            -- Start of subgrouped Elements for tooltip
+                            imgui.PushID(groupData[i].Name)
                             -- imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
-                            imgui.ProgressBar(groupData[i].PctExp / 100, ImVec2(137, 5), "##PctXP" .. groupData[i].Name)
-                            imgui.PopStyleColor()
+                            if ImGui.BeginTable('##data', 3, bit32.bor(ImGuiTableFlags.NoBordersInBody)) then
+                                local widthMax = ImGui.GetContentRegionAvail()
 
-                            imgui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(0.2, 0.9, 0.9, 0.5))
-                            -- imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
-                            imgui.ProgressBar(groupData[i].PctExpAA / 100, ImVec2(137, 5), "##AAXP" .. groupData[i].Name)
-                            imgui.PopStyleColor()
+                                ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthFixed, 95)
+                                ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthFixed, iconSize)
+                                ImGui.TableSetupColumn("Pts", ImGuiTableColumnFlags.WidthFixed, 25)
+                                ImGui.TableNextRow()
+                                ImGui.TableNextColumn()
+                                imgui.Text(groupData[i].Name)
+                                imgui.SameLine()
+                                imgui.TextColored(Module.Colors.color('tangarine'), groupData[i].Level)
+                                ImGui.TableNextColumn()
+                                local combatState = groupData[i].State
+                                if combatState == 'DEBUFFED' then
+                                    Module.Utils.DrawStatusIcon('A_PWCSDebuff', 'pwcs', 'You are Debuffed and need a cure before resting.', iconSize)
+                                elseif combatState == 'ACTIVE' then
+                                    Module.Utils.DrawStatusIcon('A_PWCSStanding', 'pwcs', 'You are not in combat and may rest at any time.', iconSize)
+                                elseif combatState == 'COOLDOWN' then
+                                    Module.Utils.DrawStatusIcon('A_PWCSTimer', 'pwcs', 'You are recovering from combat and can not reset yet', iconSize)
+                                elseif combatState == 'RESTING' then
+                                    Module.Utils.DrawStatusIcon('A_PWCSRegen', 'pwcs', 'You are Resting.', iconSize)
+                                elseif combatState == 'COMBAT' then
+                                    Module.Utils.DrawStatusIcon('A_PWCSInCombat', 'pwcs', 'You are in Combat.', iconSize)
+                                else
+                                    Module.Utils.DrawStatusIcon(3996, 'item', ' ', iconSize)
+                                end
+                                ImGui.TableNextColumn()
+                                ImGui.TextColored(Module.Colors.color('green'), groupData[i].Pts)
+                                ImGui.EndTable()
+                            end
 
-                            if groupData[i].PctAir < 100 then
-                                imgui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(0.877, 0.492, 0.170, 1.000))
+                            if not compact[groupData[i].Name] then
+                                imgui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(1, 0.9, 0.4, 0.5))
                                 -- imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
-                                imgui.ProgressBar(groupData[i].PctAir / 100, ImVec2(137, 5), "##Air" .. groupData[i].Name)
+                                imgui.ProgressBar(groupData[i].PctExp / 100, ImVec2(137, 5), "##PctXP" .. groupData[i].Name)
                                 imgui.PopStyleColor()
 
-                                if ImGui.IsItemHovered() then imgui.SetTooltip("Air Supply: %s%%", groupData[i].PctAir) end
-                            end
-                        end
+                                imgui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(0.2, 0.9, 0.9, 0.5))
+                                -- imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
+                                imgui.ProgressBar(groupData[i].PctExpAA / 100, ImVec2(137, 5), "##AAXP" .. groupData[i].Name)
+                                imgui.PopStyleColor()
 
-                        imgui.PopID()
-                        ImGui.EndGroup()
-                        -- end of subgrouped Elements for tooltip begin tooltip
-                        if ImGui.IsItemHovered() and TempSettings.showTooltip then
-                            imgui.BeginTooltip()
-                            -- local tTipTxt = "\t\t" .. groupData[i].Name
-                            imgui.TextColored(ImVec4(1, 1, 1, 1), "\t\t%s", groupData[i].Name)
-                            imgui.Separator()
-                            -- tTipTxt = string.format("Exp:\t\t\t%.2f %%", groupData[i].PctExp)
-                            imgui.TextColored(ImVec4(1, 0.9, 0.4, 1), "Exp:\t\t\t%.2f %%", groupData[i].PctExp)
-                            -- tTipTxt = string.format("AA Exp: \t%.2f %%", groupData[i].PctExpAA)
-                            imgui.TextColored(ImVec4(0.2, 0.9, 0.9, 1), "AA Exp: \t%.2f %%", groupData[i].PctExpAA)
-                            -- tTipTxt = string.format("Avail:  \t\t%d", groupData[i].Pts)
-                            imgui.TextColored(ImVec4(0, 1, 0, 1), "Avail:  \t\t%d", groupData[i].Pts)
-                            -- tTipTxt = string.format("Spent:\t\t%d", groupData[i].PtsSpent)
-                            imgui.TextColored(ImVec4(0.9, 0.4, 0.4, 1), "Spent:\t\t%d", groupData[i].PtsSpent)
-                            -- tTipTxt = string.format("Total:\t\t%d", groupData[i].PtsTotal)
-                            imgui.TextColored(ImVec4(0.8, 0.0, 0.8, 1.0), "Total:\t\t%d", groupData[i].PtsTotal)
-                            imgui.EndTooltip()
-                        end
-                        if imgui.IsItemHovered() then
-                            if imgui.IsMouseReleased(0) then
-                                expand[groupData[i].Name] = not expand[groupData[i].Name]
-                            end
-                            if imgui.IsMouseReleased(1) then
-                                compact[groupData[i].Name] = not compact[groupData[i].Name]
-                            end
-                        end
-                        -- end tooltip
+                                if groupData[i].PctAir < 100 then
+                                    imgui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(0.877, 0.492, 0.170, 1.000))
+                                    -- imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
+                                    imgui.ProgressBar(groupData[i].PctAir / 100, ImVec2(137, 5), "##Air" .. groupData[i].Name)
+                                    imgui.PopStyleColor()
 
-                        -- expanded section for adjusting AA settings
+                                    if ImGui.IsItemHovered() then imgui.SetTooltip("Air Supply: %s%%", groupData[i].PctAir) end
+                                end
+                            end
 
-                        if expand[groupData[i].Name] then
-                            imgui.SetCursorPosX(ImGui.GetCursorPosX() + 12)
-                            if imgui.Button("<##Decrease" .. groupData[i].Name) then
-                                if aaActor ~= nil then
-                                    if ImGui.IsKeyDown(ImGuiMod.Ctrl) then
-                                        aaActor:send({ mailbox = 'aa_party', script = 'aaparty', },
-                                            { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'min', })
-                                        aaActor:send({ mailbox = 'aa_party', script = 'myui', },
-                                            { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'min', })
-                                    else
-                                        aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
-                                        aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
+                            imgui.PopID()
+                            ImGui.EndGroup()
+                            -- end of subgrouped Elements for tooltip begin tooltip
+                            if ImGui.IsItemHovered() and TempSettings.showTooltip then
+                                imgui.BeginTooltip()
+                                -- local tTipTxt = "\t\t" .. groupData[i].Name
+                                imgui.TextColored(ImVec4(1, 1, 1, 1), "\t\t%s", groupData[i].Name)
+                                imgui.Separator()
+                                -- tTipTxt = string.format("Exp:\t\t\t%.2f %%", groupData[i].PctExp)
+                                imgui.TextColored(ImVec4(1, 0.9, 0.4, 1), "Exp:\t\t\t%.2f %%", groupData[i].PctExp)
+                                -- tTipTxt = string.format("AA Exp: \t%.2f %%", groupData[i].PctExpAA)
+                                imgui.TextColored(ImVec4(0.2, 0.9, 0.9, 1), "AA Exp: \t%.2f %%", groupData[i].PctExpAA)
+                                -- tTipTxt = string.format("Avail:  \t\t%d", groupData[i].Pts)
+                                imgui.TextColored(ImVec4(0, 1, 0, 1), "Avail:  \t\t%d", groupData[i].Pts)
+                                -- tTipTxt = string.format("Spent:\t\t%d", groupData[i].PtsSpent)
+                                imgui.TextColored(ImVec4(0.9, 0.4, 0.4, 1), "Spent:\t\t%d", groupData[i].PtsSpent)
+                                -- tTipTxt = string.format("Total:\t\t%d", groupData[i].PtsTotal)
+                                imgui.TextColored(ImVec4(0.8, 0.0, 0.8, 1.0), "Total:\t\t%d", groupData[i].PtsTotal)
+                                imgui.EndTooltip()
+                            end
+                            if imgui.IsItemHovered() then
+                                if imgui.IsMouseReleased(0) then
+                                    expand[groupData[i].Name] = not expand[groupData[i].Name]
+                                end
+                                if imgui.IsMouseReleased(1) then
+                                    compact[groupData[i].Name] = not compact[groupData[i].Name]
+                                end
+                            end
+                            -- end tooltip
+
+                            -- expanded section for adjusting AA settings
+
+                            if expand[groupData[i].Name] then
+                                imgui.SetCursorPosX(ImGui.GetCursorPosX() + 12)
+                                if imgui.Button("<##Decrease" .. groupData[i].Name) then
+                                    if aaActor ~= nil then
+                                        if ImGui.IsKeyDown(ImGuiMod.Ctrl) then
+                                            aaActor:send({ mailbox = 'aa_party', script = 'aaparty', },
+                                                { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'min', })
+                                            aaActor:send({ mailbox = 'aa_party', script = 'myui', },
+                                                { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'min', })
+                                        else
+                                            aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
+                                            aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
+                                        end
+                                    end
+                                end
+                                imgui.SameLine()
+                                local tmp = groupData[i].Setting
+                                tmp = tmp:gsub("%%", "")
+                                local AA_Set = tonumber(tmp) or 0
+                                -- this is for my OCD on spacing
+                                if AA_Set == 0 then
+                                    imgui.Text("AA Set:    %d", AA_Set)
+                                    imgui.SameLine()
+                                    imgui.SetCursorPosX(ImGui.GetCursorPosX() + 7)
+                                elseif AA_Set < 100 then
+                                    imgui.Text("AA Set:   %d", AA_Set)
+                                    imgui.SameLine()
+                                    imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
+                                else
+                                    imgui.Text("AA Set: %d", AA_Set)
+                                    imgui.SameLine()
+                                    imgui.SetCursorPosX(ImGui.GetCursorPosX())
+                                end
+
+                                if imgui.Button(">##Increase" .. groupData[i].Name) then
+                                    if aaActor ~= nil then
+                                        if ImGui.IsKeyDown(ImGuiMod.Ctrl) then
+                                            aaActor:send({ mailbox = 'aa_party', script = 'aaparty', },
+                                                { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'max', })
+                                            aaActor:send({ mailbox = 'aa_party', script = 'myui', },
+                                                { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'max', })
+                                        else
+                                            aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(groupData[i].Name, 'Action', 'More'))
+                                            aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(groupData[i].Name, 'Action', 'More'))
+                                        end
                                     end
                                 end
                             end
-                            imgui.SameLine()
-                            local tmp = groupData[i].Setting
-                            tmp = tmp:gsub("%%", "")
-                            local AA_Set = tonumber(tmp) or 0
-                            -- this is for my OCD on spacing
-                            if AA_Set == 0 then
-                                imgui.Text("AA Set:    %d", AA_Set)
-                                imgui.SameLine()
-                                imgui.SetCursorPosX(ImGui.GetCursorPosX() + 7)
-                            elseif AA_Set < 100 then
-                                imgui.Text("AA Set:   %d", AA_Set)
-                                imgui.SameLine()
-                                imgui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
-                            else
-                                imgui.Text("AA Set: %d", AA_Set)
-                                imgui.SameLine()
-                                imgui.SetCursorPosX(ImGui.GetCursorPosX())
-                            end
-
-                            if imgui.Button(">##Increase" .. groupData[i].Name) then
-                                if aaActor ~= nil then
-                                    if ImGui.IsKeyDown(ImGuiMod.Ctrl) then
-                                        aaActor:send({ mailbox = 'aa_party', script = 'aaparty', },
-                                            { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'max', })
-                                        aaActor:send({ mailbox = 'aa_party', script = 'myui', },
-                                            { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'max', })
-                                    else
-                                        aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(groupData[i].Name, 'Action', 'More'))
-                                        aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(groupData[i].Name, 'Action', 'More'))
-                                    end
-                                end
-                            end
+                            drawn = drawn + 1
+                            ImGui.Separator()
+                            imgui.EndChild()
+                            ImGui.PopStyleVar()
+                            -- End of grouped items
+                            -- Left Click to expand the group for AA settings
+                            currentX = currentX + itemWidth + padding
                         end
-
-                        ImGui.Separator()
-                        imgui.EndChild()
-                        ImGui.PopStyleVar()
-                        -- End of grouped items
-                        -- Left Click to expand the group for AA settings
-                        currentX = currentX + itemWidth + padding
                     end
                 end
             end
@@ -708,13 +722,14 @@ function Module.RenderGUI()
             ImGui.SameLine()
             TempSettings.alphaSort = ImGui.Checkbox("Alpha Sort##MySpells", TempSettings.alphaSort)
             TempSettings.showTooltip = ImGui.Checkbox("Show Tooltip##MySpells", TempSettings.showTooltip)
-
+            TempSettings.MyGroupOnly = ImGui.Checkbox("My Group Only##MySpells", TempSettings.MyGroupOnly)
             if ImGui.Button("Save & Close") then
                 settings = dofile(configFile)
                 settings[Module.DisplayName].Scale = TempSettings.scale
                 settings[Module.DisplayName].AlphaSort = TempSettings.alphaSort
                 settings[Module.DisplayName].LoadTheme = TempSettings.themeName
                 settings[Module.DisplayName].ShowTooltip = TempSettings.showTooltip
+                settings[Module.DisplayName].MyGroupOnly = TempSettings.MyGroupOnly
                 mq.pickle(configFile, settings)
                 AAPartyConfigShow = false
             end

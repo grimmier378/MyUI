@@ -1192,6 +1192,7 @@ local function DrawStatus()
     if tmpStatus:find("Distance:") then
         tmpStatus = tmpStatus:sub(1, tmpStatus:find("Distance:") - 1)
     end
+    ImGui.PushTextWrapPos(350)
     if status:find("Idle") then
         ImGui.Text("Status: ")
         ImGui.SameLine()
@@ -1223,6 +1224,7 @@ local function DrawStatus()
         ImGui.SameLine()
         ImGui.TextColored(ImVec4(1, 1, 1, 1), status)
     end
+    ImGui.PopTextWrapPos()
     if PathStartClock ~= nil then
         ImGui.Text("Start Time: ")
         ImGui.SameLine()
@@ -1956,6 +1958,7 @@ function Module.RenderGUI()
                                     ImGui.TableHeadersRow()
 
                                     for i = 1, #tmpTable do
+                                        ImGui.PushID(i)
                                         ImGui.TableNextRow()
                                         ImGui.TableSetColumnIndex(0)
                                         if tmpTable[i].step == tmpTable[NavSet.CurrentStepIndex].step then
@@ -2134,6 +2137,7 @@ function Module.RenderGUI()
                                                 UpdatePath(currZone, NavSet.SelectedPath)
                                             end
                                         end
+                                        ImGui.PopID()
                                     end
                                     ImGui.EndTable()
                                 end

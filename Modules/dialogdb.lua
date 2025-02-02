@@ -731,6 +731,12 @@ local function DrawHelpWin()
 	ImGui.End()
 end
 
+local filterMatched = false
+
+local function stripString(str)
+	return str:gsub("%(", ""):gsub("%)", "")
+end
+
 local function DrawMainWin()
 	local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(Module.themeName, Module.Theme)
 	local openMain, showMain = ImGui.Begin("NPC Dialog##DialogDB_Main_" .. Module.CharLoaded, true, winFlags)
@@ -767,13 +773,21 @@ local function DrawMainWin()
 			end
 			ImGui.SetNextItemWidth(200)
 			searchString = ImGui.InputText("Filter##DialogDB", searchString or "")
+
 			if (ImGui.IsItemActive()) then
 				inputFocus2 = true
+			end
+
+			for _, desc in pairs(sortedKeyList) do
+				if (searchString ~= "" and string.find(stripString(desc:lower()), stripString(searchString:lower()))) then
+					tmpDesc = desc
+					break
+				end
 			end
 			ImGui.SetNextItemWidth(200)
 			if ImGui.BeginCombo("##DialogDBCombined", tmpDesc) then
 				for _, desc in pairs(sortedKeyList) do
-					if (searchString ~= "" and string.find(desc:lower(), searchString:lower())) or (searchString == "") then
+					if (searchString ~= "" and string.find(stripString(desc:lower()), stripString(searchString:lower()))) or (searchString == "") then
 						local isSelected = (desc == tmpDesc)
 						if ImGui.Selectable(desc, isSelected) then
 							tmpDesc = desc

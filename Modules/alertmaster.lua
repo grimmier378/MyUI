@@ -360,37 +360,7 @@ local function import_spawnmaster(val)
 	end
 end
 
-local function load_settings()
-	if Module.Utils.File.Exists(settings_path) then
-		settings = LIP.load(settings_path)
-	else
-		settings = {
-			[CharConfig] = defaultConfig,
-			[CharCommands] = {},
-			Ignore = {},
-		}
-		save_settings()
-	end
-	if not loadedExeternally then
-		if Module.Utils.File.Exists(Module.ThemeFile) then
-			Module.Theme = dofile(Module.ThemeFile)
-		end
-	end
-	if Module.Utils.File.Exists(smSettings) then
-		spawnsSpawnMaster = LIP.loadSM(smSettings)
-		haveSM = true
-		importZone = true
-	end
-
-	if Module.Utils.File.Exists(smImportList) then
-		importedZones = dofile(smImportList)
-	end
-
-	useThemeName = Module.Theme.LoadTheme
-	-- if this character doesn't have the sections in the ini, create them
-	if settings[CharConfig] == nil then settings[CharConfig] = defaultConfig end
-	if settings[CharCommands] == nil then settings[CharCommands] = {} end
-	if settings['SafeZones'] == nil then settings['SafeZones'] = {} end
+local function set_settings()
 	useThemeName = settings[CharConfig]['theme'] or 'Default'
 	settings[CharConfig]['theme'] = useThemeName
 	ZoomLvl = settings[CharConfig]['ZoomLvl'] or 1.0
@@ -448,6 +418,42 @@ local function load_settings()
 	settings[CharConfig]['volPCEntered'] = volPCEntered
 	volPCLeft = settings[CharConfig]['volPCLeft'] or volPCLeft
 	settings[CharConfig]['volPCLeft'] = volPCLeft
+end
+
+local function load_settings()
+	if Module.Utils.File.Exists(settings_path) then
+		settings = LIP.load(settings_path)
+	else
+		settings = {
+			[CharConfig] = defaultConfig,
+			[CharCommands] = {},
+			Ignore = {},
+		}
+		save_settings()
+	end
+
+	if not loadedExeternally then
+		if Module.Utils.File.Exists(Module.ThemeFile) then
+			Module.Theme = dofile(Module.ThemeFile)
+		end
+	end
+
+	if Module.Utils.File.Exists(smSettings) then
+		spawnsSpawnMaster = LIP.loadSM(smSettings)
+		haveSM = true
+		importZone = true
+	end
+
+	if Module.Utils.File.Exists(smImportList) then
+		importedZones = dofile(smImportList)
+	end
+
+	useThemeName = Module.Theme.LoadTheme
+	-- if this character doesn't have the sections in the ini, create them
+	if settings[CharConfig] == nil then settings[CharConfig] = defaultConfig end
+	if settings[CharCommands] == nil then settings[CharCommands] = {} end
+	if settings['SafeZones'] == nil then settings['SafeZones'] = {} end
+	set_settings()
 	save_settings()
 	if Module.GUI_Main.Locked then
 		SearchWindow_Show = true
@@ -1636,14 +1642,19 @@ local function Config_GUI()
 				ImGui.TableSetupColumn('##ToggleCol2')
 				ImGui.TableNextRow()
 				for k, v in pairs(settings[CharConfig]) do
+					ImGui.PushID(k)
+					if keys[k] == nil then keys[k] = v end
 					if type(v) == 'boolean' then
-						keys[k]                          = false
-						settings[CharConfig][k], keys[k] = ImGui.Checkbox(k, v)
-						if keys[k] then
+						local pressed = false
+						keys[k], pressed = ImGui.Checkbox(k, keys[k])
+						if pressed then
+							settings[CharConfig][k] = keys[k]
+							set_settings()
 							save_settings()
 						end
 						ImGui.TableNextColumn()
 					end
+					ImGui.PopID()
 				end
 				ImGui.EndTable()
 			end
@@ -1839,7 +1850,7 @@ local function Config_GUI()
 			end
 		end
 
-		if ImGui.Button('Close') then
+		if ImGui.Button('Save & Close') then
 			openConfigGUI = false
 			settings[CharConfig]['theme'] = useThemeName
 			settings[CharConfig]['ZoomLvl'] = ZoomLvl

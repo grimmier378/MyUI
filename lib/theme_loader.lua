@@ -66,7 +66,7 @@ function LoadTheme.StartTheme(tName, tTable, mouseOver, mouseHovered, mouseOvaer
 						ColorCounter = ColorCounter + 1
 					end
 				else
-					ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
+					ImGui.PushStyleColor(ImGuiCol[cData.PropertyName], ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
 					ColorCounter = ColorCounter + 1
 				end
 			end

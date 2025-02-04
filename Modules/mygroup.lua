@@ -309,7 +309,7 @@ local function DrawGroupMember(id)
         end
         ImGui.TextColored(distColor, " %d ", math.floor(dist))
         ImGui.SameLine()
-        local cursorScreenPos = ImGui.GetCursorPosVec()
+        local cursorScreenPos = ImGui.GetCursorScreenPosVec()
         local dirTo = member.HeadingTo() or '0'
         Module.Utils.DrawArrow(ImVec2(cursorScreenPos.x + 10, cursorScreenPos.y), 5, 15, distColor, Module.Utils.getRelativeDirection(dirTo) or 0)
         cursorScreenPos = ImGui.GetCursorPosVec()

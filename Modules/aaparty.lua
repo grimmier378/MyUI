@@ -29,7 +29,7 @@ else
     Module.Colors      = MyUI_Colors
 end
 local myself                                                            = mq.TLO.Me
-local MyGroupLeader                                                     = mq.TLO.Group.Leader.CleanName() or "NoGroup"
+local MyGroupLeader                                                     = mq.TLO.Group.Leader() or "NoGroup"
 local themeID                                                           = 1
 local expand, compact                                                   = {}, {}
 local configFile                                                        = mq.configDir .. '/myui/AA_Party_Configs.lua'
@@ -362,7 +362,7 @@ local function getMyAA()
     local tmpLvl       = myself.Level() or 0
     local cState       = myself.CombatState() or ""
     local tmpAirSupply = myself.PctAirSupply()
-    MyGroupLeader      = mq.TLO.Group.Leader.CleanName() or "NoGroup"
+    MyGroupLeader      = mq.TLO.Group.Leader() or "NoGroup"
     if firstRun or (PctAA ~= tmpExpAA or SettingAA ~= tmpSettingAA or PtsAA ~= tmpPts or
             PtsSpent ~= tmpPtsSpent or PtsTotal ~= tmpPtsTotal or tmpLvl ~= MeLevel or tmpPctXP ~= PctExp or cState ~= LastState or tmpAirSupply ~= lastAirValue) then
         PctAA = tmpExpAA

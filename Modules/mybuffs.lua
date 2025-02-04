@@ -29,7 +29,7 @@ Module.ShowText,
 Module.ShowScroll,
 Module.DoPulse          = false, true, true, true, true, true
 Module.iconSize         = 24
-Module.MyGroupLeader    = mq.TLO.Group.Leader.CleanName() or 'NoGroup'
+Module.MyGroupLeader    = mq.TLO.Group.Leader() or 'NoGroup'
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 if not loadedExeternally then
@@ -1796,7 +1796,7 @@ function Module.MainLoop()
         ---@diagnostic disable-next-line: undefined-global
         if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
-    Module.MyGroupLeader = mq.TLO.Group.Leader.CleanName() or 'NoGroup'
+    Module.MyGroupLeader = mq.TLO.Group.Leader() or 'NoGroup'
     if mq.gettime() - clockTimer >= 1 then
         currZone = mq.TLO.Zone.ID()
         if currZone ~= lastZone then

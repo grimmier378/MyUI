@@ -157,39 +157,62 @@ local function DrawGroupMember(id)
     local r, g, b, a = 1, 1, 1, 1
     if member == 'NULL' then return end
 
+    local hpPct
+    local mpPct
+    local enPct
+    local zne, cls
+    local sitting
+    local level
+    local velo
+    if groupData[memberName] ~= nil then
+        hpPct = groupData[memberName].CurHP / groupData[memberName].MaxHP * 100
+        mpPct = groupData[memberName].CurMana / groupData[memberName].MaxMana * 100
+        enPct = groupData[memberName].CurEnd / groupData[memberName].MaxEnd * 100
+        zne = groupData[memberName].Zone
+        cls = groupData[memberName].Class
+        sitting = groupData[memberName].Sitting
+        level = groupData[memberName].Level or 0
+        velo = groupData[memberName].Velocity or 0
+    else
+        hpPct = member.PctHPs() or 0
+        mpPct = member.PctMana() or 0
+        enPct = member.PctEndurance() or 0
+        zne = member.Present() and mq.TLO.Zone.Name() or 'Unknown'
+        cls = member.Class.ShortName() or 'Unknown'
+        sitting = member.Sitting()
+        level = member.Level() or 0
+        velo = member.Speed() or 0
+    end
+
     function GetInfoToolTip()
+        ImGui.TextColored(Module.Colors.color('tangarine'), memberName)
+        ImGui.SameLine()
+        ImGui.Text("(%s)", level)
+        ImGui.Text("Class: %s", cls)
         if groupData[memberName] ~= nil then
-            ImGui.TextColored(Module.Colors.color('tangarine'), memberName)
-            ImGui.SameLine()
-            ImGui.Text("(%s)", groupData[memberName].Level)
-            ImGui.Text("Class: %s", groupData[memberName].Class)
             ImGui.TextColored(Module.Colors.color('pink2'), "Health: %d of %d", groupData[memberName].CurHP, groupData[memberName].MaxHP)
             ImGui.TextColored(Module.Colors.color('light blue'), "Mana: %d of %d", groupData[memberName].CurMana, groupData[memberName].MaxMana)
             ImGui.TextColored(Module.Colors.color('yellow'), "End: %d of %d", groupData[memberName].CurEnd, groupData[memberName].MaxEnd)
-            if groupData[memberName].Sitting then
+            if sitting then
                 ImGui.TextColored(Module.Colors.color('tangarine'), Module.Icons.FA_MOON_O)
             else
                 ImGui.TextColored(Module.Colors.color('green'), Module.Icons.FA_SMILE_O)
                 ImGui.SameLine()
                 ImGui.TextColored(Module.Colors.color('yellow'), Module.Icons.MD_DIRECTIONS_RUN)
                 ImGui.SameLine()
-                ImGui.TextColored(Module.Colors.color('teal'), "%0.1f", groupData[memberName].Velocity)
+                ImGui.TextColored(Module.Colors.color('teal'), "%0.1f", velo)
             end
-            ImGui.TextColored(Module.Colors.color('softblue'), "Zone: %s", groupData[memberName].Zone)
+            ImGui.TextColored(Module.Colors.color('softblue'), "Zone: %s", zne)
         else
-            ImGui.TextColored(Module.Colors.color('tangarine'), memberName)
-            ImGui.SameLine()
-            ImGui.Text("Level: %d", member.Level())
-            ImGui.Text("Class: %s", member.Class.ShortName())
-            ImGui.TextColored(Module.Colors.color('pink2'), "Health: %d of 100", member.PctHPs())
-            ImGui.TextColored(Module.Colors.color('light blue'), "Mana: %d of 100", member.PctMana())
-            ImGui.TextColored(Module.Colors.color('yellow'), "End: %d of 100", member.PctEndurance())
-            if member.Sitting() then
+            ImGui.TextColored(Module.Colors.color('pink2'), "Health: %s of 100", hpPct)
+            ImGui.TextColored(Module.Colors.color('light blue'), "Mana: %s of 100", mpPct)
+            ImGui.TextColored(Module.Colors.color('yellow'), "End: %s of 100", enPct)
+            if sitting then
                 ImGui.TextColored(Module.Colors.color('tangarine'), Module.Icons.FA_MOON_O)
             else
                 ImGui.TextColored(Module.Colors.color('green'), Module.Icons.FA_SMILE_O)
             end
-            ImGui.TextColored(Module.Colors.color('softblue'), "Zone: %s", mq.TLO.Zone.Name())
+            ImGui.TextColored(Module.Colors.color('softblue'), "Zone: %s", zne)
         end
 
         if mq.TLO.Group.MainTank.ID() == member.ID() then
@@ -269,7 +292,7 @@ local function DrawGroupMember(id)
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 0, 0)
         if showMoveStatus and groupData[memberName] ~= nil then
             local velocity = groupData[memberName].Velocity or 0
-            if groupData[memberName].Sitting then
+            if sitting then
                 ImGui.TextColored(Module.Colors.color('tangarine'), Module.Icons.FA_MOON_O)
             else
                 if velocity == 0 then
@@ -304,25 +327,26 @@ local function DrawGroupMember(id)
         -- Lvl
         ImGui.TableNextColumn()
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 2, 0)
-        if groupData[memberName] == nil then
-            groupData[memberName] = {
-                Name = memberName or 'Unknown',
-                Level = member.Level() or 0,
-                Class = member.Class.ShortName() or 'Unknown',
-                CurHP = member.CurrentHPs() or 0,
-                MaxHP = member.MaxHPs() or 100,
-                CurMana = member.CurrentMana() or 0,
-                MaxMana = member.MaxMana() or 100,
-                CurEnd = member.CurrentEndurance() or 0,
-                MaxEnd = member.MaxEndurance() or 0,
-                Sitting = member.Sitting() or false,
-                Zone = member.Present() and mq.TLO.Zone.Name() or 'Unknown',
-            }
-        end
-        if groupData[memberName].Sitting then
-            ImGui.TextColored(0.911, 0.351, 0.008, 1, "%d", groupData[memberName].Level or 0)
+        -- if groupData[memberName] == nil then
+        --     groupData[memberName] = {
+        --         Name = memberName or 'Unknown',
+        --         Level = member.Level() or 0,
+        --         Class = member.Class.ShortName() or 'Unknown',
+        --         CurHP = member.CurrentHPs() or 0,
+        --         MaxHP = member.MaxHPs() or 100,
+        --         CurMana = member.CurrentMana() or 0,
+        --         MaxMana = member.MaxMana() or 100,
+        --         CurEnd = member.CurrentEndurance() or 0,
+        --         MaxEnd = member.MaxEndurance() or 0,
+        --         Sitting = member.Sitting() or false,
+        --         Zone = member.Present() and mq.TLO.Zone.Name() or 'Unknown',
+        --     }
+        -- end
+
+        if sitting then
+            ImGui.TextColored(0.911, 0.351, 0.008, 1, "%d", level or 0)
         else
-            ImGui.Text("%s", groupData[memberName].Level or 0)
+            ImGui.Text("%s", level or 0)
         end
         if ImGui.IsItemHovered() then
             ImGui.BeginTooltip()
@@ -374,70 +398,62 @@ local function DrawGroupMember(id)
     end
     ImGui.Separator()
 
-    local hpPct = groupData[memberName].CurHP / groupData[memberName].MaxHP * 100
-    local mpPct = groupData[memberName].CurMana / groupData[memberName].MaxMana * 100
-    local enPct = groupData[memberName].CurEnd / groupData[memberName].MaxEnd * 100
-
     -- Health Bar
-    if groupData[memberName] ~= nil then
-        if settings[Module.Name].DynamicHP then
-            r = 1
-            b = b * (100 - hpPct) / 150
-            g = 0.1
-            a = 0.9
-            if Module.MyZone == groupData[memberName].Zone then
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r, g, b, a))
-            else
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
-            end
+    if settings[Module.Name].DynamicHP then
+        r = 1
+        b = b * (100 - hpPct) / 150
+        g = 0.1
+        a = 0.9
+        if Module.MyZone == zne then
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r, g, b, a))
         else
-            if hpPct <= 0 or hpPct == nil or not (Module.MyZone == groupData[memberName].Zone) then
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
-            elseif hpPct < 15 then
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('pink')))
-            else
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
-            end
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
         end
-        ImGui.ProgressBar((hpPct / 100), ImGui.GetContentRegionAvail(), 7 * Scale, '##pctHps' .. id)
-        ImGui.PopStyleColor()
-
-        if ImGui.IsItemHovered() then
-            ImGui.SetTooltip("%s\n%d%% Health", memberName, hpPct)
+    else
+        if hpPct <= 0 or hpPct == nil or not (Module.MyZone == groupData[memberName].Zone) then
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
+        elseif hpPct < 15 then
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('pink')))
+        else
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
         end
+    end
+    ImGui.ProgressBar((hpPct / 100), ImGui.GetContentRegionAvail(), 7 * Scale, '##pctHps' .. id)
+    ImGui.PopStyleColor()
 
-        --My Mana Bar
-        if showMana then
-            for i, v in pairs(manaClass) do
-                if string.find(groupData[memberName].Class, v) then
-                    if settings[Module.Name].DynamicMP then
-                        b = 0.9
-                        r = 1 * (100 - mpPct) / 200
-                        g = 0.9 * mpPct / 100 > 0.1 and 0.9 * mpPct / 100 or 0.1
-                        a = 0.5
-                        ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r, g, b, a))
-                    else
-                        ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('light blue2')))
-                    end
-                    ImGui.ProgressBar((mpPct / 100), ImGui.GetContentRegionAvail(), 7 * Scale, '##pctMana' .. id)
-                    ImGui.PopStyleColor()
-                    if ImGui.IsItemHovered() then
-                        ImGui.SetTooltip("%s\n%d%% Mana", memberName, mpPct)
-                    end
+    if ImGui.IsItemHovered() then
+        ImGui.SetTooltip("%s\n%d%% Health", memberName, hpPct)
+    end
+
+    --My Mana Bar
+    if showMana then
+        for i, v in pairs(manaClass) do
+            if string.find(cls, v) then
+                if settings[Module.Name].DynamicMP then
+                    b = 0.9
+                    r = 1 * (100 - mpPct) / 200
+                    g = 0.9 * mpPct / 100 > 0.1 and 0.9 * mpPct / 100 or 0.1
+                    a = 0.5
+                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r, g, b, a))
+                else
+                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('light blue2')))
+                end
+                ImGui.ProgressBar((mpPct / 100), ImGui.GetContentRegionAvail(), 7 * Scale, '##pctMana' .. id)
+                ImGui.PopStyleColor()
+                if ImGui.IsItemHovered() then
+                    ImGui.SetTooltip("%s\n%d%% Mana", memberName, mpPct)
                 end
             end
         end
-        if showEnd then
-            --My Endurance bar
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('yellow2')))
-            ImGui.ProgressBar((enPct / 100), ImGui.GetContentRegionAvail(), 7 * Scale, '##pctEndurance' .. id)
-            ImGui.PopStyleColor()
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip("%s\n%d%% Endurance", memberName, enPct)
-            end
+    end
+    if showEnd then
+        --My Endurance bar
+        ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('yellow2')))
+        ImGui.ProgressBar((enPct / 100), ImGui.GetContentRegionAvail(), 7 * Scale, '##pctEndurance' .. id)
+        ImGui.PopStyleColor()
+        if ImGui.IsItemHovered() then
+            ImGui.SetTooltip("%s\n%d%% Endurance", memberName, enPct)
         end
-    else
-        ImGui.Dummy(ImGui.GetContentRegionAvail(), 20)
     end
 
     ImGui.EndGroup()

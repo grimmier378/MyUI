@@ -35,7 +35,7 @@ if not loadedExeternally then
 	Module.Utils       = require('lib.common')
 	Module.CharLoaded  = mq.TLO.Me.DisplayName()
 	Module.Colors      = require('lib.colors')
-	Module.Guild       = mq.TLO.Me.Guild()
+	Module.Guild       = mq.TLO.Me.Guild() or 'NoGuild'
 	Module.Icons       = require('mq.ICONS')
 	Module.ThemeLoader = require('lib.theme_loader')
 	Module.ThemeFile   = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
@@ -708,7 +708,7 @@ end
 ---@param spawn MQSpawn
 local should_include_player = function(spawn)
 	local name = spawn.DisplayName()
-	local guild = spawn.Guild()
+	local guild = spawn.Guild() or 'None'
 	-- if pc exists on the ignore list, skip
 	if settings['Ignore'] ~= nil then
 		for k, v in pairs(settings['Ignore']) do
@@ -718,7 +718,7 @@ local should_include_player = function(spawn)
 	-- if pc is in group, raid or (optionally) guild, skip
 	local in_group = Group.Members() ~= nil and Group.Member(name).Index() ~= nil
 	local in_raid = Raid.Members() > 0 and Raid.Member(name)() ~= nil
-	local in_guild = ignoreguild and Module.Guild ~= nil and Module.Guild == guild
+	local in_guild = (ignoreguild and Module.Guild == guild)
 	if in_group or in_raid or in_guild then return false end
 	return true
 end
@@ -734,6 +734,7 @@ end
 
 local spawn_search_players = function(search)
 	local tmp = {}
+	-- if check_safe_zone() then return tmp end
 	local cnt = SpawnCount(search)()
 	if cnt ~= nil or cnt > 0 then
 		for i = 1, cnt do
@@ -2408,6 +2409,8 @@ Module.MainLoop = function()
 	if not loadedExeternally or os.time() - cTime > delay or firstRun then
 		if mq.TLO.Window('CharacterListWnd').Open() then return false end
 		currZone = mq.TLO.Zone.ID()
+		Module.Guild = mq.TLO.Me.Guild() or 'NoGuild'
+
 		check_for_zone_change()
 		check_for_spawns() -- always refresh spawn list and only alert if not a safe zone.(checked later in the function)
 		if check_safe_zone() ~= true then
@@ -2445,7 +2448,6 @@ Module.MainLoop = function()
 				alertTime = os.time()
 			end
 		end
-
 		cTime = os.time()
 		firstRun = false
 	end

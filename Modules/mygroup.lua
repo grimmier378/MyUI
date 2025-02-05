@@ -299,9 +299,10 @@ local function DrawGroupMember(id)
                 else
                     -- local cursorScreenPos = ImGui.GetCursorScreenPosVec()
                     -- Module.Utils.DrawArrow(ImVec2(cursorScreenPos.x + 10, cursorScreenPos.y), 0.5, 15, distColor, Module.Utils.getRelativeDirection(dirTo) or 0)
-                    ImGui.TextColored(Module.Colors.color('yellow'), Module.Icons.MD_DIRECTIONS_RUN)
-                    ImGui.SameLine()
+
                     ImGui.TextColored(Module.Colors.color('teal'), "%0.0f", velocity)
+                    ImGui.SameLine()
+                    ImGui.TextColored(Module.Colors.color('yellow'), Module.Icons.MD_DIRECTIONS_RUN)
                 end
             end
             ImGui.SameLine()

@@ -30,7 +30,6 @@ else
 	Module.ThemeFile = MyUI_ThemeFile
 	Module.Theme = MyUI_Theme
 	Module.Path = MyUI_Path
-	Module.KeypressHandler = MyUI_KeypressHandler
 end
 
 local gIcon           = Module.Icons.MD_SETTINGS
@@ -66,11 +65,8 @@ local winFlags        = bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.
 local delay           = 1
 local currZoneShort   = mq.TLO.Zone.ShortName() or 'None'
 local msgPref         = "\aw[\atDialogDB\aw] "
-local inputFocus      = 0
-local inputFocus2     = false
 
-
-Module.Config = {
+Module.Config         = {
 	cmdGroup = cmdGroup,
 	cmdZone = cmdZone,
 	cmdChar = cmdChar,
@@ -364,9 +360,6 @@ end
 local function DrawEditWin(server, target, zone, desc, cmd)
 	local ColorCountEdit, StyleCountEdit = Module.ThemeLoader.StartTheme(Module.themeName, Module.Theme)
 	local openE, showE = ImGui.Begin("Edit Dialog##Dialog_Edit_" .. Module.CharLoaded, true, ImGuiWindowFlags.NoCollapse)
-	--HERE
-	Module.KeypressHandler:handleKeypress(inputFocus > 0)
-	inputFocus = 0
 	if not openE then
 		Module.editGUI = false
 		entries = {}
@@ -423,15 +416,9 @@ local function DrawEditWin(server, target, zone, desc, cmd)
 	for i, entry in ipairs(entries) do
 		ImGui.SetNextItemWidth(150)
 		entry.desc, _ = ImGui.InputText("##EditDialogDesc" .. i, entry.desc)
-		if (ImGui.IsItemActive()) then
-			inputFocus = inputFocus + 1
-		end
 		ImGui.SameLine()
 		ImGui.SetNextItemWidth(150)
 		entry.cmd, _ = ImGui.InputText("##EditDialogCmd" .. i, entry.cmd)
-		if (ImGui.IsItemActive()) then
-			inputFocus = inputFocus + 1
-		end
 		ImGui.SameLine()
 		if ImGui.Button("Remove##" .. i) then
 			table.remove(entries, i)
@@ -620,7 +607,6 @@ end
 local function DrawThemeWin()
 	local ColorCountTheme, StyleCountTheme = Module.ThemeLoader.StartTheme(Module.themeName, Module.Theme)
 	local openTheme, showTheme = ImGui.Begin('Theme Selector##DialogDB_' .. Module.CharLoaded, true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
-	Module.KeypressHandler:handleKeypress(inputFocus2)
 	if not openTheme then
 		Module.themeGUI = false
 	end
@@ -677,7 +663,6 @@ end
 local function DrawHelpWin()
 	ImGui.SetNextWindowSize(600, 350, ImGuiCond.Appearing)
 	local openHelpWin, showHelpWin = ImGui.Begin("Help##DialogDB_" .. Module.CharLoaded, true, bit32.bor(ImGuiWindowFlags.NoCollapse))
-	Module.KeypressHandler:handleKeypress()
 	if not openHelpWin then
 		showHelp = false
 	end
@@ -743,8 +728,6 @@ local function DrawMainWin()
 	if not openMain then
 		Module.ShowDialog = false
 	end
-	Module.KeypressHandler:handleKeypress(inputFocus2)
-	inputFocus2 = false
 	if not showMain then
 		Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
 		ImGui.End()
@@ -773,17 +756,13 @@ local function DrawMainWin()
 			end
 			ImGui.SetNextItemWidth(200)
 			searchString = ImGui.InputText("Filter##DialogDB", searchString or "")
-
-			if (ImGui.IsItemActive()) then
-				inputFocus2 = true
-			end
-
 			for _, desc in pairs(sortedKeyList) do
 				if (searchString ~= "" and string.find(stripString(desc:lower()), stripString(searchString:lower()))) then
 					tmpDesc = desc
 					break
 				end
 			end
+
 			ImGui.SetNextItemWidth(200)
 			if ImGui.BeginCombo("##DialogDBCombined", tmpDesc) then
 				for _, desc in pairs(sortedKeyList) do

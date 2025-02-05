@@ -42,7 +42,6 @@ else
 	Module.Path = MyUI_Path
 	Module.ThemeFile = MyUI_ThemeFile
 	Module.Theme = MyUI_Theme
-	Module.KeypressHandler = MyUI_KeypressHandler
 end
 local isCaster = true
 local picker = Module.AbilityPicker.new()
@@ -76,7 +75,6 @@ local enableCastBar = false
 local debugShow = false
 local castTransparency = 1.0
 local startedCast, startCastTime, castBarShow = false, 0, false
-local inputFocus = false
 
 defaults = {
 	[Module.Name] = {
@@ -554,8 +552,6 @@ function Module.RenderGUI()
 	if isCaster then
 		local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
 		local open, show = ImGui.Begin(bIcon .. '##MySpells_' .. Module.CharLoaded, true, winFlags)
-		Module.KeypressHandler:handleKeypress(inputFocus)
-		inputFocus = false
 		if not open then
 			Module.IsRunning = false
 		end
@@ -760,9 +756,6 @@ function Module.RenderGUI()
 				ImGui.SeparatorText("Save Set")
 				ImGui.SetNextItemWidth(150)
 				tmpName = ImGui.InputText("##SetName", tmpName)
-				if (ImGui.IsItemActive()) then
-					inputFocus = true
-				end
 				ImGui.SameLine()
 				if ImGui.Button("Save Set") then
 					if tmpName ~= '' then
@@ -829,7 +822,6 @@ function Module.RenderGUI()
 		ImGui.SetNextWindowPos(ImGui.GetMousePosVec(), ImGuiCond.FirstUseEver)
 
 		local openCast, showCast = ImGui.Begin('Casting##MyCastingWin_' .. Module.CharLoaded, true, castFlags)
-		Module.KeypressHandler:handleKeypress()
 		if not openCast then
 			castBarShow = false
 		end

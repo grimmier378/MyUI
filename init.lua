@@ -26,9 +26,6 @@ MyUI_Server          = mq.TLO.EverQuest.Server()
 MyUI_Build           = mq.TLO.MacroQuest.BuildName()
 MyUI_Guild           = mq.TLO.Me.Guild() or "none"
 
--- keypress handler
-MyUI_KeypressHandler = require('lib.KeypressHandler')
-
 local MyActor        = MyUI_Actor.register('myui', function(message) end)
 local mods           = {}
 
@@ -94,77 +91,6 @@ MyUI_ThemeFile       = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
 MyUI_ThemeName       = 'Default'
 
 local MyUI_IsRunning = false
-
-local keyStates      = {}
-local heldPrinted    = {}
-
--- Function to check if any modifier key is held
-local function getModifierPrefix()
-	local prefix = ""
-	if ImGui.IsKeyDown(ImGuiKey.LeftCtrl) or ImGui.IsKeyDown(ImGuiKey.RightCtrl) then
-		prefix = "ctrl+"
-	elseif ImGui.IsKeyDown(ImGuiKey.LeftShift) or ImGui.IsKeyDown(ImGuiKey.RightShift) then
-		prefix = "shift+"
-	elseif ImGui.IsKeyDown(ImGuiKey.LeftAlt) or ImGui.IsKeyDown(ImGuiKey.RightAlt) then
-		prefix = "alt+"
-	end
-	return prefix
-end
-
-local function keypressHandler()
-	if not ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows) then
-		return
-	end
-
-	for i = ImGuiKey.NamedKey_BEGIN, ImGuiKey.NamedKey_END, 1 do
-		local key = ImGui.GetKeyName(i)
-		local isDown = ImGui.IsKeyDown(i)
-		local wasDown = keyStates[i] or false
-
-		-- Ignore invalid keys (e.g., mouse keys)
-		if key == "Unknown" or string.find(key, "Mouse") then
-			keyStates[i] = isDown
-			heldPrinted[i] = nil
-			return
-		end
-
-		-- Handle Escape key separately
-		if key == "Escape" and isDown and not wasDown then
-			mq.cmd("/keypress esc")
-			printf("Pressed: Escape")
-			-- Handle modifier keys separately (we will track their state)
-		elseif string.find(key, "Ctrl") or string.find(key, "Shift") or string.find(key, "Alt") then
-			keyStates[i] = isDown
-			heldPrinted[i] = nil
-			-- Handle other keys
-		elseif isDown and not wasDown then
-			local prefix = getModifierPrefix()
-
-			-- Send key press with modifier (if any) or without
-			local command = prefix .. key
-			mq.cmdf("/keypress %s hold", command)
-			printf("Pressed: %s hold", command)
-
-			heldPrinted[i] = false -- Reset "held" state tracking
-			-- Handle key being held down (print only once)
-		elseif isDown and wasDown and not heldPrinted[i] then
-			-- Only print "Held" once for each key
-			heldPrinted[i] = true
-			-- Handle key release (when key is lifted)
-		elseif not isDown and wasDown then
-			local prefix = getModifierPrefix()
-			-- Send key release with modifier (if any) or without
-			local command = prefix .. key
-			mq.cmdf("/keypress %s release", command)
-			printf("Released: %s release", command)
-
-			heldPrinted[i] = nil
-		end
-
-		-- Update key state
-		keyStates[i] = isDown
-	end
-end
 
 local function LoadTheme()
 	if MyUI_Utils.File.Exists(MyUI_ThemeFile) then
@@ -409,6 +335,7 @@ local function RenderMini()
 	local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
 	local openMini, showMini = ImGui.Begin(MyUI_ScriptName .. "##Mini" .. MyUI_CharLoaded, true,
 		bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar))
+
 	if not openMini then
 		MyUI_IsRunning = false
 	end
@@ -569,7 +496,6 @@ local function MyUI_Main()
 		if mq.TLO.EverQuest.GameState() ~= "INGAME" then mq.exit() end
 		mq.doevents()
 		ProcessModuleChanges()
-		keypressHandler()
 		for idx, data in ipairs(MyUI_Settings.mods_list) do
 			if data.enabled then
 				if MyUI_Modules[data.name].MainLoop ~= nil then MyUI_Modules[data.name].MainLoop() end

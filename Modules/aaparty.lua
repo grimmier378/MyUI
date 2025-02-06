@@ -275,6 +275,9 @@ local function MessageHandler()
                     elseif dowhat == 'max' then
                         mq.cmd('/alt on 100')
                         return
+                    elseif dowhat == 'mid' then
+                        mq.cmd('/alt on 50')
+                        return
                     end
                 end
             end
@@ -577,6 +580,14 @@ function Module.RenderGUI()
                                     imgui.SameLine()
                                     imgui.SetCursorPosX(ImGui.GetCursorPosX())
                                 end
+                                if aaActor ~= nil then
+                                    if ImGui.IsItemHovered() and ImGui.IsMouseClicked(ImGuiMouseButton.Left) and ImGui.IsKeyDown(ImGuiMod.Ctrl) then
+                                        aaActor:send({ mailbox = 'aa_party', script = 'aaparty', },
+                                            { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'mid', })
+                                        aaActor:send({ mailbox = 'aa_party', script = 'myui', },
+                                            { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'mid', })
+                                    end
+                                end
 
                                 if imgui.Button(">##Increase" .. groupData[i].Name) then
                                     if aaActor ~= nil then
@@ -612,6 +623,9 @@ function Module.RenderGUI()
                 end
                 if ImGui.MenuItem("Toggle Tooltip##Tooltip_" .. Module.CharLoaded) then
                     TempSettings.showTooltip = not TempSettings.showTooltip
+                end
+                if ImGui.MenuItem("Toggle My Group Only##MyGroup_" .. Module.CharLoaded) then
+                    TempSettings.MyGroupOnly = not TempSettings.MyGroupOnly
                 end
                 ImGui.EndPopup()
             end

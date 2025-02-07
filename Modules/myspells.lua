@@ -202,7 +202,7 @@ local function CheckCasting()
 	if mq.TLO.Me.Casting() ~= nil then
 		castBarShow = true
 		for i = 1, numGems do
-			if spellBar[i].sName == mq.TLO.Me.Casting() then
+			if spellBar[i].sName == mq.TLO.Me.CastTimeLeft() then
 				spellBar[i].sClicked = os.time()
 				casting = true
 				break
@@ -313,8 +313,8 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 	if diff >= recast then
 		spellBar[i].sClicked = -1
 	end
-	---@diagnostic disable-next-line: undefined-field
-	if not mq.TLO.Cast.Ready(i)() then
+	local gemTimer = mq.TLO.Me.GemTimer(i)() or 0
+	if gemTimer > 0 then
 		-- spell is not ready to cast
 		ImGui.SetCursorPos(cursor_x + (scale * 8), cursor_y + (5 * scale))
 		if spell.sClicked > 0 then
@@ -368,8 +368,7 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
 		ImGui.Image(pickColorByType(spell.sID):GetTextureID(), ImVec2(scale * (iconSize + 37), scale * (iconSize + 2)))
 		spell.sClicked = -1
 	end
-	---@diagnostic disable-next-line: undefined-field
-	if mq.TLO.Cast.Ready(i)() then
+	if gemTimer == 0 then
 		if currentTime - spell.sClicked > spell.sCastTime + 3 or spell.sClicked == -1 then
 			spell.sClicked = -1
 			spellBar[i].sClicked = -1
@@ -817,23 +816,30 @@ function Module.RenderGUI()
 		local castFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse, ImGuiWindowFlags.NoFocusOnAppearing)
 		if castLocked then castFlags = bit32.bor(castFlags, ImGuiWindowFlags.NoMove) end
 		if not showTitleCasting then castFlags = bit32.bor(castFlags, ImGuiWindowFlags.NoTitleBar) end
-		local ColorCountCast, StyleCountCast = Module.ThemeLoader.StartTheme(themeName, Module.Theme, true, false, castTransparency or 1)
+		local castingName = mq.TLO.Me.Casting.Name() or nil
+		local castTime = mq.TLO.Spell(castingName).MyCastTime() or 0
+		local timeLeft = mq.TLO.Me.CastTimeLeft() or 0
+		local spellID = mq.TLO.Spell(castingName).ID() or -1
+		if timeLeft > 4000000000 then
+			castTime = 0
+			return
+		end
+		if castingName == nil then
+			startCastTime = 0
+			castBarShow = false
+			return
+		end
+		if not castBarShow then return end
 		ImGui.SetNextWindowSize(ImVec2(150, 55), ImGuiCond.FirstUseEver)
 		ImGui.SetNextWindowPos(ImGui.GetMousePosVec(), ImGuiCond.FirstUseEver)
+		local ColorCountCast, StyleCountCast = Module.ThemeLoader.StartTheme(themeName, Module.Theme, true, false, castTransparency or 1)
 
 		local openCast, showCast = ImGui.Begin('Casting##MyCastingWin_' .. Module.CharLoaded, true, castFlags)
 		if not openCast then
 			castBarShow = false
 		end
 		if showCast or debugShow then
-			local castingName = mq.TLO.Me.Casting.Name() or nil
-			local castTime = mq.TLO.Spell(castingName).MyCastTime() or 0
-			local spellID = mq.TLO.Spell(castingName).ID() or -1
-			if castingName == nil then
-				startCastTime = 0
-				castBarShow = false
-			end
-			if (castingName ~= nil and startCastTime ~= 0) or debugShow then
+			if castBarShow or debugShow then
 				ImGui.BeginChild("##CastBar", ImVec2(-1, -1), bit32.bor(ImGuiChildFlags.None),
 					bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
 				local diff = os.time() - startCastTime
@@ -889,7 +895,7 @@ function Module.CommandHandler(...)
 end
 
 local function Init()
-	if not mq.TLO.Plugin("MQ2Cast").IsLoaded() then mq.cmd("/plugin MQ2Cast") end
+	-- if not mq.TLO.Plugin("MQ2Cast").IsLoaded() then mq.cmd("/plugin MQ2Cast") end
 
 	if mq.TLO.Me.MaxMana() == 0 then
 		isCaster = false

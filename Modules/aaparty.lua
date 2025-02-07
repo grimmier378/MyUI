@@ -202,7 +202,8 @@ end
 
 local function sortedBoxes(boxes)
     table.sort(boxes, function(a, b)
-        return a.Name < b.Name
+        if a.GroupLeader == b.GroupLeader then return a.Name < b.Name end
+        return a.GroupLeader < b.GroupLeader
     end)
     return boxes
 end

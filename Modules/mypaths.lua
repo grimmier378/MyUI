@@ -1947,13 +1947,13 @@ function Module.RenderGUI()
                             -- Waypoint Table
                             if NavSet.SelectedPath ~= 'None' then
                                 ImGui.SetWindowFontScale(scale)
-                                if ImGui.BeginTable('PathTable', 6, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.Resizable, ImGuiTableFlags.Reorderable, ImGuiTableFlags.Hideable), -1, -1) then
-                                    ImGui.TableSetupColumn('WP#', ImGuiTableColumnFlags.WidthFixed, -1)
-                                    ImGui.TableSetupColumn('Loc', ImGuiTableColumnFlags.WidthFixed, -1)
-                                    ImGui.TableSetupColumn('Delay', ImGuiTableColumnFlags.WidthFixed, -1)
-                                    ImGui.TableSetupColumn('Actions', ImGuiTableColumnFlags.WidthFixed, -1)
-                                    ImGui.TableSetupColumn('Door', ImGuiTableColumnFlags.WidthFixed, -1)
-                                    ImGui.TableSetupColumn('Move', ImGuiTableColumnFlags.WidthFixed, -1)
+                                if ImGui.BeginTable('PathTable##WpList', 6, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.ScrollX, ImGuiTableFlags.Resizable, ImGuiTableFlags.Reorderable, ImGuiTableFlags.Hideable), -1, -1) then
+                                    ImGui.TableSetupColumn('WP#', ImGuiTableColumnFlags.WidthFixed, 40)
+                                    ImGui.TableSetupColumn('Loc', ImGuiTableColumnFlags.WidthFixed, 120)
+                                    ImGui.TableSetupColumn('Delay', ImGuiTableColumnFlags.WidthFixed, 90)
+                                    ImGui.TableSetupColumn('Actions', ImGuiTableColumnFlags.WidthFixed, 100)
+                                    ImGui.TableSetupColumn('Door', ImGuiTableColumnFlags.WidthFixed, 90)
+                                    ImGui.TableSetupColumn('Move', ImGuiTableColumnFlags.WidthFixed, 120)
                                     ImGui.TableSetupScrollFreeze(0, 1)
                                     ImGui.TableHeadersRow()
 

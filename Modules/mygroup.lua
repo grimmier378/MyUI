@@ -61,9 +61,11 @@ local meID               = mq.TLO.Me.ID()
 local OpenConfigGUI      = false
 local hideTitle          = false
 local showSelf           = false
+local showRaidWindow     = false
 local currZone, lastZone
 local mygroupActor       = nil
 local showMoveStatus     = true
+local raidSize           = mq.TLO.Raid.Members() or 0
 local tPlayerFlags       = bit32.bor(ImGuiTableFlags.NoBordersInBody, ImGuiTableFlags.NoPadInnerX, ImGuiTableFlags.NoPadOuterX, ImGuiTableFlags.Resizable,
     ImGuiTableFlags.SizingFixedFit)
 
@@ -94,6 +96,7 @@ defaults                 = {
         ShowMana = true,
         ShowEnd = true,
         ShowRoleIcons = true,
+        ShowRaidWindow = false,
         ShowDummy = true,
         ShowPet = true,
         DynamicHP = false,
@@ -137,6 +140,7 @@ local function loadSettings()
     newSetting = Module.Utils.CheckDefaultSettings(defaults, settings)
     newSetting = Module.Utils.CheckRemovedSettings(defaults, settings) or newSetting
 
+    showRaidWindow = settings[Module.Name].ShowRaidWindow
     showSelf = settings[Module.Name].ShowSelf
     hideTitle = settings[Module.Name].HideTitleBar
     showPet = settings[Module.Name].ShowPet
@@ -478,7 +482,323 @@ local function DrawGroupMember(id)
 
     ImGui.Separator()
 end
+local function DrawRaidMember(id)
+    local member = mq.TLO.Raid.Member(id)
+    local memberName = member.Name()
+    local r, g, b, a = 1, 1, 1, 1
+    if member == 'NULL' then return end
 
+    local hpPct
+    local mpPct
+    local enPct
+    local cls
+    local sitting
+    local level
+    local velo
+    if groupData[memberName] ~= nil then
+        hpPct = groupData[memberName].CurHP / groupData[memberName].MaxHP * 100
+        mpPct = groupData[memberName].CurMana / groupData[memberName].MaxMana * 100
+        enPct = groupData[memberName].CurEnd / groupData[memberName].MaxEnd * 100
+        cls = groupData[memberName].Class
+        sitting = groupData[memberName].Sitting
+        level = groupData[memberName].Level or 0
+        velo = groupData[memberName].Velocity or 0
+    else
+        hpPct = member.PctHPs() or 0
+        mpPct = member.PctMana() or 0
+        enPct = member.PctEndurance() or 0
+        cls = member.Class.ShortName() or 'Unknown'
+        sitting = member.Sitting()
+        level = member.Level() or 0
+        velo = member.Speed() or 0
+    end
+
+    function GetInfoToolTip()
+        ImGui.TextColored(Module.Colors.color('tangarine'), memberName)
+        ImGui.SameLine()
+        ImGui.Text("(%s)", level)
+        ImGui.Text("Class: %s", cls)
+        if groupData[memberName] ~= nil then
+            ImGui.TextColored(Module.Colors.color('pink2'), "Health: %d of %d", groupData[memberName].CurHP, groupData[memberName].MaxHP)
+            ImGui.TextColored(Module.Colors.color('light blue'), "Mana: %d of %d", groupData[memberName].CurMana, groupData[memberName].MaxMana)
+            ImGui.TextColored(Module.Colors.color('yellow'), "End: %d of %d", groupData[memberName].CurEnd, groupData[memberName].MaxEnd)
+            if sitting then
+                ImGui.TextColored(Module.Colors.color('tangarine'), Module.Icons.FA_MOON_O)
+            else
+                ImGui.TextColored(Module.Colors.color('green'), Module.Icons.FA_SMILE_O)
+                ImGui.SameLine()
+                ImGui.TextColored(Module.Colors.color('yellow'), Module.Icons.MD_DIRECTIONS_RUN)
+                ImGui.SameLine()
+                ImGui.TextColored(Module.Colors.color('teal'), "%0.1f", velo)
+            end
+        else
+            ImGui.TextColored(Module.Colors.color('pink2'), "Health: %s of 100", hpPct)
+            ImGui.TextColored(Module.Colors.color('light blue'), "Mana: %s of 100", mpPct)
+            ImGui.TextColored(Module.Colors.color('yellow'), "End: %s of 100", enPct)
+            if sitting then
+                ImGui.TextColored(Module.Colors.color('tangarine'), Module.Icons.FA_MOON_O)
+            else
+                ImGui.TextColored(Module.Colors.color('green'), Module.Icons.FA_SMILE_O)
+            end
+        end
+
+        if mq.TLO.Group.MainTank.ID() == member.ID() then
+            ImGui.SameLine()
+            Module.Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
+        end
+
+        if mq.TLO.Group.MainAssist.ID() == member.ID() then
+            ImGui.SameLine()
+            Module.Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
+        end
+
+        if mq.TLO.Group.Puller.ID() == member.ID() then
+            ImGui.SameLine()
+            Module.Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
+        end
+    end
+
+    ImGui.BeginGroup()
+    local sizeX, sizeY = ImGui.GetContentRegionAvail()
+    if ImGui.BeginTable("##playerInfo" .. tostring(id), 4, tPlayerFlags) then
+        ImGui.TableSetupColumn("##tName", ImGuiTableColumnFlags.NoResize, (sizeX * .5))
+        ImGui.TableSetupColumn("##tVis", ImGuiTableColumnFlags.NoResize, 16)
+        ImGui.TableSetupColumn("##tIcons", ImGuiTableColumnFlags.WidthStretch) --*.25)
+        ImGui.TableSetupColumn("##tLvl", ImGuiTableColumnFlags.NoResize, 30)
+        ImGui.TableNextRow()
+        -- Name
+        ImGui.TableNextColumn()
+
+        if mq.TLO.Group.Leader.ID() == member.ID() then
+            ImGui.TextColored(0, 1, 1, 1, memberName)
+        else
+            ImGui.Text(memberName)
+        end
+        ImGui.SameLine()
+        ImGui.Text(' ')
+        if settings[Module.Name].ShowRoleIcons then
+            if mq.TLO.Group.MainTank.ID() == member.ID() then
+                ImGui.SameLine(0.0, 0)
+                Module.Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
+            end
+
+            if mq.TLO.Group.MainAssist.ID() == member.ID() then
+                ImGui.SameLine(0.0, 0)
+                Module.Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
+            end
+
+            if mq.TLO.Group.Puller.ID() == member.ID() then
+                ImGui.SameLine(0.0, 0)
+                Module.Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
+            end
+
+            ImGui.SameLine()
+        end
+        -- Visiblity
+
+        ImGui.TableNextColumn()
+        if member.LineOfSight() then
+            ImGui.TextColored(0, 1, 0, .5, Module.Icons.MD_VISIBILITY)
+        else
+            ImGui.TextColored(0.9, 0, 0, .5, Module.Icons.MD_VISIBILITY_OFF)
+        end
+        -- Icons
+
+        ImGui.TableNextColumn()
+        ImGui.Indent(2)
+        local dist = member.Distance() or 9999
+        local distColor = Module.Colors.color('green')
+        if dist > 200 then
+            distColor = Module.Colors.color('red')
+        end
+        ImGui.BeginGroup()
+        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 0, 0)
+        if showMoveStatus and groupData[memberName] ~= nil then
+            local velocity = groupData[memberName].Velocity or 0
+            if sitting then
+                ImGui.TextColored(Module.Colors.color('tangarine'), Module.Icons.FA_MOON_O)
+            else
+                if velocity == 0 then
+                    ImGui.TextColored(Module.Colors.color('green'), Module.Icons.FA_SMILE_O)
+                else
+                    -- local cursorScreenPos = ImGui.GetCursorScreenPosVec()
+                    -- Module.Utils.DrawArrow(ImVec2(cursorScreenPos.x + 10, cursorScreenPos.y), 0.5, 15, distColor, Module.Utils.getRelativeDirection(dirTo) or 0)
+
+                    ImGui.TextColored(Module.Colors.color('teal'), "%0.0f", velocity)
+                    ImGui.SameLine()
+                    ImGui.TextColored(Module.Colors.color('yellow'), Module.Icons.MD_DIRECTIONS_RUN)
+                end
+            end
+            ImGui.SameLine()
+        end
+        ImGui.TextColored(distColor, " %d ", math.floor(dist))
+        ImGui.SameLine()
+        local cursorScreenPos = ImGui.GetCursorScreenPosVec()
+        local dirTo = member.HeadingTo() or '0'
+        Module.Utils.DrawArrow(ImVec2(cursorScreenPos.x + 10, cursorScreenPos.y), 5, 15, distColor, Module.Utils.getRelativeDirection(dirTo) or 0)
+        cursorScreenPos = ImGui.GetCursorPosVec()
+        -- ImGui.SetCursorPos(cursorScreenPos.x + 30, cursorScreenPos.y)
+        -- ImGui.TextColored(Module.Colors.color('softblue'), Module.Icons.FA_LOCATION_ARROW)
+
+        ImGui.PopStyleVar()
+        ImGui.EndGroup()
+        if ImGui.IsItemHovered() then
+            ImGui.BeginTooltip()
+            GetInfoToolTip()
+            ImGui.EndTooltip()
+        end
+        ImGui.Unindent(2)
+        -- Lvl
+        ImGui.TableNextColumn()
+        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 2, 0)
+        -- if groupData[memberName] == nil then
+        --     groupData[memberName] = {
+        --         Name = memberName or 'Unknown',
+        --         Level = member.Level() or 0,
+        --         Class = member.Class.ShortName() or 'Unknown',
+        --         CurHP = member.CurrentHPs() or 0,
+        --         MaxHP = member.MaxHPs() or 100,
+        --         CurMana = member.CurrentMana() or 0,
+        --         MaxMana = member.MaxMana() or 100,
+        --         CurEnd = member.CurrentEndurance() or 0,
+        --         MaxEnd = member.MaxEndurance() or 0,
+        --         Sitting = member.Sitting() or false,
+        --         Zone = member.Present() and mq.TLO.Zone.Name() or 'Unknown',
+        --     }
+        -- end
+
+        if sitting then
+            ImGui.TextColored(0.911, 0.351, 0.008, 1, "%d", level or 0)
+        else
+            ImGui.Text("%s", level or 0)
+        end
+        if ImGui.IsItemHovered() then
+            ImGui.BeginTooltip()
+            GetInfoToolTip()
+            ImGui.EndTooltip()
+        end
+        ImGui.PopStyleVar()
+        ImGui.EndTable()
+    end
+
+    if ImGui.BeginPopupContextItem("##groupContext" .. tostring(id)) then -- Context menu for the group Roles
+        if ImGui.Selectable('Switch To') then
+            if useEQBC then
+                mq.cmdf("/bct %s //foreground", memberName)
+            else
+                mq.cmdf("/dex %s /foreground", memberName)
+            end
+        end
+        if ImGui.Selectable('Come to Me') then
+            if useEQBC then
+                mq.cmdf("/bct %s //nav spawn %s", memberName, Module.CharLoaded)
+            else
+                mq.cmdf("/dex %s /nav spawn %s", memberName, Module.CharLoaded)
+            end
+        end
+        if ImGui.Selectable('Go To ' .. memberName) then
+            mq.cmdf("/nav spawn %s", memberName)
+        end
+        ImGui.Separator()
+        if ImGui.BeginMenu('Roles') then
+            if ImGui.Selectable('Main Assist') then
+                mq.cmdf("/grouproles set %s 2", memberName)
+            end
+            if ImGui.Selectable('Main Tank') then
+                mq.cmdf("/grouproles set %s 1", memberName)
+            end
+            if ImGui.Selectable('Puller') then
+                mq.cmdf("/grouproles set %s 3", memberName)
+            end
+            if mq.TLO.Me.GroupLeader() and ImGui.Selectable('Make Leader') then
+                mq.cmdf("/makeleader %s", memberName)
+            end
+            if mq.TLO.Group.Leader.ID() == member.ID() and ImGui.Selectable('Make Me Leader') then
+                mq.cmdf("/dex %s /makeleader %s", memberName, Module.CharLoaded)
+            end
+            ImGui.EndMenu()
+        end
+        ImGui.EndPopup()
+    end
+    ImGui.Separator()
+
+    -- Health Bar
+    if settings[Module.Name].DynamicHP then
+        r = 1
+        b = b * (100 - hpPct) / 150
+        g = 0.1
+        a = 0.9
+        if mq.TLO.SpawnCount(string.format("PC =\"%s\"", memberName))() > 0 then
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r, g, b, a))
+        else
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
+        end
+    else
+        if hpPct <= 0 or hpPct == nil or not (Module.MyZone == groupData[memberName].Zone) then
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
+        elseif hpPct < 15 then
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('pink')))
+        else
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
+        end
+    end
+    ImGui.ProgressBar((hpPct / 100), ImGui.GetContentRegionAvail(), 7 * Scale, '##pctHps' .. id)
+    ImGui.PopStyleColor()
+
+    if ImGui.IsItemHovered() then
+        ImGui.SetTooltip("%s\n%d%% Health", memberName, hpPct)
+    end
+
+    --My Mana Bar
+    if showMana then
+        for i, v in pairs(manaClass) do
+            if string.find(cls, v) then
+                if settings[Module.Name].DynamicMP then
+                    b = 0.9
+                    r = 1 * (100 - mpPct) / 200
+                    g = 0.9 * mpPct / 100 > 0.1 and 0.9 * mpPct / 100 or 0.1
+                    a = 0.5
+                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r, g, b, a))
+                else
+                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('light blue2')))
+                end
+                ImGui.ProgressBar((mpPct / 100), ImGui.GetContentRegionAvail(), 7 * Scale, '##pctMana' .. id)
+                ImGui.PopStyleColor()
+                if ImGui.IsItemHovered() then
+                    ImGui.SetTooltip("%s\n%d%% Mana", memberName, mpPct)
+                end
+            end
+        end
+    end
+    if showEnd then
+        --My Endurance bar
+        ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('yellow2')))
+        ImGui.ProgressBar((enPct / 100), ImGui.GetContentRegionAvail(), 7 * Scale, '##pctEndurance' .. id)
+        ImGui.PopStyleColor()
+        if ImGui.IsItemHovered() then
+            ImGui.SetTooltip("%s\n%d%% Endurance", memberName, enPct)
+        end
+    end
+
+    ImGui.EndGroup()
+    -- Pet Health
+
+    if showPet then
+        ImGui.BeginGroup()
+        if member.Pet() ~= 'NO PET' then
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('green2')))
+            ImGui.ProgressBar(((tonumber(member.Pet.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), 5 * Scale, '##PetHp' .. id)
+            ImGui.PopStyleColor()
+            if ImGui.IsItemHovered() then
+                ImGui.SetTooltip('%s\n%d%% health', member.Pet.DisplayName(), member.Pet.PctHPs())
+                Module.Utils.GiveItem(member.Pet.ID() or 0)
+            end
+        end
+        ImGui.EndGroup()
+    end
+
+    ImGui.Separator()
+end
 local function DrawSelf()
     local mySelf = mq.TLO.Me
     local memberName = mySelf.Name()
@@ -818,6 +1138,141 @@ function Module.RenderGUI()
         ImGui.End()
     end
 
+
+
+    if showRaidWindow and raidSize > 0 then
+        if currZone ~= lastZone then return end
+        local flags = winFlag
+        if locked then
+            flags = bit32.bor(flags, ImGuiWindowFlags.NoMove)
+        end
+        -- Default window size
+        ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
+        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme, settings[Module.Name].MouseOver, mouseHover, settings[Module.Name].WinTransparency)
+        local openGUI, showMain = ImGui.Begin("My Raid##MyGroup" .. mq.TLO.Me.DisplayName(), true, flags)
+        if not openGUI then Module.IsRunning = false end
+        if showMain then
+            mouseHover = ImGui.IsWindowHovered(ImGuiHoveredFlags.ChildWindows)
+            if ImGui.BeginMenuBar() then
+                local lockedIcon = locked and Module.Icons.FA_LOCK .. '##lockTabButton_MyChat' or
+                    Module.Icons.FA_UNLOCK .. '##lockTablButton_MyChat'
+                if ImGui.Button(lockedIcon) then
+                    --ImGuiWindowFlags.NoMove
+                    locked = not locked
+                    settings = dofile(configFile)
+                    settings[Module.Name].locked = locked
+                    writeSettings(configFile, settings)
+                end
+                if ImGui.IsItemHovered() then
+                    ImGui.SetTooltip("Lock Window")
+                end
+                if ImGui.Button(gIcon .. '##PlayerTarg') then
+                    OpenConfigGUI = not OpenConfigGUI
+                end
+                ImGui.EndMenuBar()
+            end
+            ImGui.SetWindowFontScale(Scale)
+
+            if raidSize > 0 then
+                local col = math.floor(raidSize / 6) > 0 and math.floor(raidSize / 6) or 1
+                if ImGui.BeginTable("Raid", col) then
+                    ImGui.TableNextRow()
+                    ImGui.TableNextColumn()
+                    for i = 1, mq.TLO.Raid.Members() do
+                        local member = mq.TLO.Raid.Member(i)
+                        if i == (7 or 13 or 19 or 25 or 31) then
+                            ImGui.TableNextColumn()
+                        end
+                        if member ~= 'NULL' then
+                            ImGui.BeginGroup()
+                            DrawRaidMember(i)
+                            ImGui.EndGroup()
+                        end
+                    end
+                    ImGui.EndTable()
+                end
+            end
+
+            ImGui.SeparatorText('Commands')
+
+            local lbl = mq.TLO.Me.Invited() and 'Follow' or 'Invite'
+            local sizeX, sizeY = ImGui.GetContentRegionAvail()
+            local calcSize = ImGui.CalcTextSize('FOLLOW INVITE ')
+            ImGui.SetCursorPosX((sizeX - calcSize) * 0.5)
+
+            if ImGui.SmallButton(lbl) then
+                mq.cmdf("/raidinvite %s", mq.TLO.Target.Name())
+            end
+
+            if mq.TLO.Me.GroupSize() > 0 then
+                ImGui.SameLine()
+            end
+
+            if mq.TLO.Me.GroupSize() > 0 then
+                if ImGui.SmallButton('Disband') then
+                    mq.cmdf("/raiddisband")
+                end
+            end
+
+            ImGui.Separator()
+            calcSize = ImGui.CalcTextSize(' COME FOLLOW MIMIC ')
+            ImGui.SetCursorPosX((sizeX - calcSize) * 0.5)
+            if ImGui.SmallButton('Come') then
+                if useEQBC then
+                    mq.cmdf("/bcaa //nav spawn %s", Module.CharLoaded)
+                else
+                    mq.cmdf("/dgze /nav spawn %s", Module.CharLoaded)
+                end
+            end
+
+            ImGui.SameLine()
+
+            local tmpFollow = followMe
+            if followMe then ImGui.PushStyleColor(ImGuiCol.Button, Module.Colors.color('pink')) end
+            if ImGui.SmallButton('Follow') then
+                if not followMe then
+                    if useEQBC then
+                        mq.cmdf("/multiline ; /dcaa //nav stop; /dcaa //afollow spawn %d", meID)
+                    else
+                        mq.cmdf("/multiline ; /dgze /nav stop; /dgze /afollow spawn %d", meID)
+                    end
+                else
+                    if useEQBC then
+                        mq.cmd("/bcaa //afollow off")
+                    else
+                        mq.cmd("/dgze /afollow off")
+                    end
+                end
+                tmpFollow = not tmpFollow
+            end
+            if followMe then ImGui.PopStyleColor(1) end
+            followMe = tmpFollow
+
+            -- ImGui.SameLine()
+            -- local tmpMimic = mimicMe
+            -- if mimicMe then ImGui.PushStyleColor(ImGuiCol.Button, Module.Colors.color('pink')) end
+            -- if ImGui.SmallButton('Mimic') then
+            --     if mimicMe then
+            --         mq.cmd("/groupinfo mimicme off")
+            --     else
+            --         mq.cmd("/groupinfo mimicme on")
+            --     end
+            --     tmpMimic = not tmpMimic
+            -- end
+            -- if mimicMe then ImGui.PopStyleColor(1) end
+            -- mimicMe = tmpMimic
+        end
+        Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
+
+        ImGui.SetWindowFontScale(1)
+
+        if not openGUI then
+            showRaidWindow = false
+        end
+
+        ImGui.End()
+    end
+
     -- Config Window
     if OpenConfigGUI then
         local ColorCountConf, StyleCountConf = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
@@ -912,7 +1367,8 @@ function Module.RenderGUI()
             hideTitle = ImGui.Checkbox('Hide Title Bar##' .. Module.Name, hideTitle)
             ImGui.SameLine()
             showSelf = ImGui.Checkbox('Show Self##' .. Module.Name, showSelf)
-
+            showRaidWindow = ImGui.Checkbox('Show Raid##' .. Module.Name, showRaidWindow)
+            ImGui.SameLine()
             showMoveStatus = ImGui.Checkbox('Show Move Status##' .. Module.Name, showMoveStatus)
 
             ImGui.SeparatorText("Save and Close##" .. Module.Name)
@@ -928,6 +1384,7 @@ function Module.RenderGUI()
                 settings[Module.Name].LoadTheme = themeName
                 settings[Module.Name].ShowMoveStatus = showMoveStatus
                 settings[Module.Name].locked = locked
+                settings[Module.Name].ShowRaidWindow = showRaidWindow
                 writeSettings(configFile, settings)
             end
         end
@@ -1064,6 +1521,7 @@ end
 
 local function getMyInfo()
     local mySelf = mq.TLO.Me
+    raidSize = mq.TLO.Raid.Members() or 0
     groupData[mySelf.Name()] = {
         Name = mySelf.Name(),
         Level = mySelf.Level() or 0,

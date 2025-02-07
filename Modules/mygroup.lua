@@ -66,6 +66,7 @@ local currZone, lastZone
 local mygroupActor       = nil
 local showMoveStatus     = true
 local raidSize           = mq.TLO.Raid.Members() or 0
+local raidLeader         = mq.TLO.Raid.Leader() or 'N/A'
 local tPlayerFlags       = bit32.bor(ImGuiTableFlags.NoBordersInBody, ImGuiTableFlags.NoPadInnerX, ImGuiTableFlags.NoPadOuterX, ImGuiTableFlags.Resizable,
     ImGuiTableFlags.SizingFixedFit)
 
@@ -558,6 +559,7 @@ local function DrawRaidMember(id)
         end
     end
 
+    ImGui.BeginChild("##RaidMember" .. tostring(id), 0.0, (80 * Scale), bit32.bor(ImGuiChildFlags.Border), ImGuiWindowFlags.NoScrollbar)
     ImGui.BeginGroup()
     local sizeX, sizeY = ImGui.GetContentRegionAvail()
     if ImGui.BeginTable("##playerInfo" .. tostring(id), 4, tPlayerFlags) then
@@ -569,7 +571,7 @@ local function DrawRaidMember(id)
         -- Name
         ImGui.TableNextColumn()
 
-        if mq.TLO.Group.Leader.ID() == member.ID() then
+        if mq.TLO.Raid.Leader.ID() == member.ID() then
             ImGui.TextColored(0, 1, 1, 1, memberName)
         else
             ImGui.Text(memberName)
@@ -796,8 +798,7 @@ local function DrawRaidMember(id)
         end
         ImGui.EndGroup()
     end
-
-    ImGui.Separator()
+    ImGui.EndChild()
 end
 local function DrawSelf()
     local mySelf = mq.TLO.Me
@@ -1215,7 +1216,8 @@ function Module.RenderGUI()
             end
 
             ImGui.Separator()
-            calcSize = ImGui.CalcTextSize(' COME FOLLOW MIMIC ')
+            ImGui.Spacing()
+            calcSize = ImGui.CalcTextSize(' COME FOLLOW ')
             ImGui.SetCursorPosX((sizeX - calcSize) * 0.5)
             if ImGui.SmallButton('Come') then
                 if useEQBC then
@@ -1248,6 +1250,25 @@ function Module.RenderGUI()
             if followMe then ImGui.PopStyleColor(1) end
             followMe = tmpFollow
 
+            if raidLeader == Module.CharLoaded then
+                ImGui.SeparatorText('Raid Loot Settings')
+                if settings[Module.Name].RaidLoot == (nil) then
+                    settings[Module.Name].RaidLoot = tonumber(mq.TLO.Window('RaidOptionsWindow/RAIDOPTIONS_CurrentLootType').Text()) or 1
+                end
+                ImGui.SetCursorPosX(sizeX * 0.5 - 50)
+                local raidLoot = { 'Raid Leader', 'Leaders Only', 'Leader Selected', 'Everyone', }
+                ImGui.SetNextItemWidth(100)
+                if ImGui.BeginCombo('Loot##MyGroup', raidLoot[settings[Module.Name].RaidLoot]) then
+                    for i, loot in ipairs(raidLoot) do
+                        local isSelected = settings[Module.Name].RaidLoot == i
+                        if ImGui.Selectable(loot, isSelected) then
+                            settings[Module.Name].RaidLoot = i
+                            mq.cmdf("/Setloottype %d", i)
+                        end
+                    end
+                    ImGui.EndCombo()
+                end
+            end
             -- ImGui.SameLine()
             -- local tmpMimic = mimicMe
             -- if mimicMe then ImGui.PushStyleColor(ImGuiCol.Button, Module.Colors.color('pink')) end
@@ -1522,6 +1543,7 @@ end
 local function getMyInfo()
     local mySelf = mq.TLO.Me
     raidSize = mq.TLO.Raid.Members() or 0
+    raidLeader = mq.TLO.Raid.Leader() or 'N/A'
     groupData[mySelf.Name()] = {
         Name = mySelf.Name(),
         Level = mySelf.Level() or 0,

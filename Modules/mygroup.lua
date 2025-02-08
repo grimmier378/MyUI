@@ -56,6 +56,7 @@ local mouseHover         = false
 local defaults, settings = {}, {}
 local groupData          = {}
 local mailBox            = {}
+local raidKeys           = {}
 local useEQBC            = false
 local meID               = mq.TLO.Me.ID()
 local OpenConfigGUI      = false
@@ -106,6 +107,20 @@ defaults                 = {
         showMoveStatus = true,
     },
 }
+
+local function sortRaidByGroup()
+    raidKeys = {}
+    for grp = 1, 10 do
+        for i = 1, raidSize do
+            local member = mq.TLO.Raid.Member(i)
+            if member ~= 'NULL' then
+                if member.Group() == grp then
+                    table.insert(raidKeys, { name = member.Name(), slot = i, })
+                end
+            end
+        end
+    end
+end
 
 local function loadTheme()
     if Module.Utils.File.Exists(Module.ThemeFile) then
@@ -488,7 +503,7 @@ local function DrawRaidMember(id)
     local memberName = member.Name()
     local r, g, b, a = 1, 1, 1, 1
     if member == 'NULL' then return end
-
+    local memberDistance = member.Distance() or 9999
     local hpPct
     local mpPct
     local enPct
@@ -608,9 +623,8 @@ local function DrawRaidMember(id)
 
         ImGui.TableNextColumn()
         ImGui.Indent(2)
-        local dist = member.Distance() or 9999
         local distColor = Module.Colors.color('green')
-        if dist > 200 then
+        if memberDistance > 200 then
             distColor = Module.Colors.color('red')
         end
         ImGui.BeginGroup()
@@ -633,7 +647,7 @@ local function DrawRaidMember(id)
             end
             ImGui.SameLine()
         end
-        ImGui.TextColored(distColor, " %d ", math.floor(dist))
+        ImGui.TextColored(distColor, " %d ", math.floor(memberDistance))
         ImGui.SameLine()
         local cursorScreenPos = ImGui.GetCursorScreenPosVec()
         local dirTo = member.HeadingTo() or '0'
@@ -783,6 +797,9 @@ local function DrawRaidMember(id)
     end
 
     ImGui.EndGroup()
+    if ImGui.IsItemHovered() and memberDistance < 20 then
+        Module.Utils.GiveItem(member.ID() or 0)
+    end
     -- Pet Health
 
     if showPet then
@@ -1179,16 +1196,18 @@ function Module.RenderGUI()
                 if ImGui.BeginTable("Raid", col) then
                     ImGui.TableNextRow()
                     ImGui.TableNextColumn()
-                    for i = 1, mq.TLO.Raid.Members() do
-                        local member = mq.TLO.Raid.Member(i)
-                        if i == (7 or 13 or 19 or 25 or 31) then
+                    local cnt = 1
+                    for k, v in ipairs(raidKeys) do
+                        local member = mq.TLO.Raid.Member(v.slot)
+                        if cnt == (7 or 13 or 19 or 25 or 31) then
                             ImGui.TableNextColumn()
                         end
                         if member ~= 'NULL' then
                             ImGui.BeginGroup()
-                            DrawRaidMember(i)
+                            DrawRaidMember(v.slot)
                             ImGui.EndGroup()
                         end
+                        cnt = cnt + 1
                     end
                     ImGui.EndTable()
                 end
@@ -1638,6 +1657,10 @@ function Module.MainLoop()
     end
 
     getMyInfo()
+
+    if raidSize > 0 then
+        sortRaidByGroup()
+    end
 
     if mygroupActor ~= nil then
         CheckStale()

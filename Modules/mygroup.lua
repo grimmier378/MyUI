@@ -170,6 +170,65 @@ local function loadSettings()
     if newSetting then writeSettings(configFile, settings) end
 end
 
+local function GetInfoToolTip(id)
+    if id == nil then return end
+    local member = mq.TLO.Group.Member(id)
+    if member == nil then return end
+    printf("%s %s", id, member)
+    if member.Name() == nil then return end
+    local memberName = member.Name() or "NO"
+    local r, g, b, a = 1, 1, 1, 1
+    if member == 'NULL' then return end
+    if groupData[memberName] ~= nil then
+        ImGui.TextColored(Module.Colors.color('tangarine'), memberName)
+        ImGui.SameLine()
+        ImGui.Text("(%s)", groupData[memberName].Level)
+        ImGui.Text("Class: %s", groupData[memberName].Class)
+        ImGui.TextColored(Module.Colors.color('pink2'), "Health: %d of %d", groupData[memberName].CurHP, groupData[memberName].MaxHP)
+        ImGui.TextColored(Module.Colors.color('light blue'), "Mana: %d of %d", groupData[memberName].CurMana, groupData[memberName].MaxMana)
+        ImGui.TextColored(Module.Colors.color('yellow'), "End: %d of %d", groupData[memberName].CurEnd, groupData[memberName].MaxEnd)
+        if groupData[memberName].Sitting then
+            ImGui.TextColored(Module.Colors.color('tangarine'), Module.Icons.FA_MOON_O)
+        else
+            ImGui.TextColored(Module.Colors.color('green'), Module.Icons.FA_SMILE_O)
+            ImGui.SameLine()
+            ImGui.TextColored(Module.Colors.color('yellow'), Module.Icons.MD_DIRECTIONS_RUN)
+            ImGui.SameLine()
+            ImGui.TextColored(Module.Colors.color('teal'), "%0.1f", groupData[memberName].Velocity)
+        end
+        ImGui.TextColored(Module.Colors.color('softblue'), "Zone: %s", groupData[memberName].Zone)
+    else
+        ImGui.TextColored(Module.Colors.color('tangarine'), memberName)
+        ImGui.SameLine()
+        ImGui.Text("Level: %d", member.Level())
+        ImGui.Text("Class: %s", member.Class.ShortName())
+        ImGui.TextColored(Module.Colors.color('pink2'), "Health: %d of 100", member.PctHPs())
+        ImGui.TextColored(Module.Colors.color('light blue'), "Mana: %d of 100", member.PctMana())
+        ImGui.TextColored(Module.Colors.color('yellow'), "End: %d of 100", member.PctEndurance())
+        if member.Sitting() then
+            ImGui.TextColored(Module.Colors.color('tangarine'), Module.Icons.FA_MOON_O)
+        else
+            ImGui.TextColored(Module.Colors.color('green'), Module.Icons.FA_SMILE_O)
+        end
+        ImGui.TextColored(Module.Colors.color('softblue'), "Zone: %s", mq.TLO.Zone.Name())
+    end
+
+    if mq.TLO.Group.MainTank.ID() == member.ID() then
+        ImGui.SameLine()
+        Module.Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
+    end
+
+    if mq.TLO.Group.MainAssist.ID() == member.ID() then
+        ImGui.SameLine()
+        Module.Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
+    end
+
+    if mq.TLO.Group.Puller.ID() == member.ID() then
+        ImGui.SameLine()
+        Module.Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
+    end
+end
+
 local function DrawGroupMember(id)
     local member = mq.TLO.Group.Member(id)
     local memberName = member.Name()
@@ -201,53 +260,6 @@ local function DrawGroupMember(id)
         sitting = member.Sitting()
         level = member.Level() or 0
         velo = member.Speed() or 0
-    end
-
-    function GetInfoToolTip()
-        ImGui.TextColored(Module.Colors.color('tangarine'), memberName)
-        ImGui.SameLine()
-        ImGui.Text("(%s)", level)
-        ImGui.Text("Class: %s", cls)
-        if groupData[memberName] ~= nil then
-            ImGui.TextColored(Module.Colors.color('pink2'), "Health: %d of %d", groupData[memberName].CurHP, groupData[memberName].MaxHP)
-            ImGui.TextColored(Module.Colors.color('light blue'), "Mana: %d of %d", groupData[memberName].CurMana, groupData[memberName].MaxMana)
-            ImGui.TextColored(Module.Colors.color('yellow'), "End: %d of %d", groupData[memberName].CurEnd, groupData[memberName].MaxEnd)
-            if sitting then
-                ImGui.TextColored(Module.Colors.color('tangarine'), Module.Icons.FA_MOON_O)
-            else
-                ImGui.TextColored(Module.Colors.color('green'), Module.Icons.FA_SMILE_O)
-                ImGui.SameLine()
-                ImGui.TextColored(Module.Colors.color('yellow'), Module.Icons.MD_DIRECTIONS_RUN)
-                ImGui.SameLine()
-                ImGui.TextColored(Module.Colors.color('teal'), "%0.1f", velo)
-            end
-            ImGui.TextColored(Module.Colors.color('softblue'), "Zone: %s", zne)
-        else
-            ImGui.TextColored(Module.Colors.color('pink2'), "Health: %s of 100", hpPct)
-            ImGui.TextColored(Module.Colors.color('light blue'), "Mana: %s of 100", mpPct)
-            ImGui.TextColored(Module.Colors.color('yellow'), "End: %s of 100", enPct)
-            if sitting then
-                ImGui.TextColored(Module.Colors.color('tangarine'), Module.Icons.FA_MOON_O)
-            else
-                ImGui.TextColored(Module.Colors.color('green'), Module.Icons.FA_SMILE_O)
-            end
-            ImGui.TextColored(Module.Colors.color('softblue'), "Zone: %s", zne)
-        end
-
-        if mq.TLO.Group.MainTank.ID() == member.ID() then
-            ImGui.SameLine()
-            Module.Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
-        end
-
-        if mq.TLO.Group.MainAssist.ID() == member.ID() then
-            ImGui.SameLine()
-            Module.Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
-        end
-
-        if mq.TLO.Group.Puller.ID() == member.ID() then
-            ImGui.SameLine()
-            Module.Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
-        end
     end
 
     ImGui.BeginGroup()
@@ -340,7 +352,7 @@ local function DrawGroupMember(id)
         ImGui.EndGroup()
         if ImGui.IsItemHovered() then
             ImGui.BeginTooltip()
-            GetInfoToolTip()
+            GetInfoToolTip(id)
             ImGui.EndTooltip()
         end
         ImGui.Unindent(2)
@@ -370,7 +382,7 @@ local function DrawGroupMember(id)
         end
         if ImGui.IsItemHovered() then
             ImGui.BeginTooltip()
-            GetInfoToolTip()
+            GetInfoToolTip(id)
             ImGui.EndTooltip()
         end
         ImGui.PopStyleVar()
@@ -430,10 +442,14 @@ local function DrawGroupMember(id)
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
         end
     else
-        if hpPct <= 0 or hpPct == nil or not (Module.MyZone == groupData[memberName].Zone) then
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
-        elseif hpPct < 15 then
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('pink')))
+        if (groupData[memberName] ~= nil) then
+            if hpPct == nil or hpPct <= 0 or not (Module.MyZone == groupData[memberName].Zone) then
+                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
+            elseif hpPct < 15 then
+                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('pink')))
+            else
+                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
+            end
         else
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
         end
@@ -823,31 +839,6 @@ local function DrawSelf()
     local r, g, b, a = 1, 1, 1, 1
     if mySelf == 'NULL' then return end
 
-    function GetInfoToolTip()
-        local pInfoToolTip = (mySelf.Name() ..
-            '\t\tlvl: ' .. tostring(mySelf.Level()) ..
-            '\nClass: ' .. mySelf.Class.ShortName() ..
-            '\nHealth: ' .. tostring(mySelf.CurrentHPs()) .. ' of ' .. tostring(mySelf.MaxHPs()) ..
-            '\nMana: ' .. tostring(mySelf.CurrentMana()) .. ' of ' .. tostring(mySelf.MaxMana()) ..
-            '\nEnd: ' .. tostring(mySelf.CurrentEndurance()) .. ' of ' .. tostring(mySelf.MaxEndurance()) .. '\n'
-        )
-        ImGui.Text(pInfoToolTip)
-        if mq.TLO.Group.MainAssist.ID() == mySelf.ID() then
-            ImGui.SameLine()
-            Module.Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
-        end
-
-        if mq.TLO.Group.Puller.ID() == mySelf.ID() then
-            ImGui.SameLine()
-            Module.Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
-        end
-
-        if mq.TLO.Group.MainTank.ID() == mySelf.ID() then
-            ImGui.SameLine()
-            Module.Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
-        end
-    end
-
     local sizeX, sizeY = ImGui.GetContentRegionAvail()
     ImGui.BeginGroup()
     if ImGui.BeginTable("##playerInfoSelf", 4, tPlayerFlags) then
@@ -903,7 +894,7 @@ local function DrawSelf()
         end
         if ImGui.IsItemHovered() then
             ImGui.BeginTooltip()
-            GetInfoToolTip()
+            GetInfoToolTip(0)
             ImGui.EndTooltip()
         end
         ImGui.PopStyleVar()

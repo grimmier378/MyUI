@@ -401,11 +401,11 @@ local function DrawGroupMember(id)
             if useEQBC then
                 mq.cmdf("/bct %s //nav spawn %s", memberName, Module.CharLoaded)
             else
-                mq.cmdf("/dex %s /nav spawn %s", memberName, Module.CharLoaded)
+                mq.cmdf("/dex %s /nav spawn %s dist=\"20\"", memberName, Module.CharLoaded)
             end
         end
         if ImGui.Selectable('Go To ' .. memberName) then
-            mq.cmdf("/nav spawn %s", memberName)
+            mq.cmdf("/nav spawn %s dist=\'20\"", memberName)
         end
         ImGui.Separator()
         if ImGui.BeginMenu('Roles') then
@@ -520,15 +520,15 @@ local function DrawRaidMember(id)
     local r, g, b, a = 1, 1, 1, 1
     if member == 'NULL' then return end
     local memberDistance = member.Distance() or 9999
-    local hpPct
-    local mpPct
-    local enPct
+    local hpPct = 0
+    local mpPct = 0
+    local enPct = 0
     local cls
     local sitting
     local level
     local velo
     if groupData[memberName] ~= nil then
-        hpPct = groupData[memberName].CurHP / groupData[memberName].MaxHP * 100
+        hpPct = (groupData[memberName].CurHP / groupData[memberName].MaxHP * 100) or 0
         mpPct = groupData[memberName].CurMana / groupData[memberName].MaxMana * 100
         enPct = groupData[memberName].CurEnd / groupData[memberName].MaxEnd * 100
         cls = groupData[memberName].Class
@@ -593,15 +593,27 @@ local function DrawRaidMember(id)
     ImGui.BeginChild("##RaidMember" .. tostring(id), 0.0, (80 * Scale), bit32.bor(ImGuiChildFlags.Border), ImGuiWindowFlags.NoScrollbar)
     ImGui.BeginGroup()
     local sizeX, sizeY = ImGui.GetContentRegionAvail()
-    if ImGui.BeginTable("##playerInfo" .. tostring(id), 4, tPlayerFlags) then
+    if ImGui.BeginTable("##playerInfo" .. tostring(id), 3, tPlayerFlags) then
         ImGui.TableSetupColumn("##tName", ImGuiTableColumnFlags.NoResize, (sizeX * .5))
         ImGui.TableSetupColumn("##tVis", ImGuiTableColumnFlags.NoResize, 16)
         ImGui.TableSetupColumn("##tIcons", ImGuiTableColumnFlags.WidthStretch) --*.25)
-        ImGui.TableSetupColumn("##tLvl", ImGuiTableColumnFlags.NoResize, 30)
         ImGui.TableNextRow()
         -- Name
         ImGui.TableNextColumn()
+        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 2, 0)
 
+        if sitting then
+            ImGui.TextColored(0.911, 0.351, 0.008, 1, "%d", level or 0)
+        else
+            ImGui.Text("%s", level or 0)
+        end
+        if ImGui.IsItemHovered() then
+            ImGui.BeginTooltip()
+            GetInfoToolTip()
+            ImGui.EndTooltip()
+        end
+        ImGui.PopStyleVar()
+        ImGui.SameLine()
         if mq.TLO.Raid.Leader.ID() == member.ID() then
             ImGui.TextColored(0, 1, 1, 1, memberName)
         else
@@ -681,35 +693,7 @@ local function DrawRaidMember(id)
         end
         ImGui.Unindent(2)
         -- Lvl
-        ImGui.TableNextColumn()
-        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 2, 0)
-        -- if groupData[memberName] == nil then
-        --     groupData[memberName] = {
-        --         Name = memberName or 'Unknown',
-        --         Level = member.Level() or 0,
-        --         Class = member.Class.ShortName() or 'Unknown',
-        --         CurHP = member.CurrentHPs() or 0,
-        --         MaxHP = member.MaxHPs() or 100,
-        --         CurMana = member.CurrentMana() or 0,
-        --         MaxMana = member.MaxMana() or 100,
-        --         CurEnd = member.CurrentEndurance() or 0,
-        --         MaxEnd = member.MaxEndurance() or 0,
-        --         Sitting = member.Sitting() or false,
-        --         Zone = member.Present() and mq.TLO.Zone.Name() or 'Unknown',
-        --     }
-        -- end
 
-        if sitting then
-            ImGui.TextColored(0.911, 0.351, 0.008, 1, "%d", level or 0)
-        else
-            ImGui.Text("%s", level or 0)
-        end
-        if ImGui.IsItemHovered() then
-            ImGui.BeginTooltip()
-            GetInfoToolTip()
-            ImGui.EndTooltip()
-        end
-        ImGui.PopStyleVar()
         ImGui.EndTable()
     end
 
@@ -723,13 +707,13 @@ local function DrawRaidMember(id)
         end
         if ImGui.Selectable('Come to Me') then
             if useEQBC then
-                mq.cmdf("/bct %s //nav spawn %s", memberName, Module.CharLoaded)
+                mq.cmdf("/bct %s //nav spawn %s dist=\'20\"", memberName, Module.CharLoaded)
             else
-                mq.cmdf("/dex %s /nav spawn %s", memberName, Module.CharLoaded)
+                mq.cmdf("/dex %s /nav spawn %s dist=\'20\"", memberName, Module.CharLoaded)
             end
         end
         if ImGui.Selectable('Go To ' .. memberName) then
-            mq.cmdf("/nav spawn %s", memberName)
+            mq.cmdf("/nav spawn %s dist=\'20\"", memberName)
         end
         ImGui.Separator()
         if ImGui.BeginMenu('Roles') then
@@ -813,7 +797,8 @@ local function DrawRaidMember(id)
     end
 
     ImGui.EndGroup()
-    if ImGui.IsItemHovered() and memberDistance < 20 then
+    if ImGui.IsItemHovered() then
+        mq.cmdf("/target %s", member.Name())
         Module.Utils.GiveItem(member.ID() or 0)
     end
     -- Pet Health
@@ -1095,7 +1080,7 @@ function Module.RenderGUI()
                 if useEQBC then
                     mq.cmdf("/bcaa //nav spawn %s", Module.CharLoaded)
                 else
-                    mq.cmdf("/dgge /nav spawn %s", Module.CharLoaded)
+                    mq.cmdf("/dgge /nav spawn %s dist=\"20\"", Module.CharLoaded)
                 end
             end
 
@@ -1233,7 +1218,7 @@ function Module.RenderGUI()
                 if useEQBC then
                     mq.cmdf("/bcaa //nav spawn %s", Module.CharLoaded)
                 else
-                    mq.cmdf("/dgze /nav spawn %s", Module.CharLoaded)
+                    mq.cmdf("/dgze /nav spawn %s dist=\'20\"", Module.CharLoaded)
                 end
             end
 

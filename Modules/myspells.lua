@@ -31,9 +31,11 @@ if not loadedExeternally then
 	Module.ThemeLoader   = require('lib.theme_loader')
 	Module.Path          = string.format("%s/%s/", mq.luaDir, Module.Name)
 	Module.ThemeFile     = string.format('%s/MyUI/ThemeZ.lua', mq.configDir)
+	Module.Colors        = require('lib.colors')
 	Module.Theme         = {}
 else
 	Module.Utils = MyUI_Utils
+	Module.Colors = MyUI_Colors
 	Module.Icons = MyUI_Icons
 	Module.CharLoaded = MyUI_CharLoaded
 	Module.Server = MyUI_Server
@@ -618,7 +620,28 @@ function Module.RenderGUI()
 							ImGui.EndPopup()
 						end
 						if ImGui.IsItemHovered() then
-							ImGui.SetTooltip(string.format("%d) %s", i, spellBar[i].sName))
+							ImGui.BeginTooltip()
+							ImGui.Indent(4)
+							local colorName = Module.Colors.color('white')
+							local manaCost = mq.TLO.Spell(spellBar[i].sID).Mana() or 0
+							local curMana = mq.TLO.Me.CurrentMana() or 0
+							if curMana < manaCost * 1.1 then
+								colorName = Module.Colors.color('pink2')
+							end
+							ImGui.TextColored(colorName, "%s", spellBar[i].sName)
+							ImGui.Separator()
+							ImGui.TextColored(colorName, "Mana: %d", manaCost)
+							ImGui.SameLine(0.0, 2)
+							ImGui.TextColored(Module.Colors.color('white'), "/")
+							ImGui.SameLine(0.0, 2)
+							ImGui.TextColored(Module.Colors.color('teal'), "%d", curMana)
+							ImGui.TextColored(Module.Colors.color('white'), "Recast: %d", spellBar[i].sRecast)
+							ImGui.TextColored(Module.Colors.color('tangerine'), "Cast Time: %d", spellBar[i].sCastTime)
+							ImGui.Separator()
+
+							ImGui.Unindent(4)
+
+							ImGui.EndTooltip()
 							if ImGui.IsMouseReleased(0) then
 								mq.cmdf("/cast %s", i)
 								casting = true

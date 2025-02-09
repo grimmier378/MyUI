@@ -96,6 +96,8 @@ local InterruptSet                                               = {
     stopForCombat   = true,
     stopForGoupDist = 100,
     stopForDist     = false,
+    stopForRaidDist = 100,
+    stopForRaid     = false,
     stopForXtar     = true,
     stopForFear     = true,
     stopForCharm    = true,
@@ -563,12 +565,32 @@ local function groupDistance()
     if gsize == 0 then return false end
     for i = 1, gsize - 1 do
         if member(i).Present() then
-            if member(i).Distance() > InterruptSet.stopForGoupDist then
-                status = string.format('Paused for Group Distance. %s is %.2f units away.', member(i).Name(), member(i).Distance())
+            local dist = member(i).Distance() or 0
+            if dist > InterruptSet.stopForGoupDist then
+                status = string.format('Paused for Group Distance. %s is %.2f units away.', member(i).Name(), dist)
                 return true
             end
         else
             status = string.format('Paused for Group Distance. %s is not in Zone!', member(i).Name())
+            return true
+        end
+    end
+    return false
+end
+
+local function raidDistance()
+    local member = mq.TLO.Raid.Member
+    local rSize = mq.TLO.Raid.Members() or 0
+    if rSize == 0 then return false end
+    for i = 1, rSize do
+        if mq.TLO.SpawnCount(string.format("PC =%s", member(i).Name()))() > 0 then
+            local dist = member(i).Distance() or 0
+            if dist > InterruptSet.stopForRaidDist then
+                status = string.format('Paused for Raid Distance. %s is %.2f units away.', member(i).Name(), dist)
+                return true
+            end
+        else
+            status = string.format('Paused for Raid Distance. %s is not in Zone!', member(i).Name())
             return true
         end
     end
@@ -793,6 +815,12 @@ local function CheckInterrupts()
             interruptInProgress = true
         end
     elseif InterruptSet.stopForDist == true and groupDistance() then
+        flag = true
+        if flag and not interruptInProgress then
+            mq.cmdf("/nav stop log=off")
+            interruptInProgress = true
+        end
+    elseif InterruptSet.stopForRaid == true and raidDistance() then
         flag = true
         if flag and not interruptInProgress then
             mq.cmdf("/nav stop log=off")
@@ -2310,54 +2338,51 @@ function Module.RenderGUI()
 
                 if ImGui.BeginTable("##Interrupts", 2, bit32.bor(ImGuiTableFlags.Borders), -1, 0) then
                     ImGui.TableNextRow()
-                    ImGui.TableSetColumnIndex(0)
+                    ImGui.TableNextColumn()
                     InterruptSet.stopForCharm = ImGui.Checkbox("Stop for Charmed##" .. Module.Name, InterruptSet.stopForCharm)
                     if not InterruptSet.stopForCharm then InterruptSet.stopForAll = false end
-                    ImGui.TableSetColumnIndex(1)
+                    ImGui.TableNextColumn()
                     InterruptSet.stopForCombat = ImGui.Checkbox("Stop for Combat##" .. Module.Name, InterruptSet.stopForCombat)
                     if not InterruptSet.stopForCombat then InterruptSet.stopForAll = false end
-                    ImGui.TableNextRow()
+                    ImGui.TableNextColumn()
 
-                    ImGui.TableSetColumnIndex(0)
                     InterruptSet.stopForFear = ImGui.Checkbox("Stop for Fear##" .. Module.Name, InterruptSet.stopForFear)
                     if not InterruptSet.stopForFear then InterruptSet.stopForAll = false end
-                    ImGui.TableSetColumnIndex(1)
+                    ImGui.TableNextColumn()
                     InterruptSet.stopForGM = ImGui.Checkbox("Stop for GM##" .. Module.Name, InterruptSet.stopForGM)
                     if not InterruptSet.stopForGM then InterruptSet.stopForAll = false end
-                    ImGui.TableNextRow()
+                    ImGui.TableNextColumn()
 
-                    ImGui.TableSetColumnIndex(0)
                     InterruptSet.stopForLoot = ImGui.Checkbox("Stop for Loot##" .. Module.Name, InterruptSet.stopForLoot)
                     if not InterruptSet.stopForLoot then InterruptSet.stopForAll = false end
-                    ImGui.TableSetColumnIndex(1)
+                    ImGui.TableNextColumn()
                     InterruptSet.stopForMez = ImGui.Checkbox("Stop for Mez##" .. Module.Name, InterruptSet.stopForMez)
                     if not InterruptSet.stopForMez then InterruptSet.stopForAll = false end
-                    ImGui.TableNextRow()
+                    ImGui.TableNextColumn()
 
-                    ImGui.TableSetColumnIndex(0)
                     InterruptSet.stopForRoot = ImGui.Checkbox("Stop for Root##" .. Module.Name, InterruptSet.stopForRoot)
                     if not InterruptSet.stopForRoot then InterruptSet.stopForAll = false end
-                    ImGui.TableSetColumnIndex(1)
+                    ImGui.TableNextColumn()
                     InterruptSet.stopForSitting = ImGui.Checkbox("Stop for Sitting##" .. Module.Name, InterruptSet.stopForSitting)
                     if not InterruptSet.stopForSitting then InterruptSet.stopForAll = false end
-                    ImGui.TableNextRow()
+                    ImGui.TableNextColumn()
 
-                    ImGui.TableSetColumnIndex(0)
                     InterruptSet.stopForXtar = ImGui.Checkbox("Stop for Xtarget##" .. Module.Name, InterruptSet.stopForXtar)
                     if not InterruptSet.stopForXtar then InterruptSet.stopForAll = false end
-                    ImGui.TableSetColumnIndex(1)
+                    ImGui.TableNextColumn()
                     InterruptSet.stopForDist = ImGui.Checkbox("Stop for Party Dist##" .. Module.Name, InterruptSet.stopForDist)
                     if not InterruptSet.stopForDist then InterruptSet.stopForAll = false end
-                    ImGui.TableNextRow()
+                    ImGui.TableNextColumn()
+                    InterruptSet.stopForRaid = ImGui.Checkbox("Stop for Raid Dist##" .. Module.Name, InterruptSet.stopForRaid)
+                    if not InterruptSet.stopForRaid then InterruptSet.stopForAll = false end
+                    ImGui.TableNextColumn()
 
-                    ImGui.TableSetColumnIndex(0)
                     InterruptSet.stopForInvis = ImGui.Checkbox("Stop for Invis##" .. Module.Name, InterruptSet.stopForInvis)
                     if not InterruptSet.stopForInvis then InterruptSet.stopForAll = false end
-                    ImGui.TableSetColumnIndex(1)
+                    ImGui.TableNextColumn()
                     InterruptSet.stopForDblInvis = ImGui.Checkbox("Stop for Dbl Invis##" .. Module.Name, InterruptSet.stopForDblInvis)
                     if not InterruptSet.stopForDblInvis then InterruptSet.stopForAll = false end
-                    ImGui.TableNextRow()
-                    ImGui.TableSetColumnIndex(0)
+                    ImGui.TableNextColumn()
                     settings[Module.Name].AutoStand, _ = ImGui.Checkbox("Auto Stand##" .. Module.Name, settings[Module.Name].AutoStand)
                     if _ then mq.pickle(configFile, settings) end
                     ImGui.EndTable()
@@ -2368,6 +2393,10 @@ function Module.RenderGUI()
                     if InterruptSet.stopForDist then
                         ImGui.SetNextItemWidth(100)
                         InterruptSet.stopForGoupDist = ImGui.InputInt("Party Distance##GroupDist", InterruptSet.stopForGoupDist, 1, 50)
+                    end
+                    if InterruptSet.stopForRaidDist then
+                        ImGui.SetNextItemWidth(100)
+                        InterruptSet.stopForRaidDist = ImGui.InputInt("Raid Distance##RaidDist", InterruptSet.stopForRaidDist, 1, 50)
                     end
                 end
                 settings[Module.Name].GroupWatch = ImGui.Checkbox("Group Watch##" .. Module.Name, settings[Module.Name].GroupWatch)
@@ -2812,7 +2841,8 @@ function Module.MainLoop()
     currZone = mq.TLO.Zone.ShortName()
 
     if (InterruptSet.stopForDist and InterruptSet.stopForCharm and InterruptSet.stopForCombat and InterruptSet.stopForFear and InterruptSet.stopForGM and
-            InterruptSet.stopForLoot and InterruptSet.stopForMez and InterruptSet.stopForRoot and InterruptSet.stopForSitting and InterruptSet.stopForXtar and InterruptSet.stopForInvis and InterruptSet.stopForDblInvis) then
+            InterruptSet.stopForLoot and InterruptSet.stopForMez and InterruptSet.stopForRoot and InterruptSet.stopForSitting and InterruptSet.stopForXtar and
+            InterruptSet.stopForInvis and InterruptSet.stopForDblInvis and InterruptSet.stopForRaid) then
         InterruptSet.stopForAll = true
     else
         InterruptSet.stopForAll = false

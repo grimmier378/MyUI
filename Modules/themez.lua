@@ -197,19 +197,19 @@ local function DrawStyles()
 		end
 	end
 	ImGui.SameLine()
-	local tmpTBorder = false
-	local borderTPressed = false
-	if style[ImGuiStyleVar.TabBarBorderSize].Size == 1 then
-		tmpTBorder = true
-	end
-	tmpTBorder, borderTPressed = ImGui.Checkbox('TabBorder##', tmpTBorder)
-	if borderTPressed then
-		if tmpTBorder then
-			style[ImGuiStyleVar.TabBarBorderSize].Size = 1
-		else
-			style[ImGuiStyleVar.TabBarBorderSize].Size = 0
-		end
-	end
+	-- local tmpTBorder = false
+	-- local borderTPressed = false
+	-- if style[ImGuiStyleVar.TabBarBorderSize].Size == 1 then
+	-- 	tmpTBorder = true
+	-- end
+	-- tmpTBorder, borderTPressed = ImGui.Checkbox('TabBorder##', tmpTBorder)
+	-- if borderTPressed then
+	-- 	if tmpTBorder then
+	-- 		style[ImGuiStyleVar.TabBarBorderSize].Size = 1
+	-- 	else
+	-- 		style[ImGuiStyleVar.TabBarBorderSize].Size = 0
+	-- 	end
+	-- end
 
 	ImGui.SeparatorText('Main Sizing')
 	ImGui.BeginTable('##StylesMain', 3, tFlags)

@@ -269,7 +269,7 @@ end
 
 local function getTellChat(line, who)
     if string.find(line, " pet tells you") then return end
-    if string.find(line, "Master%.'^") then return end
+    if string.find(line, "Master%.%'$") then return end
     if not settings[Module.DisplayName].RelayTells then return end
     local checkNPC = string.format("npc =\"%s\"", who)
     local check2 = string.format("pet =\"%s\"", who)

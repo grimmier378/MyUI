@@ -66,6 +66,7 @@ local showRaidWindow     = false
 local currZone, lastZone
 local mygroupActor       = nil
 local showMoveStatus     = true
+local navDist            = 10
 local raidSize           = mq.TLO.Raid.Members() or 0
 local raidLeader         = mq.TLO.Raid.Leader() or 'N/A'
 local tPlayerFlags       = bit32.bor(ImGuiTableFlags.NoBordersInBody, ImGuiTableFlags.NoPadInnerX, ImGuiTableFlags.NoPadOuterX, ImGuiTableFlags.Resizable,
@@ -105,6 +106,7 @@ defaults                 = {
         DynamicMP = false,
         HideTitleBar = false,
         showMoveStatus = true,
+        NavDist = 10,
     },
 }
 
@@ -166,6 +168,7 @@ local function loadSettings()
     locked = settings[Module.Name].locked
     Scale = settings[Module.Name].Scale
     themeName = settings[Module.Name].LoadTheme
+    navDist = settings[Module.Name].NavDist ~= nil and settings[Module.Name].NavDist or 20
     showMoveStatus = settings[Module.Name].ShowMoveStatus
     if newSetting then writeSettings(configFile, settings) end
 end
@@ -174,7 +177,6 @@ local function GetInfoToolTip(id)
     if id == nil then return end
     local member = mq.TLO.Group.Member(id)
     if member == nil then return end
-    printf("%s %s", id, member)
     if member.Name() == nil then return end
     local memberName = member.Name() or "NO"
     local r, g, b, a = 1, 1, 1, 1
@@ -399,13 +401,13 @@ local function DrawGroupMember(id)
         end
         if ImGui.Selectable('Come to Me') then
             if useEQBC then
-                mq.cmdf("/bct %s //nav spawn %s", memberName, Module.CharLoaded)
+                mq.cmdf("/bct %s //nav id %s dist=%d lineofsight=on", memberName, mq.TLO.Me.ID(), navDist)
             else
-                mq.cmdf("/dex %s /nav spawn %s dist=\"20\"", memberName, Module.CharLoaded)
+                mq.cmdf("/dex %s /nav id %s dist=%d lineofsight=on", memberName, mq.TLO.Me.ID(), navDist)
             end
         end
         if ImGui.Selectable('Go To ' .. memberName) then
-            mq.cmdf("/nav spawn %s dist=\'20\"", memberName)
+            mq.cmdf("/nav id %s dist=%s lineofsight=on", member.ID() or 0, navDist)
         end
         ImGui.Separator()
         if ImGui.BeginMenu('Roles') then
@@ -707,13 +709,13 @@ local function DrawRaidMember(id)
         end
         if ImGui.Selectable('Come to Me') then
             if useEQBC then
-                mq.cmdf("/bct %s //nav spawn %s dist=\'20\"", memberName, Module.CharLoaded)
+                mq.cmdf("/bct %s //nav id \"%s\" dist=%d lineofsight=on", memberName, mq.TLO.Me.ID(), navDist)
             else
-                mq.cmdf("/dex %s /nav spawn %s dist=\'20\"", memberName, Module.CharLoaded)
+                mq.cmdf("/dex %s /nav id \"%s\" dist=%d lineofsight=on", memberName, mq.TLO.Me.ID(), navDist)
             end
         end
         if ImGui.Selectable('Go To ' .. memberName) then
-            mq.cmdf("/nav spawn %s dist=\'20\"", memberName)
+            mq.cmdf("/nav id %s dist=%d lineofsight=on", member.ID() or 0, navDist)
         end
         ImGui.Separator()
         if ImGui.BeginMenu('Roles') then
@@ -797,7 +799,7 @@ local function DrawRaidMember(id)
     end
 
     ImGui.EndGroup()
-    if ImGui.IsItemHovered() then
+    if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
         mq.cmdf("/target %s", member.Name())
         Module.Utils.GiveItem(member.ID() or 0)
     end
@@ -970,7 +972,7 @@ local function DrawSelf()
             ImGui.PopStyleColor()
             if ImGui.IsItemHovered() then
                 ImGui.SetTooltip('%s\n%d%% health', mySelf.Pet.DisplayName(), mySelf.Pet.PctHPs())
-                if ImGui.IsMouseClicked(0) then
+                if ImGui.IsMouseReleased(0) then
                     mq.cmdf("/target id %s", mySelf.Pet.ID())
                     if mq.TLO.Cursor() then
                         mq.cmdf('/multiline ; /tar id %s; /face; /if (${Cursor.ID}) /click left target', mySelf.Pet.ID())
@@ -1078,9 +1080,9 @@ function Module.RenderGUI()
             ImGui.SetCursorPosX((sizeX - calcSize) * 0.5)
             if ImGui.SmallButton('Come') then
                 if useEQBC then
-                    mq.cmdf("/bcaa //nav spawn %s", Module.CharLoaded)
+                    mq.cmdf("/bcaa //nav id %s dist=%d lineofsight=on", mq.TLO.Me.ID(), navDist)
                 else
-                    mq.cmdf("/dgge /nav spawn %s dist=\"20\"", Module.CharLoaded)
+                    mq.cmdf("/dgge /nav id %s dist=%d lineofsight=on", mq.TLO.Me.ID(), navDist)
                 end
             end
 
@@ -1216,9 +1218,9 @@ function Module.RenderGUI()
             ImGui.SetCursorPosX((sizeX - calcSize) * 0.5)
             if ImGui.SmallButton('Come') then
                 if useEQBC then
-                    mq.cmdf("/bcaa //nav spawn %s", Module.CharLoaded)
+                    mq.cmdf("/bcaa //nav id %s dist=%d lineofsight=on", mq.TLO.Me.ID(), navDist)
                 else
-                    mq.cmdf("/dgze /nav spawn %s dist=\'20\"", Module.CharLoaded)
+                    mq.cmdf("/dgre /nav id %s dist=%d lineofsight=on", mq.TLO.Me.ID(), navDist)
                 end
             end
 
@@ -1231,13 +1233,13 @@ function Module.RenderGUI()
                     if useEQBC then
                         mq.cmdf("/multiline ; /dcaa //nav stop; /dcaa //afollow spawn %d", meID)
                     else
-                        mq.cmdf("/multiline ; /dgze /nav stop; /dgze /afollow spawn %d", meID)
+                        mq.cmdf("/multiline ; /dgre /nav stop; /dgze /afollow spawn %d", meID)
                     end
                 else
                     if useEQBC then
                         mq.cmd("/bcaa //afollow off")
                     else
-                        mq.cmd("/dgze /afollow off")
+                        mq.cmd("/dgre /afollow off")
                     end
                 end
                 tmpFollow = not tmpFollow
@@ -1386,7 +1388,15 @@ function Module.RenderGUI()
             showRaidWindow = ImGui.Checkbox('Show Raid##' .. Module.Name, showRaidWindow)
             ImGui.SameLine()
             showMoveStatus = ImGui.Checkbox('Show Move Status##' .. Module.Name, showMoveStatus)
-
+            local tmpDist
+            if tmpDist == nil then tmpDist = navDist end
+            ImGui.SetNextItemWidth(100)
+            tmpDist = ImGui.InputInt('Nav Stop Dist##' .. Module.Name, tmpDist, 1, 5)
+            if tmpDist < 1 then tmpDist = 1 end
+            if tmpDist > 100 then tmpDist = 100 end
+            if tmpDist ~= navDist then
+                navDist = tmpDist
+            end
             ImGui.SeparatorText("Save and Close##" .. Module.Name)
             if ImGui.Button('Save and Close##' .. Module.Name) then
                 OpenConfigGUI = false
@@ -1401,6 +1411,7 @@ function Module.RenderGUI()
                 settings[Module.Name].ShowMoveStatus = showMoveStatus
                 settings[Module.Name].locked = locked
                 settings[Module.Name].ShowRaidWindow = showRaidWindow
+                settings[Module.Name].NavDist = tmpDist
                 writeSettings(configFile, settings)
             end
         end
@@ -1629,7 +1640,7 @@ function Module.MainLoop()
 
     if mimicMe and lastTar ~= mq.TLO.Target.ID() then
         lastTar = mq.TLO.Target.ID()
-        mq.cmdf("/dgge /target id %s", mq.TLO.Target.ID())
+        mq.cmdf("/dgge /target id %s", lastTar)
     end
 
     getMyInfo()

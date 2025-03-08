@@ -18,6 +18,7 @@ if not loadedExeternally then
     Module.ThemeFile   = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
     Module.Theme       = {}
     Module.Colors      = require('lib.colors')
+    Module.Server      = mq.TLO.MacroQuest.Server():gsub(" ", "_")
 else
     Module.Utils       = MyUI_Utils
     Module.ThemeLoader = MyUI_ThemeLoader
@@ -27,12 +28,14 @@ else
     Module.ThemeFile   = MyUI_ThemeFile
     Module.Theme       = MyUI_Theme
     Module.Colors      = MyUI_Colors
+    Module.Server      = MyUI_Server
 end
 local myself                                                            = mq.TLO.Me
 local MyGroupLeader                                                     = mq.TLO.Group.Leader() or "NoGroup"
 local themeID                                                           = 1
 local expand, compact                                                   = {}, {}
-local configFile                                                        = mq.configDir .. '/myui/AA_Party_Configs.lua'
+local configFileOld                                                     = mq.configDir .. '/myui/AA_Party_Configs.lua'
+local configFile                                                        = string.format('%s/myui/AAParty/%s/%s.lua', mq.configDir, Module.Server, Module.CharLoaded)
 local themezDir                                                         = mq.luaDir .. '/themez/init.lua'
 local MeLevel                                                           = myself.Level()
 local PctExp                                                            = myself.PctExp()
@@ -53,7 +56,7 @@ local MailBoxShow                                                       = false
 local AAPartyConfigShow                                                 = false
 local AAPartyMode                                                       = 'driver'
 local iconSize                                                          = 15
-
+local needSave                                                          = false
 local defaults                                                          = {
     Scale = 1,
     LoadTheme = 'Default',
@@ -62,6 +65,7 @@ local defaults                                                          = {
     MaxRow = 1,
     AlphaSort = false,
     MyGroupOnly = true,
+    LockWindow = false,
 }
 
 local function loadTheme()
@@ -77,21 +81,25 @@ local function loadSettings()
     -- Check if the dialog data file exists
     local newSetting = false
     if not Module.Utils.File.Exists(configFile) then
-        settings[Module.DisplayName] = defaults
-        mq.pickle(configFile, settings)
-        loadSettings()
+        if Module.Utils.File.Exists(configFileOld) then
+            settings = dofile(configFileOld)
+            mq.pickle(configFile, settings)
+        else
+            settings[Module.DisplayName] = defaults
+            mq.pickle(configFile, settings)
+        end
     else
         -- Load settings from the Lua config file
         settings = dofile(configFile)
-        if settings[Module.DisplayName] == nil then
-            settings[Module.DisplayName] = {}
-            settings[Module.DisplayName] = defaults
-            newSetting = true
-        end
+    end
+    if settings[Module.DisplayName] == nil then
+        settings[Module.DisplayName] = {}
+        settings[Module.DisplayName] = defaults
+        newSetting = true
     end
 
-    if settings[Module.DisplayName].locked == nil then
-        settings[Module.DisplayName].locked = false
+    if settings[Module.DisplayName].LockWindow == nil then
+        settings[Module.DisplayName].LockWindow = false
         newSetting = true
     end
 
@@ -129,6 +137,10 @@ local function loadSettings()
         loadTheme()
     end
 
+    if settings[Module.LockWindow] == nil then
+
+    end
+
     if settings[Module.DisplayName].AutoSize == nil then
         settings[Module.DisplayName].AutoSize = TempSettings.aSize
         newSetting = true
@@ -141,6 +153,7 @@ local function loadSettings()
     TempSettings.showTooltip = settings[Module.DisplayName].ShowTooltip
     TempSettings.themeName   = settings[Module.DisplayName].LoadTheme
     TempSettings.MyGroupOnly = settings[Module.DisplayName].MyGroupOnly
+    TempSettings.LockWindow  = settings[Module.DisplayName].LockWindow
     if newSetting then mq.pickle(configFile, settings) end
 end
 
@@ -420,6 +433,11 @@ function Module.RenderGUI()
         else
             winFlags = bit32.bor(ImGuiWindowFlags.None)
         end
+        if TempSettings.LockWindow then
+            winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoResize, ImGuiWindowFlags.NoMove)
+        else
+            winFlags = bit32.bor(winFlags)
+        end
         local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(settings[Module.DisplayName].LoadTheme or 'Default', Module.Theme)
         local openGUI, showGUI = imgui.Begin("AA Party##_" .. Module.CharLoaded, true, winFlags)
         if not openGUI then
@@ -621,12 +639,20 @@ function Module.RenderGUI()
                 end
                 if ImGui.MenuItem("Toggle Auto Size##Size_" .. Module.CharLoaded) then
                     TempSettings.aSize = not TempSettings.aSize
+                    needSave = true
                 end
                 if ImGui.MenuItem("Toggle Tooltip##Tooltip_" .. Module.CharLoaded) then
                     TempSettings.showTooltip = not TempSettings.showTooltip
+                    needSave = true
                 end
                 if ImGui.MenuItem("Toggle My Group Only##MyGroup_" .. Module.CharLoaded) then
                     TempSettings.MyGroupOnly = not TempSettings.MyGroupOnly
+                    needSave = true
+                end
+                local lbl = TempSettings.LockWindow and "Unlock Window##" or "Lock Window##"
+                if ImGui.MenuItem(lbl) then
+                    TempSettings.LockWindow = not TempSettings.LockWindow
+                    needSave = true
                 end
                 ImGui.EndPopup()
             end
@@ -680,15 +706,15 @@ function Module.RenderGUI()
 
     if AAPartyConfigShow then
         local ColorCountTheme, StyleCountTheme = Module.ThemeLoader.StartTheme(settings[Module.DisplayName].LoadTheme or 'Default', Module.Theme)
-        local openTheme, showConfig = ImGui.Begin('Config##MySpells_', true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
+        local openTheme, showConfig = ImGui.Begin('Config##_', true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
         if not openTheme then
             AAPartyConfigShow = false
         end
         if showConfig then
-            ImGui.SeparatorText("Theme##MySpells")
+            ImGui.SeparatorText("Theme##")
             ImGui.Text("Cur Theme: %s", TempSettings.themeName)
             -- Combo Box Load Theme
-            if ImGui.BeginCombo("Load Theme##MySpells", TempSettings.themeName) then
+            if ImGui.BeginCombo("Load Theme##", TempSettings.themeName) then
                 for k, data in pairs(Module.Theme.Theme) do
                     local isSelected = data.Name == TempSettings.themeName
                     if ImGui.Selectable(data.Name, isSelected) then
@@ -733,11 +759,12 @@ function Module.RenderGUI()
                 loadTheme()
             end
 
-            MailBoxShow = ImGui.Checkbox("Show MailBox##MySpells", MailBoxShow)
+            MailBoxShow = ImGui.Checkbox("Show MailBox##", MailBoxShow)
             ImGui.SameLine()
-            TempSettings.alphaSort = ImGui.Checkbox("Alpha Sort##MySpells", TempSettings.alphaSort)
-            TempSettings.showTooltip = ImGui.Checkbox("Show Tooltip##MySpells", TempSettings.showTooltip)
-            TempSettings.MyGroupOnly = ImGui.Checkbox("My Group Only##MySpells", TempSettings.MyGroupOnly)
+            TempSettings.alphaSort = ImGui.Checkbox("Alpha Sort##", TempSettings.alphaSort)
+            TempSettings.showTooltip = ImGui.Checkbox("Show Tooltip##", TempSettings.showTooltip)
+            TempSettings.MyGroupOnly = ImGui.Checkbox("My Group Only##", TempSettings.MyGroupOnly)
+            TempSettings.LockWindow = ImGui.Checkbox("Lock Window##", TempSettings.LockWindow)
             if ImGui.Button("Save & Close") then
                 settings = dofile(configFile)
                 settings[Module.DisplayName].Scale = TempSettings.scale
@@ -745,6 +772,7 @@ function Module.RenderGUI()
                 settings[Module.DisplayName].LoadTheme = TempSettings.themeName
                 settings[Module.DisplayName].ShowTooltip = TempSettings.showTooltip
                 settings[Module.DisplayName].MyGroupOnly = TempSettings.MyGroupOnly
+                settings[Module.DisplayName].LockWindow = TempSettings.LockWindow
                 mq.pickle(configFile, settings)
                 AAPartyConfigShow = false
             end
@@ -878,6 +906,16 @@ function Module.MainLoop()
             CheckStale()
         else
             MessageHandler()
+        end
+        if needSave then
+            settings[Module.DisplayName].Scale = TempSettings.scale
+            settings[Module.DisplayName].AlphaSort = TempSettings.alphaSort
+            settings[Module.DisplayName].LoadTheme = TempSettings.themeName
+            settings[Module.DisplayName].ShowTooltip = TempSettings.showTooltip
+            settings[Module.DisplayName].MyGroupOnly = TempSettings.MyGroupOnly
+            settings[Module.DisplayName].LockWindow = TempSettings.LockWindow
+            mq.pickle(configFile, settings)
+            needSave = false
         end
         clockTimer = mq.gettime()
     end

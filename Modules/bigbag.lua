@@ -11,8 +11,10 @@ if not loadedExeternally then
 	Module.ThemeFile   = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
 	Module.Theme       = require('defaults.themes')
 	Module.ThemeLoader = require('lib.theme_loader')
+	Module.Colors      = require('lib.colors')
 else
 	Module.Path = MyUI_Path
+	Module.Colors = MyUI_Colors
 	Module.ThemeFile = MyUI_ThemeFile
 	Module.Theme = MyUI_Theme
 	Module.ThemeLoader = MyUI_ThemeLoader
@@ -46,6 +48,13 @@ local clickies                                            = {}
 local augments                                            = {}
 local bank_items                                          = {}
 local bank_augments                                       = {}
+local display_tables                                      = {
+	augments = {},
+	items = {},
+	clickies = {},
+	bank_items = {},
+	bank_augments = {},
+}
 local needSort                                            = true
 local coin_type                                           = 0
 local coin_qty                                            = ''
@@ -76,7 +85,7 @@ local defaults                                            = {
 	toggleModKey2 = 'None',
 	toggleModKey3 = 'None',
 	toggleMouse = 'None',
-	INVENTORY_DELAY_SECONDS = 2,
+	INVENTORY_DELAY_SECONDS = 20,
 }
 local modKeys                                             = {
 	"None",
@@ -155,6 +164,16 @@ local function sort_inventory()
 		-- else
 		-- table.sort(items)
 	end
+	table.sort(augments, function(a, b) return a.Name() < b.Name() end)   -- Sort augments by name
+	table.sort(bank_augments, function(a, b) return a.Name() < b.Name() end) -- Sort banked augments by name TODO:: Impliment this display
+	table.sort(clickies, function(a, b) return a.Name() < b.Name() end)   -- Sort clickies by name
+	display_tables = {
+		augments = augments,
+		items = items,
+		clickies = clickies,
+		bank_items = bank_items,
+		bank_augments = bank_augments,
+	}
 end
 
 local function process_coin()
@@ -703,15 +722,22 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 		local charges = item.Charges() or 0
 		local clicky = item.Clicky() or 'none'
 		ImGui.BeginTooltip()
-		ImGui.Text("Item: %s", item.Name())
-		ImGui.Text("Qty: %s", item.Stack() or 1)
-		ImGui.TextColored(ImVec4(0, 1, 1, 1), "Value: %0.1f Plat ", (item.Value() or 0) / 1000) -- 1000 copper - 1 plat
+		ImGui.Text("Item: ")
 		ImGui.SameLine()
-		ImGui.TextColored(ImVec4(1, 1, 0, 1), 'Trib: %s', (item.Tribute() or 0))
+		ImGui.TextColored(Module.Colors.color('tangarine'), "%s", item.Name())
+		ImGui.Text("Type: ")
+		ImGui.SameLine()
+		ImGui.TextColored(Module.Colors.color('pink2'), "%s", item.Type())
+		ImGui.Text("Qty: ")
+		ImGui.SameLine()
+		ImGui.TextColored(Module.Colors.color('green'), "%s", item.Stack() or 1)
+		ImGui.TextColored(Module.Colors.color('teal'), "Value: %0.1f Plat ", (item.Value() or 0) / 1000) -- 1000 copper - 1 plat
+		ImGui.SameLine()
+		ImGui.TextColored(Module.Colors.color('yellow'), 'Trib: %s', (item.Tribute() or 0))
 		if clicky ~= 'none' then
 			ImGui.SeparatorText("Clicky Info")
-			ImGui.TextColored(ImVec4(0, 1, 0, 1), "Clicky: %s", clicky)
-			ImGui.TextColored(ImVec4(0, 1, 1, 1), "Charges: %s", charges >= 0 and charges or 'Infinite')
+			ImGui.TextColored(Module.Colors.color('green'), "Clicky: %s", clicky)
+			ImGui.TextColored(Module.Colors.color('teal'), "Charges: %s", charges >= 0 and charges or 'Infinite')
 		end
 		ImGui.SeparatorText("Click Actions")
 		if clickable then
@@ -780,9 +806,9 @@ local function display_bag_content()
 		local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
 		local temp_bag_cols = 1
 
-		for index, _ in ipairs(items) do
-			if string.match(string.lower(items[index].Name()), string.lower(filter_text)) then
-				draw_item_icon(items[index], ICON_WIDTH, ICON_HEIGHT, 'inv' .. index, true)
+		for index, _ in ipairs(display_tables.items or {}) do
+			if string.match(string.lower(display_tables.items[index].Name()), string.lower(filter_text)) then
+				draw_item_icon(display_tables.items[index], ICON_WIDTH, ICON_HEIGHT, 'inv' .. index, true)
 				if bag_cols > temp_bag_cols then
 					temp_bag_cols = temp_bag_cols + 1
 					ImGui.SameLine()
@@ -805,9 +831,9 @@ local function display_bank_content()
 		local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
 		local temp_bag_cols = 1
 
-		for index, _ in ipairs(bank_items) do
-			if string.match(string.lower(bank_items[index].Name()), string.lower(filter_text)) then
-				draw_item_icon(bank_items[index], ICON_WIDTH, ICON_HEIGHT, 'bank' .. index, false)
+		for index, _ in ipairs(display_tables.bank_items or {}) do
+			if string.match(string.lower(display_tables.bank_items[index].Name()), string.lower(filter_text)) then
+				draw_item_icon(display_tables.bank_items[index], ICON_WIDTH, ICON_HEIGHT, 'bank' .. index, false)
 				if bag_cols > temp_bag_cols then
 					temp_bag_cols = temp_bag_cols + 1
 					ImGui.SameLine()
@@ -829,9 +855,9 @@ local function display_clickies()
 		local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
 		local temp_bag_cols = 1
 
-		for index, _ in ipairs(clickies) do
-			if string.match(string.lower(clickies[index].Name()), string.lower(filter_text)) then
-				draw_item_icon(clickies[index], ICON_WIDTH, ICON_HEIGHT, 'clicky' .. index, true)
+		for index, _ in ipairs(display_tables.clickies or {}) do
+			if string.match(string.lower(display_tables.clickies[index].Name()), string.lower(filter_text)) then
+				draw_item_icon(display_tables.clickies[index], ICON_WIDTH, ICON_HEIGHT, 'clicky' .. index, true)
 				if bag_cols > temp_bag_cols then
 					temp_bag_cols = temp_bag_cols + 1
 					ImGui.SameLine()
@@ -853,9 +879,9 @@ local function display_augments()
 		local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
 		local temp_bag_cols = 1
 
-		for index, _ in ipairs(augments) do
-			if string.match(string.lower(augments[index].Name()), string.lower(filter_text)) then
-				draw_item_icon(augments[index], ICON_WIDTH, ICON_HEIGHT, 'augments' .. index, true)
+		for index, _ in ipairs(display_tables.augments or {}) do
+			if string.match(string.lower(display_tables.augments[index].Name()), string.lower(filter_text)) then
+				draw_item_icon(display_tables.augments[index], ICON_WIDTH, ICON_HEIGHT, 'augments' .. index, true)
 				if bag_cols > temp_bag_cols then
 					temp_bag_cols = temp_bag_cols + 1
 					ImGui.SameLine()
@@ -882,10 +908,10 @@ local function display_details()
 		ImGui.TableSetupColumn('Augment', ImGuiTableColumnFlags.WidthStretch)
 		ImGui.TableSetupScrollFreeze(0, 1)
 		ImGui.TableHeadersRow()
-		for index, _ in ipairs(items) do
+		for index, _ in ipairs(display_tables.items or {}) do
 			ImGui.PushID(index)
-			if string.match(string.lower(items[index].Name()), string.lower(filter_text)) then
-				local item = items[index]
+			if string.match(string.lower(display_tables.items[index].Name()), string.lower(filter_text)) then
+				local item = display_tables.items[index]
 				local clicky = item.Clicky() or 'No'
 				local charges = item.Charges()
 				local lbl = 'Infinite'
@@ -916,7 +942,7 @@ local function display_details()
 				ImGui.TableNextColumn()
 				ImGui.Text("%s", item.Worn() or 'No')
 				ImGui.TableNextColumn()
-				ImGui.TextColored(ImVec4(0, 1, 1, 1), clicky)
+				ImGui.TextColored(Module.Colors.color('teal'), clicky)
 				ImGui.TableNextColumn()
 				ImGui.Text("%s", lbl)
 				ImGui.TableNextColumn()
@@ -972,17 +998,28 @@ local function renderBtn()
 		if FreeSlots > MIN_SLOTS_WARN then
 			animMini:SetTextureCell(3635 - EQ_ICON_OFFSET)
 			ImGui.DrawTextureAnimation(animMini, 34, 34, true)
+			if ImGui.IsItemHovered() then
+				BigButtonTooltip()
+				if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
+					Module.ShowGUI = not Module.ShowGUI
+				end
+			end
+			ImGui.SetCursorPos(20, 20)
+			ImGui.Text("%s", FreeSlots)
 		else
 			animMini:SetTextureCell(3632 - EQ_ICON_OFFSET)
 			ImGui.DrawTextureAnimation(animMini, 34, 34, true)
+			if ImGui.IsItemHovered() then
+				BigButtonTooltip()
+				if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
+					Module.ShowGUI = not Module.ShowGUI
+				end
+			end
+			ImGui.SetCursorPos(20, 20)
+			ImGui.Text("%s", FreeSlots)
 		end
 
-		if ImGui.IsItemHovered() then
-			BigButtonTooltip()
-			if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
-				Module.ShowGUI = not Module.ShowGUI
-			end
-		end
+
 
 		if toggleMouse ~= 'None' then
 			if ImGui.IsMouseReleased(ImGuiMouseButton[toggleMouse]) and not ImGui.IsKeyDown(ImGuiMod.Ctrl) then

@@ -11,11 +11,13 @@ if not loadedExeternally then
 	Module.Utils = require('lib.common')
 	Module.Icons = require('mq.ICONS')
 	Module.CharLoaded = mq.TLO.Me.DisplayName()
+	Module.Colors = require('lib.colors')
 	Module.Server = mq.TLO.MacroQuest.Server()
 else
 	Module.Utils = MyUI_Utils
 	Module.Icons = MyUI_Icons
 	Module.CharLoaded = MyUI_CharLoaded
+	Module.Colors = MyUI_Colors
 	Module.Server = MyUI_Server
 end
 
@@ -165,8 +167,9 @@ function Module.RenderGUI()
 				ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(1.00, 0.454, 0.000, 1.000))
 				ImGui.PushStyleColor(ImGuiCol.Separator, ImVec4(1.00, 0.454, 0.000, 1.000))
 				ImGui.SeparatorText('Adventure Stats')
+				local ptsAvail = mq.TLO.Window("AdventureStatsWnd/AdvStats_AvailableValue").Text() or 'Refresh Me'
 
-				if ImGui.BeginTable('Adv Info##SAST_Info', 4, bit32.bor(ImGuiTableFlags.Resizable), ImVec2(-1, -1)) then
+				if ImGui.BeginTable('Adv Info##SAST_Info', 4, bit32.bor(ImGuiTableFlags.Resizable)) then
 					ImGui.TableSetupColumn('Theme', ImGuiTableColumnFlags.WidthFixed, 90)
 					ImGui.TableSetupColumn('Success', ImGuiTableColumnFlags.WidthFixed, 60)
 					ImGui.TableSetupColumn('Fail', ImGuiTableColumnFlags.WidthFixed, 35)
@@ -218,6 +221,10 @@ function Module.RenderGUI()
 					end
 					ImGui.EndTable()
 				end
+				ImGui.SetCursorPosX((ImGui.GetWindowWidth() - ImGui.CalcTextSize('Points Available: ' .. ptsAvail) - 10) * 0.5)
+				ImGui.Text('Points Available: ')
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('teal'), ptsAvail)
 
 				ImGui.PopStyleColor(2)
 			end

@@ -57,6 +57,7 @@ local defaults, settings = {}, {}
 local groupData          = {}
 local mailBox            = {}
 local raidKeys           = {}
+local raidLootIdx        = 0
 local useEQBC            = false
 local meID               = mq.TLO.Me.ID()
 local OpenConfigGUI      = false
@@ -173,9 +174,14 @@ local function loadSettings()
     if newSetting then writeSettings(configFile, settings) end
 end
 
-local function GetInfoToolTip(id)
+local function GetInfoToolTip(id, raid)
     if id == nil then return end
-    local member = mq.TLO.Group.Member(id)
+    local member
+    if raid then
+        member = mq.TLO.Raid.Member(id)
+    else
+        member = mq.TLO.Group.Member(id)
+    end
     if member == nil then return end
     if member.Name() == nil then return end
     local memberName = member.Name() or "NO"
@@ -204,9 +210,15 @@ local function GetInfoToolTip(id)
         ImGui.SameLine()
         ImGui.Text("Level: %d", member.Level())
         ImGui.Text("Class: %s", member.Class.ShortName())
-        ImGui.TextColored(Module.Colors.color('pink2'), "Health: %d of 100", member.PctHPs())
-        ImGui.TextColored(Module.Colors.color('light blue'), "Mana: %d of 100", member.PctMana())
-        ImGui.TextColored(Module.Colors.color('yellow'), "End: %d of 100", member.PctEndurance())
+        if member.PctHPs() ~= nil then
+            ImGui.TextColored(Module.Colors.color('pink2'), "Health: %d of 100", member.PctHPs())
+        end
+        if member.PctMana() ~= nil then
+            ImGui.TextColored(Module.Colors.color('light blue'), "Mana: %d of 100", member.PctMana())
+        end
+        if member.PctEndurance() ~= nil then
+            ImGui.TextColored(Module.Colors.color('yellow'), "End: %d of 100", member.PctEndurance())
+        end
         if member.Sitting() then
             ImGui.TextColored(Module.Colors.color('tangarine'), Module.Icons.FA_MOON_O)
         else
@@ -215,19 +227,23 @@ local function GetInfoToolTip(id)
         ImGui.TextColored(Module.Colors.color('softblue'), "Zone: %s", mq.TLO.Zone.Name())
     end
 
+    local entry = false
     if mq.TLO.Group.MainTank.ID() == member.ID() then
-        ImGui.SameLine()
+        if entry then ImGui.SameLine() end
         Module.Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
+        entry = true
     end
 
     if mq.TLO.Group.MainAssist.ID() == member.ID() then
-        ImGui.SameLine()
+        if entry then ImGui.SameLine() end
         Module.Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
+        entry = true
     end
 
     if mq.TLO.Group.Puller.ID() == member.ID() then
-        ImGui.SameLine()
+        if entry then ImGui.SameLine() end
         Module.Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
+        entry = true
     end
 end
 
@@ -547,51 +563,6 @@ local function DrawRaidMember(id)
         velo = member.Speed() or 0
     end
 
-    function GetInfoToolTip()
-        ImGui.TextColored(Module.Colors.color('tangarine'), memberName)
-        ImGui.SameLine()
-        ImGui.Text("(%s)", level)
-        ImGui.Text("Class: %s", cls)
-        if groupData[memberName] ~= nil then
-            ImGui.TextColored(Module.Colors.color('pink2'), "Health: %d of %d", groupData[memberName].CurHP, groupData[memberName].MaxHP)
-            ImGui.TextColored(Module.Colors.color('light blue'), "Mana: %d of %d", groupData[memberName].CurMana, groupData[memberName].MaxMana)
-            ImGui.TextColored(Module.Colors.color('yellow'), "End: %d of %d", groupData[memberName].CurEnd, groupData[memberName].MaxEnd)
-            if sitting then
-                ImGui.TextColored(Module.Colors.color('tangarine'), Module.Icons.FA_MOON_O)
-            else
-                ImGui.TextColored(Module.Colors.color('green'), Module.Icons.FA_SMILE_O)
-                ImGui.SameLine()
-                ImGui.TextColored(Module.Colors.color('yellow'), Module.Icons.MD_DIRECTIONS_RUN)
-                ImGui.SameLine()
-                ImGui.TextColored(Module.Colors.color('teal'), "%0.1f", velo)
-            end
-        else
-            ImGui.TextColored(Module.Colors.color('pink2'), "Health: %s of 100", hpPct)
-            ImGui.TextColored(Module.Colors.color('light blue'), "Mana: %s of 100", mpPct)
-            ImGui.TextColored(Module.Colors.color('yellow'), "End: %s of 100", enPct)
-            if sitting then
-                ImGui.TextColored(Module.Colors.color('tangarine'), Module.Icons.FA_MOON_O)
-            else
-                ImGui.TextColored(Module.Colors.color('green'), Module.Icons.FA_SMILE_O)
-            end
-        end
-
-        if mq.TLO.Group.MainTank.ID() == member.ID() then
-            ImGui.SameLine()
-            Module.Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
-        end
-
-        if mq.TLO.Group.MainAssist.ID() == member.ID() then
-            ImGui.SameLine()
-            Module.Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
-        end
-
-        if mq.TLO.Group.Puller.ID() == member.ID() then
-            ImGui.SameLine()
-            Module.Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
-        end
-    end
-
     ImGui.BeginChild("##RaidMember" .. tostring(id), 0.0, (80 * Scale), bit32.bor(ImGuiChildFlags.Border), ImGuiWindowFlags.NoScrollbar)
     ImGui.BeginGroup()
     local sizeX, sizeY = ImGui.GetContentRegionAvail()
@@ -611,7 +582,7 @@ local function DrawRaidMember(id)
         end
         if ImGui.IsItemHovered() then
             ImGui.BeginTooltip()
-            GetInfoToolTip()
+            GetInfoToolTip(id, true)
             ImGui.EndTooltip()
         end
         ImGui.PopStyleVar()
@@ -640,6 +611,11 @@ local function DrawRaidMember(id)
             end
 
             ImGui.SameLine()
+        end
+        if ImGui.IsItemHovered() then
+            ImGui.BeginTooltip()
+            GetInfoToolTip(id, true)
+            ImGui.EndTooltip()
         end
         -- Visiblity
 
@@ -690,7 +666,7 @@ local function DrawRaidMember(id)
         ImGui.EndGroup()
         if ImGui.IsItemHovered() then
             ImGui.BeginTooltip()
-            GetInfoToolTip()
+            GetInfoToolTip(id, true)
             ImGui.EndTooltip()
         end
         ImGui.Unindent(2)
@@ -881,7 +857,7 @@ local function DrawSelf()
         end
         if ImGui.IsItemHovered() then
             ImGui.BeginTooltip()
-            GetInfoToolTip(0)
+            GetInfoToolTip(0, false)
             ImGui.EndTooltip()
         end
         ImGui.PopStyleVar()
@@ -992,6 +968,7 @@ end
 
 function Module.RenderGUI()
     if not Module.IsRunning then return end
+    local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme, settings[Module.Name].MouseOver, mouseHover, settings[Module.Name].WinTransparency)
 
     ------- Main Window --------
     if showGroupWindow then
@@ -1002,7 +979,6 @@ function Module.RenderGUI()
         end
         -- Default window size
         ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
-        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme, settings[Module.Name].MouseOver, mouseHover, settings[Module.Name].WinTransparency)
         local openGUI, showMain = ImGui.Begin("My Group##MyGroup" .. mq.TLO.Me.DisplayName(), true, flags)
         if not openGUI then Module.IsRunning = false end
         if showMain then
@@ -1123,7 +1099,6 @@ function Module.RenderGUI()
             if mimicMe then ImGui.PopStyleColor(1) end
             mimicMe = tmpMimic
         end
-        Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
 
         ImGui.SetWindowFontScale(1)
 
@@ -1144,7 +1119,6 @@ function Module.RenderGUI()
         end
         -- Default window size
         ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
-        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme, settings[Module.Name].MouseOver, mouseHover, settings[Module.Name].WinTransparency)
         local openGUI, showMain = ImGui.Begin("My Raid##MyGroup" .. mq.TLO.Me.DisplayName(), true, flags)
         if not openGUI then Module.IsRunning = false end
         if showMain then
@@ -1249,38 +1223,26 @@ function Module.RenderGUI()
 
             if raidLeader == Module.CharLoaded then
                 ImGui.SeparatorText('Raid Loot Settings')
-                if settings[Module.Name].RaidLoot == (nil) then
-                    settings[Module.Name].RaidLoot = tonumber(mq.TLO.Window('RaidOptionsWindow/RAIDOPTIONS_CurrentLootType').Text()) or 1
+                if raidLootIdx == 0 then
+                    raidLootIdx = tonumber(mq.TLO.Window('RaidOptionsWindow/RAIDOPTIONS_CurrentLootType').Text()) or 1
                 end
                 ImGui.SetCursorPosX(sizeX * 0.5 - 50)
                 local raidLoot = { 'Raid Leader', 'Leaders Only', 'Leader Selected', 'Everyone', }
                 ImGui.SetNextItemWidth(100)
-                if ImGui.BeginCombo('Loot##MyGroup', raidLoot[settings[Module.Name].RaidLoot]) then
+                if ImGui.BeginCombo('Loot##MyGroup', raidLoot[raidLootIdx]) then
                     for i, loot in ipairs(raidLoot) do
-                        local isSelected = settings[Module.Name].RaidLoot == i
+                        local isSelected = raidLootIdx == i
                         if ImGui.Selectable(loot, isSelected) then
-                            settings[Module.Name].RaidLoot = i
-                            mq.cmdf("/Setloottype %d", i)
+                            if raidLootIdx ~= i then
+                                mq.cmdf("/Setloottype %d", i)
+                                raidLootIdx = i
+                            end
                         end
                     end
                     ImGui.EndCombo()
                 end
             end
-            -- ImGui.SameLine()
-            -- local tmpMimic = mimicMe
-            -- if mimicMe then ImGui.PushStyleColor(ImGuiCol.Button, Module.Colors.color('pink')) end
-            -- if ImGui.SmallButton('Mimic') then
-            --     if mimicMe then
-            --         mq.cmd("/groupinfo mimicme off")
-            --     else
-            --         mq.cmd("/groupinfo mimicme on")
-            --     end
-            --     tmpMimic = not tmpMimic
-            -- end
-            -- if mimicMe then ImGui.PopStyleColor(1) end
-            -- mimicMe = tmpMimic
         end
-        Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
 
         ImGui.SetWindowFontScale(1)
 
@@ -1293,7 +1255,6 @@ function Module.RenderGUI()
 
     -- Config Window
     if OpenConfigGUI then
-        local ColorCountConf, StyleCountConf = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
         local open, configShow = ImGui.Begin("MyGroup Conf", true, bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
         if not open then OpenConfigGUI = false end
         if configShow then
@@ -1415,10 +1376,10 @@ function Module.RenderGUI()
                 writeSettings(configFile, settings)
             end
         end
-        Module.ThemeLoader.EndTheme(ColorCountConf, StyleCountConf)
         ImGui.SetWindowFontScale(1)
         ImGui.End()
     end
+    Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
 end
 
 function Module.Unload()

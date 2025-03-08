@@ -857,6 +857,15 @@ local function DrawMainWin()
 							end
 							searchString = ""
 						end
+						ImGui.SameLine()
+						if ImGui.Button("Group Hail") then
+							if not DEBUG then
+								mq.cmdf("/dgz /multiline ; /target %s; /timed 5, /say hail", CurrTarget)
+							else
+								Module.Utils.PrintOutput('MyUI', nil, "/dgz /multiline ; /target %s; /timed 5, /say hail", CurrTarget)
+							end
+							searchString = ""
+						end
 					end
 				end
 			end

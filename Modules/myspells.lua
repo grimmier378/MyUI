@@ -516,17 +516,17 @@ local function DrawConfigWin()
 	end
 
 	ImGui.SeparatorText("General Settings##MySpells")
-	if mq.TLO.Me.Class.ShortName() ~= 'BRD' then
-		castTransparency = ImGui.SliderFloat("Cast Bar Transparency##MySpells", castTransparency, 0.0, 1.0)
-		enableCastBar = ImGui.Checkbox("Enable Cast Bar##MySpells", enableCastBar)
-		if enableCastBar then
-			ImGui.SameLine()
-			debugShow = ImGui.Checkbox("Force Show CastBar##MySpells", debugShow)
-			CastTextColorByType = ImGui.Checkbox("Cast Text Color By Type##MySpells", CastTextColorByType)
-			ImGui.SameLine()
-			ImGui.HelpMarker("This will change the color of the cast bar text based on the spell type.")
-		end
+	-- if mq.TLO.Me.Class.ShortName() ~= 'BRD' then
+	castTransparency = ImGui.SliderFloat("Cast Bar Transparency##MySpells", castTransparency, 0.0, 1.0)
+	enableCastBar = ImGui.Checkbox("Enable Cast Bar##MySpells", enableCastBar)
+	if enableCastBar then
+		ImGui.SameLine()
+		debugShow = ImGui.Checkbox("Force Show CastBar##MySpells", debugShow)
+		CastTextColorByType = ImGui.Checkbox("Cast Text Color By Type##MySpells", CastTextColorByType)
+		ImGui.SameLine()
+		ImGui.HelpMarker("This will change the color of the cast bar text based on the spell type.")
 	end
+	-- end
 	timerColor, _ = ImGui.ColorEdit4("Timer Color##MySpells", timerColor, ImGuiColorEditFlags.AlphaBar)
 	ImGui.SameLine()
 	ImGui.HelpMarker("This will change the color of the timer text on the spell gems.\nThis is also the Text Default color for the Cast Bar.")

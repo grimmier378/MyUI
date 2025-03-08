@@ -145,6 +145,7 @@ defaults                                                         = {
     InvisDelay            = 3,
     WatchHealth           = 90,
     GroupWatch            = false,
+    RaidWatch             = false,
     HeadsUpTransparency   = 0.5,
     MouseOverTransparency = 1.0,
     StopDistance          = 30,
@@ -597,10 +598,10 @@ local function raidDistance()
     return false
 end
 
-local function groupWatch(type)
-    if type == 'None' then return false end
+local function groupWatch(watchType)
+    if watchType == 'None' then return false end
     local myClass = mq.TLO.Me.Class.ShortName()
-    if type == "Self" then
+    if watchType == "Self" then
         if mq.TLO.Me.PctHPs() < settings[Module.Name].WatchHealth then
             mq.TLO.Me.Sit()
             return true
@@ -608,7 +609,7 @@ local function groupWatch(type)
         for x = 1, #manaClass do
             if manaClass[x] == myClass and mq.TLO.Me.PctMana() < settings[Module.Name].WatchMana then
                 mq.TLO.Me.Sit()
-                status = string.format('Paused for Mana Watch.')
+                status = string.format('Paused for SELF Mana Watch.')
                 return true
             end
         end
@@ -616,18 +617,18 @@ local function groupWatch(type)
         local member = mq.TLO.Group.Member
         local gsize = mq.TLO.Me.GroupSize() or 0
 
-        if type == 'Healer' then
+        if watchType == 'Healer' then
             for i = 1, gsize - 1 do
                 if member(i).Present() then
                     local class = member(i).Class.ShortName()
 
                     if class == 'CLR' or class == 'DRU' or class == 'SHM' then
                         if member(i).PctHPs() < settings[Module.Name].WatchHealth then
-                            status = string.format('Paused for Healer Health.')
+                            status = string.format('Paused for GROUP Healer Health.')
                             return true
                         end
                         if member(i).PctMana() < settings[Module.Name].WatchMana then
-                            status = string.format('Paused for Healer Mana.')
+                            status = string.format('Paused for GROUP Healer Mana.')
                             return true
                         end
                     end
@@ -635,28 +636,28 @@ local function groupWatch(type)
             end
             if myClass == 'CLR' or myClass == 'DRU' or myClass == 'SHM' then
                 if mq.TLO.Me.PctHPs() < settings[Module.Name].WatchHealth then
-                    status = string.format('Paused for Health Watch.')
+                    status = string.format('Paused for GROUP Health Watch.')
                     mq.TLO.Me.Sit()
                     return true
                 end
                 if manaClass[myClass] and mq.TLO.Me.PctMana() < settings[Module.Name].WatchMana then
                     mq.TLO.Me.Sit()
-                    status = string.format('Paused for Mana Watch.')
+                    status = string.format('Paused for GROUP Mana Watch.')
                     return true
                 end
             end
         end
-        if type == 'All' then
+        if watchType == 'All' then
             for i = 1, gsize - 1 do
                 if member(i).Present() then
                     if member(i).PctHPs() < settings[Module.Name].WatchHealth then
-                        status = string.format('Paused for Health Watch.')
+                        status = string.format('Paused for GROUP Health Watch.')
                         return true
                     end
                     for x = 1, #manaClass do
                         if member(i).Class.ShortName() == manaClass[x] then
                             if member(i).PctMana() < settings[Module.Name].WatchMana then
-                                status = string.format('Paused for Mana Watch.')
+                                status = string.format('Paused for GROUP Mana Watch.')
                                 return true
                             end
                         end
@@ -666,14 +667,101 @@ local function groupWatch(type)
                     return true
                 end
                 if mq.TLO.Me.PctHPs() < settings[Module.Name].WatchHealth then
-                    status = string.format('Paused for Health Watch.')
+                    status = string.format('Paused for GROUP Health Watch.')
                     mq.TLO.Me.Sit()
                     return true
                 end
                 for x = 1, #manaClass do
                     if manaClass[x] == myClass and mq.TLO.Me.PctMana() < settings[Module.Name].WatchMana then
                         mq.TLO.Me.Sit()
-                        status = string.format('Paused for Mana Watch.')
+                        status = string.format('Paused for GROUP Mana Watch.')
+                        return true
+                    end
+                end
+            end
+        end
+        -- mq.delay(1)
+    end
+    return false
+end
+
+local function raidWatch(watchType)
+    if watchType == 'None' then return false end
+    local myClass = mq.TLO.Me.Class.ShortName()
+    if watchType == "Self" then
+        if mq.TLO.Me.PctHPs() < settings[Module.Name].WatchHealth then
+            mq.TLO.Me.Sit()
+            return true
+        end
+        for x = 1, #manaClass do
+            if manaClass[x] == myClass and mq.TLO.Me.PctMana() < settings[Module.Name].WatchMana then
+                mq.TLO.Me.Sit()
+                status = string.format('Paused for SELF Mana Watch.')
+                return true
+            end
+        end
+    elseif mq.TLO.Me.GroupSize() > 0 then
+        local member = mq.TLO.Raid.Member
+        local rsize = mq.TLO.Raid.Members() or 0
+
+        if watchType == 'Healer' then
+            for i = 1, rsize do
+                if mq.TLO.SpawnCount(string.format("PC =%s", member(i).Name()))() > 0 then
+                    local class = member(i).Class.ShortName()
+
+                    if class == 'CLR' or class == 'DRU' or class == 'SHM' then
+                        if member(i).PctHPs() < settings[Module.Name].WatchHealth then
+                            status = string.format('Paused for RAID Healer Health.')
+                            return true
+                        end
+                        if member(i).PctMana() < settings[Module.Name].WatchMana then
+                            status = string.format('Paused for RAID Healer Mana.')
+                            return true
+                        end
+                    end
+                end
+            end
+            if myClass == 'CLR' or myClass == 'DRU' or myClass == 'SHM' then
+                if mq.TLO.Me.PctHPs() < settings[Module.Name].WatchHealth then
+                    status = string.format('Paused for RAID Health Watch.')
+                    mq.TLO.Me.Sit()
+                    return true
+                end
+                if manaClass[myClass] and mq.TLO.Me.PctMana() < settings[Module.Name].WatchMana then
+                    mq.TLO.Me.Sit()
+                    status = string.format('Paused for RAID Mana Watch.')
+                    return true
+                end
+            end
+        end
+        if watchType == 'All' then
+            for i = 1, rsize do
+                if mq.TLO.SpawnCount(string.format("PC =%s", member(i).Name()))() > 0 then
+                    if member(i).PctHPs() < settings[Module.Name].WatchHealth then
+                        status = string.format('Paused for RAID Health Watch.')
+                        return true
+                    end
+                    for x = 1, #manaClass do
+                        if member(i).Class.ShortName() == manaClass[x] then
+                            if member(i).PctMana() < settings[Module.Name].WatchMana then
+                                status = string.format('Paused for RAID Mana Watch.')
+                                return true
+                            end
+                        end
+                    end
+                else
+                    status = string.format('Paused for Raid Member %s not Present.', member(i).CleanName())
+                    return true
+                end
+                if mq.TLO.Me.PctHPs() < settings[Module.Name].WatchHealth then
+                    status = string.format('Paused for RAID Health Watch.')
+                    mq.TLO.Me.Sit()
+                    return true
+                end
+                for x = 1, #manaClass do
+                    if manaClass[x] == myClass and mq.TLO.Me.PctMana() < settings[Module.Name].WatchMana then
+                        mq.TLO.Me.Sit()
+                        status = string.format('Paused forRAID  Mana Watch.')
                         return true
                     end
                 end
@@ -814,6 +902,12 @@ local function CheckInterrupts()
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
+        -- elseif settings[Module.Name].RaidWatch == true and raidWatch(settings[Module.Name].WatchType) then
+        --     flag = true
+        --     if flag and not interruptInProgress then
+        --         mq.cmdf("/nav stop log=off")
+        --         interruptInProgress = true
+        --     end
     elseif InterruptSet.stopForDist == true and groupDistance() then
         flag = true
         if flag and not interruptInProgress then
@@ -833,7 +927,6 @@ local function CheckInterrupts()
         if invis then intPauseTime = settings[Module.Name].InvisDelay end
     else
         interruptInProgress = false
-        intPauseTime = 0
     end
 
     return flag
@@ -2421,6 +2514,28 @@ function Module.RenderGUI()
                         end
                     end
                 end
+                -- settings[Module.Name].RaidWatch = ImGui.Checkbox("Raid Watch##" .. Module.Name, settings[Module.Name].RaidWatch)
+                -- if settings[Module.Name].RaidWatch then
+                --     if ImGui.CollapsingHeader("Raid Watch Settings##" .. Module.Name) then
+                --         settings[Module.Name].RaidWatchHealth = ImGui.InputInt("Watch Health##" .. Module.Name, settings[Module.Name].RaidWatchHealth, 1, 5)
+                --         if settings[Module.Name].RaidWatchHealth > 100 then settings[Module.Name].RaidWatchHealth = 100 end
+                --         if settings[Module.Name].RaidWatchHealth < 1 then settings[Module.Name].RaidWatchHealth = 1 end
+                --         settings[Module.Name].RaidWatchMana = ImGui.InputInt("Watch Mana##" .. Module.Name, settings[Module.Name].RaidWatchMana, 1, 5)
+                --         if settings[Module.Name].RaidWatchMana > 100 then settings[Module.Name].RaidWatchMana = 100 end
+                --         if settings[Module.Name].RaidWatchMana < 1 then settings[Module.Name].RaidWatchMana = 1 end
+
+                --         if ImGui.BeginCombo("Watch Type##" .. Module.Name, settings[Module.Name].RaidWatchType) then
+                --             local types = { "All", "Healer", "Self", "None", }
+                --             for i = 1, #types do
+                --                 local isSelected = types[i] == settings[Module.Name].RaidWatchType
+                --                 if ImGui.Selectable(types[i], isSelected) then
+                --                     settings[Module.Name].RaidWatchType = types[i]
+                --                 end
+                --             end
+                --             ImGui.EndCombo()
+                --         end
+                --     end
+                -- end
             end
             ImGui.Spacing()
 

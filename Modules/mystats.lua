@@ -57,33 +57,43 @@ end
 function Module.GetStats()
 	local stats = {}
 	table.insert(stats, 1, { ['HP'] = string.format("%s / %s", MySelf.CurrentHPs() or 0, MySelf.MaxHPs() or 0), })
-	table.insert(stats, 2, { ['Regen'] = string.format("%s + %s", (MySelf.HPRegen() or 0) + 20, MySelf.HPRegenBonus() or 0), })
+	table.insert(stats, 2, { ['Regen'] = string.format("%s + %s", mq.TLO.Window('InventoryWindow/IWS_CurrentCombatHPRegen').Text(), MySelf.HPRegenBonus() or 0), })
 
 	table.insert(stats, 3, { ['Mana'] = string.format("%s / %s", MySelf.CurrentMana() or 0, MySelf.MaxMana() or 0), })
-	table.insert(stats, 4, { ['Mana Regen'] = string.format("%s + %s", MySelf.ManaRegen() or 0, MySelf.ManaRegenBonus() or 0), })
+	table.insert(stats, 4, { ['Mana Regen'] = string.format("%s + %s", mq.TLO.Window('InventoryWindow/IWS_CurrentCombatManaRegen').Text(), MySelf.ManaRegenBonus() or 0), })
 
 	table.insert(stats, 5, { ['Endurance'] = string.format("%s / %s", MySelf.CurrentEndurance() or 0, MySelf.MaxEndurance() or 0), })
-	table.insert(stats, 6, { ['End Regen'] = string.format("%s + %s", MySelf.EnduranceRegen() or 0, MySelf.EnduranceRegenBonus() or 0), })
+	table.insert(stats, 6, { ['End Regen'] = string.format("%s + %s", mq.TLO.Window('InventoryWindow/IWS_CurrentCombatEndRegen').Text(), MySelf.EnduranceRegenBonus() or 0), })
 
-	table.insert(stats, 7, { ['Haste'] = string.format("%s%%", MySelf.Haste() or 0), })
-	table.insert(stats, 8, { ['ATK Bonus'] = MySelf.AttackBonus() or 0, })
-	table.insert(stats, 9, { ['STATS'] = '----', })
-	table.insert(stats, 10, { ['RESISTS'] = '----', })
-	table.insert(stats, 11, { ['STR'] = string.format("%s + %s", MySelf.STR() or 0, MySelf.HeroicSTRBonus() or 0), })
-	table.insert(stats, 13, { ['STA'] = string.format("%s + %s", MySelf.STA() or 0, MySelf.HeroicSTABonus() or 0), })
-	table.insert(stats, 15, { ['AGI'] = string.format("%s + %s", MySelf.AGI() or 0, MySelf.HeroicAGIBonus() or 0), })
-	table.insert(stats, 17, { ['DEX'] = string.format("%s + %s", MySelf.DEX() or 0, MySelf.HeroicDEXBonus() or 0), })
-	table.insert(stats, 19, { ['WIS'] = string.format("%s + %s", MySelf.WIS() or 0, MySelf.HeroicWISBonus() or 0), })
-	table.insert(stats, 21, { ['INT'] = string.format("%s + %s", MySelf.INT() or 0, MySelf.HeroicINTBonus() or 0), })
-	table.insert(stats, 23, { ['CHA'] = string.format("%s + %s", MySelf.CHA() or 0, MySelf.HeroicCHABonus() or 0), })
+	table.insert(stats, 7, { ['Armor Class'] = mq.TLO.Window('InventoryWindow/IWS_CurrentArmorClass').Text(), })
+	table.insert(stats, 8, { ['DUMMY'] = 'DUMMY', })
+	--	table.insert(stats, 8, { ['Avoidance'] = mq.TLO.Window('InventoryWindow/IWS_CurrentAvoidance').Text(), })
 
-	table.insert(stats, 12, { ['Resist Fire'] = MySelf.svFire() or 0, })
-	table.insert(stats, 14, { ['Resist Cold'] = MySelf.svCold() or 0, })
-	table.insert(stats, 16, { ['Resist Magic'] = MySelf.svMagic() or 0, })
-	table.insert(stats, 18, { ['Resist Disease'] = MySelf.svDisease() or 0, })
-	table.insert(stats, 20, { ['Resist Poison'] = MySelf.svPoison() or 0, })
-	table.insert(stats, 22, { ['Resist Corruption'] = MySelf.svCorruption() or 0, })
-	table.insert(stats, 24, { ['Resist Prismatic'] = MySelf.svPrismatic() or 0, })
+	table.insert(stats, 9, { ['ATK'] = mq.TLO.Window('InventoryWindow/IWS_CurrentAttack').Text(), })
+	table.insert(stats, 10, { ['Haste'] = string.format("%s%%", MySelf.Haste() or 0), })
+
+	table.insert(stats, 11, { ['STATS'] = '----', })
+	table.insert(stats, 12, { ['RESISTS'] = '----', })
+
+	table.insert(stats, 13,
+		{ ['STR'] = string.format("%s (%s) + %s", MySelf.STR() or 0, mq.TLO.Window('InventoryWindow/IWS_CurrentStrength').Text(), MySelf.HeroicSTRBonus() or 0), })
+	table.insert(stats, 15, { ['STA'] = string.format("%s (%s) + %s", MySelf.STA() or 0, mq.TLO.Window('InventoryWindow/IWS_CurrentStamina').Text(), MySelf.HeroicSTABonus() or 0), })
+	table.insert(stats, 17, { ['AGI'] = string.format("%s (%s) + %s", MySelf.AGI() or 0, mq.TLO.Window('InventoryWindow/IWS_CurrentAgility').Text(), MySelf.HeroicAGIBonus() or 0), })
+	table.insert(stats, 19,
+		{ ['DEX'] = string.format("%s (%s) + %s", MySelf.DEX() or 0, mq.TLO.Window('InventoryWindow/IWS_CurrentDexterity').Text(), MySelf.HeroicDEXBonus() or 0), })
+	table.insert(stats, 21, { ['WIS'] = string.format("%s (%s) + %s", MySelf.WIS() or 0, mq.TLO.Window('InventoryWindow/IWS_CurrentWisdom').Text(), MySelf.HeroicWISBonus() or 0), })
+	table.insert(stats, 23,
+		{ ['INT'] = string.format("%s (%s) + %s", MySelf.INT() or 0, mq.TLO.Window('InventoryWindow/IWS_CurrentIntelligence').Text(), MySelf.HeroicINTBonus() or 0), })
+	table.insert(stats, 25,
+		{ ['CHA'] = string.format("%s (%s) + %s", MySelf.CHA() or 0, mq.TLO.Window('InventoryWindow/IWS_CurrentCharisma').Text(), MySelf.HeroicCHABonus() or 0), })
+
+	table.insert(stats, 14, { ['Resist Fire'] = MySelf.svFire() or 0, })
+	table.insert(stats, 16, { ['Resist Cold'] = MySelf.svCold() or 0, })
+	table.insert(stats, 18, { ['Resist Magic'] = MySelf.svMagic() or 0, })
+	table.insert(stats, 20, { ['Resist Disease'] = MySelf.svDisease() or 0, })
+	table.insert(stats, 22, { ['Resist Poison'] = MySelf.svPoison() or 0, })
+	table.insert(stats, 24, { ['Resist Corruption'] = MySelf.svCorruption() or 0, })
+	table.insert(stats, 26, { ['Resist Prismatic'] = MySelf.svPrismatic() or 0, })
 
 	-- Alt Currency
 
@@ -134,6 +144,14 @@ function Module.RenderGUI()
 							ImGui.TableNextRow()
 							ImGui.TableSetColumnIndex(0)
 							sectionChange = true
+						elseif k == 'DUMMY' then
+							ImGui.TableNextColumn()
+							if v == 'DUMMY' then
+								ImGui.TableNextColumn()
+							else
+								ImGui.TextColored(Module.Colors.color(valColor), "%s", v)
+								ImGui.TableNextColumn()
+							end
 						else
 							ImGui.TextColored(Module.Colors.color(txtColor), "%s:", k)
 							ImGui.TableNextColumn()

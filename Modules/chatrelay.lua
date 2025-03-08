@@ -344,10 +344,10 @@ function Module.RenderGUI()
                 showConfig = not showConfig
             end
             ImGui.SameLine()
-            if ImGui.BeginTabBar("Chat Relay##ChatRelay", ImGuiTabBarFlags.None) then
+            if ImGui.BeginTabBar("Chat Relay##ChatRelay") then
                 if RelayGuild then
                     if ImGui.BeginTabItem("Guild Chat") then
-                        if ImGui.BeginTabBar("Guild Chat##GuildChat", ImGuiTabBarFlags.None) then
+                        if ImGui.BeginTabBar("Guild Chat##GuildChat", bit32.bor(ImGuiTabBarFlags.TabListPopupButton, ImGuiTabBarFlags.FittingPolicyScroll)) then
                             local sortedKeys = {}
                             sortedKeys = sortedBoxes(guildChat)
                             for key in pairs(sortedKeys) do
@@ -396,7 +396,7 @@ function Module.RenderGUI()
                 end
                 if RelayTells then
                     if ImGui.BeginTabItem("Tell Chat") then
-                        if ImGui.BeginTabBar("Tell Chat##TellChat", ImGuiTabBarFlags.None) then
+                        if ImGui.BeginTabBar("Tell Chat##TellChat", bit32.bor(ImGuiTabBarFlags.TabListPopupButton, ImGuiTabBarFlags.FittingPolicyScroll)) then
                             local sortedKeys = {}
                             sortedKeys = sortedBoxes(tellChat)
                             for key in pairs(sortedKeys) do

@@ -254,13 +254,12 @@ function CommonUtils.GiveItem(target_id)
 	if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
 		mq.cmdf("/target id %s", target_id)
 		if mq.TLO.Cursor() then
-			mq.cmdf('/multiline ; /tar id %s; /timed 2, /face; /timed 5, /click left target', target_id)
+			mq.cmdf('/multiline ; /tar id %s; /timed 5, /click left target', target_id)
 		end
 	end
 end
 
 function CommonUtils.MaskName(name)
-	if mq.TLO.Anonymous() then end
 	local maskedName = name
 	if maskedName ~= nil then
 		maskedName = maskedName:gsub("([A-Za-z])", "X")

@@ -601,7 +601,7 @@ function Module.RenderGUI()
 				local sizeX, sizeY = ImGui.GetContentRegionAvail()
 				sizeY = sizeY - 50
 				local col = math.floor(sizeX / 75) or 1
-				local sorted_names = MyUI_Utils.SortTableColums(nil, btnKeys, col)
+				local sorted_names = MyUI_Utils.SortTableColumns(nil, btnKeys, col)
 
 				ImGui.SetNextItemWidth(100)
 				settings[Module.Name].ButtonsRow = ImGui.InputInt("Buttons Per Row##" .. Module.Name, settings[Module.Name].ButtonsRow, 1, 5)

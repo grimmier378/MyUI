@@ -120,14 +120,11 @@ function CommonUtils.GetNextID(table)
 	return maxID + 1
 end
 
---- Takes in a table or sorted index,key pairs and returns a sorted table of keys based on the number of columns to sorty by.
----
----This will keep your table sorted by columns instead of rows.
 ---@param input_table table|nil  the table to sort (optional) You can send a set of sorted keys if you have already custom sorted it.
 ---@param sorted_keys table|nil  the sorted keys table (optional) if you have already sorted the keys
 ---@param num_columns integer  the number of column groups to sort the keys into
 ---@return table
-function CommonUtils.SortTableColums(input_table, sorted_keys, num_columns)
+function CommonUtils.SortTableColumns(input_table, sorted_keys, num_columns)
 	if input_table == nil and sorted_keys == nil then return {} end
 
 	-- If sorted_keys is provided, use it, otherwise extract the keys from the input_table
@@ -142,15 +139,33 @@ function CommonUtils.SortTableColums(input_table, sorted_keys, num_columns)
 	end
 
 	local total_items = #keys
-	local num_rows = math.ceil(total_items / num_columns)
-	local column_sorted = {}
+	local base_rows = math.floor(total_items / num_columns) -- Base number of rows per column
+	local extra_rows = total_items % num_columns         -- Number of columns that need an extra row
 
-	-- Reorganize the keys to fill vertically by columns
-	for row = 1, num_rows do
+	local column_sorted = {}
+	local column_entries = {}
+
+	-- Precompute how many rows each column gets
+	local start_index = 1
+	for col = 1, num_columns do
+		local rows_in_col = base_rows + (col <= extra_rows and 1 or 0)
+		column_entries[col] = {}
+
+		-- Assign keys to their respective columns
+		for row = 1, rows_in_col do
+			if start_index <= total_items then
+				table.insert(column_entries[col], keys[start_index])
+				start_index = start_index + 1
+			end
+		end
+	end
+
+	-- Rearrange into the final sorted order, maintaining column-first layout
+	local max_rows = base_rows + (extra_rows > 0 and 1 or 0)
+	for row = 1, max_rows do
 		for col = 1, num_columns do
-			local index = (col - 1) * num_rows + row
-			if index <= total_items then
-				table.insert(column_sorted, keys[index])
+			if column_entries[col][row] then
+				table.insert(column_sorted, column_entries[col][row])
 			end
 		end
 	end

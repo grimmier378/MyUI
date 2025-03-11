@@ -419,7 +419,7 @@ local function MyUI_Render()
 				local col = math.floor(sizeX / 125) or 1
 				if ImGui.BeginTable("Modules", col, ImGuiWindowFlags.None) then
 					local tempSort = GetSortedModuleNames()
-					local sorted_names = MyUI_Utils.SortTableColums(nil, tempSort, col)
+					local sorted_names = MyUI_Utils.SortTableColumns(nil, tempSort, col)
 
 					for _, name in ipairs(sorted_names) do
 						local module_data = nil

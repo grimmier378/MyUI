@@ -16,7 +16,7 @@ if not loadedExeternally then
     Module.CharLoaded  = mq.TLO.Me.DisplayName()
     Module.Mode        = 'driver'
     Module.ThemeFile   = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
-    Module.Theme       = {}
+    Module.Theme       = require('defaults.themes')
     Module.Colors      = require('lib.colors')
     Module.Server      = mq.TLO.MacroQuest.Server():gsub(" ", "_")
 else

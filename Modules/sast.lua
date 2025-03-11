@@ -60,7 +60,7 @@ local function checkExp()
 		return 'No Expedition Started'
 	end
 end
-
+local desc = ''
 --GUI
 function Module.RenderGUI()
 	if currZone ~= lastZone then return end
@@ -80,7 +80,7 @@ function Module.RenderGUI()
 				ImGui.PushStyleColor(ImGuiCol.Separator, ImVec4(1.00, 0.454, 0.000, 1.000))
 				ImGui.Text("Adventure Status: \t")
 				ImGui.SameLine()
-				ImGui.Text(AdvWIN.Child('AdvRqst_ProgressTextLabel').Text() or 'None')
+				ImGui.Text(desc)
 				ImGui.SameLine(200)
 				ImGui.Text(Module.Icons.MD_MORE_HORIZ)
 				if ImGui.IsItemHovered() then
@@ -146,7 +146,7 @@ function Module.RenderGUI()
 					ImGui.PushTextWrapPos(250)
 					ImGui.Text("Click to Open InGame\nQuest Information:")
 					ImGui.Separator()
-					ImGui.Text(ExpWIN.Child('DZ_CurrentDZValue').Text() or 'No Expedition')
+					ImGui.Text(desc)
 					ImGui.PopTextWrapPos()
 					ImGui.EndTooltip()
 				end
@@ -358,11 +358,15 @@ local refreshTimer = 0
 local delTimerAdv = os.time()
 local delTimerExp = os.time()
 function Module.MainLoop()
+	if mq.TLO.EverQuest.GameState() ~= "INGAME" then
+		Module.IsRunning = false
+		return
+	end
 	if loadedExeternally then
 		---@diagnostic disable-next-line: undefined-global
 		if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
 	end
-
+	desc = AdvWIN.Child('AdvRqst_ProgressTextLabel').Text() or 'None'
 	if refreshStats and refreshTimer == 0 then
 		refreshTimer = mq.gettime()
 		-- mq.delay(3000, function() return (mq.TLO.Window("AdventureStatsWnd/AdvStats_ThemeList").List(1)() or 0) ~= 0 end)

@@ -78,28 +78,28 @@ local settings                          = {}
 function LoadSettings()
     -- Check if the dialog data file exists
     local newSetting = false
+    settings[Module.DisplayName] = defaults
+
     if not Module.Utils.File.Exists(configFile) then
-        settings[Module.DisplayName] = defaults
         mq.pickle(configFile, settings)
-        LoadSettings()
     else
         -- Load settings from the Lua config file
-        settings = dofile(configFile)
-        if settings[Module.DisplayName] == nil then
-            settings[Module.DisplayName] = {}
-        end
-    end
-
-    for i = 10, 40 do
-        if i % 2 == 0 then
-            table.insert(fontSizes, i)
-            if i == 12 then
-                table.insert(fontSizes, 13) -- this is the default font size so keep it in the list
+        local tmpSettings = dofile(configFile)
+        if tmpSettings[Module.DisplayName] ~= nil then
+            for k, v in pairs(defaults) do
+                if tmpSettings[Module.DisplayName][k] == nil then
+                    tmpSettings[Module.DisplayName][k] = v
+                    newSetting = true
+                end
             end
+            settings = tmpSettings
+        else
+            settings[Module.DisplayName] = defaults
+            newSetting = true
         end
     end
 
-    newSetting = Module.Utils.CheckDefaultSettings(defaults, settings[Module.DisplayName])
+    newSetting = Module.Utils.CheckDefaultSettings(defaults, settings[Module.DisplayName]) or newSetting
 
     RelayGuild = settings[Module.DisplayName].RelayGuild
     RelayTells = settings[Module.DisplayName].RelayTells
@@ -132,17 +132,18 @@ local function RegisterRelayActor()
             else
                 lastMessages[MemberEntry.Guild] = MemberEntry.Message
             end
+            if charBufferCount[MemberEntry.Guild] == nil then charBufferCount[MemberEntry.Guild] = { Current = 1, Last = 1, } end
             if guildChat[MemberEntry.Guild] == nil then
                 guildChat[MemberEntry.Guild] = ImGui.ConsoleWidget.new("chat_relay_Console" .. MemberEntry.Guild .. "##chat_relayConsole")
-                -- guildChat[MemberEntry.Guild].fontSize = settings[Module.DisplayName].FontSize
                 guildBufferCount[MemberEntry.Guild] = { Current = 1, Last = 1, }
             end
             Module.Utils.AppendColoredTimestamp(guildChat[MemberEntry.Guild], tStamp, MemberEntry.Message)
             guildBufferCount[MemberEntry.Guild].Current = guildBufferCount[MemberEntry.Guild].Current + 1
         elseif MemberEntry.Subject == 'Tell' and settings[Module.DisplayName].RelayTells then
+            if charBufferCount[MemberEntry.Name] == nil then charBufferCount[MemberEntry.Name] = { Current = 1, Last = 1, } end
             if tellChat[MemberEntry.Name] == nil then
                 tellChat[MemberEntry.Name] = ImGui.ConsoleWidget.new("chat_relay_Console" .. MemberEntry.Name .. "##chat_relayConsole")
-                -- tellChat[MemberEntry.Name].fontSize = settings[Module.DisplayName].FontSize
+                charBufferCount[MemberEntry.Name] = { Current = 1, Last = 1, }
             end
             Module.Utils.AppendColoredTimestamp(tellChat[MemberEntry.Name], tStamp, MemberEntry.Message)
             charBufferCount[MemberEntry.Name].Current = charBufferCount[MemberEntry.Name].Current + 1
@@ -350,43 +351,45 @@ function Module.RenderGUI()
                         if ImGui.BeginTabBar("Guild Chat##GuildChat", bit32.bor(ImGuiTabBarFlags.TabListPopupButton, ImGuiTabBarFlags.FittingPolicyScroll)) then
                             local sortedKeys = {}
                             sortedKeys = sortedBoxes(guildChat)
-                            for key in pairs(sortedKeys) do
-                                local gName = sortedKeys[key]
-                                local gConsole = guildChat[gName]
-                                local conTag = false
-                                local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
-                                contentSizeY = contentSizeY - 30
-                                if guildBufferCount[gName].Current > guildBufferCount[gName].Last then
-                                    ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(1, 0, 0, 1))
-                                    conTag = true
-                                end
-                                if ImGui.BeginTabItem(gName) then
-                                    if guildBufferCount[gName].Current ~= guildBufferCount[gName].Last then
-                                        guildBufferCount[gName].Last = guildBufferCount[gName].Current
+                            if #sortedKeys > 0 then
+                                for key in pairs(sortedKeys) do
+                                    local gName = sortedKeys[key]
+                                    local gConsole = guildChat[gName]
+                                    local conTag = false
+                                    local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
+                                    contentSizeY = contentSizeY - 30
+                                    if guildBufferCount[gName].Current > guildBufferCount[gName].Last then
+                                        ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(1, 0, 0, 1))
+                                        conTag = true
                                     end
-                                    gConsole:Render(ImVec2(contentSizeX, contentSizeY))
-                                    ImGui.Separator()
-                                    local textFlags = bit32.bor(0,
-                                        ImGuiInputTextFlags.EnterReturnsTrue
-                                    -- not implemented yet
-                                    -- ImGuiInputTextFlags.CallbackCompletion,
-                                    -- ImGuiInputTextFlags.CallbackHistory
-                                    )
-                                    -- local contentSizeX, _ = ImGui.GetContentRegionAvail()
-                                    ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
-                                    ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 2)
-                                    local accept = false
-                                    local cmdBuffer = ''
-                                    ImGui.SetNextItemWidth(contentSizeX)
-                                    cmdBuffer, accept = ImGui.InputTextWithHint('##Input##' .. gName, "who|message", cmdBuffer, textFlags)
-                                    if accept then
-                                        ChannelExecGuildCommand(cmdBuffer, gName, gConsole)
-                                        cmdBuffer = ''
+                                    if ImGui.BeginTabItem(gName) then
+                                        if guildBufferCount[gName].Current ~= guildBufferCount[gName].Last then
+                                            guildBufferCount[gName].Last = guildBufferCount[gName].Current
+                                        end
+                                        gConsole:Render(ImVec2(contentSizeX, contentSizeY))
+                                        ImGui.Separator()
+                                        local textFlags = bit32.bor(0,
+                                            ImGuiInputTextFlags.EnterReturnsTrue
+                                        -- not implemented yet
+                                        -- ImGuiInputTextFlags.CallbackCompletion,
+                                        -- ImGuiInputTextFlags.CallbackHistory
+                                        )
+                                        -- local contentSizeX, _ = ImGui.GetContentRegionAvail()
+                                        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
+                                        ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 2)
+                                        local accept = false
+                                        local cmdBuffer = ''
+                                        ImGui.SetNextItemWidth(contentSizeX)
+                                        cmdBuffer, accept = ImGui.InputTextWithHint('##Input##' .. gName, "who|message", cmdBuffer, textFlags)
+                                        if accept then
+                                            ChannelExecGuildCommand(cmdBuffer, gName, gConsole)
+                                            cmdBuffer = ''
+                                        end
+                                        ImGui.EndTabItem()
                                     end
-                                    ImGui.EndTabItem()
-                                end
-                                if conTag then
-                                    ImGui.PopStyleColor()
+                                    if conTag then
+                                        ImGui.PopStyleColor()
+                                    end
                                 end
                             end
                             ImGui.EndTabBar()
@@ -399,45 +402,47 @@ function Module.RenderGUI()
                         if ImGui.BeginTabBar("Tell Chat##TellChat", bit32.bor(ImGuiTabBarFlags.TabListPopupButton, ImGuiTabBarFlags.FittingPolicyScroll)) then
                             local sortedKeys = {}
                             sortedKeys = sortedBoxes(tellChat)
-                            for key in pairs(sortedKeys) do
-                                local tName = sortedKeys[key]
-                                local tConsole = tellChat[tName]
-                                local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
-                                local colFlag = false
-                                contentSizeY = contentSizeY - 30
-                                if charBufferCount[tName].Current > charBufferCount[tName].Last then
-                                    ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(1, 0, 0, 1))
-                                    colFlag = true
-                                end
-                                if ImGui.BeginTabItem(tName) then
-                                    if charBufferCount[tName].Current ~= charBufferCount[tName].Last then
-                                        charBufferCount[tName].Last = charBufferCount[tName].Current
+                            if #sortedKeys > 0 then
+                                for key in pairs(sortedKeys) do
+                                    local tName = sortedKeys[key]
+                                    local tConsole = tellChat[tName]
+                                    local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
+                                    local colFlag = false
+                                    contentSizeY = contentSizeY - 30
+                                    if charBufferCount[tName].Current > charBufferCount[tName].Last then
+                                        ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(1, 0, 0, 1))
+                                        colFlag = true
                                     end
+                                    if ImGui.BeginTabItem(tName) then
+                                        if charBufferCount[tName].Current ~= charBufferCount[tName].Last then
+                                            charBufferCount[tName].Last = charBufferCount[tName].Current
+                                        end
 
-                                    tConsole:Render(ImVec2(contentSizeX, contentSizeY))
-                                    --Command Line
-                                    ImGui.Separator()
-                                    local textFlags = bit32.bor(0,
-                                        ImGuiInputTextFlags.EnterReturnsTrue
-                                    -- not implemented yet
-                                    -- ImGuiInputTextFlags.CallbackCompletion,
-                                    -- ImGuiInputTextFlags.CallbackHistory
-                                    )
-                                    -- local contentSizeX, _ = ImGui.GetContentRegionAvail()
-                                    ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
-                                    ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 2)
-                                    local accept = false
-                                    local cmdBuffer = ''
-                                    ImGui.SetNextItemWidth(contentSizeX)
-                                    cmdBuffer, accept = ImGui.InputTextWithHint('##Input##' .. tName, "who|message", cmdBuffer, textFlags)
-                                    if accept then
-                                        ChannelExecCommand(cmdBuffer, tName, tConsole)
-                                        cmdBuffer = ''
+                                        tConsole:Render(ImVec2(contentSizeX, contentSizeY))
+                                        --Command Line
+                                        ImGui.Separator()
+                                        local textFlags = bit32.bor(0,
+                                            ImGuiInputTextFlags.EnterReturnsTrue
+                                        -- not implemented yet
+                                        -- ImGuiInputTextFlags.CallbackCompletion,
+                                        -- ImGuiInputTextFlags.CallbackHistory
+                                        )
+                                        -- local contentSizeX, _ = ImGui.GetContentRegionAvail()
+                                        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
+                                        ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 2)
+                                        local accept = false
+                                        local cmdBuffer = ''
+                                        ImGui.SetNextItemWidth(contentSizeX)
+                                        cmdBuffer, accept = ImGui.InputTextWithHint('##Input##' .. tName, "who|message", cmdBuffer, textFlags)
+                                        if accept then
+                                            ChannelExecCommand(cmdBuffer, tName, tConsole)
+                                            cmdBuffer = ''
+                                        end
+                                        ImGui.EndTabItem()
                                     end
-                                    ImGui.EndTabItem()
-                                end
-                                if colFlag then
-                                    ImGui.PopStyleColor()
+                                    if colFlag then
+                                        ImGui.PopStyleColor()
+                                    end
                                 end
                             end
                             ImGui.EndTabBar()

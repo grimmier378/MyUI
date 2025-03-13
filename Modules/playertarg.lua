@@ -62,6 +62,7 @@ local bLocked = false
 local breathBarShow = false
 local enableBreathBar = false
 local breathPct = 100
+local haveAggroColor, noAggroColor
 -- Flags
 
 local tPlayerFlags = bit32.bor(ImGuiTableFlags.NoBordersInBody, ImGuiTableFlags.NoPadInnerX,
@@ -102,6 +103,8 @@ defaults = {
     ProgressSize = 10,
     ProgressSizeTarget = 30,
     TargetTextColor = { 1, 1, 1, 1, },
+    NoAggroColor = { 0.8, 0.0, 1.0, 1.0, },
+    HaveAggroColor = { 0.78, 0.20, 0.05, 0.8, },
 }
 
 -- Functions
@@ -180,6 +183,8 @@ local function loadSettings()
     themeName = settings[Module.Name].LoadTheme
     ProgressSizeTarget = settings[Module.Name].ProgressSizeTarget
     targetTextColor = settings[Module.Name].TargetTextColor
+    noAggroColor = settings[Module.Name].NoAggroColor
+    haveAggroColor = settings[Module.Name].HaveAggroColor
 
     if newSetting then mq.pickle(configFile, settings) end
 end
@@ -549,6 +554,14 @@ local function PlayerTargConf_GUI()
 
         ImGui.Spacing()
 
+        haveAggroColor = ImGui.ColorEdit4("Have Aggro Color##" .. Module.Name, haveAggroColor, bit32.bor(ImGuiColorEditFlags.NoInputs))
+
+        ImGui.Spacing()
+
+        noAggroColor = ImGui.ColorEdit4("Don't Have Aggrp Color##" .. Module.Name, noAggroColor, bit32.bor(ImGuiColorEditFlags.NoInputs))
+
+        ImGui.Spacing()
+
         -- breath bar settings
         if ImGui.CollapsingHeader("Breath Meter##" .. Module.Name) then
             local tmpbreath = settings[Module.Name].EnableBreathBar
@@ -588,6 +601,8 @@ local function PlayerTargConf_GUI()
             settings[Module.Name].pulseSpeed = pulseSpeed
             settings[Module.Name].combatPulseSpeed = combatPulseSpeed
             settings[Module.Name].TargetTextColor = targetTextColor
+            settings[Module.Name].NoAggroColor = noAggroColor
+            settings[Module.Name].HaveAggroColor = haveAggroColor
             mq.pickle(configFile, settings)
         end
     end
@@ -688,9 +703,9 @@ local function drawTarget()
             yPos = ImGui.GetCursorPosY() - 2
             ImGui.BeginGroup()
             if target.PctAggro() < 100 then
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('orange')))
+                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(noAggroColor[1], noAggroColor[2], noAggroColor[3], noAggroColor[4]))
             else
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
+                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(haveAggroColor[1], haveAggroColor[2], haveAggroColor[3], haveAggroColor[4]))
             end
             ImGui.ProgressBar(((tonumber(target.PctAggro() or 0)) / 100), ImGui.GetContentRegionAvail(), progressSize,
                 '##pctAggro')

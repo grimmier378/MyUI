@@ -1195,36 +1195,35 @@ local function pDPS(dur, rType)
 			if settings.Options.announceDNET then
 				announceDanNet(msg)
 			end
-			if settings.Options.announceActors and ActorDPS ~= nil then
-				local msgSend = {
-					Name = Module.CharLoaded,
-					Subject = 'Update',
-					BattleNum = -3,
-					DPS = dps,
-					TimeSpan = dur,
-					TotalDmg = dmgTotalBattle,
-					AvgDmg = avgDmg,
-					Remove = false,
-					Crit = critTotalBattle,
-					CritHeals = critHealsTotal,
-					Dot = dotTotalBattle,
-					Report = msg,
-				}
-				ActorDPS:send({ mailbox = 'my_dps', script = 'mydps', }, (msgSend))
-				ActorDPS:send({ mailbox = 'my_dps', script = 'myui', }, (msgSend))
-				for k, v in ipairs(actorsTable) do
-					if v.name == Module.CharLoaded then
-						v.name      = Module.CharLoaded
-						v.sequence  = -3
-						v.dps       = dps
-						v.dur       = dur
-						v.dmg       = dmgTotalBattle
-						v.crit      = critTotalBattle
-						v.critHeals = critHealsTotal
-						v.dot       = dotTotalBattle
-						v.avg       = avgDmg
-						break
-					end
+		end
+		if settings.Options.announceActors and ActorDPS ~= nil then
+			local msgSend = {
+				Name = Module.CharLoaded,
+				Subject = 'Update',
+				BattleNum = -3,
+				DPS = dps,
+				TimeSpan = dur,
+				TotalDmg = dmgTotalBattle,
+				AvgDmg = avgDmg,
+				Remove = false,
+				Crit = critTotalBattle,
+				CritHeals = critHealsTotal,
+				Dot = dotTotalBattle,
+			}
+			ActorDPS:send({ mailbox = 'my_dps', script = 'mydps', }, (msgSend))
+			ActorDPS:send({ mailbox = 'my_dps', script = 'myui', }, (msgSend))
+			for k, v in ipairs(actorsTable) do
+				if v.name == Module.CharLoaded then
+					v.name      = Module.CharLoaded
+					v.sequence  = -3
+					v.dps       = dps
+					v.dur       = dur
+					v.dmg       = dmgTotalBattle
+					v.crit      = critTotalBattle
+					v.critHeals = critHealsTotal
+					v.dot       = dotTotalBattle
+					v.avg       = avgDmg
+					break
 				end
 			end
 		end

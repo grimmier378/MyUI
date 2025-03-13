@@ -147,8 +147,8 @@ local function loadSettings()
 	end
 
 	-- check for new settings and add them to the settings file
-	newSetting = Module.Utils.CheckDefaultSettings(defaults, settings)
-	newSetting = Module.Utils.CheckRemovedSettings(defaults, settings) or newSetting
+	newSetting = Module.Utils.CheckDefaultSettings(defaults[Module.Name], settings[Module.Name])
+	newSetting = Module.Utils.CheckRemovedSettings(defaults[Module.Name], settings[Module.Name]) or newSetting
 
 	if settings[Module.Name][Module.CharLoaded] == nil then
 		settings[Module.Name][Module.CharLoaded] = {}

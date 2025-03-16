@@ -66,6 +66,7 @@ local defaults                                                          = {
     AlphaSort = false,
     MyGroupOnly = true,
     LockWindow = false,
+    ShowLeader = false,
 }
 
 local function loadTheme()
@@ -98,52 +99,11 @@ local function loadSettings()
         newSetting = true
     end
 
-    if settings[Module.DisplayName].LockWindow == nil then
-        settings[Module.DisplayName].LockWindow = false
-        newSetting = true
-    end
-
-    if settings[Module.DisplayName].AlphaSort == nil then
-        settings[Module.DisplayName].AlphaSort = false
-        newSetting = true
-    end
-
-    if settings[Module.DisplayName].Scale == nil then
-        settings[Module.DisplayName].Scale = 1
-        newSetting = true
-    end
-
-    if settings[Module.DisplayName].ShowTooltip == nil then
-        settings[Module.DisplayName].ShowTooltip = true
-        newSetting = true
-    end
-
-    if settings[Module.DisplayName].MaxRow == nil then
-        settings[Module.DisplayName].MaxRow = 1
-        newSetting = true
-    end
-
-    if settings[Module.DisplayName].LoadTheme == nil then
-        settings[Module.DisplayName].LoadTheme = 'Default'
-        newSetting = true
-    end
-
-    if settings[Module.DisplayName].MyGroupOnly == nil then
-        settings[Module.DisplayName].MyGroupOnly = true
-        newSetting = true
-    end
+    newSetting = Module.Utils.CheckDefaultSettings(defaults, settings[Module.DisplayName])
+    newSetting = Module.Utils.CheckRemovedSettings(defaults, settings[Module.DisplayName]) or newSetting
 
     if not loadedExeternally then
         loadTheme()
-    end
-
-    if settings[Module.LockWindow] == nil then
-
-    end
-
-    if settings[Module.DisplayName].AutoSize == nil then
-        settings[Module.DisplayName].AutoSize = TempSettings.aSize
-        newSetting = true
     end
 
     -- Set the settings to the variables
@@ -154,6 +114,7 @@ local function loadSettings()
     TempSettings.themeName   = settings[Module.DisplayName].LoadTheme
     TempSettings.MyGroupOnly = settings[Module.DisplayName].MyGroupOnly
     TempSettings.LockWindow  = settings[Module.DisplayName].LockWindow
+    TempSettings.ShowLeader  = settings[Module.DisplayName].ShowLeader
     if newSetting then mq.pickle(configFile, settings) end
 end
 
@@ -214,10 +175,16 @@ local function GenerateContent(who, sub, what)
 end
 
 local function sortedBoxes(boxes)
-    table.sort(boxes, function(a, b)
-        if a.GroupLeader == b.GroupLeader then return a.Name < b.Name end
-        return a.GroupLeader < b.GroupLeader
-    end)
+    if TempSettings.alphaSort then
+        table.sort(boxes, function(a, b)
+            if a.GroupLeader == b.GroupLeader then return a.Name < b.Name end
+            return a.GroupLeader < b.GroupLeader
+        end)
+    else
+        table.sort(boxes, function(a, b)
+            return a.GroupLeader < b.GroupLeader
+        end)
+    end
     return boxes
 end
 
@@ -363,7 +330,7 @@ local function MessageHandler()
                     })
             end
         end
-        if TempSettings.alphaSort then groupData = sortedBoxes(groupData) end
+        groupData = sortedBoxes(groupData)
         if check == 0 then CheckStale() end
     end)
 end
@@ -434,7 +401,7 @@ function Module.RenderGUI()
             winFlags = bit32.bor(ImGuiWindowFlags.None)
         end
         if TempSettings.LockWindow then
-            winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoResize, ImGuiWindowFlags.NoMove)
+            winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoMove)
         else
             winFlags = bit32.bor(winFlags)
         end
@@ -450,8 +417,13 @@ function Module.RenderGUI()
                 local itemWidth = 150 -- approximate width
                 local padding = 2     -- padding between items
                 local drawn = 0
+                local tmpLeader = nil
                 for i = 1, #groupData do
                     if groupData[i] ~= nil then
+                        if not tmpLeader then
+                            tmpLeader = groupData[i].GroupLeader
+                            if TempSettings.ShowLeader then imgui.SeparatorText("Leader: %s", tmpLeader) end
+                        end
                         if (groupData[i].GroupLeader == MyGroupLeader and TempSettings.MyGroupOnly) or not TempSettings.MyGroupOnly then
                             if expand[groupData[i].Name] == nil then expand[groupData[i].Name] = false end
                             if compact[groupData[i].Name] == nil then compact[groupData[i].Name] = false end
@@ -462,6 +434,10 @@ function Module.RenderGUI()
                                 currentX = imgui.GetCursorPosX()
                                 -- currentY = imgui.GetCursorPosY()
                                 ImGui.SetCursorPosY(currentY - 20)
+                                if tmpLeader ~= groupData[i].GroupLeader then
+                                    if TempSettings.ShowLeader then imgui.SeparatorText("Leader: %s", tmpLeader) end
+                                    tmpLeader = groupData[i].GroupLeader
+                                end
                             else
                                 if drawn > 0 then
                                     imgui.SameLine()
@@ -649,8 +625,13 @@ function Module.RenderGUI()
                     TempSettings.MyGroupOnly = not TempSettings.MyGroupOnly
                     needSave = true
                 end
-                local lbl = TempSettings.LockWindow and "Unlock Window##" or "Lock Window##"
-                if ImGui.MenuItem(lbl) then
+                local lblLeader = TempSettings.ShowLeader and "Hide Leader##HideLeader_" or "Show Leader##ShowLeader_"
+                if ImGui.MenuItem(lblLeader) then
+                    TempSettings.ShowLeader = not TempSettings.ShowLeader
+                    needSave = true
+                end
+                local lblLock = TempSettings.LockWindow and "Unlock Window##" or "Lock Window##"
+                if ImGui.MenuItem(lblLock) then
                     TempSettings.LockWindow = not TempSettings.LockWindow
                     needSave = true
                 end
@@ -765,6 +746,7 @@ function Module.RenderGUI()
             TempSettings.showTooltip = ImGui.Checkbox("Show Tooltip##", TempSettings.showTooltip)
             TempSettings.MyGroupOnly = ImGui.Checkbox("My Group Only##", TempSettings.MyGroupOnly)
             TempSettings.LockWindow = ImGui.Checkbox("Lock Window##", TempSettings.LockWindow)
+            TempSettings.ShowLeader = ImGui.Checkbox("Show Leader##", TempSettings.ShowLeader)
             if ImGui.Button("Save & Close") then
                 settings = dofile(configFile)
                 settings[Module.DisplayName].Scale = TempSettings.scale
@@ -773,6 +755,7 @@ function Module.RenderGUI()
                 settings[Module.DisplayName].ShowTooltip = TempSettings.showTooltip
                 settings[Module.DisplayName].MyGroupOnly = TempSettings.MyGroupOnly
                 settings[Module.DisplayName].LockWindow = TempSettings.LockWindow
+                settings[Module.DisplayName].ShowLeader = TempSettings.ShowLeader
                 mq.pickle(configFile, settings)
                 AAPartyConfigShow = false
             end
@@ -914,6 +897,7 @@ function Module.MainLoop()
             settings[Module.DisplayName].ShowTooltip = TempSettings.showTooltip
             settings[Module.DisplayName].MyGroupOnly = TempSettings.MyGroupOnly
             settings[Module.DisplayName].LockWindow = TempSettings.LockWindow
+            settings[Module.DisplayName].ShowLeader = TempSettings.ShowLeader
             mq.pickle(configFile, settings)
             needSave = false
         end

@@ -73,6 +73,7 @@ local raidSize           = mq.TLO.Raid.Members() or 0
 local raidLeader         = mq.TLO.Raid.Leader() or 'N/A'
 local tPlayerFlags       = bit32.bor(ImGuiTableFlags.NoBordersInBody, ImGuiTableFlags.NoPadInnerX, ImGuiTableFlags.NoPadOuterX, ImGuiTableFlags.Resizable,
     ImGuiTableFlags.SizingFixedFit)
+local lastRaidSort       = os.clock()
 
 local manaClass          = {
     [1] = 'WIZ',
@@ -108,23 +109,24 @@ defaults                 = {
         DynamicHP = false,
         DynamicMP = false,
         HideTitleBar = false,
-        showMoveStatus = true,
+        ShowMoveStatus = true,
         NavDist = 10,
     },
 }
 
 local function sortRaidByGroup()
-    raidKeys = {}
+    local tmpKeys = {}
     for grp = 1, 10 do
         for i = 1, raidSize do
             local member = mq.TLO.Raid.Member(i)
             if member ~= 'NULL' then
                 if member.Group() == grp then
-                    table.insert(raidKeys, { name = member.Name(), slot = i, })
+                    table.insert(tmpKeys, { name = member.Name(), slot = i, })
                 end
             end
         end
     end
+    raidKeys = tmpKeys
 end
 
 local function loadTheme()

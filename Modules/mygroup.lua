@@ -256,9 +256,9 @@ end
 
 local function DrawGroupMember(id)
     local member = mq.TLO.Group.Member(id)
-    local memberName = member.Name()
     local r, g, b, a = 1, 1, 1, 1
     if member == 'NULL' then return end
+    local memberName = member.Name()
 
     local hpPct
     local mpPct
@@ -286,7 +286,7 @@ local function DrawGroupMember(id)
         level = member.Level() or 0
         velo = member.Speed() or 0
     end
-
+    ImGui.PushID(memberName)
     ImGui.BeginGroup()
     local sizeX, sizeY = ImGui.GetContentRegionAvail()
     if ImGui.BeginTable("##playerInfo" .. tostring(id), 4, tPlayerFlags) then
@@ -486,7 +486,7 @@ local function DrawGroupMember(id)
         end
         ImGui.EndGroup()
     end
-
+    ImGui.PopID()
     ImGui.Separator()
 end
 

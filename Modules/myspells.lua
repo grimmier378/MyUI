@@ -947,7 +947,7 @@ function Module.MainLoop()
 		---@diagnostic disable-next-line: undefined-global
 		if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
 	end
-
+	if mq.TLO.EverQuest.GameState() ~= "INGAME" then mq.exit() end
 	mq.doevents()
 
 	if loadSet then LoadSet(setName) end

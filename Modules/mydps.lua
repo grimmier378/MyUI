@@ -24,7 +24,8 @@ else
 	Module.ThemeFile = MyUI_ThemeFile
 	Module.Theme = MyUI_Theme
 end
-
+Module.PetName = mq.TLO.Pet.DisplayName() or 'NoPet'
+Module.TempSettings = {}
 local ActorDPS = nil
 local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, Module.Name, Module.Server, Module.CharLoaded)
 local damTable, settings = {}, {}
@@ -59,6 +60,7 @@ local defaults = {
 		showCritHeals          = true,
 		showDS                 = true,
 		showHistory            = true,
+		addPet                 = true,
 		displayTime            = 10,
 		fontScale              = 1.0,
 		spamFontScale          = 1.0,
@@ -313,7 +315,8 @@ local function npcMeleeCallBack(line, dType, target, dmg)
 	workingTable = sortTable(damTable, 'combat')
 end
 
-local function nonMeleeClallBack(line, target, dmg)
+local function nonMeleeClallBack(line, target, dmg, who)
+	if who == nil then who = 'none' end
 	if not tonumber(dmg) then return end
 	if not enteredCombat then
 		enteredCombat   = true
@@ -327,7 +330,7 @@ local function nonMeleeClallBack(line, target, dmg)
 	end
 	local dmgType = "non-melee"
 	if target == nil then
-		target  = 'YOU'
+		target  = who == Module.PetName and Module.PetName or 'YOU'
 		dmgType = "hit-by-non-melee"
 	end
 
@@ -360,7 +363,7 @@ local function nonMeleeClallBack(line, target, dmg)
 	if damTable == nil then damTable = {} end
 	sequenceCounter = sequenceCounter + 1
 	table.insert(damTable, {
-		type      = dmgType,
+		type      = who == Module.PetName and Module.PetName .. " " .. dmgType or dmgType,
 		target    = target,
 		damage    = dmg,
 		timestamp = os.time(),
@@ -401,6 +404,51 @@ local function dotCallBack(line, target, dmg, spell_name)
 		type      = dmgType,
 		target    = target,
 		damage    = string.format("DOT [%s] <%d>", spell_name, dmg),
+		timestamp = os.time(),
+		sequence  = sequenceCounter,
+	})
+	tableSize = tableSize + 1
+	parseCurrentBattle(os.time() - battleStartTime)
+end
+
+local function petCallBack(line, dType, target, dmg)
+	local dmgType = dType or nil
+	if dmgType == nil then return end
+	if not enteredCombat then
+		enteredCombat   = true
+		dmgBattCounter  = 0
+		dmgTotalBattle  = 0
+		critTotalBattle = 0
+		dotTotalBattle  = 0
+		critHealsTotal  = 0
+		battleStartTime = os.time()
+		leftCombatTime  = 0
+	end
+	if dmg == nil then
+		dmg = 'MISSED'
+		dmgType = 'miss'
+	end
+
+	dmgTotal = dmgTotal + (tonumber(dmg) or 0)
+	dmgCounter = dmgCounter + 1
+	if enteredCombat then
+		dmgTotalBattle = dmgTotalBattle + (tonumber(dmg) or 0)
+		dmgBattCounter = dmgBattCounter + 1
+	end
+
+	if not settings.Options.showMyMisses and dmgType == 'miss' then
+		parseCurrentBattle(os.time() - battleStartTime)
+		return
+	end
+
+	if dmgType == 'miss' then target = Module.PetName end
+	if damTable == nil then damTable = {} end
+
+	sequenceCounter = sequenceCounter + 1
+	table.insert(damTable, {
+		type      = Module.PetName .. " " .. dmgType,
+		target    = target,
+		damage    = dmg,
 		timestamp = os.time(),
 		sequence  = sequenceCounter,
 	})
@@ -1532,6 +1580,11 @@ function Module.Unload()
 	mq.unevent("melee_got_hit")
 	mq.unevent("melee_missed_me")
 	mq.unevent("melee_crit_heal")
+	mq.unevent("melee_damage_dot")
+	if Module.TempSettings.petLoaded then
+		mq.unevent("melee_pet_damage")
+		mq.unevent("melee_pet_non_melee")
+	end
 	mq.unbind("/mydps")
 end
 
@@ -1546,6 +1599,15 @@ local function CheckArgs(args)
 		clickThrough = true
 		winFlags = bit32.bor(ImGuiWindowFlags.NoMouseInputs, ImGuiWindowFlags.NoDecoration)
 		Module.Utils.PrintOutput(tempSettings.OutputTab, nil, "\aw[\at%s\ax] \ayStarted\ax", Module.Name)
+	end
+end
+
+local function petEvent()
+	if Module.PetName ~= 'NoPet' then
+		local str = string.format("#*#%s #1# #2# for #3# points of damage#*#", Module.PetName)
+		mq.event("melee_pet_damage", str, petCallBack)
+		mq.event("melee_pet_non_melee", "#*##3# hit #1# for #2# points of non-melee damage#*#", nonMeleeClallBack)
+		Module.TempSettings.petLoaded = true
 	end
 end
 
@@ -1574,6 +1636,8 @@ local function Init()
 	mq.bind("/mydps", processCommand)
 	-- #*# has taken #1# damage from #*# by #*# -- dot dmg others
 	-- #*# has taken #1# damage from your #*# -- dot dmg you
+	-- Pet dmg
+	petEvent()
 	-- Register Actor Mailbox
 	if settings.Options.announceActors then RegisterActor() end
 
@@ -1658,6 +1722,16 @@ function Module.MainLoop()
 	-- else
 	-- 	actorsWorking = actorsTable
 	-- end
+	Module.PetName = mq.TLO.Pet.DisplayName() or 'NoPet'
+	if not Module.TempSettings.petLoaded and Module.PetName ~= 'NoPet' then
+		petEvent()
+	end
+
+	if Module.TempSettings.petLoaded and Module.PetName == 'NoPet' then
+		mq.unevent("melee_pet_damage")
+		mq.unevent("melee_pet_non_melee")
+		Module.TempSettings.petLoaded = false
+	end
 
 	mq.doevents()
 	-- mq.delay(5)

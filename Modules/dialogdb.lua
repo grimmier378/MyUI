@@ -52,6 +52,7 @@ local eCmd            = ""
 local newCmd          = ""
 local newDesc         = ""
 local CurrTarget      = mq.TLO.Target.DisplayName() or 'None'
+local CurrTarID       = mq.TLO.Target.ID() or 0
 local dialogDataOld   = mq.configDir .. '/npc_dialog.lua'
 local dialogConfigOld = mq.configDir .. '/DialogDB_Config.lua'
 local dialogData      = mq.configDir .. '/MyUI/DialogDB/npc_dialog.lua'
@@ -226,6 +227,7 @@ local function checkDialog()
 	hasDialog = false
 	if mq.TLO.Target() ~= nil then
 		CurrTarget = mq.TLO.Target.DisplayName()
+		CurrTarID = mq.TLO.Target.ID()
 		-- Module.Utils.Module.Utils.PrintOutput('MyUI',nil,"Server: %s  Zone: %s Target: %s",serverName,curZone,target)
 		if Dialog[Module.Server] == nil then
 			return hasDialog
@@ -801,7 +803,7 @@ local function DrawMainWin()
 								cmdGroup = cmdGroup .. " "
 							end
 							if not DEBUG then
-								mq.cmdf("/multiline ; %s/target %s; /timed 5, %s%s", cmdGroup, CurrTarget, cmdGroup, _G["cmdString"])
+								mq.cmdf("/multiline ; %s/target id %s; /timed 5, %s%s", cmdGroup, CurrTarID, cmdGroup, _G["cmdString"])
 							else
 								Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s/target %s; /timed 5, %s%s", cmdGroup, CurrTarget, cmdGroup, _G["cmdString"])
 							end
@@ -828,7 +830,7 @@ local function DrawMainWin()
 											pName = pName .. " "
 										end
 										if not DEBUG then
-											mq.cmdf("/multiline ; %s %s/target %s; %s %s/timed %s, %s", cmdChar, pName, CurrTarget, cmdChar, pName, cDelay, _G["cmdString"])
+											mq.cmdf("/multiline ; %s %s/target id %s; %s %s/timed %s, %s", cmdChar, pName, CurrTarID, cmdChar, pName, cDelay, _G["cmdString"])
 										else
 											Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s %s/target %s; %s %s/timed %s, %s", cmdChar, pName, CurrTarget, cmdChar, pName,
 												cDelay,
@@ -851,18 +853,18 @@ local function DrawMainWin()
 								cmdZone = cmdZone .. " "
 							end
 							if not DEBUG then
-								mq.cmdf("/multiline ; %s/target %s; /timed 5, %s%s", cmdZone, CurrTarget, cmdZone, _G["cmdString"])
+								mq.cmdf("/multiline ; %s/target id %s; /timed 5, %s%s", cmdZone, CurrTarID, cmdZone, _G["cmdString"])
 							else
-								Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s/target %s; /timed 5, %s%s", cmdZone, CurrTarget, cmdZone, _G["cmdString"])
+								Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s/target id %s; /timed 5, %s%s", cmdZone, CurrTarID, cmdZone, _G["cmdString"])
 							end
 							searchString = ""
 						end
 						ImGui.SameLine()
 						if ImGui.Button("Group Hail") then
 							if not DEBUG then
-								mq.cmdf("/dgz /multiline ; /target %s; /timed 5, /say hail", CurrTarget)
+								mq.cmdf("/dgz /multiline ; /target id %s; /timed 5, /say hail", CurrTarID)
 							else
-								Module.Utils.PrintOutput('MyUI', nil, "/dgz /multiline ; /target %s; /timed 5, /say hail", CurrTarget)
+								Module.Utils.PrintOutput('MyUI', nil, "/dgz /multiline ; /target id %s; /timed 5, /say hail", CurrTar)
 							end
 							searchString = ""
 						end

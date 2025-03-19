@@ -577,6 +577,9 @@ local function StartUp()
 	mq.imgui.init(MyUI_ScriptName, MyUI_Render)
 
 	for _, data in ipairs(MyUI_Settings.mods_list) do
+		if (data.name == 'MyGroup' or data.name == 'MyBuffs' or data.name == 'AAParty') and MyUI_Mode == 'client' then
+			data.enabled = true
+		end
 		if data.enabled then
 			table.insert(mods, data.name)
 			MyUI_NumModsEnabled = MyUI_NumModsEnabled + 1

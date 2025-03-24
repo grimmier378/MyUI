@@ -49,6 +49,7 @@ local battleStartTime, leftCombatTime = 0, 0
 local firstRun = true
 local themeName = "Default"
 local tempSettings = {}
+local MyLeader = 'None'
 local defaults = {
 	Options = {
 		sortNewest             = true,
@@ -230,6 +231,7 @@ local function parseCurrentBattle(dur)
 		if settings.Options.announceActors and ActorDPS ~= nil then
 			local msgSend = {
 				Name = Module.CharLoaded,
+				Leader = MyLeader,
 				Subject = 'CURRENT',
 				BattleNum = -2,
 				DPS = dps,
@@ -315,8 +317,7 @@ local function npcMeleeCallBack(line, dType, target, dmg)
 	workingTable = sortTable(damTable, 'combat')
 end
 
-local function nonMeleeClallBack(line, target, dmg, who)
-	if who == nil then who = 'none' end
+local function nonMeleeClallBack(line, target, dmg)
 	if not tonumber(dmg) then return end
 	if not enteredCombat then
 		enteredCombat   = true
@@ -330,7 +331,7 @@ local function nonMeleeClallBack(line, target, dmg, who)
 	end
 	local dmgType = "non-melee"
 	if target == nil then
-		target  = who == Module.PetName and Module.PetName or 'YOU'
+		target  = 'YOU'
 		dmgType = "hit-by-non-melee"
 	end
 
@@ -363,7 +364,64 @@ local function nonMeleeClallBack(line, target, dmg, who)
 	if damTable == nil then damTable = {} end
 	sequenceCounter = sequenceCounter + 1
 	table.insert(damTable, {
-		type      = who == Module.PetName and Module.PetName .. " " .. dmgType or dmgType,
+		type      = dmgType,
+		target    = target,
+		damage    = dmg,
+		timestamp = os.time(),
+		sequence  = sequenceCounter,
+	})
+	tableSize = tableSize + 1
+	parseCurrentBattle(os.time() - battleStartTime)
+end
+
+local function nonMeleePetClallBack(line, target, dmg)
+	if not tonumber(dmg) then return end
+	if not enteredCombat then
+		enteredCombat   = true
+		dmgBattCounter  = 0
+		critHealsTotal  = 0
+		critTotalBattle = 0
+		dotTotalBattle  = 0
+		dmgTotalBattle  = 0
+		battleStartTime = os.time()
+		leftCombatTime  = 0
+	end
+	local dmgType = "non-melee"
+	if target == nil then
+		target  = Module.PetName
+		dmgType = "hit-by-non-melee"
+	end
+
+	if string.find(line, "was hit") then
+		target  = string.sub(line, 1, string.find(line, "was") - 2)
+		dmgType = "dShield"
+	end
+
+	if dmgType ~= 'dShield' then
+		dmgTotal = dmgTotal + (tonumber(dmg) or 0)
+		dmgCounter = dmgCounter + 1
+		if enteredCombat then
+			dmgTotalBattle = dmgTotalBattle + (tonumber(dmg) or 0)
+			dmgBattCounter = dmgBattCounter + 1
+		end
+	else
+		dmgTotalDS = dmgTotalDS + (tonumber(dmg) or 0)
+		dsCounter = dsCounter + 1
+		if enteredCombat then
+			dmgTotalBattle = dmgTotalBattle + (tonumber(dmg) or 0)
+			dmgBattCounter = dmgBattCounter + 1
+		end
+	end
+
+	if not settings.Options.showDS and dmgType == 'dShield' then
+		parseCurrentBattle(os.time() - battleStartTime)
+		return
+	end
+
+	if damTable == nil then damTable = {} end
+	sequenceCounter = sequenceCounter + 1
+	table.insert(damTable, {
+		type      = Module.PetName .. " " .. dmgType,
 		target    = target,
 		damage    = dmg,
 		timestamp = os.time(),
@@ -1248,6 +1306,7 @@ local function pDPS(dur, rType)
 			local msgSend = {
 				Name = Module.CharLoaded,
 				Subject = 'Update',
+				Leader = MyLeader,
 				BattleNum = -3,
 				DPS = dps,
 				TimeSpan = dur,
@@ -1504,6 +1563,7 @@ local function RegisterActor()
 	ActorDPS = Module.Actor.register(Module.ActorMailBox, function(message)
 		local MemberEntry  = message()
 		local who          = MemberEntry.Name
+		local leader       = MemberEntry.Leader or 'None'
 		local timeSpan     = MemberEntry.TimeSpan or 0
 		local avgDmg       = MemberEntry.AvgDmg or 0
 		local dps          = MemberEntry.DPS or 0
@@ -1514,9 +1574,12 @@ local function RegisterActor()
 		local dotDmg       = MemberEntry.Dot or 0
 		local report       = MemberEntry.Report or ''
 		if who == Module.CharLoaded then return end
+		if MyLeader ~= 'None' and leader ~= MyLeader then return end
+
 		if #actorsTable == 0 then
 			table.insert(actorsTable, {
 				name = who,
+				leader = leader,
 				dps = dps,
 				avg = avgDmg,
 				dmg = totalDmg,
@@ -1534,6 +1597,7 @@ local function RegisterActor()
 						table.remove(actorsTable, i)
 					else
 						actorsTable[i].name      = who
+						actorsTable[i].leader    = leader
 						actorsTable[i].dps       = dps
 						actorsTable[i].avg       = avgDmg
 						actorsTable[i].dmg       = totalDmg
@@ -1550,6 +1614,7 @@ local function RegisterActor()
 			if not found then
 				table.insert(actorsTable, {
 					name = who,
+					leader = leader,
 					dps = dps,
 					avg = avgDmg,
 					dmg = totalDmg,
@@ -1606,7 +1671,8 @@ local function petEvent()
 	if Module.PetName ~= 'NoPet' then
 		local str = string.format("#*#%s #1# #2# for #3# points of damage#*#", Module.PetName)
 		mq.event("melee_pet_damage", str, petCallBack)
-		mq.event("melee_pet_non_melee", "#*##3# hit #1# for #2# points of non-melee damage#*#", nonMeleeClallBack)
+		str = string.format("#*#%s hit #1# for #2# points of non-melee damage#*#", Module.PetName)
+		mq.event("melee_pet_non_melee", str, nonMeleePetClallBack)
 		Module.TempSettings.petLoaded = true
 	end
 end
@@ -1731,6 +1797,14 @@ function Module.MainLoop()
 		mq.unevent("melee_pet_damage")
 		mq.unevent("melee_pet_non_melee")
 		Module.TempSettings.petLoaded = false
+	end
+
+	if mq.TLO.Raid.Members() > 0 then
+		MyLeader = mq.TLO.Raid.Leader.CleanName()
+	elseif mq.TLO.Group.Leader() ~= nil then
+		MyLeader = mq.TLO.Group.Leader.CleanName()
+	else
+		MyLeader = 'None'
 	end
 
 	mq.doevents()

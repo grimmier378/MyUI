@@ -8,13 +8,30 @@ function Module.loadAll(module_list)
 	local modules = {}
 	local count = 0
 	if #module_list >= 0 then
+		-- load mychat first to avoid spamming the main console on load
 		for _, module in ipairs(module_list) do
+			if module:lower() == 'mychat' then
+				local moduleName = mq.luaDir .. "/MyUI/modules/" .. module:lower() .. ".lua"
+				Module.checkExternal(module)
+				modules[module] = dofile(moduleName)
+				count = count + 1
+				MyUI_InitPctComplete = ((count / #module_list) * 100)
+				MyUI_CurLoading = "Loading Module: " .. module .. " .."
+				break
+			end
+		end
+		for _, module in ipairs(module_list) do
+			if module:lower() == 'mychat' then
+				-- skip it since we already loaded it
+				goto continue
+			end
 			local moduleName = mq.luaDir .. "/MyUI/modules/" .. module:lower() .. ".lua"
 			Module.checkExternal(module)
 			modules[module] = dofile(moduleName)
 			count = count + 1
 			MyUI_InitPctComplete = ((count / #module_list) * 100)
 			MyUI_CurLoading = "Loading Module: " .. module .. " .."
+			::continue::
 		end
 	else
 		MyUI_InitPctComplete = 100

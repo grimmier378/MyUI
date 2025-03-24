@@ -414,7 +414,7 @@ function Module.RenderGUI()
             if #groupData > 0 then
                 local windowWidth = imgui.GetWindowWidth() - 4
                 local currentX, currentY = imgui.GetCursorPosX(), imgui.GetCursorPosY()
-                local itemWidth = 150 -- approximate width
+                local itemWidth = 160 -- approximate width
                 local padding = 2     -- padding between items
                 local drawn = 0
                 local tmpLeader = nil
@@ -435,8 +435,8 @@ function Module.RenderGUI()
                                 -- currentY = imgui.GetCursorPosY()
                                 ImGui.SetCursorPosY(currentY - 20)
                                 if tmpLeader ~= groupData[i].GroupLeader then
-                                    if TempSettings.ShowLeader then imgui.SeparatorText("Leader: %s", tmpLeader) end
                                     tmpLeader = groupData[i].GroupLeader
+                                    if TempSettings.ShowLeader then imgui.SeparatorText("Leader: %s", tmpLeader) end
                                 end
                             else
                                 if drawn > 0 then
@@ -452,7 +452,7 @@ function Module.RenderGUI()
                             if compact[groupData[i].Name] then childY = 25 end
                             if compact[groupData[i].Name] and expand[groupData[i].Name] then childY = 53 + modY end
                             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 2, 2)
-                            imgui.BeginChild(groupData[i].Name, 145, childY, bit32.bor(ImGuiChildFlags.Border, ImGuiChildFlags.AutoResizeY), ImGuiWindowFlags.NoScrollbar)
+                            imgui.BeginChild(groupData[i].Name, 165, childY, bit32.bor(ImGuiChildFlags.Border, ImGuiChildFlags.AutoResizeY), ImGuiWindowFlags.NoScrollbar)
                             -- Start of grouped Whole Elements
                             ImGui.BeginGroup()
                             -- Start of subgrouped Elements for tooltip
@@ -463,7 +463,7 @@ function Module.RenderGUI()
 
                                 ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthFixed, 95)
                                 ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthFixed, iconSize)
-                                ImGui.TableSetupColumn("Pts", ImGuiTableColumnFlags.WidthFixed, 25)
+                                ImGui.TableSetupColumn("Pts", ImGuiTableColumnFlags.WidthFixed, 55)
                                 ImGui.TableNextRow()
                                 ImGui.TableNextColumn()
                                 imgui.Text(groupData[i].Name)

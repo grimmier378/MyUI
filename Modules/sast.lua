@@ -88,6 +88,12 @@ function Module.RenderGUI()
 					if ImGui.IsMouseReleased(0) then
 						if forcedOpen then forcedOpen = false end
 						showAdv = not showAdv
+					elseif ImGui.IsMouseReleased(1) then
+						if mq.TLO.Window("AdventureLeaderboardWnd").Open() then
+							mq.TLO.Window("AdventureLeaderboardWnd").DoClose()
+						else
+							mq.TLO.Window("AdventureStatsWnd/AdvStats_LeaderboardButton").LeftMouseUp()
+						end
 					end
 				end
 				ImGui.SameLine(220)
@@ -198,35 +204,55 @@ function Module.RenderGUI()
 						ImGui.TableNextColumn()
 						ImGui.Text(points)
 					end
-					if not needRefresh then
-						local totalSuc = mq.TLO.Window("AdventureStatsWnd/AdvStats_ThemeList").List(7, 3)() or 'Refresh Me'
-						local totalFail = mq.TLO.Window("AdventureStatsWnd/AdvStats_ThemeList").List(7, 4)() or 'Refresh Me'
-						local totalPoints = mq.TLO.Window("AdventureStatsWnd/AdvStats_ThemeList").List(7, 7)() or 'Refresh Me'
-						ImGui.TableNextColumn()
-						ImGui.Separator()
-						ImGui.TableNextColumn()
-						ImGui.Separator()
-						ImGui.TableNextColumn()
-						ImGui.Separator()
-						ImGui.TableNextColumn()
-						ImGui.Separator()
-						ImGui.TableNextColumn()
-						ImGui.Text("Totals:")
-						ImGui.TableNextColumn()
-						ImGui.Text(totalSuc)
-						ImGui.TableNextColumn()
-						ImGui.Text(totalFail)
-						ImGui.TableNextColumn()
-						ImGui.Text(totalPoints)
-					end
+					-- if not needRefresh then
+					-- 	local totalSuc = mq.TLO.Window("AdventureStatsWnd/AdvStats_ThemeList").List(7, 3)() or 'Refresh Me'
+					-- 	local totalFail = mq.TLO.Window("AdventureStatsWnd/AdvStats_ThemeList").List(7, 4)() or 'Refresh Me'
+					-- 	local totalPoints = mq.TLO.Window("AdventureStatsWnd/AdvStats_ThemeList").List(7, 7)() or 'Refresh Me'
+					-- 	ImGui.TableNextColumn()
+					-- 	ImGui.Separator()
+					-- 	ImGui.TableNextColumn()
+					-- 	ImGui.Separator()
+					-- 	ImGui.TableNextColumn()
+					-- 	ImGui.Separator()
+					-- 	ImGui.TableNextColumn()
+					-- 	ImGui.Separator()
+					-- 	ImGui.TableNextColumn()
+					-- 	ImGui.Text("Totals:")
+					-- 	ImGui.TableNextColumn()
+					-- 	ImGui.Text(totalSuc)
+					-- 	ImGui.TableNextColumn()
+					-- 	ImGui.Text(totalFail)
+					-- 	ImGui.TableNextColumn()
+					-- 	ImGui.Text(totalPoints)
+					-- end
 					ImGui.EndTable()
 				end
 				ImGui.SetCursorPosX((ImGui.GetWindowWidth() - ImGui.CalcTextSize('Points Available: ' .. ptsAvail) - 10) * 0.5)
 				ImGui.Text('Points Available: ')
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('teal'), ptsAvail)
-
 				ImGui.PopStyleColor(2)
+				ImGui.SetCursorPosX((ImGui.GetWindowWidth() - ImGui.CalcTextSize(Module.Icons.FA_BAR_CHART) + 5) * 0.5)
+
+				-- ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(0.000, 0.833, 0.751, 1.000)) -- teal
+				ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(1.000, 1.0, 0.0, 1.000)) -- yellow
+
+				-- ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(1.00, 0.454, 0.000, 1.000)) -- orange
+				ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
+				ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0, 0, 0, 0))
+				ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
+				if ImGui.SmallButton(Module.Icons.FA_BAR_CHART) then
+					if mq.TLO.Window("AdventureLeaderboardWnd").Open() then
+						mq.TLO.Window("AdventureLeaderboardWnd").DoClose()
+					else
+						mq.TLO.Window("AdventureStatsWnd/AdvStats_LeaderboardButton").LeftMouseUp()
+					end
+				end
+				ImGui.PopStyleColor(4)
+
+				if ImGui.IsItemHovered() then
+					ImGui.SetTooltip('Click to Toggle Leaderboard')
+				end
 			end
 		end
 

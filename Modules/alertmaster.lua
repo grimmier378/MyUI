@@ -25,10 +25,15 @@
 local LIP = require('lib.lip')
 local mq = require('mq')
 local ImGui = require('ImGui')
+local ZoneNames = require("defaults.ZoneNames")
+
 Module = {}
 Module.Name = 'AlertMaster'
 Module.Path = string.format("%s/%s/", mq.luaDir, Module.Name)
-
+if mq.TLO.EverQuest.GameState() ~= "INGAME" then
+	printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", Module.Name)
+	mq.exit()
+end
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 if not loadedExeternally then
@@ -41,6 +46,8 @@ if not loadedExeternally then
 	Module.ThemeFile   = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
 	Module.Theme       = require('defaults.themes')
 	Module.Path        = string.format("%s/%s/", mq.luaDir, Module.Name)
+	Module.Server      = mq.TLO.EverQuest.Server()
+	Module.Build       = mq.TLO.MacroQuest.BuildName()
 else
 	Module.Utils = MyUI_Utils
 	Module.CharLoaded = MyUI_CharLoaded
@@ -51,6 +58,8 @@ else
 	Module.ThemeFile = MyUI_ThemeFile
 	Module.Theme = MyUI_Theme
 	Module.Path = MyUI_Path
+	Module.Server = MyUI_Server
+	Module.Build = MyUI_Build
 end
 Module.SoundPath = string.format("%s/sounds/default/", Module.Path)
 
@@ -71,6 +80,7 @@ local groupCmd = '/dgae ' -- assumes DanNet, if EQBC found we switch to '/bcca /
 local angle = 0
 local CharConfig = 'Char_' .. mq.TLO.Me.DisplayName() .. '_Config'
 local CharCommands = 'Char_' .. mq.TLO.Me.DisplayName() .. '_Commands'
+local newConfigFile = string.format("%s/MyUI/AlertMaster/%s/%s.lua", mq.configDir, Module.Server, Module.CharLoaded)
 local defaultConfig = {
 	delay = 1,
 	remindNPC = 5,
@@ -114,6 +124,7 @@ local originalVolume = 50
 local playTime = 0
 local playing = false
 local currZone, lastZone
+local newSMFile = mq.configDir .. '/MyUI/MQ2SpawnMaster.ini'
 
 local DistColorRanges = {
 	orange = 600, -- distance the color changes from green to orange
@@ -250,6 +261,9 @@ Module.GUI_Alert = {
 		},
 	},
 }
+Module.Settings = {}
+Module.Settings[CharConfig] = {}
+Module.Settings[CharCommands] = {}
 ------- Sounds ----------
 local ffi = require("ffi")
 -- C code definitions
@@ -327,6 +341,7 @@ end
 
 local save_settings = function()
 	LIP.save(settings_path, settings)
+	mq.pickle(newConfigFile, Module.Settings)
 end
 
 local check_safe_zone = function()
@@ -361,72 +376,88 @@ local function import_spawnmaster(val)
 end
 
 local function set_settings()
-	useThemeName = settings[CharConfig]['theme'] or 'Default'
-	settings[CharConfig]['theme'] = useThemeName
-	ZoomLvl = settings[CharConfig]['ZoomLvl'] or 1.0
-	settings[CharConfig]['ZoomLvl'] = ZoomLvl
-	delay = settings[CharConfig]['delay']
-	remind = settings[CharConfig]['remind']
-	pcs = settings[CharConfig]['pcs']
-	spawns = settings[CharConfig]['spawns']
-	gms = settings[CharConfig]['gms']
-	announce = settings[CharConfig]['announce']
-	ignoreguild = settings[CharConfig]['ignoreguild']
-	radius = settings[CharConfig]['radius'] or radius
-	settings[CharConfig]['radius'] = radius
-	zradius = settings[CharConfig]['zradius'] or zradius
-	settings[CharConfig]['zradius'] = zradius
-	remindNPC = settings[CharConfig]['remindNPC'] or 5
-	settings[CharConfig]['remindNPC'] = remindNPC
-	doBeep = settings[CharConfig]['beep'] or false
-	settings[CharConfig]['beep'] = doBeep
-	DoDrawArrow = settings[CharConfig]['arrows'] or false
-	settings[CharConfig]['arrows'] = DoDrawArrow
-	Module.GUI_Main.Locked = settings[CharConfig]['locked'] or false
-	settings[CharConfig]['locked'] = Module.GUI_Main.Locked
-	doAlert = settings[CharConfig]['popup'] or false
-	settings[CharConfig]['popup'] = doAlert
-	showAggro = settings[CharConfig]['aggro'] or false
-	settings[CharConfig]['aggro'] = showAggro
-	DistColorRanges.orange = settings[CharConfig]['distmid'] or 600
-	settings[CharConfig]['distmid'] = DistColorRanges.orange
-	DistColorRanges.red = settings[CharConfig]['distfar'] or 1200
-	settings[CharConfig]['distfar'] = DistColorRanges.red
-	doSoundGM = settings[CharConfig]['doSoundGM'] or false
-	settings[CharConfig]['doSoundGM'] = doSoundGM
-	doSoundNPC = settings[CharConfig]['doSoundNPC'] or false
-	settings[CharConfig]['doSoundNPC'] = doSoundNPC
-	doSoundPC = settings[CharConfig]['doSoundPC'] or false
-	settings[CharConfig]['doSoundPC'] = doSoundPC
-	volGM = settings[CharConfig]['volGM'] or volGM
-	settings[CharConfig]['volGM'] = volGM
-	volNPC = settings[CharConfig]['volNPC'] or volNPC
-	settings[CharConfig]['volNPC'] = volNPC
-	volPC = settings[CharConfig]['volPC'] or volPC
-	settings[CharConfig]['volPC'] = volPC
-	soundGM = settings[CharConfig]['soundGM'] or soundGM
-	settings[CharConfig]['soundGM'] = soundGM
-	soundNPC = settings[CharConfig]['soundNPC'] or soundNPC
-	settings[CharConfig]['soundNPC'] = soundNPC
-	soundPC = settings[CharConfig]['soundPC'] or soundPC
-	settings[CharConfig]['soundPC'] = soundPC
-	soundPCEntered = settings[CharConfig]['soundPCEntered'] or soundPCEntered
-	settings[CharConfig]['soundPCEntered'] = soundPCEntered
-	soundPCLeft = settings[CharConfig]['soundPCLeft'] or soundPCLeft
-	settings[CharConfig]['soundPCLeft'] = soundPCLeft
-	volPCEntered = settings[CharConfig]['volPCEntered'] or volPCEntered
-	settings[CharConfig]['volPCEntered'] = volPCEntered
-	volPCLeft = settings[CharConfig]['volPCLeft'] or volPCLeft
-	settings[CharConfig]['volPCLeft'] = volPCLeft
+	useThemeName = Module.Settings[CharConfig]['theme'] or 'Default'
+	Module.Settings[CharConfig]['theme'] = useThemeName
+	ZoomLvl = Module.Settings[CharConfig]['ZoomLvl'] or 1.0
+	Module.Settings[CharConfig]['ZoomLvl'] = ZoomLvl
+	delay = Module.Settings[CharConfig]['delay']
+	remind = Module.Settings[CharConfig]['remind']
+	pcs = Module.Settings[CharConfig]['pcs']
+	spawns = Module.Settings[CharConfig]['spawns']
+	gms = Module.Settings[CharConfig]['gms']
+	announce = Module.Settings[CharConfig]['announce']
+	ignoreguild = Module.Settings[CharConfig]['ignoreguild']
+	radius = Module.Settings[CharConfig]['radius'] or radius
+	Module.Settings[CharConfig]['radius'] = radius
+	zradius = Module.Settings[CharConfig]['zradius'] or zradius
+	Module.Settings[CharConfig]['zradius'] = zradius
+	remindNPC = Module.Settings[CharConfig]['remindNPC'] or 5
+	Module.Settings[CharConfig]['remindNPC'] = remindNPC
+	doBeep = Module.Settings[CharConfig]['beep'] or false
+	Module.Settings[CharConfig]['beep'] = doBeep
+	DoDrawArrow = Module.Settings[CharConfig]['arrows'] or false
+	Module.Settings[CharConfig]['arrows'] = DoDrawArrow
+	Module.GUI_Main.Locked = Module.Settings[CharConfig]['locked'] or false
+	Module.Settings[CharConfig]['locked'] = Module.GUI_Main.Locked
+	doAlert = Module.Settings[CharConfig]['popup'] or false
+	Module.Settings[CharConfig]['popup'] = doAlert
+	showAggro = Module.Settings[CharConfig]['aggro'] or false
+	Module.Settings[CharConfig]['aggro'] = showAggro
+	DistColorRanges.orange = Module.Settings[CharConfig]['distmid'] or 600
+	Module.Settings[CharConfig]['distmid'] = DistColorRanges.orange
+	DistColorRanges.red = Module.Settings[CharConfig]['distfar'] or 1200
+	Module.Settings[CharConfig]['distfar'] = DistColorRanges.red
+	doSoundGM = Module.Settings[CharConfig]['doSoundGM'] or false
+	Module.Settings[CharConfig]['doSoundGM'] = doSoundGM
+	doSoundNPC = Module.Settings[CharConfig]['doSoundNPC'] or false
+	Module.Settings[CharConfig]['doSoundNPC'] = doSoundNPC
+	doSoundPC = Module.Settings[CharConfig]['doSoundPC'] or false
+	Module.Settings[CharConfig]['doSoundPC'] = doSoundPC
+	volGM = Module.Settings[CharConfig]['volGM'] or volGM
+	Module.Settings[CharConfig]['volGM'] = volGM
+	volNPC = Module.Settings[CharConfig]['volNPC'] or volNPC
+	Module.Settings[CharConfig]['volNPC'] = volNPC
+	volPC = Module.Settings[CharConfig]['volPC'] or volPC
+	Module.Settings[CharConfig]['volPC'] = volPC
+	soundGM = Module.Settings[CharConfig]['soundGM'] or soundGM
+	Module.Settings[CharConfig]['soundGM'] = soundGM
+	soundNPC = Module.Settings[CharConfig]['soundNPC'] or soundNPC
+	Module.Settings[CharConfig]['soundNPC'] = soundNPC
+	soundPC = Module.Settings[CharConfig]['soundPC'] or soundPC
+	Module.Settings[CharConfig]['soundPC'] = soundPC
+	soundPCEntered = Module.Settings[CharConfig]['soundPCEntered'] or soundPCEntered
+	Module.Settings[CharConfig]['soundPCEntered'] = soundPCEntered
+	soundPCLeft = Module.Settings[CharConfig]['soundPCLeft'] or soundPCLeft
+	Module.Settings[CharConfig]['soundPCLeft'] = soundPCLeft
+	volPCEntered = Module.Settings[CharConfig]['volPCEntered'] or volPCEntered
+	Module.Settings[CharConfig]['volPCEntered'] = volPCEntered
+	volPCLeft = Module.Settings[CharConfig]['volPCLeft'] or volPCLeft
+	Module.Settings[CharConfig]['volPCLeft'] = volPCLeft
 end
 
 local function load_settings()
+	local check = false
+	if Module.Utils.File.Exists(newConfigFile) then
+		local config = dofile(newConfigFile)
+		Module.Settings[CharCommands] = config[CharCommands] or {}
+		Module.Settings[CharConfig] = config[CharConfig] or {}
+		check = true
+	else
+		Module.Settings[CharCommands] = {}
+		Module.Settings[CharConfig] = defaultConfig
+	end
+
 	if Module.Utils.File.Exists(settings_path) then
 		settings = LIP.load(settings_path)
+		if not check then
+			Module.Settings[CharConfig] = settings[CharConfig] or defaultConfig
+			Module.Settings[CharCommands] = settings[CharCommands] or {}
+			settings[CharConfig] = nil
+			settings[CharCommands] = nil
+			save_settings()
+		end
 	else
 		settings = {
-			[CharConfig] = defaultConfig,
-			[CharCommands] = {},
 			Ignore = {},
 		}
 		save_settings()
@@ -438,11 +469,25 @@ local function load_settings()
 		end
 	end
 
-	if Module.Utils.File.Exists(smSettings) then
+	if Module.Utils.File.Exists(newSMFile) then
+		spawnsSpawnMaster = LIP.loadSM(newSMFile)
+		haveSM = true
+		importZone = true
+	elseif Module.Utils.File.Exists(smSettings) then
 		spawnsSpawnMaster = LIP.loadSM(smSettings)
 		haveSM = true
 		importZone = true
+		for section, data in pairs(spawnsSpawnMaster) do
+			local lwrSection = section:lower()
+			if ZoneNames[lwrSection] then
+				spawnsSpawnMaster[ZoneNames[lwrSection]] = data
+				spawnsSpawnMaster[section] = nil
+			end
+		end
+		LIP.save(newSMFile, spawnsSpawnMaster)
 	end
+	local exportFile = string.format("%s/MyUI/ExportSM.lua", mq.configDir)
+	mq.pickle(exportFile, spawnsSpawnMaster)
 
 	if Module.Utils.File.Exists(smImportList) then
 		importedZones = dofile(smImportList)
@@ -450,8 +495,8 @@ local function load_settings()
 
 	useThemeName = Module.Theme.LoadTheme
 	-- if this character doesn't have the sections in the ini, create them
-	if settings[CharConfig] == nil then settings[CharConfig] = defaultConfig end
-	if settings[CharCommands] == nil then settings[CharCommands] = {} end
+	if Module.Settings[CharConfig] == nil then Module.Settings[CharConfig] = defaultConfig end
+	if Module.Settings[CharCommands] == nil then Module.Settings[CharCommands] = {} end
 	if settings['SafeZones'] == nil then settings['SafeZones'] = {} end
 	set_settings()
 	save_settings()
@@ -730,8 +775,8 @@ local should_include_player = function(spawn)
 end
 
 local run_char_commands = function()
-	if settings[CharCommands] ~= nil then
-		for k, cmd in pairs(settings[CharCommands]) do
+	if Module.Settings[CharCommands] ~= nil then
+		for k, cmd in pairs(Module.Settings[CharCommands]) do
 			mq.cmdf(cmd)
 			Module.Utils.PrintOutput('AlertMaster', nil, string.format('Ran command: "%s"', cmd))
 		end
@@ -1057,7 +1102,7 @@ local function DrawToggles()
 	if ImGui.SmallButton(lockedIcon) then
 		--ImGuiWindowFlags.NoMove
 		Module.GUI_Main.Locked = not Module.GUI_Main.Locked
-		settings[CharConfig]['locked'] = Module.GUI_Main.Locked
+		Module.Settings[CharConfig]['locked'] = Module.GUI_Main.Locked
 		save_settings()
 	end
 	if ImGui.IsItemHovered() and showTooltips then
@@ -1157,14 +1202,14 @@ local function DrawToggles()
 	if DoDrawArrow then
 		ImGui.PushStyleColor(ImGuiCol.Button, Module.Colors.color('btn_green')) -- Green for enabled
 		if ImGui.SmallButton(Module.Icons.FA_ARROW_UP) then
-			DoDrawArrow, settings[CharConfig]['arrows'] = false, false
+			DoDrawArrow, Module.Settings[CharConfig]['arrows'] = false, false
 			save_settings()
 		end
 		ImGui.PopStyleColor(1)
 	else
 		ImGui.PushStyleColor(ImGuiCol.Button, Module.Colors.color('btn_red')) -- Red for disabled
 		if ImGui.SmallButton(Module.Icons.FA_ARROW_DOWN) then
-			DoDrawArrow, settings[CharConfig]['arrows'] = true, true
+			DoDrawArrow, Module.Settings[CharConfig]['arrows'] = true, true
 			save_settings()
 		end
 		ImGui.PopStyleColor(1)
@@ -1251,17 +1296,21 @@ local function DrawRuleRow(entry)
 	ImGui.TableNextColumn()
 	-- Mob Name
 	ImGui.Text('%s', entry.MobName)
-	if ImGui.IsItemHovered() and showTooltips then
-		ImGui.BeginTooltip()
-		ImGui.Text("%s\n\nRight-Click to Navigate\nCtrl+Right-Click Group Nav", entry.MobName)
-		ImGui.EndTooltip()
-	end
 	-- Right-click interaction uses the original spawnName
 	if ImGui.IsItemHovered() then
+		if showTooltips then
+			ImGui.BeginTooltip()
+			ImGui.Text("%s\n\nRight-Click to Navigate\nCtrl+Right-Click Group Nav", entry.MobName)
+			if Module.Build:lower() == 'emu' then
+				ImGui.Text("Shift+Left-Click to Target")
+			end
+			ImGui.EndTooltip()
+		end
 		if ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsMouseReleased(1) then
 			mq.cmdf("/noparse %s/docommand /timed ${Math.Rand[5,25]} /nav id %s", groupCmd, entry.MobID)
-		elseif
-			ImGui.IsMouseReleased(1) then
+		elseif ImGui.IsKeyDown(ImGuiMod.Shift) and ImGui.IsMouseReleased(0) and Module.Build:lower() == 'emu' then
+			mq.cmdf("/target id %s", entry.MobID)
+		elseif ImGui.IsMouseReleased(1) then
 			mq.cmdf('/nav id %s', entry.MobID)
 		end
 	end
@@ -1590,7 +1639,7 @@ local function Config_GUI()
 					if ImGui.Selectable(data.Name, isSelected) then
 						Module.Theme.LoadTheme = data.Name
 						useThemeName = Module.Theme.LoadTheme
-						settings[CharConfig]['theme'] = useThemeName
+						Module.Settings[CharConfig]['theme'] = useThemeName
 						save_settings()
 					end
 				end
@@ -1604,7 +1653,7 @@ local function Config_GUI()
 			end
 			if ZoomLvl ~= tmpZoom then
 				ZoomLvl = tmpZoom
-				settings[CharConfig]['ZoomLvl'] = ZoomLvl
+				Module.Settings[CharConfig]['ZoomLvl'] = ZoomLvl
 			end
 
 			if ImGui.Button('Reload Theme File') then
@@ -1641,14 +1690,14 @@ local function Config_GUI()
 				ImGui.TableSetupColumn('##ToggleCol1')
 				ImGui.TableSetupColumn('##ToggleCol2')
 				ImGui.TableNextRow()
-				for k, v in pairs(settings[CharConfig]) do
+				for k, v in pairs(Module.Settings[CharConfig]) do
 					ImGui.PushID(k)
 					if keys[k] == nil then keys[k] = v end
 					if type(v) == 'boolean' then
 						local pressed = false
 						keys[k], pressed = ImGui.Checkbox(k, keys[k])
 						if pressed then
-							settings[CharConfig][k] = keys[k]
+							Module.Settings[CharConfig][k] = keys[k]
 							set_settings()
 							save_settings()
 						end
@@ -1671,7 +1720,7 @@ local function Config_GUI()
 			tmpDoGM = ImGui.Checkbox('GM Alert##AlertMaster', tmpDoGM)
 			if tmpDoGM ~= doSoundGM then
 				doSoundGM = tmpDoGM
-				settings[CharConfig]['doSoundGM'] = doSoundGM
+				Module.Settings[CharConfig]['doSoundGM'] = doSoundGM
 				save_settings()
 			end
 			ImGui.SameLine()
@@ -1690,8 +1739,8 @@ local function Config_GUI()
 			if ImGui.Button("Test and Save##GMALERT") then
 				setVolume(volGM)
 				playSound(soundGM)
-				settings[CharConfig]['volGM'] = volGM
-				settings[CharConfig]['soundGM'] = soundGM
+				Module.Settings[CharConfig]['volGM'] = volGM
+				Module.Settings[CharConfig]['soundGM'] = soundGM
 				save_settings()
 			end
 			--- PC Alerts ---
@@ -1704,7 +1753,7 @@ local function Config_GUI()
 			tmpDoPC = ImGui.Checkbox('PC Alert##AlertMaster', tmpDoPC)
 			if tmpDoPC ~= doSoundPC then
 				doSoundPC = tmpDoPC
-				settings[CharConfig]['doSoundPC'] = doSoundPC
+				Module.Settings[CharConfig]['doSoundPC'] = doSoundPC
 				save_settings()
 			end
 			ImGui.SameLine()
@@ -1723,8 +1772,8 @@ local function Config_GUI()
 			if ImGui.Button("Test and Save##PCALERT") then
 				setVolume(volPC)
 				playSound(soundPC)
-				settings[CharConfig]['volPC'] = volPC
-				settings[CharConfig]['soundPC'] = soundPC
+				Module.Settings[CharConfig]['volPC'] = volPC
+				Module.Settings[CharConfig]['soundPC'] = soundPC
 				save_settings()
 			end
 			--- PC Announce ---
@@ -1740,7 +1789,7 @@ local function Config_GUI()
 			tmpDoPCEntered = ImGui.Checkbox('PC Entered##AlertMaster', tmpDoPCEntered)
 			if doSoundPCEntered ~= tmpDoPCEntered then
 				doSoundPCEntered = tmpDoPCEntered
-				settings[CharConfig]['doSoundPCEntered'] = doSoundPCEntered
+				Module.Settings[CharConfig]['doSoundPCEntered'] = doSoundPCEntered
 				save_settings()
 			end
 			ImGui.SameLine()
@@ -1759,14 +1808,14 @@ local function Config_GUI()
 			if ImGui.Button("Test and Save##PCENTEREDALERT") then
 				setVolume(volPCEntered)
 				playSound(soundPCEntered)
-				settings[CharConfig]['volPCEntered'] = volPCEntered
-				settings[CharConfig]['soundPCEntered'] = soundPCEntered
+				Module.Settings[CharConfig]['volPCEntered'] = volPCEntered
+				Module.Settings[CharConfig]['soundPCEntered'] = soundPCEntered
 				save_settings()
 			end
 			tmpDoPCLeft = ImGui.Checkbox('PC Left##AlertMaster', tmpDoPCLeft)
 			if doSoundPCLeft ~= tmpDoPCLeft then
 				doSoundPCLeft = tmpDoPCLeft
-				settings[CharConfig]['doSoundPCLeft'] = doSoundPCLeft
+				Module.Settings[CharConfig]['doSoundPCLeft'] = doSoundPCLeft
 				save_settings()
 			end
 			ImGui.SameLine()
@@ -1785,8 +1834,8 @@ local function Config_GUI()
 			if ImGui.Button("Test and Save##PCLEFTALERT") then
 				setVolume(volPCLeft)
 				playSound(soundPCLeft)
-				settings[CharConfig]['volPCLeft'] = volPCLeft
-				settings[CharConfig]['soundPCLeft'] = soundPCLeft
+				Module.Settings[CharConfig]['volPCLeft'] = volPCLeft
+				Module.Settings[CharConfig]['soundPCLeft'] = soundPCLeft
 				save_settings()
 			end
 
@@ -1801,7 +1850,7 @@ local function Config_GUI()
 			tmpDoNPC = ImGui.Checkbox('NPC Alert##AlertMaster', tmpDoNPC)
 			if doSoundNPC ~= tmpDoNPC then
 				doSoundNPC = tmpDoNPC
-				settings[CharConfig]['doSoundNPC'] = doSoundNPC
+				Module.Settings[CharConfig]['doSoundNPC'] = doSoundNPC
 				save_settings()
 			end
 			ImGui.SameLine()
@@ -1820,8 +1869,8 @@ local function Config_GUI()
 			if ImGui.Button("Test and Save##NPCALERT") then
 				setVolume(volNPC)
 				playSound(soundNPC)
-				settings[CharConfig]['volNPC'] = volNPC
-				settings[CharConfig]['soundNPC'] = soundNPC
+				Module.Settings[CharConfig]['volNPC'] = volNPC
+				Module.Settings[CharConfig]['soundNPC'] = soundNPC
 				save_settings()
 			end
 		end
@@ -1830,7 +1879,7 @@ local function Config_GUI()
 			if ImGui.BeginTable("CommandTable", 2, ImGuiTableFlags.Resizable) then
 				ImGui.TableSetupColumn("Command")
 				ImGui.TableSetupColumn("Text")
-				for key, command in pairs(settings[CharCommands]) do
+				for key, command in pairs(Module.Settings[CharCommands]) do
 					local tmpCmd = command
 					ImGui.TableNextRow()
 					ImGui.TableNextColumn()
@@ -1839,9 +1888,9 @@ local function Config_GUI()
 					tmpCmd = ImGui.InputText("##" .. key, tmpCmd)
 					if tmpCmd ~= command then
 						if tmpCmd == '' or tmpCmd == nil then
-							settings[CharCommands][key] = nil
+							Module.Settings[CharCommands][key] = nil
 						else
-							settings[CharCommands][key] = tmpCmd
+							Module.Settings[CharCommands][key] = tmpCmd
 						end
 						save_settings()
 					end
@@ -1852,8 +1901,8 @@ local function Config_GUI()
 
 		if ImGui.Button('Save & Close') then
 			openConfigGUI = false
-			settings[CharConfig]['theme'] = useThemeName
-			settings[CharConfig]['ZoomLvl'] = ZoomLvl
+			Module.Settings[CharConfig]['theme'] = useThemeName
+			Module.Settings[CharConfig]['ZoomLvl'] = ZoomLvl
 			save_settings()
 		end
 	end
@@ -1977,12 +2026,12 @@ local load_binds = function()
 		if cmd == 'doalert' then
 			if doAlert then
 				doAlert = false
-				settings[CharConfig]['popup'] = doAlert
+				Module.Settings[CharConfig]['popup'] = doAlert
 				save_settings()
 				Module.Utils.PrintOutput('AlertMaster', nil, '\ayAlert PopUp Disabled.')
 			else
 				doAlert = true
-				settings[CharConfig]['popup'] = doAlert
+				Module.Settings[CharConfig]['popup'] = doAlert
 				save_settings()
 				Module.Utils.PrintOutput('AlertMaster', nil, '\ayAlert PopUp Enabled.')
 			end
@@ -1991,12 +2040,12 @@ local load_binds = function()
 		if cmd == 'aggro' then
 			if showAggro then
 				showAggro = false
-				settings[CharConfig]['aggro'] = showAggro
+				Module.Settings[CharConfig]['aggro'] = showAggro
 				save_settings()
 				Module.Utils.PrintOutput('AlertMaster', nil, '\ayShow Aggro Disabled.')
 			else
 				showAggro = true
-				settings[CharConfig]['aggro'] = showAggro
+				Module.Settings[CharConfig]['aggro'] = showAggro
 				save_settings()
 				Module.Utils.PrintOutput('AlertMaster', nil, '\ayShow Aggro Enabled.')
 			end
@@ -2005,40 +2054,40 @@ local load_binds = function()
 		if cmd == 'beep' then
 			if doBeep then
 				doBeep = false
-				settings[CharConfig]['beep'] = doBeep
+				Module.Settings[CharConfig]['beep'] = doBeep
 				save_settings()
 				Module.Utils.PrintOutput('AlertMaster', nil, '\ayBeep Alerts Disabled.')
 			else
 				doBeep = true
-				settings[CharConfig]['beep'] = doBeep
+				Module.Settings[CharConfig]['beep'] = doBeep
 				save_settings()
 				Module.Utils.PrintOutput('AlertMaster', nil, '\ayBeep Alerts Enabled.')
 			end
 		end
 		-- radius
 		if cmd == 'radius' and val_num > 0 then
-			settings[CharConfig]['radius'] = val_num
+			Module.Settings[CharConfig]['radius'] = val_num
 			radius = val_num
 			save_settings()
 			Module.Utils.PrintOutput('AlertMaster', nil, '\ayUpdated radius = ' .. radius)
 		end
 		-- zradius
 		if cmd == 'zradius' and val_num > 0 then
-			settings[CharConfig]['zradius'] = val_num
+			Module.Settings[CharConfig]['zradius'] = val_num
 			zradius = val_num
 			save_settings()
 			Module.Utils.PrintOutput('AlertMaster', nil, '\ayUpdated zradius = ' .. zradius)
 		end
 		-- delay
 		if cmd == 'delay' and val_num > 0 then
-			settings[CharConfig]['delay'] = val_num
+			Module.Settings[CharConfig]['delay'] = val_num
 			delay = val_num
 			save_settings()
 			Module.Utils.PrintOutput('AlertMaster', nil, '\ayDelay interval = ' .. delay)
 		end
 		---- Volumes ----
 		if cmd == 'volnpc' and val_num > 0 then
-			settings[CharConfig]['volNPC'] = val_num
+			Module.Settings[CharConfig]['volNPC'] = val_num
 			volNPC = val_num
 			save_settings()
 			setVolume(volNPC)
@@ -2046,7 +2095,7 @@ local load_binds = function()
 			Module.Utils.PrintOutput('AlertMaster', nil, '\ayNPC Volume = ' .. volNPC)
 		end
 		if cmd == 'volpc' and val_num > 0 then
-			settings[CharConfig]['volPC'] = val_num
+			Module.Settings[CharConfig]['volPC'] = val_num
 			volPC = val_num
 			save_settings()
 			setVolume(volPC)
@@ -2054,7 +2103,7 @@ local load_binds = function()
 			Module.Utils.PrintOutput('AlertMaster', nil, '\ayPC Volume = ' .. volPC)
 		end
 		if cmd == 'volgm' and val_num > 0 then
-			settings[CharConfig]['volGM'] = val_num
+			Module.Settings[CharConfig]['volGM'] = val_num
 			volGM = val_num
 			save_settings()
 			setVolume(volGM)
@@ -2065,36 +2114,36 @@ local load_binds = function()
 		if cmd == 'dosound' and val_str ~= nil then
 			if val_str == 'npc' then
 				doSoundNPC = not doSoundNPC
-				settings[CharConfig]['doSoundNPC'] = doSoundNPC
+				Module.Settings[CharConfig]['doSoundNPC'] = doSoundNPC
 				Module.Utils.PrintOutput('AlertMaster', nil, '\aySetting doSoundNPC = ' .. tostring(doSoundNPC))
 			elseif val_str == 'pc' then
 				doSoundPC = not doSoundPC
-				settings[CharConfig]['doSoundPC'] = doSoundPC
+				Module.Settings[CharConfig]['doSoundPC'] = doSoundPC
 				Module.Utils.PrintOutput('AlertMaster', nil, '\aySetting doSoundPC = ' .. tostring(doSoundPC))
 			elseif val_str == 'gm' then
 				doSoundGM = not doSoundGM
-				settings[CharConfig]['doSoundGM'] = doSoundGM
+				Module.Settings[CharConfig]['doSoundGM'] = doSoundGM
 				Module.Utils.PrintOutput('AlertMaster', nil, '\aySetting doSoundGM = ' .. tostring(doSoundGM))
 			end
 			save_settings()
 		end
 		-- distfar Color Distance
 		if cmd == 'distfar' and val_num > 0 then
-			settings[CharConfig]['distfar'] = val_num
+			Module.Settings[CharConfig]['distfar'] = val_num
 			DistColorRanges.red = val_num
 			save_settings()
 			Module.Utils.PrintOutput('AlertMaster', nil, '\arFar Range\a-t Greater than:\a-r' .. DistColorRanges.red .. '\ax')
 		end
 		-- distmid Color Distance
 		if cmd == 'distmid' and val_num > 0 then
-			settings[CharConfig]['distmid'] = val_num
+			Module.Settings[CharConfig]['distmid'] = val_num
 			DistColorRanges.orange = val_num
 			save_settings()
 			Module.Utils.PrintOutput('AlertMaster', nil, '\aoMid Range\a-t Between: \a-g' .. DistColorRanges.orange .. ' \a-tand \a-r' .. DistColorRanges.red .. '\ax')
 		end
 		-- remind
 		if cmd == 'remind' and val_num >= 0 then
-			settings[CharConfig]['remind'] = val_num
+			Module.Settings[CharConfig]['remind'] = val_num
 			remind = val_num
 			save_settings()
 			Module.Utils.PrintOutput('AlertMaster', nil, '\ayRemind interval = ' .. remind)
@@ -2104,31 +2153,31 @@ local load_binds = function()
 			Module.Utils.PrintOutput('AlertMaster', nil, "\ayReloading Settings from File!")
 		end
 		if cmd == 'remindnpc' and val_num >= 0 then
-			settings[CharConfig]['remindNPC'] = val_num
+			Module.Settings[CharConfig]['remindNPC'] = val_num
 			remindNPC = val_num
 			save_settings()
 			Module.Utils.PrintOutput('AlertMaster', nil, '\ayRemind NPC interval = ' .. remindNPC .. 'minutes')
 		end
 		-- enabling/disabling spawn alerts
 		if cmd == 'spawns' and val_str == 'on' then
-			settings[CharConfig]['spawns'] = true
+			Module.Settings[CharConfig]['spawns'] = true
 			save_settings()
 			spawns = true
 			Module.Utils.PrintOutput('AlertMaster', nil, '\aySpawn alerting enabled.')
 		elseif cmd == 'spawns' and val_str == 'off' then
-			settings[CharConfig]['spawns'] = false
+			Module.Settings[CharConfig]['spawns'] = false
 			save_settings()
 			spawns = false
 			Module.Utils.PrintOutput('AlertMaster', nil, '\aySpawn alerting disabled.')
 		end
 		-- enabling/disabling pcs alerts
 		if cmd == 'pcs' and val_str == 'on' then
-			settings[CharConfig]['pcs'] = true
+			Module.Settings[CharConfig]['pcs'] = true
 			save_settings()
 			pcs = true
 			Module.Utils.PrintOutput('AlertMaster', nil, '\ayPC alerting enabled.')
 		elseif cmd == 'pcs' and val_str == 'off' then
-			settings[CharConfig]['pcs'] = false
+			Module.Settings[CharConfig]['pcs'] = false
 			save_settings()
 			pcs = false
 			Module.Utils.PrintOutput('AlertMaster', nil, '\ayPC alerting disabled.')
@@ -2220,33 +2269,33 @@ local load_binds = function()
 
 		-- adding/removing/listing commands
 		local cmdCount = 0
-		for k, v in pairs(settings[CharCommands]) do
+		for k, v in pairs(Module.Settings[CharCommands]) do
 			cmdCount = cmdCount + 1
 		end
 		if cmd == 'cmdadd' and val_str:len() > 0 then
 			-- if the section doesn't exist in ini yet, create a new table
-			if settings[CharCommands] == nil then settings[CharCommands] = {} end
+			if Module.Settings[CharCommands] == nil then Module.Settings[CharCommands] = {} end
 			-- if the section does exist in the ini, spin over entries and make sure we aren't duplicating
-			for k, v in pairs(settings[CharCommands]) do
-				if settings[CharCommands][k] == val_str then
+			for k, v in pairs(Module.Settings[CharCommands]) do
+				if Module.Settings[CharCommands][k] == val_str then
 					Module.Utils.PrintOutput('AlertMaster', nil, "\ayCommand \"" .. val_str .. "\" already exists.")
 					return
 				end
 				cmdCount = cmdCount + 1
 			end
 			-- if we made it this far, the command is new -- add it to the table and store to ini
-			settings[CharCommands]['Cmd' .. cmdCount + 1] = val_str
+			Module.Settings[CharCommands]['Cmd' .. cmdCount + 1] = val_str
 			save_settings()
 			Module.Utils.PrintOutput('AlertMaster', nil, '\ayAdded Command \"' .. val_str .. '\"')
 		elseif cmd == 'cmddel' and val_str:len() > 0 then
 			-- remove from the ini
-			for k, v in pairs(settings[CharCommands]) do
+			for k, v in pairs(Module.Settings[CharCommands]) do
 				if k:lower() == val_str:lower() then
-					settings[CharCommands][k] = nil
+					Module.Settings[CharCommands][k] = nil
 					break
 				end
-				if settings[CharCommands][k] == val_str then
-					settings[CharCommands][k] = nil
+				if Module.Settings[CharCommands][k] == val_str then
+					Module.Settings[CharCommands][k] = nil
 					break
 				end
 			end
@@ -2255,7 +2304,7 @@ local load_binds = function()
 		elseif cmd == 'cmdlist' then
 			if cmdCount > 0 then
 				Module.Utils.PrintOutput('AlertMaster', nil, '\ayCommands (\a-t' .. Module.CharLoaded .. '\ax): ')
-				for k, v in pairs(settings[CharCommands]) do
+				for k, v in pairs(Module.Settings[CharCommands]) do
 					Module.Utils.PrintOutput('AlertMaster', nil, '\t\a-t' .. k .. ' - ' .. v)
 				end
 			else
@@ -2299,24 +2348,24 @@ local load_binds = function()
 		-- Announce Alerts
 		if cmd == 'announce' and val_str == 'on' then
 			announce = true
-			settings[CharConfig]['announce'] = announce
+			Module.Settings[CharConfig]['announce'] = announce
 			save_settings()
 			Module.Utils.PrintOutput('AlertMaster', nil, '\ayNow announcing players entering/exiting the zone.')
 		elseif cmd == 'announce' and val_str == 'off' then
 			announce = false
-			settings[CharConfig]['announce'] = announce
+			Module.Settings[CharConfig]['announce'] = announce
 			save_settings()
 			Module.Utils.PrintOutput('AlertMaster', nil, '\ayNo longer announcing players entering/exiting the zone.')
 		end
 		-- GM Checks
 		if cmd == 'gm' and val_str == 'on' then
 			gms = true
-			settings[CharConfig]['gms'] = gms
+			Module.Settings[CharConfig]['gms'] = gms
 			save_settings()
 			Module.Utils.PrintOutput('AlertMaster', nil, '\ayGM Alerts enabled.')
 		elseif cmd == 'gm' and val_str == 'off' then
 			gms = false
-			settings[CharConfig]['gms'] = gms
+			Module.Settings[CharConfig]['gms'] = gms
 			save_settings()
 			Module.Utils.PrintOutput('AlertMaster', nil, '\ayGM Alerts disabled.')
 		end

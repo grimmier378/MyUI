@@ -86,6 +86,7 @@ local defaults                                            = {
 	toggleModKey3 = 'None',
 	toggleMouse = 'None',
 	INVENTORY_DELAY_SECONDS = 20,
+	highlightUseable = true,
 }
 local modKeys                                             = {
 	"None",
@@ -109,6 +110,13 @@ local function loadSettings()
 			Module.Theme = dofile(Module.ThemeFile)
 		end
 	end
+
+	for k, v in pairs(defaults) do
+		if settings[k] == nil then
+			settings[k] = v
+		end
+	end
+
 	if settings.toggleModKey == '' then settings.toggleModKey = 'None' end
 	if settings.toggleModKey2 == '' then settings.toggleModKey2 = 'None' end
 	if settings.toggleModKey3 == '' then settings.toggleModKey3 = 'None' end
@@ -681,6 +689,7 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 	-- Reset the cursor to start position, then fetch and draw the item icon
 	ImGui.SetCursorPos(cursor_x, cursor_y)
 	animItems:SetTextureCell(item.Icon() - EQ_ICON_OFFSET)
+	local canUse = (item.CanUse() and settings.HighlightUseable) or false
 	ImGui.DrawTextureAnimation(animItems, iconWidth, iconHeight)
 
 	-- Overlay the stack size text in the lower right corner
@@ -713,7 +722,13 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 		ImGui.PushStyleColor(ImGuiCol.ButtonHovered, 0, 0.3, 0, 0.2)
 		ImGui.PushStyleColor(ImGuiCol.ButtonActive, 0, 0.3, 0, 0.3)
 	end
+	if canUse then
+		ImGui.PushStyleColor(ImGuiCol.Button, 0, 0.8, 0.2, 0.2)
+	end
 	ImGui.Button(btn_label(item), iconWidth, iconHeight)
+	if canUse then
+		ImGui.PopStyleColor(1)
+	end
 	ImGui.PopStyleColor(3)
 	ImGui.PopID()
 
@@ -1094,6 +1109,14 @@ local function RenderTabs()
 				mq.cmd("/destroy")
 			end
 		end
+		local pressed
+		ImGui.SetNextItemWidth(100)
+		settings.HighlightUseable, pressed = ImGui.Checkbox("Highlight Useable", settings.HighlightUseable)
+		if pressed then
+			mq.pickle(configFile, settings)
+		end
+		ImGui.SameLine()
+		help_marker("Highlight items that are useable by your class.")
 
 		ImGui.Separator()
 		if ImGui.BeginChild("BagTabs") then

@@ -57,6 +57,9 @@ local default_list   = {
 	"ThemeZ",
 	"BigBag",
 	"XPTrack",
+	"MyStats",
+	"iTrack",
+	--"MyDots",
 }
 
 MyUI_DefaultConfig   = {
@@ -73,15 +76,18 @@ MyUI_DefaultConfig   = {
 		[6]  = { name = 'MySpells', enabled = false, },
 		[7]  = { name = 'PlayerTarg', enabled = false, },
 		[8]  = { name = 'SAST', enabled = false, },
-		[9]  = { name = 'SillySounds', enabled = false, },
+		[9]  = { name = 'SillySounds', enabled = false, }, -- Customized Cold's cartoonsounds
 		[10] = { name = 'MyDPS', enabled = false, },
 		[11] = { name = 'MyBuffs', enabled = false, },
 		[12] = { name = 'ChatRelay', enabled = false, },
 		[13] = { name = 'AAParty', enabled = false, },
 		[14] = { name = 'AlertMaster', enabled = false, },
 		[15] = { name = 'ThemeZ', enabled = false, },
-		[16] = { name = 'BigBag', enabled = false, },
-		[17] = { name = 'XPTrack', enabled = false, },
+		[16] = { name = 'BigBag', enabled = false, }, -- Customized Fork of Cold's Big Bag
+		[17] = { name = 'XPTrack', enabled = false, }, -- Customized Fork of Derple's XPTrack
+		[18] = { name = 'MyStats', enabled = false, },
+		[19] = { name = 'iTrack', enabled = false, },
+		--[20] = { name = 'MyDots', enabled = false, }, -- Customized Fork of Zathus' MyDots
 	},
 }
 MyUI_Settings        = {}
@@ -99,6 +105,12 @@ local function LoadTheme()
 		MyUI_Theme = require('defaults.themes')
 		mq.pickle(MyUI_ThemeFile, MyUI_Theme)
 	end
+end
+
+local function sortModules()
+	table.sort(MyUI_Settings.mods_list, function(a, b)
+		return a.name < b.name
+	end)
 end
 
 local function LoadSettings()
@@ -125,7 +137,7 @@ local function LoadSettings()
 			newSetting = true
 		end
 	end
-
+	sortModules()
 	LoadTheme()
 	MyUI_ThemeName = MyUI_Settings.ThemeName
 	if newSetting then
@@ -231,6 +243,7 @@ local function ProcessModuleChanges()
 				break
 			end
 		end
+		sortModules()
 		MyUI_TempSettings.ModuleChanged = false
 	end
 
@@ -245,6 +258,7 @@ local function ProcessModuleChanges()
 		end
 		if not found then
 			table.insert(MyUI_Settings.mods_list, { name = MyUI_TempSettings.AddModule, enabled = false, })
+			sortModules()
 			mq.pickle(MyUI_SettingsFile, MyUI_Settings)
 		end
 		MyUI_TempSettings.AddModule = ''
@@ -264,6 +278,7 @@ local function ProcessModuleChanges()
 					end
 				end
 				table.remove(MyUI_Settings.mods_list, idx)
+				sortModules()
 				mq.pickle(MyUI_SettingsFile, MyUI_Settings)
 				break
 			end

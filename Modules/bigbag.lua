@@ -744,12 +744,18 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 		ImGui.PushStyleColor(ImGuiCol.ButtonHovered, 0, 0.3, 0, 0.2)
 		ImGui.PushStyleColor(ImGuiCol.ButtonActive, 0, 0.3, 0, 0.3)
 	end
+	local toolTipSpell = ''
 	local colorChange = false
 	if canUse then
-		if item.Name():find("Spell:") then
-			local spellName = item.Name():gsub("Spell: ", "")
+		local isSpell = item.Name():find("Spell:")
+		local isSong = item.Name():find("Song:")
+		if isSpell or isSong then
+			local spellName = item.Name():gsub("Spell: ", ""):gsub("Song: ", "")
 			if not book[spellName] then
 				colorChange = true
+				toolTipSpell = mq.TLO.Spell(spellName).Level() > 0 and string.format("Lvl %s", mq.TLO.Spell(spellName).Level()) or ''
+			else
+				toolTipSpell = "Already Know"
 			end
 		else
 			colorChange = true
@@ -773,6 +779,11 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 		ImGui.Text("Item: ")
 		ImGui.SameLine()
 		ImGui.TextColored(Module.Colors.color('tangarine'), "%s", item.Name())
+		if toolTipSpell ~= '' then
+			ImGui.Text("Scroll: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('green'), "(%s)", toolTipSpell)
+		end
 		ImGui.Text("Type: ")
 		ImGui.SameLine()
 		ImGui.TextColored(Module.Colors.color('pink2'), "%s", item.Type())

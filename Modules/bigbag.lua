@@ -48,6 +48,7 @@ local clickies                                            = {}
 local augments                                            = {}
 local bank_items                                          = {}
 local bank_augments                                       = {}
+local book                                                = {}
 local display_tables                                      = {
 	augments = {},
 	items = {},
@@ -75,6 +76,8 @@ local MySelf                                              = mq.TLO.Me
 local MyClass                                             = MySelf.Class()
 local myCopper, mySilver, myGold, myPlat, myWeight, myStr = 0, 0, 0, 0, 0, 0
 local bankCopper, bankSilver, bankGold, bankPlat          = 0, 0, 0, 0
+local book_timer                                          = 0
+
 local defaults                                            = {
 	MIN_SLOTS_WARN = 3,
 	show_item_background = true,
@@ -420,6 +423,25 @@ local function create_inventory()
 						if slot.Item(j).AugType() > 0 then
 							table.insert(augments, slot.Item(j))
 						end
+
+						-- check spells and songs against our spellbook
+						local isSpell = slot.Item(j).Name():find("Spell:")
+						local isSong = slot.Item(j).Name():find("Song:")
+						local spellName = nil
+						if isSpell then
+							spellName = slot.Item(j).Name():gsub("Spell: ", "")
+						elseif isSong then
+							spellName = slot.Item(j).Name():gsub("Song: ", "")
+						end
+						if spellName ~= nil then
+							if not book[spellName] then
+								if mq.TLO.Me.Book(spellName)() then
+									book[spellName] = true
+								else
+									book[spellName] = false
+								end
+							end
+						end
 					end
 				end
 			elseif slot.ID() ~= nil then
@@ -722,11 +744,22 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 		ImGui.PushStyleColor(ImGuiCol.ButtonHovered, 0, 0.3, 0, 0.2)
 		ImGui.PushStyleColor(ImGuiCol.ButtonActive, 0, 0.3, 0, 0.3)
 	end
+	local colorChange = false
 	if canUse then
+		if item.Name():find("Spell:") then
+			local spellName = item.Name():gsub("Spell: ", "")
+			if not book[spellName] then
+				colorChange = true
+			end
+		else
+			colorChange = true
+		end
+	end
+	if colorChange then
 		ImGui.PushStyleColor(ImGuiCol.Button, 0, 0.8, 0.2, 0.2)
 	end
 	ImGui.Button(btn_label(item), iconWidth, iconHeight)
-	if canUse then
+	if colorChange then
 		ImGui.PopStyleColor(1)
 	end
 	ImGui.PopStyleColor(3)
@@ -1010,31 +1043,31 @@ local function renderBtn()
 	end
 
 	if showBtn then
+		local cursorX, cursorY = ImGui.GetCursorScreenPos()
 		if FreeSlots > MIN_SLOTS_WARN then
 			animMini:SetTextureCell(3635 - EQ_ICON_OFFSET)
 			ImGui.DrawTextureAnimation(animMini, 34, 34, true)
-			if ImGui.IsItemHovered() then
-				BigButtonTooltip()
-				if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
-					Module.ShowGUI = not Module.ShowGUI
-				end
-			end
 			ImGui.SetCursorPos(20, 20)
 			ImGui.Text("%s", FreeSlots)
 		else
 			animMini:SetTextureCell(3632 - EQ_ICON_OFFSET)
 			ImGui.DrawTextureAnimation(animMini, 34, 34, true)
-			if ImGui.IsItemHovered() then
-				BigButtonTooltip()
-				if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
-					Module.ShowGUI = not Module.ShowGUI
-				end
-			end
 			ImGui.SetCursorPos(20, 20)
 			ImGui.Text("%s", FreeSlots)
 		end
 
+		ImGui.SetCursorScreenPos(cursorX, cursorY)
+		ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
+		ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0, 0.5, 0.5, 0.5))
+		ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
+		if ImGui.Button("##BigBagsBtn", ImVec2(34, 34)) then
+			Module.ShowGUI = not Module.ShowGUI
+		end
+		ImGui.PopStyleColor(3)
 
+		if ImGui.IsItemHovered() then
+			BigButtonTooltip()
+		end
 
 		if toggleMouse ~= 'None' then
 			if ImGui.IsMouseReleased(ImGuiMouseButton[toggleMouse]) and not ImGui.IsKeyDown(ImGuiMod.Ctrl) then
@@ -1179,6 +1212,7 @@ local function init()
 	Module.IsRunning = true
 	loadSettings()
 	create_inventory()
+	-- get_book()
 	mq.bind("/bigbag", Module.CommandHandler)
 
 	if not loadedExeternally then
@@ -1224,6 +1258,7 @@ function Module.MainLoop()
 		UpdateCoin()
 		coin_timer = os.time()
 	end
+
 	myWeight = MySelf.CurrentWeight()
 	myStr = MySelf.STR()
 end

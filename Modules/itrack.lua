@@ -164,22 +164,32 @@ local colYellow = ImVec4(1, 1, 0, 1)
 
 local function renderBtn()
 	-- apply_style()
-	local winFlags = Module.Settings.lockWindow and bit32.bor(ImGuiWindowFlags.NoMove, buttonWinFlags) or buttonWinFlags
+	local winBtnFlags = Module.Settings.lockWindow and bit32.bor(ImGuiWindowFlags.NoMove, buttonWinFlags) or buttonWinFlags
 
-	local openBtn, showBtn = ImGui.Begin(string.format("Item Tracker##Mini"), true, winFlags)
+	local openBtn, showBtn = ImGui.Begin(string.format("Item Tracker##Mini"), true, winBtnFlags)
 	if not openBtn then
 		showBtn = false
 	end
 
 	if showBtn then
+		local cursorPosX, cursorPosY = ImGui.GetCursorScreenPos()
 		animMini:SetTextureCell(1147 - EQ_ICON_OFFSET)
 		ImGui.DrawTextureAnimation(animMini, 34, 34, true)
-		if ImGui.IsItemHovered() then
-			if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
-				Module.Settings.showUI = not Module.Settings.showUI
-				mq.pickle(configFile, Module.Settings)
-			end
+		ImGui.SetCursorScreenPos(cursorPosX, cursorPosY)
+		ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
+		ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0.5, 0.5, 0, 0.5))
+		ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
+		if ImGui.Button("##ItemTrackerBtn", ImVec2(34, 34)) then
+			Module.Settings.showUI = not Module.Settings.showUI
+			mq.pickle(configFile, Module.Settings)
 		end
+		ImGui.PopStyleColor(3)
+		-- if ImGui.IsItemHovered() then
+		-- 	if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
+		-- 		Module.Settings.showUI = not Module.Settings.showUI
+		-- 		mq.pickle(configFile, Module.Settings)
+		-- 	end
+		-- end
 	end
 	if ImGui.IsWindowHovered() then
 		ImGui.BeginTooltip()

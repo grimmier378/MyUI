@@ -430,10 +430,15 @@ function CommonUtils.DrawArrow(topPoint, width, height, color, angle)
 	draw_list:AddTriangleFilled(p1, p2, p3, ImGui.GetColorU32(color))
 end
 
-function CommonUtils.ColorDistance(distance)
+---comment
+---@param distance integer  the distance to check the color for
+---@param range_orange integer|nil  the distance the color changes from green to orange default (600)
+---@param range_red integer|nil  the distance the color changes from orange to red default (1200)
+---@return ImVec4 color returns the color as an ImVec4
+function CommonUtils.ColorDistance(distance, range_orange, range_red)
 	local DistColorRanges = {
-		orange = 600, -- distance the color changes from green to orange
-		red = 1200, -- distance the color changes from orange to red
+		orange = range_orange or 600, -- distance the color changes from green to orange
+		red = range_red or 1200, -- distance the color changes from orange to red
 	}
 	if distance < DistColorRanges.orange then
 		-- Green color for Close Range

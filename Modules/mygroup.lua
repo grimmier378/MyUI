@@ -18,7 +18,7 @@ if not loadedExeternally then
     Module.Utils       = require('lib.common')
     Module.Colors      = require('lib.colors')
     Module.Icons       = require('mq.ICONS')
-    Module.Actor       = require('lib.actors')
+    Module.Actor       = require('actors')
     Module.Mode        = 'driver'
     Module.CharLoaded  = mq.TLO.Me.DisplayName()
     Module.Server      = mq.TLO.MacroQuest.Server()
@@ -111,6 +111,7 @@ defaults                 = {
         HideTitleBar = false,
         ShowMoveStatus = true,
         NavDist = 10,
+        ShowLevel = true,
     },
 }
 
@@ -288,12 +289,15 @@ local function DrawGroupMember(id)
     end
     ImGui.PushID(memberName)
     ImGui.BeginGroup()
+    local colCount = settings[Module.Name].ShowLevel and 4 or 3
     local sizeX, sizeY = ImGui.GetContentRegionAvail()
-    if ImGui.BeginTable("##playerInfo" .. tostring(id), 4, tPlayerFlags) then
+    if ImGui.BeginTable("##playerInfo" .. tostring(id), colCount, tPlayerFlags) then
         ImGui.TableSetupColumn("##tName", ImGuiTableColumnFlags.NoResize, (sizeX * .5))
         ImGui.TableSetupColumn("##tVis", ImGuiTableColumnFlags.NoResize, 16)
         ImGui.TableSetupColumn("##tIcons", ImGuiTableColumnFlags.WidthStretch) --*.25)
-        ImGui.TableSetupColumn("##tLvl", ImGuiTableColumnFlags.NoResize, 30)
+        if settings[Module.Name].ShowLevel then
+            ImGui.TableSetupColumn("##tLvl", ImGuiTableColumnFlags.NoResize, 30)
+        end
         ImGui.TableNextRow()
         -- Name
         ImGui.TableNextColumn()
@@ -376,31 +380,33 @@ local function DrawGroupMember(id)
         ImGui.PopStyleVar()
         ImGui.EndGroup()
         ImGui.Unindent(2)
-        -- Lvl
-        ImGui.TableNextColumn()
-        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 2, 0)
-        -- if groupData[memberName] == nil then
-        --     groupData[memberName] = {
-        --         Name = memberName or 'Unknown',
-        --         Level = member.Level() or 0,
-        --         Class = member.Class.ShortName() or 'Unknown',
-        --         CurHP = member.CurrentHPs() or 0,
-        --         MaxHP = member.MaxHPs() or 100,
-        --         CurMana = member.CurrentMana() or 0,
-        --         MaxMana = member.MaxMana() or 100,
-        --         CurEnd = member.CurrentEndurance() or 0,
-        --         MaxEnd = member.MaxEndurance() or 0,
-        --         Sitting = member.Sitting() or false,
-        --         Zone = member.Present() and mq.TLO.Zone.Name() or 'Unknown',
-        --     }
-        -- end
+        if settings[Module.Name].ShowLevel then
+            -- Lvl
+            ImGui.TableNextColumn()
+            ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 2, 0)
+            -- if groupData[memberName] == nil then
+            --     groupData[memberName] = {
+            --         Name = memberName or 'Unknown',
+            --         Level = member.Level() or 0,
+            --         Class = member.Class.ShortName() or 'Unknown',
+            --         CurHP = member.CurrentHPs() or 0,
+            --         MaxHP = member.MaxHPs() or 100,
+            --         CurMana = member.CurrentMana() or 0,
+            --         MaxMana = member.MaxMana() or 100,
+            --         CurEnd = member.CurrentEndurance() or 0,
+            --         MaxEnd = member.MaxEndurance() or 0,
+            --         Sitting = member.Sitting() or false,
+            --         Zone = member.Present() and mq.TLO.Zone.Name() or 'Unknown',
+            --     }
+            -- end
 
-        if sitting then
-            ImGui.TextColored(0.911, 0.351, 0.008, 1, "%d", level or 0)
-        else
-            ImGui.Text("%s", level or 0)
+            if sitting then
+                ImGui.TextColored(0.911, 0.351, 0.008, 1, "%d", level or 0)
+            else
+                ImGui.Text("%s", level or 0)
+            end
+            ImGui.PopStyleVar()
         end
-        ImGui.PopStyleVar()
         ImGui.EndTable()
     end
 
@@ -761,6 +767,7 @@ local function DrawRaidMember(id)
     end
     ImGui.EndChild()
 end
+
 local function DrawSelf()
     local mySelf = mq.TLO.Me
     local memberName = mySelf.Name()
@@ -769,11 +776,14 @@ local function DrawSelf()
 
     local sizeX, sizeY = ImGui.GetContentRegionAvail()
     ImGui.BeginGroup()
-    if ImGui.BeginTable("##playerInfoSelf", 4, tPlayerFlags) then
+    local colCount = settings[Module.Name].ShowLevel and 4 or 3
+    if ImGui.BeginTable("##playerInfoSelf", colCount, tPlayerFlags) then
         ImGui.TableSetupColumn("##tName", ImGuiTableColumnFlags.NoResize, (sizeX * .5))
         ImGui.TableSetupColumn("##tVis", ImGuiTableColumnFlags.NoResize, 16)
         ImGui.TableSetupColumn("##tIcons", ImGuiTableColumnFlags.WidthStretch) --ImGui.GetContentRegionAvail()*.25)
-        ImGui.TableSetupColumn("##tLvl", ImGuiTableColumnFlags.NoResize, 30)
+        if colCount == 4 then
+            ImGui.TableSetupColumn("##tLvl", ImGuiTableColumnFlags.NoResize, 30)
+        end
         ImGui.TableNextRow()
         -- Name
         ImGui.TableNextColumn()
@@ -813,19 +823,21 @@ local function DrawSelf()
         end
         ImGui.PopStyleVar()
         -- Lvl
-        ImGui.TableNextColumn()
-        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 2, 0)
-        if mySelf.Sitting() then
-            ImGui.TextColored(0.911, 0.351, 0.008, 1, "%d", mySelf.Level() or 0)
-        else
-            ImGui.Text("%s", mySelf.Level() or 0)
+        if colCount == 4 then
+            ImGui.TableNextColumn()
+            ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 2, 0)
+            if mySelf.Sitting() then
+                ImGui.TextColored(0.911, 0.351, 0.008, 1, "%d", mySelf.Level() or 0)
+            else
+                ImGui.Text("%s", mySelf.Level() or 0)
+            end
+            if ImGui.IsItemHovered() then
+                ImGui.BeginTooltip()
+                GetInfoToolTip(0, false)
+                ImGui.EndTooltip()
+            end
+            ImGui.PopStyleVar()
         end
-        if ImGui.IsItemHovered() then
-            ImGui.BeginTooltip()
-            GetInfoToolTip(0, false)
-            ImGui.EndTooltip()
-        end
-        ImGui.PopStyleVar()
         ImGui.EndTable()
     end
 
@@ -951,7 +963,7 @@ function Module.RenderGUI()
         -- Default window size
         ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
         local openGUI, showMain = ImGui.Begin("My Group##MyGroup" .. mq.TLO.Me.DisplayName(), true, flags)
-        if not openGUI then Module.IsRunning = false end
+
         if showMain then
             mouseHover = ImGui.IsWindowHovered(ImGuiHoveredFlags.ChildWindows)
             if ImGui.BeginMenuBar() then
@@ -1091,7 +1103,7 @@ function Module.RenderGUI()
         -- Default window size
         ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
         local openGUI, showMain = ImGui.Begin("My Raid##MyGroup" .. mq.TLO.Me.DisplayName(), true, flags)
-        if not openGUI then Module.IsRunning = false end
+
         if showMain then
             mouseHover = ImGui.IsWindowHovered(ImGuiHoveredFlags.ChildWindows)
             if ImGui.BeginMenuBar() then
@@ -1321,13 +1333,17 @@ function Module.RenderGUI()
             settings[Module.Name].ShowDummy = ImGui.Checkbox('Show Dummy##' .. Module.Name, settings[Module.Name].ShowDummy)
             ImGui.SameLine()
             settings[Module.Name].ShowRoleIcons = ImGui.Checkbox('Show Role Icons##' .. Module.Name, settings[Module.Name].ShowRoleIcons)
+
             settings[Module.Name].DynamicHP = ImGui.Checkbox('Dynamic HP##' .. Module.Name, settings[Module.Name].DynamicHP)
+            ImGui.SameLine()
             settings[Module.Name].DynamicMP = ImGui.Checkbox('Dynamic MP##' .. Module.Name, settings[Module.Name].DynamicMP)
+
             hideTitle = ImGui.Checkbox('Hide Title Bar##' .. Module.Name, hideTitle)
             ImGui.SameLine()
             showSelf = ImGui.Checkbox('Show Self##' .. Module.Name, showSelf)
             showRaidWindow = ImGui.Checkbox('Show Raid##' .. Module.Name, showRaidWindow)
             ImGui.SameLine()
+            settings[Module.Name].ShowLevel = ImGui.Checkbox('Show Level##' .. Module.Name, settings[Module.Name].ShowLevel)
             showMoveStatus = ImGui.Checkbox('Show Move Status##' .. Module.Name, showMoveStatus)
             local tmpDist
             if tmpDist == nil then tmpDist = navDist end
@@ -1528,8 +1544,17 @@ end
 
 local function CommandHandler(...)
     local args = { ..., }
-
-    if args[1] == 'ui' or args[1] == 'gui' or args[1] == 'show' then
+    if #args == 2 then
+        if args[1] == 'show' and args[2] == 'group' then
+            showGroupWindow = true
+        elseif args[1] == 'show' and args[2] == 'raid' then
+            showRaidWindow = true
+        elseif args[1] == 'hide' and args[2] == 'group' then
+            showGroupWindow = false
+        elseif args[1] == 'hide' and args[2] == 'raid' then
+            showRaidWindow = false
+        end
+    elseif args[1] == 'ui' or args[1] == 'gui' or args[1] == 'show' then
         showGroupWindow = not showGroupWindow
     end
 end

@@ -88,7 +88,14 @@ local function RegisterActors()
 		local items = received_message.Items or {}
 		local tracking = received_message.Tracking or {}
 		local remItem = received_message.Remove or nil
+		local switch = received_message.Switch or nil
 
+		if switch then
+			if switch == myName then
+				mq.cmd("/foreground")
+			end
+			return
+		end
 		-- if we were told to remove an item do so.
 		if remItem ~= nil then
 			printf("\ayRemoving\ax Item:\at %s", remItem)
@@ -275,6 +282,9 @@ local function renderMain()
 						ImGui.TableNextRow()
 						ImGui.TableSetColumnIndex(0)
 						ImGui.Text(char)
+						if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
+							actor:send({ mailbox = mailboxName, }, { Sender = myName, Switch = char, })
+						end
 						ImGui.TableSetColumnIndex(1)
 						ImGui.TextColored(colInv, tostring(data.inventory or 0))
 						ImGui.TableSetColumnIndex(2)

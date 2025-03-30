@@ -71,6 +71,7 @@ local Module            = {}
 local loadedExeternally = MyUI_ScriptName ~= nil
 Module.Name             = "MyDots"
 Module.IsRunning        = false
+Module.TempSettings     = {}
 
 if loadedExeternally then
     Module.Utils = MyUI_Utils
@@ -91,6 +92,7 @@ local defaultSettings = {
     autoSize = true,
     hideTitlebar = false,
     lockWindows = false,
+    timerLowThreshold = LOW_TIME_THRESHOLD,
 }
 
 local function saveSettings()
@@ -219,6 +221,7 @@ local function update_multi_target_dots()
                             time = timer_str,
                             raw_seconds = math.floor(effect_timer / 1000),
                             startTime = dotStartTime,
+                            type = "dot",
                         })
 
                         if not firstTargetID then
@@ -243,13 +246,19 @@ local function update_multi_target_dots()
 end
 
 -- Draw status icon (Single Target)
-local function DrawStatusIcon(iconID, type, txt)
+local function DrawStatusIcon(iconID, type, txt, timer)
     animSpell:SetTextureCell(iconID or 0)
     animItem:SetTextureCell(iconID or 3996)
     if type == 'item' then
         ImGui.DrawTextureAnimation(animItem, iconSize, iconSize)
     else
         ImGui.DrawTextureAnimation(animSpell, iconSize, iconSize)
+        if ImGui.IsItemHovered() and txt ~= nil then
+            ImGui.SetTooltip("%s %s", txt or '', timer or '')
+            if ImGui.IsMouseReleased(0) then
+                mq.cmdf("/cast \"%s\"", txt)
+            end
+        end
     end
 end
 
@@ -277,111 +286,214 @@ local function draw_health_bar(targetHP)
 end
 
 -- Horizontal layout rendering for Single Target
-local function renderHorizontalIcons(items)
+local function renderHorizontalIcons(items, compactMode)
     if #items == 0 then
         ImGui.Text("No Effects")
         return
     end
 
-    local windowWidth = ImGui.GetContentRegionAvail()
-    local posX = ImGui.GetCursorPosX()
-    local startX = posX
-    local posY = ImGui.GetCursorPosY()
-    local maxWidth = 0
-    local lineHeight = iconSize + spacing
+    local maxX, maxY = ImGui.GetContentRegionAvail()
+    local maxRow = math.floor(maxX / (iconSize + 2))
+    local counter = 0
 
     for i, item in ipairs(items) do
         ImGui.PushID(item.name .. i)
-        ImGui.SetCursorPos(posX, posY)
-
-        DrawStatusIcon(item.icon, 'spell', item.name)
-
-        local textWidth = settings.compactMode and ImGui.CalcTextSize(item.time) or ImGui.CalcTextSize(item.name .. " - " .. item.time)
-        local itemWidth = iconSize + textWidth + spacing * 2
-
-        if i > 1 and (posX + itemWidth > windowWidth) then
-            posX = startX
-            posY = posY + lineHeight
-            ImGui.SetCursorPos(posX, posY)
-            DrawStatusIcon(item.icon, 'spell', item.name)
-        end
-
-        ImGui.SameLine()
-        local isDoT = (item.type == "dot")
-        if isDoT and item.raw_seconds < LOW_TIME_THRESHOLD then
-            if settings.compactMode then
-                ImGui.TextColored(1, 0.5, 0, 1, string.format("%s [!]", item.time))
-            else
-                ImGui.TextColored(1, 0.5, 0, 1, string.format("%s - %s [!]", item.name, item.time))
-            end
-        else
-            if isDoT then
-                if settings.compactMode then
-                    ImGui.TextColored(1, 0, 0, 1, item.time)
-                else
-                    ImGui.TextColored(1, 0, 0, 1, string.format("%s - %s", item.name, item.time))
-                end
-            else
-                if settings.compactMode then
-                    ImGui.TextColored(0, 1, 0, 1, item.time)
-                else
-                    ImGui.TextColored(0, 1, 0, 1, string.format("%s - %s", item.name, item.time))
-                end
-            end
-        end
-
-        if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-            mq.cmdf("/cast \"%s\"", item.name)
-        end
+        DrawStatusIcon(item.icon, 'spell', item.name, item.time)
+        counter = counter + 1
 
         ImGui.PopID()
-        posX = posX + itemWidth
-        maxWidth = math.max(maxWidth, posX - startX)
-    end
 
-    ImGui.SetCursorPosY(posY + lineHeight)
+        if counter >= maxRow then
+            ImGui.NewLine()
+            counter = 0
+        else
+            ImGui.SameLine(0, spacing)
+        end
+    end
 end
 
 -- Vertical layout rendering for Single Target
-local function renderVerticalItems(items)
+local function renderVerticalItems(items, compactMode)
     if #items == 0 then
         ImGui.Text("No Effects")
         return
     end
+    if not compactMode then
+        if ImGui.BeginTable("Debuffs", 3) then
+            ImGui.TableSetupColumn("Icon", ImGuiTableColumnFlags.WidthFixed, iconSize)
+            ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch, 100)
+            ImGui.TableSetupColumn("Time", ImGuiTableColumnFlags.WidthFixed, 80)
+            ImGui.TableNextRow()
 
-    for _, item in ipairs(items) do
-        ImGui.PushID(item.name)
-        DrawStatusIcon(item.icon, 'spell', item.name)
-        ImGui.SameLine()
+            for _, item in ipairs(items) do
+                local isDoT = (item.type == "dot")
+                local isBuff = (item.type == "buff")
+                ImGui.TableNextColumn()
+                -- icon
+                ImGui.PushID(item.name)
+                DrawStatusIcon(item.icon, 'spell', item.name, item.time)
 
-        local isDoT = (item.type == "dot")
-        if isDoT and item.raw_seconds < LOW_TIME_THRESHOLD then
-            if settings.compactMode then
-                ImGui.TextColored(1, 0.5, 0, 1, string.format("%s [!]", item.time))
-            else
-                ImGui.TextColored(1, 0.5, 0, 1, string.format("%s - %s [!]", item.name, item.time))
-            end
-        else
-            if isDoT then
-                if settings.compactMode then
-                    ImGui.TextColored(1, 0, 0, 1, item.time)
+                ImGui.TableNextColumn()
+
+                --Name
+                if isBuff and not (item.raw_seconds < settings.timerLowThreshold) then
+                    ImGui.TextColored(0, 1, 0, 1, item.name)
+                elseif isBuff and (item.raw_seconds < settings.timerLowThreshold) then
+                    ImGui.TextColored(0, 1, 1, 1, item.name)
+                elseif isDoT and (item.raw_seconds < settings.timerLowThreshold) then
+                    ImGui.TextColored(1, 0.5, 0, 1, item.name)
                 else
-                    ImGui.TextColored(1, 0, 0, 1, string.format("%s - %s", item.name, item.time))
+                    ImGui.Text(item.name)
                 end
-            else
-                if settings.compactMode then
-                    ImGui.TextColored(0, 1, 0, 1, item.time)
+                if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
+                    mq.cmdf("/cast \"%s\"", item.name)
+                end
+
+                ImGui.TableNextColumn()
+
+                --Timer
+                if isBuff and (item.raw_seconds < settings.timerLowThreshold) then
+                    ImGui.TextColored(0, 1, 1, 1, item.time)
+                elseif isDoT and (item.raw_seconds < settings.timerLowThreshold) then
+                    ImGui.TextColored(1, 0, 0, 1, "%s", item.time)
                 else
-                    ImGui.TextColored(0, 1, 0, 1, string.format("%s - %s", item.name, item.time))
+                    ImGui.Text("%s", item.time)
+                end
+                ImGui.PopID()
+                if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
+                    mq.cmdf("/cast \"%s\"", item.name)
                 end
             end
+            ImGui.EndTable()
+        end
+    else
+        if ImGui.BeginTable("Debuffs", 2) then
+            ImGui.TableSetupColumn("Icon", ImGuiTableColumnFlags.WidthFixed, iconSize)
+            ImGui.TableSetupColumn("Time", ImGuiTableColumnFlags.WidthStretch, 20)
+            ImGui.TableNextRow()
+
+            for _, item in ipairs(items) do
+                local isDoT = (item.type == "dot")
+                local isBuff = (item.type == "buff")
+                ImGui.TableNextColumn()
+                -- icon
+                ImGui.PushID(item.name)
+                DrawStatusIcon(item.icon, 'spell', item.name, item.time)
+
+                ImGui.TableNextColumn()
+
+                --Timer
+                if isDoT and item.raw_seconds < settings.timerLowThreshold then
+                    ImGui.TextColored(1, 1, 1, 1, "%s", item.time)
+                else
+                    ImGui.Text("%s", item.time)
+                end
+                ImGui.PopID()
+                if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
+                    mq.cmdf("/cast \"%s\"", item.name)
+                end
+            end
+            ImGui.EndTable()
+        end
+    end
+end
+
+local function renderMenu()
+    local activated = false
+    local lbl = ""
+
+    if ImGui.BeginMenu("Windows") then
+        lbl = settings.lockWindows and string.format("%s Unlock Windows", icons.FA_UNLOCK) or string.format("%s Lock Windows", icons.FA_LOCK)
+        _, settings.lockWindows = ImGui.MenuItem(lbl, nil, settings.lockWindows)
+        if _ then
+            activated = true
         end
 
-        ImGui.PopID()
-
-        if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-            mq.cmdf("/cast \"%s\"", item.name)
+        lbl = "Hide Title Bar"
+        _, settings.hideTitlebar = ImGui.MenuItem(lbl, nil, settings.hideTitlebar)
+        if _ then
+            activated = true
         end
+
+        lbl = "Show MenuBar"
+        _, settings.showControls = ImGui.MenuItem(lbl, nil, settings.showControls)
+        if _ then
+            activated = true
+        end
+
+        lbl = "Enable AutoSize"
+        _, settings.autoSize = ImGui.MenuItem(lbl, nil, settings.autoSize)
+        if _ then
+            activated = true
+        end
+
+        ImGui.SeparatorText('Window Toggles')
+
+        lbl = "Open Main Window"
+        _, settings.openGUI = ImGui.MenuItem(lbl, nil, settings.openGUI)
+        if _ then
+            activated = true
+        end
+
+        lbl = "Open Multi-Target UI"
+        _, settings.openMultiTargetUI = ImGui.MenuItem(lbl, nil, settings.openMultiTargetUI)
+        if _ then
+            activated = true
+        end
+
+        ImGui.EndMenu()
+    end
+
+    if ImGui.BeginMenu("Settings") then
+        lbl = "Horizontal Layout"
+        _, settings.horizontalLayout = ImGui.MenuItem(lbl, nil, settings.horizontalLayout)
+        if _ then
+            activated = true
+        end
+
+        lbl = "Enable Single Compact"
+        _, settings.compactMode = ImGui.MenuItem(lbl, nil, settings.compactMode)
+        if _ then
+            activated = true
+        end
+
+        lbl = "Enable Multi Compact"
+        _, settings.multiTargetCompactMode = ImGui.MenuItem(lbl, nil, settings.multiTargetCompactMode)
+        if _ then
+            activated = true
+        end
+
+        ImGui.SeparatorText('Timers')
+
+        lbl = "Low Timer (seconds)"
+        if Module.TempSettings.timerLowThreshold == nil then
+            Module.TempSettings.timerLowThreshold = settings.timerLowThreshold
+        end
+        ImGui.SetNextItemWidth(110)
+        Module.TempSettings.timerLowThreshold = ImGui.InputInt(lbl, Module.TempSettings.timerLowThreshold, 1, 1)
+        if Module.TempSettings.timerLowThreshold ~= settings.timerLowThreshold then
+            settings.timerLowThreshold = Module.TempSettings.timerLowThreshold
+            activated = true
+        end
+
+        ImGui.SeparatorText('Target Info')
+
+        lbl = "Show Target Info"
+        _, settings.showTargetInfo = ImGui.MenuItem(lbl, nil, settings.showTargetInfo)
+        if _ then
+            activated = true
+        end
+
+        lbl = "Show Health Bar"
+        _, settings.showHealthBar = ImGui.MenuItem(lbl, nil, settings.showHealthBar)
+        if _ then
+            activated = true
+        end
+
+        ImGui.EndMenu()
+    end
+    if activated then
+        needSave = true
     end
 end
 
@@ -394,8 +506,8 @@ local function renderSingleTargetUI()
 
     if shouldDraw then
         if ImGui.BeginPopupContextWindow("##MyDotsContextMenuMain") then
-            if ImGui.MenuItem("Show Controls") then
-                settings.showControls = true
+            if ImGui.MenuItem(settings.showControls and "Hide Menu" or "Show Menu") then
+                settings.showControls = not settings.showControls
                 needSave = true
             end
             if ImGui.MenuItem(settings.lockWindows and "Unlock Windows" or "Lock Windows") then
@@ -405,84 +517,7 @@ local function renderSingleTargetUI()
             ImGui.EndPopup()
         end
         if ImGui.BeginMenuBar() then
-            if ImGui.SmallButton(settings.lockWindows and icons.FA_LOCK or icons.FA_UNLOCK) then
-                settings.lockWindows = not settings.lockWindows
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.lockWindows and "Unlock Windows" or "Lock Windows")
-            end
-
-
-            if ImGui.SmallButton(settings.hideTitlebar and icons.FA_EYE or icons.FA_EYE_SLASH) then
-                settings.hideTitlebar = not settings.hideTitlebar
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.hideTitlebar and "Show Title Bar" or "Hide Title Bar")
-            end
-
-
-            local lbl = settings.showControls and icons.FA_TOGGLE_ON or icons.FA_TOGGLE_OFF
-            if ImGui.SmallButton(lbl) then
-                settings.showControls = not settings.showControls
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.showControls and "Hide UI Controls" or "Show UI Controls")
-            end
-
-
-            lbl = settings.autoSize and icons.FA_EXPAND or icons.FA_COMPRESS
-            if ImGui.SmallButton(lbl .. "##Asize") then
-                settings.autoSize = not settings.autoSize
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.autoSize and "Disable AutoSize" or "Enable AutoSize")
-            end
-
-            if ImGui.SmallButton(settings.compactMode and icons.MD_UNFOLD_MORE or icons.MD_UNFOLD_LESS) then
-                settings.compactMode = not settings.compactMode
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.compactMode and "Disable Compact" or "Enable Compact")
-            end
-
-            if ImGui.SmallButton(settings.horizontalLayout and icons.MD_ARROW_DOWNWARD or icons.FA_ARROW_RIGHT) then
-                settings.horizontalLayout = not settings.horizontalLayout
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.horizontalLayout and "Vertical Layout" or "Horizontal Layout")
-            end
-
-            lbl = settings.showHealthBar and icons.FA_TOGGLE_ON or icons.FA_TOGGLE_OFF
-            if ImGui.SmallButton(lbl .. "##HealthBar") then
-                settings.showHealthBar = not settings.showHealthBar
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.showHealthBar and "Hide Health Bar" or "Show Health Bar")
-            end
-
-            if ImGui.SmallButton(settings.showTargetInfo and icons.MD_INFO_OUTLINE or icons.FA_INFO_CIRCLE) then
-                settings.showTargetInfo = not settings.showTargetInfo
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.showTargetInfo and "Hide Target Info" or "Show Target Info")
-            end
-
-            if ImGui.SmallButton(settings.openMultiTargetUI and icons.FA_WINDOW_CLOSE_O or icons.MD_OPEN_IN_NEW) then
-                settings.openMultiTargetUI = not settings.openMultiTargetUI
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.openMultiTargetUI and "Hide Multi Window" or "Show Multi Window")
-            end
-
+            renderMenu()
 
             ImGui.EndMenuBar()
         end
@@ -514,8 +549,6 @@ local function renderSingleTargetUI()
             draw_health_bar(targetHP)
         end
 
-
-
         if settings.showControls then
             ImGui.Text(settings.compactMode and "(Icons + Time Only)" or "(Icons + Names + Time)")
             ImGui.SameLine()
@@ -536,9 +569,9 @@ local function renderSingleTargetUI()
 
         if mq.TLO.Target() then
             if settings.horizontalLayout then
-                renderHorizontalIcons(all_effects)
+                renderHorizontalIcons(all_effects, settings.compactMode)
             else
-                renderVerticalItems(all_effects)
+                renderVerticalItems(all_effects, settings.compactMode)
             end
         else
             ImGui.Text("No target selected. Use targeting to see effects.")
@@ -603,40 +636,74 @@ local function renderMultiTargetDots()
             draw_health_bar(targetData.currentHP)
         end
 
-        for _, dot in ipairs(targetData.dots) do
-            local dotText = settings.multiTargetCompactMode and dot.time or (dot.name .. " - " .. dot.time)
-            local itemWidth = iconSize + ImGui.CalcTextSize(dotText) + spacing * 2
-
-            if currentLineWidth + itemWidth > windowWidth then
-                ImGui.NewLine()
-                currentLineWidth = 0
-            end
-
-            DrawStatusIcon(dot.icon)
-            ImGui.SameLine()
-
-            if dot.raw_seconds <= LOW_TIME_THRESHOLD then
-                if settings.multiTargetCompactMode then
-                    ImGui.TextColored(1, 0, 0, 1, string.format("%s [!]", dot.time))
-                else
-                    ImGui.TextColored(1, 0, 0, 1, string.format("%s - %s [!]", dot.name, dot.time))
-                end
-            else
-                if settings.multiTargetCompactMode then
-                    ImGui.Text(dot.time)
-                else
-                    ImGui.Text(string.format("%s - %s", dot.name, dot.time))
-                end
-            end
-
-            if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-                mq.cmdf("/cast \"%s\"", dot.name)
-            end
-
-            currentLineWidth = currentLineWidth + itemWidth
-            ImGui.SameLine(0, spacing)
+        if settings.horizontalLayout then
+            renderHorizontalIcons(targetData.dots, settings.multiTargetCompactMode)
+        else
+            renderVerticalItems(targetData.dots, settings.multiTargetCompactMode)
         end
+        -- if settings.multiTargetCompactMode then
+        --     if ImGui.BeginTable("DoTsTable", 2) then
+        --         ImGui.TableSetupColumn("Icon", ImGuiTableColumnFlags.WidthFixed, iconSize)
+        --         ImGui.TableSetupColumn("Time", ImGuiTableColumnFlags.WidthStretch, 20)
+        --         ImGui.TableNextRow()
 
+        --         for _, dot in ipairs(targetData.dots) do
+        --             ImGui.TableNextColumn()
+
+        --             DrawStatusIcon(dot.icon, 'spell', dot.name, dot.time)
+
+        --             ImGui.TableNextColumn()
+
+        --             if dot.raw_seconds <= settings.timerLowThreshold then
+        --                 ImGui.TextColored(1, 0, 0, 1, "%s", dot.time)
+        --             else
+        --                 ImGui.Text("%s", dot.time)
+        --             end
+
+        --             if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
+        --                 mq.cmdf("/cast \"%s\"", dot.name)
+        --             end
+        --         end
+        --         ImGui.EndTable()
+        --     end
+        -- else
+        --     if ImGui.BeginTable("DoTsTable", 3) then
+        --         ImGui.TableSetupColumn("Icon", ImGuiTableColumnFlags.WidthFixed, iconSize)
+        --         ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch, 100)
+        --         ImGui.TableSetupColumn("Time", ImGuiTableColumnFlags.WidthFixed, 100)
+        --         ImGui.TableNextRow()
+
+        --         for _, dot in ipairs(targetData.dots) do
+        --             ImGui.TableNextColumn()
+
+        --             DrawStatusIcon(dot.icon, 'spell', dot.name, dot.time)
+
+        --             ImGui.TableNextColumn()
+
+        --             if dot.raw_seconds <= settings.timerLowThreshold then
+        --                 ImGui.TextColored(1, 0.5, 0, 1, dot.name)
+        --             else
+        --                 ImGui.Text(dot.name)
+        --             end
+        --             if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
+        --                 mq.cmdf("/cast \"%s\"", dot.name)
+        --             end
+
+        --             ImGui.TableNextColumn()
+
+        --             if dot.raw_seconds <= settings.timerLowThreshold then
+        --                 ImGui.TextColored(1, 0, 0, 1, "%s", dot.time)
+        --             else
+        --                 ImGui.Text("%s", dot.time)
+        --             end
+
+        --             if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
+        --                 mq.cmdf("/cast \"%s\"", dot.name)
+        --             end
+        --         end
+        --         ImGui.EndTable()
+        --     end
+        -- end
         ImGui.PopID()
         ImGui.Separator()
         currentLineWidth = 0
@@ -651,8 +718,8 @@ local function renderMultiTargetUI()
 
     if shouldDraw then
         if ImGui.BeginPopupContextWindow("##MyDotsContextMenu") then
-            if ImGui.MenuItem("Show Controls") then
-                settings.showControls = true
+            if ImGui.MenuItem(settings.showControls and "Hide Menu" or "Show Menu") then
+                settings.showControls = not settings.showControls
                 needSave = true
             end
             if ImGui.MenuItem(settings.lockWindows and "Unlock Windows" or "Lock Windows") then
@@ -662,85 +729,9 @@ local function renderMultiTargetUI()
             ImGui.EndPopup()
         end
         if ImGui.BeginMenuBar() then
-            if ImGui.SmallButton(settings.lockWindows and icons.FA_LOCK or icons.FA_UNLOCK) then
-                settings.lockWindows = not settings.lockWindows
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.lockWindows and "Unlock Windows" or "Lock Windows")
-            end
-
-
-            if ImGui.SmallButton(settings.hideTitlebar and icons.FA_EYE or icons.FA_EYE_SLASH) then
-                settings.hideTitlebar = not settings.hideTitlebar
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.hideTitlebar and "Show Title Bar" or "Hide Title Bar")
-            end
-
-
-            local lbl = settings.showControls and icons.FA_TOGGLE_ON or icons.FA_TOGGLE_OFF
-            if ImGui.SmallButton(lbl) then
-                settings.showControls = not settings.showControls
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.showControls and "Hide UI Controls" or "Show UI Controls")
-            end
-
-
-            lbl = settings.autoSize and icons.FA_EXPAND or icons.FA_COMPRESS
-            if ImGui.SmallButton(lbl .. "##Asize") then
-                settings.autoSize = not settings.autoSize
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.autoSize and "Disable AutoSize" or "Enable AutoSize")
-            end
-
-            if ImGui.SmallButton(settings.compactMode and icons.MD_UNFOLD_MORE or icons.MD_UNFOLD_LESS) then
-                settings.compactMode = not settings.compactMode
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.compactMode and "Disable Compact" or "Enable Compact")
-            end
-
-            if ImGui.SmallButton(settings.horizontalLayout and icons.MD_ARROW_DOWNWARD or icons.FA_ARROW_RIGHT) then
-                settings.horizontalLayout = not settings.horizontalLayout
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.horizontalLayout and "Vertical Layout" or "Horizontal Layout")
-            end
-
-            lbl = settings.showHealthBar and icons.FA_TOGGLE_ON or icons.FA_TOGGLE_OFF
-            if ImGui.SmallButton(lbl .. "##HealthBar") then
-                settings.showHealthBar = not settings.showHealthBar
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.showHealthBar and "Hide Health Bar" or "Show Health Bar")
-            end
-
-            if ImGui.SmallButton(settings.showTargetInfo and icons.MD_INFO_OUTLINE or icons.FA_INFO_CIRCLE) then
-                settings.showTargetInfo = not settings.showTargetInfo
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.showTargetInfo and "Hide Target Info" or "Show Target Info")
-            end
-
-            lbl = settings.openGUI and icons.FA_WINDOW_CLOSE_O or icons.MD_OPEN_IN_NEW
-            if ImGui.SmallButton(lbl) then
-                settings.openGUI = not settings.openGUI
-                needSave = true
-            end
-            if ImGui.IsItemHovered() then
-                ImGui.SetTooltip(settings.openGUI and "Close Main Window" or " Open Main Window")
-            end
-
+            ImGui.PushID("MultiTargetMenuBar")
+            renderMenu()
+            ImGui.PopID()
             ImGui.EndMenuBar()
         end
 

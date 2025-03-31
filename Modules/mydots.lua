@@ -150,8 +150,9 @@ end
 -- Function to update target effects (Single Target)
 local function update_target_effects()
     local target = mq.TLO.Target
-    buffs = {}
-    dots = {}
+    local tmpBuff = {}
+    local tmpDot = {}
+
     if not target() then
         return
     end
@@ -167,16 +168,18 @@ local function update_target_effects()
             if effect_name and effect_timer and caster == myName then
                 local timer_str = convert_milliseconds_to_time(effect_timer)
                 if spell_type == "Beneficial" then
-                    table.insert(buffs, { name = effect_name, icon = icon, time = timer_str, raw_seconds = effect_timer / 1000, type = "buff", })
+                    table.insert(tmpBuff, { name = effect_name, icon = icon, time = timer_str, raw_seconds = effect_timer / 1000, type = "buff", })
                 elseif spell_type == "Detrimental" then
-                    table.insert(dots, { name = effect_name, icon = icon, time = timer_str, raw_seconds = effect_timer / 1000, type = "dot", })
+                    table.insert(tmpDot, { name = effect_name, icon = icon, time = timer_str, raw_seconds = effect_timer / 1000, type = "dot", })
                 end
             end
         end
     end
 
-    table.sort(buffs, function(a, b) return a.raw_seconds < b.raw_seconds end)
-    table.sort(dots, function(a, b) return a.raw_seconds < b.raw_seconds end)
+    table.sort(tmpBuff, function(a, b) return a.raw_seconds < b.raw_seconds end)
+    table.sort(tmpDot, function(a, b) return a.raw_seconds < b.raw_seconds end)
+    buffs = tmpBuff
+    dots = tmpDot
 end
 
 -- Function to update DoTs across all targets

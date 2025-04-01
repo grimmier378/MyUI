@@ -16,6 +16,7 @@ if not loadedExeternally then
     MyUI_CharLoaded = mq.TLO.Me.DisplayName()
     MyUI_Server = mq.TLO.MacroQuest.Server()
 end
+Module.Utils = MyUI_Utils
 
 local itemWatch = false
 
@@ -332,7 +333,7 @@ local function DrawAlertSettings(alertName, script, path, configFile)
     local alert = string.format("do%s", alertName)
     local volAlert = string.format("vol%s", alertName)
     local soundAlert = string.format("sound%s", alertName)
-    settings[alert] = ImGui.Checkbox(alertName .. " Alert##" .. script, settings[alert])
+    settings[alert] = Module.Utils.DrawToggle(alertName .. " Alert##" .. script, settings[alert])
     ImGui.TableNextColumn()
     ImGui.SetNextItemWidth(70)
     settings.Sounds[settings.theme][soundAlert].file = ImGui.InputText('Filename##' .. alertName .. 'SND', settings.Sounds[settings.theme][soundAlert].file)

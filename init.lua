@@ -251,7 +251,7 @@ local function ProcessModuleChanges()
 	if MyUI_TempSettings.AddCustomModule then
 		local found = false
 		for _, data in ipairs(MyUI_Settings.mods_list) do
-			if data.name == MyUI_TempSettings.AddModule then
+			if data.name:lower() == MyUI_TempSettings.AddModule:lower() then
 				found = true
 				break
 			end
@@ -513,6 +513,7 @@ local function MyUI_Main()
 		ProcessModuleChanges()
 		for idx, data in ipairs(MyUI_Settings.mods_list) do
 			if data.enabled then
+				mq.doevents()
 				if MyUI_Modules[data.name].MainLoop ~= nil then MyUI_Modules[data.name].MainLoop() end
 			end
 		end
@@ -565,12 +566,17 @@ local function CommandHandler(...)
 				end
 			end
 		elseif args[1] == 'new' then
-			MyUI_TempSettings.AddModule = module_name
+			MyUI_TempSettings.AddModule = args[2]
 			MyUI_TempSettings.AddCustomModule = true
-			MyUI_Utils.PrintOutput('MyUI', true, "\ay%s \awis \agAdded\aw...", module_name)
+			MyUI_Utils.PrintOutput('MyUI', true, "\ay%s \awis \agAdded\aw...", args[2])
+			goto finished_cmd
+		elseif args[1] == 'remove' then
+			MyUI_TempSettings.AddModule = args[2]
+			MyUI_TempSettings.RemoveModule = true
+			MyUI_Utils.PrintOutput('MyUI', true, "\ay%s \awis \arRemoved\aw...", args[2])
 			goto finished_cmd
 		end
-		MyUI_Utils.PrintOutput('MyUI', true, "\aoModule Named: \ay%s was \arNot Found\aw...", module_name)
+		MyUI_Utils.PrintOutput('MyUI', true, "\aoModule Named: \ay%s was \arNot Found\aw...", args[2])
 	else
 		if args[1] == 'show' then
 			MyUI_Settings.ShowMain = not MyUI_Settings.ShowMain

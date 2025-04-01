@@ -186,9 +186,10 @@ end
 local function update_multi_target_dots()
     targetDots = {}
     local myName = mq.TLO.Me.CleanName()
-
-    for i = 1, 20 do
-        local target = mq.TLO.NearestSpawn(i)
+    local closeSpawns = mq.TLO.SpawnCount("npc radius 50 zradius 50")()
+    if closeSpawns == 0 then return end
+    for i = 1, closeSpawns do
+        local target = mq.TLO.NearestSpawn(string.format("%d, NPC radius 100 zradius 100", i))
         if target() and target.Type() == "NPC" then
             local targetKey = target.ID()
             local validDots = {}

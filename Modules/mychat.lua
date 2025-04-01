@@ -1755,7 +1755,7 @@ function Module.AddChannel(editChanID, isNewChannel)
     end
     ImGui.SameLine()
     if Module.tempSettings.Channels[editChanID] then
-        Module.tempSettings.Channels[editChanID].MainEnable = ImGui.Checkbox('Show on Main Tab##Main', Module.tempSettings.Channels[editChanID].MainEnable)
+        Module.tempSettings.Channels[editChanID].MainEnable = Module.Utils.DrawToggle('Show on Main Tab##Main', Module.tempSettings.Channels[editChanID].MainEnable)
         if ImGui.IsItemHovered() then
             ImGui.BeginTooltip()
             ImGui.Text('Do you want this channel to display on the Main Tab?')
@@ -1883,7 +1883,7 @@ function Module.AddChannel(editChanID, isNewChannel)
                                         ImGui.SameLine()
                                         if Module.tempFilterEnabled[editChanID][eventID] == nil then Module.tempFilterEnabled[editChanID][eventID] = {} end
                                         local tmpEnabl = Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['enabled']
-                                        tmpEnabl, _ = ImGui.Checkbox("Enabled##_" .. tmpKey, tmpEnabl)
+                                        tmpEnabl, _ = Module.Utils.DrawToggle("Enabled##_" .. tmpKey, tmpEnabl)
                                         if Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['enabled'] ~= tmpEnabl then
                                             Module.tempFilterEnabled[editChanID][eventID][filterID] = tmpEnabl
                                             Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['enabled'] = tmpEnabl
@@ -1895,7 +1895,7 @@ function Module.AddChannel(editChanID, isNewChannel)
                                         local tmpHidden = Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['hidden']
                                         local hiddenLabel = tmpHidden and Module.Icons.FA_EYE_SLASH or Module.Icons.FA_EYE
                                         hiddenLabel = hiddenLabel .. "##_" .. tmpKey
-                                        tmpHidden, _ = ImGui.Checkbox(hiddenLabel, tmpHidden)
+                                        tmpHidden, _ = Module.Utils.DrawToggle(hiddenLabel, tmpHidden)
                                         if Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['hidden'] ~= tmpHidden then
                                             Module.tempFilterHidden[editChanID][eventID][filterID] = tmpHidden
                                             Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['hidden'] = tmpHidden
@@ -1981,7 +1981,7 @@ local function buildConfig()
                                     ImGui.Dummy(1, 1)
                                 end
                                 ImGui.TableSetColumnIndex(1)
-                                Module.tempSettings.Channels[channelID].Events[eventId].enabled = ImGui.Checkbox('Enabled##' .. eventId,
+                                Module.tempSettings.Channels[channelID].Events[eventId].enabled = Module.Utils.DrawToggle('Enabled##' .. eventId,
                                     Module.tempSettings.Channels[channelID].Events[eventId].enabled)
                                 ImGui.TableSetColumnIndex(2)
                                 ImGui.Text(eventDetails.eventString)
@@ -2060,7 +2060,7 @@ function Module.Config_GUI(open)
         ImGui.SeparatorText('Import Settings')
         importFile = ImGui.InputTextWithHint('Import##FileName', importFile, importFile, 256)
         ImGui.SameLine()
-        cleanImport = ImGui.Checkbox('Clean Import##clean', cleanImport)
+        cleanImport = Module.Utils.DrawToggle('Clean Import##clean', cleanImport)
 
         if ImGui.Button('Import Channels') then
             local tmp = mq.configDir .. '/MyUI/MyChat/' .. importFile

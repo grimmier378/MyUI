@@ -489,12 +489,12 @@ function Module.RenderGUI()
                 end
             end
             ImGui.Text("Chat Relay Settings")
-            RelayTells = ImGui.Checkbox("Relay Tells", RelayTells)
-            RelayGuild = ImGui.Checkbox("Relay Guild", RelayGuild)
+            RelayTells = Module.Utils.DrawToggle("Relay Tells", RelayTells, nil, nil, true)
+            RelayGuild = Module.Utils.DrawToggle("Relay Guild", RelayGuild, nil, nil, true)
 
             ImGui.Separator()
-            settings[Module.DisplayName].ShowOnNewMessage = ImGui.Checkbox("Show on New Message", settings[Module.DisplayName].ShowOnNewMessage)
-            settings[Module.DisplayName].EscapeToMin = ImGui.Checkbox("Escape to Minimize", settings[Module.DisplayName].EscapeToMin)
+            settings[Module.DisplayName].ShowOnNewMessage = Module.Utils.DrawToggle("Show on New Message", settings[Module.DisplayName].ShowOnNewMessage, nil, nil, true)
+            settings[Module.DisplayName].EscapeToMin = Module.Utils.DrawToggle("Escape to Minimize", settings[Module.DisplayName].EscapeToMin, nil, nil, true)
 
             ImGui.SetNextItemWidth(100)
             settings[Module.DisplayName].IconSize = ImGui.SliderInt("Icon Size", settings[Module.DisplayName].IconSize, 10, 50)

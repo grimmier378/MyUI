@@ -217,6 +217,14 @@ local function MessageHandler()
                 end
             end)
         end
+        if subject == 'switch' then
+            if who == Module.CharLoaded then
+                mq.cmd("/foreground")
+                return
+            else
+                return
+            end
+        end
         --New member connected if Hello is true. Lets send them our data so they have it.
         if subject == 'Hello' then
             -- if who ~= Module.CharLoaded then
@@ -400,16 +408,20 @@ function Module.RenderGUI()
         else
             winFlags = bit32.bor(ImGuiWindowFlags.None)
         end
+
         if TempSettings.LockWindow then
             winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoMove)
         else
             winFlags = bit32.bor(winFlags)
         end
+
         local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(settings[Module.DisplayName].LoadTheme or 'Default', Module.Theme)
         local openGUI, showGUI = imgui.Begin("AA Party##_" .. Module.CharLoaded, true, winFlags)
+
         if not openGUI then
             AAPartyShow = false
         end
+
         if showGUI then
             if #groupData > 0 then
                 local windowWidth = imgui.GetWindowWidth() - 4
@@ -531,10 +543,14 @@ function Module.RenderGUI()
                                 imgui.EndTooltip()
                             end
                             if imgui.IsItemHovered() then
-                                if imgui.IsMouseReleased(0) then
+                                if imgui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsMouseReleased(0) then
+                                    if aaActor then
+                                        aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, { Name = groupData[i].Name, Subject = 'switch', })
+                                        aaActor:send({ mailbox = 'aa_party', script = 'myui', }, { Name = groupData[i].Name, Subject = 'switch', })
+                                    end
+                                elseif imgui.IsMouseReleased(0) then
                                     expand[groupData[i].Name] = not expand[groupData[i].Name]
-                                end
-                                if imgui.IsMouseReleased(1) then
+                                elseif imgui.IsMouseReleased(1) then
                                     compact[groupData[i].Name] = not compact[groupData[i].Name]
                                 end
                             end
@@ -637,12 +653,9 @@ function Module.RenderGUI()
                 end
                 ImGui.EndPopup()
             end
-            Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
-            imgui.End()
-        else
-            Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
-            imgui.End()
         end
+        Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
+        imgui.End()
     end
 
     if MailBoxShow then
@@ -740,13 +753,13 @@ function Module.RenderGUI()
                 loadTheme()
             end
 
-            MailBoxShow = ImGui.Checkbox("Show MailBox##", MailBoxShow)
+            MailBoxShow = Module.Utils.DrawToggle("Show MailBox##", MailBoxShow)
             ImGui.SameLine()
-            TempSettings.alphaSort = ImGui.Checkbox("Alpha Sort##", TempSettings.alphaSort)
-            TempSettings.showTooltip = ImGui.Checkbox("Show Tooltip##", TempSettings.showTooltip)
-            TempSettings.MyGroupOnly = ImGui.Checkbox("My Group Only##", TempSettings.MyGroupOnly)
-            TempSettings.LockWindow = ImGui.Checkbox("Lock Window##", TempSettings.LockWindow)
-            TempSettings.ShowLeader = ImGui.Checkbox("Show Leader##", TempSettings.ShowLeader)
+            TempSettings.alphaSort = Module.Utils.DrawToggle("Alpha Sort##", TempSettings.alphaSort, nil, false, true)
+            TempSettings.showTooltip = Module.Utils.DrawToggle("Show Tooltip##", TempSettings.showTooltip, nil, false, true)
+            TempSettings.MyGroupOnly = Module.Utils.DrawToggle("My Group Only##", TempSettings.MyGroupOnly, nil, false, true)
+            TempSettings.LockWindow = Module.Utils.DrawToggle("Lock Window##", TempSettings.LockWindow, nil, false, true)
+            TempSettings.ShowLeader = Module.Utils.DrawToggle("Show Leader##", TempSettings.ShowLeader, nil, false, true)
             if ImGui.Button("Save & Close") then
                 settings = dofile(configFile)
                 settings[Module.DisplayName].Scale = TempSettings.scale

@@ -146,7 +146,7 @@ local function DrawStyles()
 	if style[ImGuiStyleVar.WindowBorderSize].Size == 1 then
 		tmpBorder = true
 	end
-	tmpBorder, borderPressed = ImGui.Checkbox('WindowBorder##', tmpBorder)
+	tmpBorder, borderPressed = Module.Utils.DrawToggle('WindowBorder##', tmpBorder)
 	if borderPressed then
 		if tmpBorder then
 			style[ImGuiStyleVar.WindowBorderSize].Size = 1
@@ -160,7 +160,7 @@ local function DrawStyles()
 	if style[ImGuiStyleVar.FrameBorderSize].Size == 1 then
 		tmpFBorder = true
 	end
-	tmpFBorder, borderFPressed = ImGui.Checkbox('FrameBorder##', tmpFBorder)
+	tmpFBorder, borderFPressed = Module.Utils.DrawToggle('FrameBorder##', tmpFBorder)
 	if borderFPressed then
 		if tmpFBorder then
 			style[ImGuiStyleVar.FrameBorderSize].Size = 1
@@ -174,7 +174,7 @@ local function DrawStyles()
 	if style[ImGuiStyleVar.ChildBorderSize].Size == 1 then
 		tmpCBorder = true
 	end
-	tmpCBorder, borderCPressed = ImGui.Checkbox('ChildBorder##', tmpCBorder)
+	tmpCBorder, borderCPressed = Module.Utils.DrawToggle('ChildBorder##', tmpCBorder)
 	if borderCPressed then
 		if tmpCBorder then
 			style[ImGuiStyleVar.ChildBorderSize].Size = 1
@@ -188,7 +188,7 @@ local function DrawStyles()
 	if style[ImGuiStyleVar.PopupBorderSize].Size == 1 then
 		tmpPBorder = true
 	end
-	tmpPBorder, borderPPressed = ImGui.Checkbox('PopupBorder##', tmpPBorder)
+	tmpPBorder, borderPPressed = Module.Utils.DrawToggle('PopupBorder##', tmpPBorder)
 	if borderPPressed then
 		if tmpPBorder then
 			style[ImGuiStyleVar.PopupBorderSize].Size = 1
@@ -202,7 +202,7 @@ local function DrawStyles()
 	-- if style[ImGuiStyleVar.TabBarBorderSize].Size == 1 then
 	-- 	tmpTBorder = true
 	-- end
-	-- tmpTBorder, borderTPressed = ImGui.Checkbox('TabBorder##', tmpTBorder)
+	-- tmpTBorder, borderTPressed = Module.Utils.DrawToggle('TabBorder##', tmpTBorder)
 	-- if borderTPressed then
 	-- 	if tmpTBorder then
 	-- 		style[ImGuiStyleVar.TabBarBorderSize].Size = 1

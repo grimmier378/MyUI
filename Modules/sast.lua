@@ -35,19 +35,30 @@ local currZone, lastZone
 local winFlags = bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoFocusOnAppearing)
 local locked, showAdv, forcedOpen, refreshStats = false, false, false, false
 --Helpers
-local function checkAdv()
+local function checkAdv(draw)
 	-- check for active adventure timers.Either time to enter dungeon or time to complete.
 	if AdvWIN.Child('AdvRqst_EnterTimeLeftLabel').Text() ~= '' then
 		adv = true
-		return string.format('Time to Enter Left: %s', AdvWIN.Child('AdvRqst_EnterTimeLeftLabel').Text())
+		if draw then
+			ImGui.Text("Time to Enter Left: ")
+			ImGui.SameLine()
+			ImGui.TextColored(ImVec4(0.70, 0.754, 0.000, 1.000), AdvWIN.Child('AdvRqst_EnterTimeLeftLabel').Text())
+		end
 	elseif AdvWIN.Child('AdvRqst_CompleteTimeLeftLabel').Text() ~= '' then
 		adv = true
-		return string.format('Time to Complete Left: %s', AdvWIN.Child('AdvRqst_CompleteTimeLeftLabel').Text())
+		if draw then
+			ImGui.Text("Time to Complete Left: ")
+			ImGui.SameLine()
+			ImGui.TextColored(ImVec4(0.70, 0.754, 0.000, 1.000), AdvWIN.Child('AdvRqst_CompleteTimeLeftLabel').Text())
+		end
 	else
 		adv = false
 		-- no active timers, so we are not in an adventure.
-		return tostring('No Adventure Started')
+		if draw then
+			ImGui.Text('No Adventure Started')
+		end
 	end
+	return adv
 end
 
 local function checkExp()
@@ -80,7 +91,9 @@ function Module.RenderGUI()
 				ImGui.PushStyleColor(ImGuiCol.Separator, ImVec4(1.00, 0.454, 0.000, 1.000))
 				ImGui.Text("Adventure Status: \t")
 				ImGui.SameLine()
+				ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(0.000, 0.833, 0.751, 1.000))
 				ImGui.Text(desc)
+				ImGui.PopStyleColor(1)
 				ImGui.SameLine(200)
 				ImGui.Text(Module.Icons.MD_MORE_HORIZ)
 				if ImGui.IsItemHovered() then
@@ -126,7 +139,7 @@ function Module.RenderGUI()
 					end
 				end
 				ImGui.Separator()
-				ImGui.Text(checkAdv())
+				checkAdv(true)
 				ImGui.PopStyleColor(2)
 			end
 			if exp and adv then ImGui.Separator() end
@@ -198,11 +211,11 @@ function Module.RenderGUI()
 						end
 						ImGui.Text(name)
 						ImGui.TableNextColumn()
-						ImGui.Text(sucComp)
+						ImGui.TextColored(ImVec4(0.415, 0.937, 0.340, 1.000), sucComp)
 						ImGui.TableNextColumn()
 						ImGui.Text(failComp)
 						ImGui.TableNextColumn()
-						ImGui.Text(points)
+						ImGui.TextColored(ImVec4(0.7, 0.75, 0, 1), points)
 					end
 					-- if not needRefresh then
 					-- 	local totalSuc = mq.TLO.Window("AdventureStatsWnd/AdvStats_ThemeList").List(7, 3)() or 'Refresh Me'
@@ -411,7 +424,7 @@ function Module.MainLoop()
 	end
 	local curTime = os.time()
 	if mq.gettime() - clockTimer > 1000 then
-		local advActive = checkAdv() ~= 'No Adventure Started'
+		local advActive = checkAdv()
 		local expActive = checkExp() ~= 'No Expedition Started'
 		if advActive or expActive then
 			guiOpen = true

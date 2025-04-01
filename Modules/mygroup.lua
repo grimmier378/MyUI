@@ -473,10 +473,16 @@ local function DrawGroupMember(id)
         ImGui.BeginTooltip()
         GetInfoToolTip(id)
         ImGui.EndTooltip()
+
+        if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) and ImGui.IsKeyDown(ImGuiMod.Ctrl) then
+            mq.cmdf("/dex %s /foreground", member.Name())
+        elseif ImGui.IsItemHovered() and member.Present() and ImGui.IsMouseClicked(0) then
+            mq.cmdf("/target id %s", member.ID())
+
+            Module.Utils.GiveItem(member.ID() or 0)
+        end
     end
-    if ImGui.IsItemHovered() and member.Present() then
-        Module.Utils.GiveItem(member.ID() or 0)
-    end
+
     -- Pet Health
 
     if showPet then
@@ -573,7 +579,7 @@ local function DrawRaidMember(id)
         velo = member.Speed() or 0
     end
 
-    ImGui.BeginChild("##RaidMember" .. tostring(id), 0.0, (80 * RaidScale), bit32.bor(ImGuiChildFlags.Border), ImGuiWindowFlags.NoScrollbar)
+    ImGui.BeginChild("##RaidMember" .. tostring(id), 0.0, (90 * RaidScale), bit32.bor(ImGuiChildFlags.Border), ImGuiWindowFlags.NoScrollbar)
     ImGui.BeginGroup()
     local sizeX, sizeY = ImGui.GetContentRegionAvail()
     if ImGui.BeginTable("##playerInfo" .. tostring(id), 3, tPlayerFlags) then
@@ -583,20 +589,17 @@ local function DrawRaidMember(id)
         ImGui.TableNextRow()
         -- Name
         ImGui.TableNextColumn()
-        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 2, 0)
+        if settings[Module.Name].ShowLevel then
+            ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 2, 0)
 
-        if sitting then
-            ImGui.TextColored(0.911, 0.351, 0.008, 1, "%d", level or 0)
-        else
-            ImGui.Text("%s", level or 0)
+            if sitting then
+                ImGui.TextColored(0.911, 0.351, 0.008, 1, "%d", level or 0)
+            else
+                ImGui.Text("%s", level or 0)
+            end
+            ImGui.PopStyleVar()
+            ImGui.SameLine()
         end
-        if ImGui.IsItemHovered() then
-            ImGui.BeginTooltip()
-            GetInfoToolTip(id, true)
-            ImGui.EndTooltip()
-        end
-        ImGui.PopStyleVar()
-        ImGui.SameLine()
         if mq.TLO.Raid.Leader.ID() == member.ID() then
             ImGui.TextColored(0, 1, 1, 1, memberName)
         else
@@ -739,11 +742,13 @@ local function DrawRaidMember(id)
     end
 
     ImGui.EndGroup()
-    if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
-        mq.cmdf("/target %s", member.Name())
-        Module.Utils.GiveItem(member.ID() or 0)
-    end
     if ImGui.IsItemHovered() then
+        if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) and ImGui.IsKeyDown(ImGuiMod.Ctrl) then
+            mq.cmdf("/dex %s /foreground", member.Name())
+        elseif ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
+            mq.cmdf("/target %s", member.Name())
+            Module.Utils.GiveItem(member.ID() or 0)
+        end
         ImGui.BeginTooltip()
         GetInfoToolTip(id, true)
         ImGui.EndTooltip()
@@ -1281,7 +1286,7 @@ function Module.RenderGUI()
                     end
                 end
 
-                settings[Module.Name].MouseOver = ImGui.Checkbox('Mouse Over', settings[Module.Name].MouseOver)
+                settings[Module.Name].MouseOver = Module.Utils.DrawToggle('Mouse Over', settings[Module.Name].MouseOver, nil, nil, true)
                 settings[Module.Name].WinTransparency = ImGui.SliderFloat('Window Transparency##' .. Module.Name, settings[Module.Name].WinTransparency, 0.1, 1.0)
                 ImGui.SeparatorText("Scaling##" .. Module.Name)
                 -- Slider for adjusting zoom level
@@ -1303,48 +1308,56 @@ function Module.RenderGUI()
                 end
             end
             ImGui.SeparatorText("Toggles##" .. Module.Name)
-            local tmpComms = useEQBC
-            tmpComms = ImGui.Checkbox('Use EQBC##' .. Module.Name, tmpComms)
-            if tmpComms ~= useEQBC then
-                useEQBC = tmpComms
+            if ImGui.BeginTable("##tGroupToggles", 2, tPlayerFlags) then
+                ImGui.TableNextRow()
+                ImGui.TableNextColumn()
+
+                local tmpComms = useEQBC
+                tmpComms = Module.Utils.DrawToggle('Use EQBC##' .. Module.Name, tmpComms, nil, nil, true)
+                if tmpComms ~= useEQBC then
+                    useEQBC = tmpComms
+                end
+                ImGui.TableNextColumn()
+                local tmpMana = showMana
+                tmpMana = Module.Utils.DrawToggle('Mana##' .. Module.Name, tmpMana, nil, nil, true)
+                if tmpMana ~= showMana then
+                    showMana = tmpMana
+                end
+                ImGui.TableNextColumn()
+
+                local tmpEnd = showEnd
+                tmpEnd = Module.Utils.DrawToggle('Endurance##' .. Module.Name, tmpEnd, nil, nil, true)
+                if tmpEnd ~= showEnd then
+                    showEnd = tmpEnd
+                end
+                ImGui.TableNextColumn()
+
+                local tmpPet = showPet
+                tmpPet = Module.Utils.DrawToggle('Show Pet##' .. Module.Name, tmpPet, nil, nil, true)
+                if tmpPet ~= showPet then
+                    showPet = tmpPet
+                end
+                ImGui.TableNextColumn()
+                settings[Module.Name].ShowDummy = Module.Utils.DrawToggle('Show Dummy##' .. Module.Name, settings[Module.Name].ShowDummy, nil, nil, true)
+                ImGui.TableNextColumn()
+                settings[Module.Name].ShowRoleIcons = Module.Utils.DrawToggle('Show Role Icons##' .. Module.Name, settings[Module.Name].ShowRoleIcons, nil, nil, true)
+                ImGui.TableNextColumn()
+                settings[Module.Name].DynamicHP = Module.Utils.DrawToggle('Dynamic HP##' .. Module.Name, settings[Module.Name].DynamicHP, nil, nil, true)
+                ImGui.TableNextColumn()
+                settings[Module.Name].DynamicMP = Module.Utils.DrawToggle('Dynamic MP##' .. Module.Name, settings[Module.Name].DynamicMP, nil, nil, true)
+                ImGui.TableNextColumn()
+                hideTitle = Module.Utils.DrawToggle('Hide Title Bar##' .. Module.Name, hideTitle, nil, nil, true)
+                ImGui.TableNextColumn()
+                showSelf = Module.Utils.DrawToggle('Show Self##' .. Module.Name, showSelf, nil, nil, true)
+                ImGui.TableNextColumn()
+                showRaidWindow = Module.Utils.DrawToggle('Show Raid##' .. Module.Name, showRaidWindow, nil, nil, true)
+                ImGui.TableNextColumn()
+                settings[Module.Name].ShowLevel = Module.Utils.DrawToggle('Show Level##' .. Module.Name, settings[Module.Name].ShowLevel, nil, nil, true)
+                ImGui.TableNextColumn()
+                showMoveStatus = Module.Utils.DrawToggle('Show Move Status##' .. Module.Name, showMoveStatus, nil, nil, true)
+                ImGui.TableNextColumn()
+                ImGui.EndTable()
             end
-
-            local tmpMana = showMana
-            tmpMana = ImGui.Checkbox('Mana##' .. Module.Name, tmpMana)
-            if tmpMana ~= showMana then
-                showMana = tmpMana
-            end
-
-            ImGui.SameLine()
-
-            local tmpEnd = showEnd
-            tmpEnd = ImGui.Checkbox('Endurance##' .. Module.Name, tmpEnd)
-            if tmpEnd ~= showEnd then
-                showEnd = tmpEnd
-            end
-
-            ImGui.SameLine()
-
-            local tmpPet = showPet
-            tmpPet = ImGui.Checkbox('Show Pet##' .. Module.Name, tmpPet)
-            if tmpPet ~= showPet then
-                showPet = tmpPet
-            end
-            settings[Module.Name].ShowDummy = ImGui.Checkbox('Show Dummy##' .. Module.Name, settings[Module.Name].ShowDummy)
-            ImGui.SameLine()
-            settings[Module.Name].ShowRoleIcons = ImGui.Checkbox('Show Role Icons##' .. Module.Name, settings[Module.Name].ShowRoleIcons)
-
-            settings[Module.Name].DynamicHP = ImGui.Checkbox('Dynamic HP##' .. Module.Name, settings[Module.Name].DynamicHP)
-            ImGui.SameLine()
-            settings[Module.Name].DynamicMP = ImGui.Checkbox('Dynamic MP##' .. Module.Name, settings[Module.Name].DynamicMP)
-
-            hideTitle = ImGui.Checkbox('Hide Title Bar##' .. Module.Name, hideTitle)
-            ImGui.SameLine()
-            showSelf = ImGui.Checkbox('Show Self##' .. Module.Name, showSelf)
-            showRaidWindow = ImGui.Checkbox('Show Raid##' .. Module.Name, showRaidWindow)
-            ImGui.SameLine()
-            settings[Module.Name].ShowLevel = ImGui.Checkbox('Show Level##' .. Module.Name, settings[Module.Name].ShowLevel)
-            showMoveStatus = ImGui.Checkbox('Show Move Status##' .. Module.Name, showMoveStatus)
             local tmpDist
             if tmpDist == nil then tmpDist = navDist end
             ImGui.SetNextItemWidth(100)

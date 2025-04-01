@@ -518,11 +518,11 @@ local function DrawConfigWin()
 	ImGui.SeparatorText("General Settings##MySpells")
 	-- if mq.TLO.Me.Class.ShortName() ~= 'BRD' then
 	castTransparency = ImGui.SliderFloat("Cast Bar Transparency##MySpells", castTransparency, 0.0, 1.0)
-	enableCastBar = ImGui.Checkbox("Enable Cast Bar##MySpells", enableCastBar)
+	enableCastBar = Module.Utils.DrawToggle("Enable Cast Bar##MySpells", enableCastBar)
 	if enableCastBar then
 		ImGui.SameLine()
-		debugShow = ImGui.Checkbox("Force Show CastBar##MySpells", debugShow)
-		CastTextColorByType = ImGui.Checkbox("Cast Text Color By Type##MySpells", CastTextColorByType)
+		debugShow = Module.Utils.DrawToggle("Force Show CastBar##MySpells", debugShow)
+		CastTextColorByType = Module.Utils.DrawToggle("Cast Text Color By Type##MySpells", CastTextColorByType)
 		ImGui.SameLine()
 		ImGui.HelpMarker("This will change the color of the cast bar text based on the spell type.")
 	end
@@ -681,7 +681,7 @@ function Module.RenderGUI()
 			end
 			ImGui.PopStyleVar()
 			if memSpell ~= -1 and not picker.Draw then -- and not pickerOpen then
-				ImGui.SetNextWindowPos(ImGui.GetMousePosOnOpeningCurrentPopupVec(), ImGuiCond.Appearing)
+				-- ImGui.SetNextWindowPos(ImGui.GetMousePosOnOpeningCurrentPopupVec(), ImGuiCond.Appearing)
 				picker:SetOpen()
 				pickerOpen = true
 			end

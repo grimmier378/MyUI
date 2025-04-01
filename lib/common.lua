@@ -66,8 +66,172 @@ function CommonUtils.DrawStatusIcon(iconID, type, txt, iconSize)
 		ImGui.DrawTextureAnimation(CommonUtils.Animation_Spell, iconSize, iconSize)
 	end
 	if ImGui.IsItemHovered() then
-		ImGui.SetTooltip(txt)
+		ImGui.BeginTooltip()
+		if string.find(txt, "\\n") then
+			local lines = {}
+			for line in string.gmatch(txt, "[^\n]+") do
+				table.insert(lines, line)
+			end
+			for _, line in ipairs(lines) do
+				ImGui.Text(line)
+			end
+		else
+			ImGui.Text(txt)
+		end
+		ImGui.EndTooltip()
 	end
+end
+
+---@param draw_list ImDrawList to draw to
+---@param pos ImVec2 Top-left position (of star)
+---@param size number Size of the star (diameter)
+---@param col ImU32 Color
+function CommonUtils.RenderStar(draw_list, pos, size, col)
+	local outer_radius = size * 0.5
+	local inner_radius = outer_radius * 0.5
+	local rotationOffset = -math.pi / 2
+	local angleStep = math.pi / 5
+
+	local center = ImVec2(pos.x + outer_radius, pos.y + outer_radius)
+
+	local function polarToVec2(angleRad, distance)
+		return ImVec2(
+			center.x + math.cos(angleRad) * distance,
+			center.y + math.sin(angleRad) * distance
+		)
+	end
+
+	local points = {}
+	for i = 0, 4 do
+		local outerAngle = i * 2 * math.pi / 5 + rotationOffset
+		table.insert(points, polarToVec2(outerAngle, outer_radius))
+		local innerAngle = outerAngle + angleStep
+		table.insert(points, polarToVec2(innerAngle, inner_radius))
+	end
+
+	draw_list:AddConvexPolyFilled(points, col)
+end
+
+---@param id string Unique ID for the button
+---@param value boolean Current toggle state
+---@param size ImVec2|number|nil Size as ImVec2 or a number if a number is passed it will be used as height and width will be height * 2
+---@param star_knob boolean|nil If true the knob will be a star
+---@param right_label boolean|nil If true the label will be on the right side of the toggle
+---@param on_color ImVec4|nil Color when ON default(green)
+---@param off_color ImVec4|nil Color when OFF default(red)
+---@param knob_color ImVec4|nil Color of the knob default(white)
+---@return boolean value New toggle value
+---@return boolean clicked Whether the value changed
+function CommonUtils.DrawToggle(id, value, size, star_knob, right_label, on_color, off_color, knob_color)
+	if not id or value == nil then return false, false end
+	-- setup any defaults for mising params
+	size = type(size) == 'number' and ImVec2(size * 2, size) or size or ImVec2(32, 16)
+	local height = size.y or 16
+	local width = size.x or height * 2
+	on_color = on_color or ImGui.GetStyleColorVec4(ImGuiCol.FrameBgActive)
+	off_color = off_color or ImGui.GetStyleColorVec4(ImGuiCol.FrameBg)
+	knob_color = knob_color or ImVec4(1, 1, 1, 1) -- default white
+	star_knob = star_knob or false
+	right_label = right_label or false
+
+	-- pull the label from the ID if there is one
+	local label = id:match("^(.-)##") -- Capture text before ##
+
+	-- if there was no "##" then to separate the ID from the lable then use the ID as the label
+	if not id:find("##") then -- no ID tag so the id is the label
+		label = id
+	end
+
+	if not right_label and label and label ~= "" then
+		ImGui.Text(string.format("%s:", label))
+		ImGui.SameLine()
+	end
+
+	local clicked = false
+	local draw_list = ImGui.GetWindowDrawList()
+	local pos = { x = 0, y = 0, }
+	pos.x, pos.y = ImGui.GetCursorScreenPos()
+	local radius = height * 0.5
+
+	-- clickable area
+	ImGui.InvisibleButton(id, width, height)
+	if ImGui.IsItemClicked() then
+		value = not value
+		clicked = true
+	end
+
+	local t = value and 1.0 or 0.0
+	local knob_x = pos.x + radius + t * (width - height)
+
+	-- Background
+	draw_list:AddRectFilled(
+		ImVec2(pos.x, pos.y),
+		ImVec2(pos.x + width, pos.y + height),
+		ImGui.GetColorU32(value and on_color or off_color),
+		height * 0.5
+	)
+
+	if not star_knob then
+		-- Knob (circle)
+		draw_list:AddCircleFilled(
+			ImVec2(knob_x, pos.y + radius),
+			radius * 0.8,
+			ImGui.GetColorU32(knob_color),
+			0
+		)
+	else
+		-- Knob (Star!)
+		CommonUtils.RenderStar(draw_list, ImVec2(knob_x - radius * 0.8, pos.y + radius - radius * 0.8), radius * 1.6, ImGui.GetColorU32(knob_color))
+	end
+
+	-- Label on the right side of the toggle
+	if right_label and label and label ~= "" then
+		ImGui.SameLine()
+		ImGui.Text(string.format("%s", label))
+	end
+
+	return value, clicked
+end
+
+function CommonUtils.GetBreathingColor(base_color, do_breathe)
+	if not do_breathe then
+		return base_color
+	end
+	-- If the incoming color is white or black, return it unchanged
+	if (base_color.x == 1 and base_color.y == 1 and base_color.z == 1) or
+		(base_color.x == 0 and base_color.y == 0 and base_color.z == 0) then
+		return base_color
+	end
+
+	local t = os.clock() * 2
+	local breathe = 0.5 + 0.5 * math.sin(t)
+	local highest = math.max(base_color.x, base_color.y, base_color.z)
+
+	-- small amplitude of breathing (how much it shifts)
+	local breatheAmount = 0.4
+
+	local function breatheChannel(base, isDominant)
+		if isDominant then
+			-- is base is 0.9 or higher then we lower the base value
+			-- if base is 0.1 or lower then we raise the base value
+			if base >= 0.9 then
+				base = base - 0.1
+			elseif base <= 0.1 then
+				base = base + 0.1
+			end
+			-- breathe slightly above and below the base value
+			return math.min(1.0, math.max(0.0, base + (breathe - 0.5) * 2.0 * breatheAmount))
+		else
+			return base
+		end
+	end
+
+	local r = breatheChannel(base_color.x, highest == base_color.x)
+	local g = breatheChannel(base_color.y, highest == base_color.y)
+	local b = breatheChannel(base_color.z, highest == base_color.z)
+	local a = base_color.w
+
+	return ImVec4(r, g, b, a)
 end
 
 ---@param spawn MQSpawn
@@ -268,7 +432,7 @@ function CommonUtils.GiveItem(target_id)
 	if target_id == nil then return end
 	if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
 		mq.cmdf("/target id %s", target_id)
-		if mq.TLO.Cursor() then
+		if mq.TLO.Cursor() or mq.TLO.Me.CursorPlatinum() > 0 or mq.TLO.Me.CursorGold() > 0 or mq.TLO.Me.CursorSilver() > 0 or mq.TLO.Me.CursorCopper() > 0 then
 			mq.cmdf('/multiline ; /tar id %s; /timed 5, /click left target', target_id)
 		end
 	end
@@ -280,6 +444,38 @@ function CommonUtils.MaskName(name)
 		maskedName = maskedName:gsub("([A-Za-z])", "X")
 	end
 	return maskedName
+end
+
+-- Animation
+
+---comment
+---@param textureMap MQTexture the texture map to draw from
+---@param rowNum integer the row number to draw from (0-7)
+---@param colNum integer the column number to draw from (0-3) there are 8 columns but we offset to get to the last 4. Any animation uses 4 cells at most.
+---@param colPerAnimation integer the number of columns per animation
+---@param spriteSheetSize integer the size of the sprite sheet
+---@param frameWidth integer the width of the frame
+---@param frameHeight integer the height of the frame
+---@param imgSize integer the size of the image to draw
+---@param isOffset boolean if true we will offset the column number by rightOffset
+---@param rightOffset integer the offset to apply to the column number
+---@param cursorX integer the x position to draw the image at
+---@param cursorY integer the y position to draw the image at
+function CommonUtils.DrawAnimatedFrame(textureMap, rowNum, colNum, colPerAnimation, spriteSheetSize, frameWidth, frameHeight, imgSize, isOffset, rightOffset, cursorX, cursorY)
+	local genderOffset = isOffset and rightOffset or 0
+
+	local col = (colNum % colPerAnimation) + genderOffset
+
+	-- Normalize UVs
+	local u1 = (col * frameWidth) / spriteSheetSize
+	local v1 = (rowNum * frameHeight) / spriteSheetSize
+	local u2 = ((col + 1) * frameWidth) / spriteSheetSize
+	local v2 = ((rowNum + 1) * frameHeight) / spriteSheetSize
+
+	if textureMap then
+		ImGui.Image(textureMap:GetTextureID(), ImVec2(imgSize, imgSize), ImVec2(u1, v1), ImVec2(u2, v2))
+	end
+	ImGui.SetCursorPos(cursorX, cursorY)
 end
 
 -- --- File Picker Dialog Stuff --

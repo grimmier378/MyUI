@@ -456,7 +456,7 @@ local function PlayerTargConf_GUI()
                 end
             end
 
-            settings[Module.Name].MouseOver = ImGui.Checkbox('Mouse Over', settings[Module.Name].MouseOver)
+            settings[Module.Name].MouseOver = Module.Utils.DrawToggle('Mouse Over', settings[Module.Name].MouseOver, nil, nil, true)
             settings[Module.Name].WinTransparency = ImGui.SliderFloat('Window Transparency##' .. Module.Name, settings[Module.Name].WinTransparency, 0.1, 1.0)
         end
         ImGui.Spacing()
@@ -487,15 +487,15 @@ local function PlayerTargConf_GUI()
                 progressSize = tmpPrgSz
             end
             ProgressSizeTarget = ImGui.SliderInt("Target Progress Bar Size##" .. Module.Name, ProgressSizeTarget, 5, 150)
-            settings[Module.Name].showXtar = ImGui.Checkbox('Show XTarget Number', settings[Module.Name].showXtar)
+            settings[Module.Name].showXtar = Module.Utils.DrawToggle('Show XTarget Number', settings[Module.Name].showXtar)
         end
         ImGui.Spacing()
 
         if ImGui.CollapsingHeader("Pulse Settings##" .. Module.Name) then
-            flashBorder = ImGui.Checkbox('Flash Border', flashBorder)
+            flashBorder = Module.Utils.DrawToggle('Flash Border', flashBorder, nil, nil, true)
             ImGui.SameLine()
             local tmpPulse = pulse
-            tmpPulse, _ = ImGui.Checkbox('Pulse Icons', tmpPulse)
+            tmpPulse, _ = Module.Utils.DrawToggle('Pulse Icons', tmpPulse, nil, nil, true)
             if _ then
                 if tmpPulse == true and pulseSpeed == 0 then
                     pulseSpeed = defaults.pulseSpeed
@@ -520,7 +520,7 @@ local function PlayerTargConf_GUI()
         ImGui.Spacing()
 
         if ImGui.CollapsingHeader("Dynamic Bar Colors##" .. Module.Name) then
-            settings[Module.Name].DynamicHP = ImGui.Checkbox('Dynamic HP Bar', settings[Module.Name].DynamicHP)
+            settings[Module.Name].DynamicHP = Module.Utils.DrawToggle('Dynamic HP Bar', settings[Module.Name].DynamicHP, nil, nil, true)
             ImGui.SameLine()
             ImGui.SetNextItemWidth(60)
             colorHpMin = ImGui.ColorEdit4("HP Min Color##" .. Module.Name, colorHpMin, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
@@ -534,7 +534,7 @@ local function PlayerTargConf_GUI()
             ImGui.ProgressBar((testValue / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test')
             ImGui.PopStyleColor()
 
-            settings[Module.Name].DynamicMP = ImGui.Checkbox('Dynamic Mana Bar', settings[Module.Name].DynamicMP)
+            settings[Module.Name].DynamicMP = Module.Utils.DrawToggle('Dynamic Mana Bar', settings[Module.Name].DynamicMP, nil, nil, true)
             ImGui.SameLine()
             ImGui.SetNextItemWidth(60)
             colorMpMin = ImGui.ColorEdit4("Mana Min Color##" .. Module.Name, colorMpMin, bit32.bor(ImGuiColorEditFlags.NoInputs))
@@ -565,7 +565,7 @@ local function PlayerTargConf_GUI()
         -- breath bar settings
         if ImGui.CollapsingHeader("Breath Meter##" .. Module.Name) then
             local tmpbreath = settings[Module.Name].EnableBreathBar
-            tmpbreath = ImGui.Checkbox('Enable Breath', tmpbreath)
+            tmpbreath = Module.Utils.DrawToggle('Enable Breath', tmpbreath)
             if tmpbreath ~= settings[Module.Name].EnableBreathBar then
                 settings[Module.Name].EnableBreathBar = tmpbreath
             end
@@ -804,6 +804,7 @@ function Module.RenderGUI()
                 if ImGui.MenuItem('X##Close' .. Module.Name) then
                     Module.IsRunning = false
                 end
+
                 ImGui.EndMenuBar()
             end
 

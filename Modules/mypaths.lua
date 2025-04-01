@@ -54,7 +54,7 @@ local currZone, lastZone                                         = '', ''
 local lastHP, lastMP, intPauseTime, curWpPauseTime               = 0, 0, 0, 0
 local lastRecordedWP                                             = ''
 local PathStartClock, PathStartTime                              = nil, nil
-
+local oneshot                                                    = false
 local NavSet                                                     = {
     ChainPath        = 'Select Path...',
     ChainStart       = false,
@@ -84,30 +84,32 @@ local NavSet                                                     = {
 }
 
 local InterruptSet                                               = {
-    interruptsOn    = true,
-    interruptFound  = false,
-    reported        = false,
-    interruptDelay  = 2,
-    PauseStart      = 0,
-    openDoor        = false,
-    stopForAll      = true,
-    stopForGM       = true,
-    stopForSitting  = true,
-    stopForCombat   = true,
-    stopForGoupDist = 100,
-    stopForDist     = false,
-    stopForRaidDist = 100,
-    stopForRaid     = false,
-    stopForXtar     = true,
-    stopForFear     = true,
-    stopForCharm    = true,
-    stopForMez      = true,
-    stopForRoot     = true,
-    stopForLoot     = true,
-    stopForInvis    = false,
-    stopForDblInvis = false,
-    stopForCasting  = true,
-    interruptCheck  = 0,
+    interruptsOn       = true,
+    interruptFound     = false,
+    reported           = false,
+    interruptDelay     = 2,
+    PauseStart         = 0,
+    openDoor           = false,
+    stopForAll         = true,
+    stopForGM          = true,
+    stopForSitting     = true,
+    stopForCombat      = true,
+    stopForGoupDist    = 100,
+    stopForDist        = false,
+    stopForRaidDist    = 100,
+    stopForRaid        = false,
+    stopForXtar        = true,
+    stopForFear        = true,
+    stopForCharm       = true,
+    stopForMez         = true,
+    stopForRoot        = true,
+    stopForLoot        = true,
+    stopForInvis       = false,
+    stopForDblInvis    = false,
+    stopForCasting     = true,
+    interruptCheck     = 0,
+    stopForPartyCorpse = true,
+    stopForRaidCorpse  = true,
 }
 
 -- GUI Settings
@@ -153,6 +155,8 @@ defaults                                                         = {
     InterruptDelay        = 1,
     RecordMinDist         = 25,
     AutoStand             = false,
+    StopForPartyCorpse    = true,
+    StopForRaidCorpse     = true,
 }
 
 local manaClass                                                  = {
@@ -353,7 +357,8 @@ local function loadSettings()
     scale = settings[Module.Name].Scale
     themeName = settings[Module.Name].LoadTheme
     NavSet.RecordDelay = settings[Module.Name].RecordDelay
-
+    InterruptSet.stopForPartyCorpse = settings[Module.Name].StopForPartyCorpse
+    InterruptSet.stopForRaidCorpse = settings[Module.Name].StopForRaidCorpse
 
     -- Save the settings if new settings were added
     if newSetting then mq.pickle(configFile, settings) end
@@ -598,6 +603,41 @@ local function raidDistance()
     return false
 end
 
+local function checkCorpses(which)
+    local deadCount = mq.TLO.SpawnCount(string.format('pccorpse radius %s zradius 50', 100))() or 0
+    if deadCount == 0 then return false end
+    local spawnSearch = '%s radius %d zradius 50'
+    local corpseList  = {}
+    local member      = which == 'Party' and mq.TLO.Group.Member or mq.TLO.Raid.Member
+    if deadCount > 0 then
+        for i = 1, deadCount do
+            local corpse = mq.TLO.NearestSpawn(string.format('%d pcorpse radius %d zradius 50', i, 100))
+            if corpse() then
+                corpseList[corpse.CleanName()] = true
+            end
+        end
+    end
+    if corpseList ~= nil then
+        if which == 'Party' then
+            for i = 0, mq.TLO.Me.GroupSize() - 1 do
+                if member(i).Name() then
+                    if corpseList[member(i).CleanName()] then
+                        return true
+                    end
+                end
+            end
+        elseif which == 'Raid' then
+            for i = 1, mq.TLO.Raid.Members() do
+                if member(i).Name() then
+                    if corpseList[member(i).CleanName()] then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+end
+
 local function groupWatch(watchType)
     if watchType == 'None' then return false end
     local myClass = mq.TLO.Me.Class.ShortName()
@@ -803,7 +843,7 @@ local function CheckInterrupts()
                 flag = false
             end
         end
-    elseif mq.TLO.Window('LootWnd').Open() and InterruptSet.stopForLoot then
+    elseif mq.TLO.Corpse() ~= 'FALSE' and InterruptSet.stopForLoot then
         if not interruptInProgress then
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
@@ -920,6 +960,20 @@ local function CheckInterrupts()
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
+    elseif InterruptSet.stopForPartyCorpse == true and checkCorpses('Party') then
+        if not interruptInProgress then
+            mq.cmdf("/nav stop log=off")
+            interruptInProgress = true
+        end
+        status = 'Paused for Party Corpse.'
+        flag = true
+    elseif InterruptSet.stopForRaidCorpse == true and checkCorpses('Raid') then
+        if not interruptInProgress then
+            mq.cmdf("/nav stop log=off")
+            interruptInProgress = true
+        end
+        status = 'Paused for Raid Corpse.'
+        flag = true
     end
     if flag then
         InterruptSet.PauseStart = os.time()
@@ -2477,6 +2531,12 @@ function Module.RenderGUI()
                     if not InterruptSet.stopForDblInvis then InterruptSet.stopForAll = false end
                     ImGui.TableNextColumn()
                     settings[Module.Name].AutoStand, _ = ImGui.Checkbox("Auto Stand##" .. Module.Name, settings[Module.Name].AutoStand)
+                    ImGui.TableNextColumn()
+                    InterruptSet.stopForPartyCorpse = ImGui.Checkbox("Stop for Party Corpse##" .. Module.Name, InterruptSet.stopForPartyCorpse)
+                    if not InterruptSet.stopForPartyCorpse then InterruptSet.stopForAll = false end
+                    ImGui.TableNextColumn()
+                    InterruptSet.stopForRaidCorpse = ImGui.Checkbox("Stop for Raid Corpse##" .. Module.Name, InterruptSet.stopForRaidCorpse)
+                    if not InterruptSet.stopForRaidCorpse then InterruptSet.stopForAll = false end
                     if _ then mq.pickle(configFile, settings) end
                     ImGui.EndTable()
                     if InterruptSet.stopForInvis or InterruptSet.stopForDblInvis then
@@ -2678,8 +2738,7 @@ local function displayHelp()
     Module.Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \agCommands: \ay/mypaths [\atdointerrupts\ax] [\aton\ax|\atoff\ax] \ay- \atToggle Interrupts.", Module.Name)
 end
 
-local function bind(...)
-    local args = { ..., }
+local function handleArguments()
     local key = args[1]
     local action = args[2]
     local path = args[3]
@@ -2896,6 +2955,11 @@ local function bind(...)
     end
 end
 
+local function bind(...)
+    args = { ..., }
+    handleArguments()
+end
+
 local function processArgs()
     if #args == 0 then
         displayHelp()
@@ -2916,6 +2980,12 @@ local function processArgs()
         showHUD = not showHUD
         return
     end
+    for i = 1, #args do
+        if args[i] == 'go' then
+            oneshot = true
+        end
+    end
+    handleArguments()
 end
 
 function Module.Unload()
@@ -2923,7 +2993,6 @@ function Module.Unload()
 end
 
 local function Init()
-    processArgs()
     -- Get Character Name
     configFile = string.format('%s/MyUI/%s/%s/%s_Configs.lua', mq.configDir, Module.Name, Module.Server, Module.CharLoaded)
     -- Load Settings
@@ -2932,12 +3001,15 @@ local function Init()
     mq.bind('/mypaths', bind)
 
     -- Check if ThemeZ exists
+
     if Module.Utils.File.Exists(themezDir) then
         hasThemeZ = true
     end
     currZone = mq.TLO.Zone.ShortName()
     lastZone = currZone
     displayHelp()
+    processArgs()
+
     Module.IsRunning = true
     if not loadedExeternally then
         mq.imgui.init(Module.Name, Module.RenderGUI)
@@ -3295,6 +3367,11 @@ function Module.MainLoop()
     -- Process ImGui Window Flag Changes
     winFlags = locked and bit32.bor(ImGuiWindowFlags.NoMove, ImGuiWindowFlags.MenuBar) or bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.MenuBar)
     winFlags = aSize and bit32.bor(winFlags, ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.MenuBar) or winFlags
+
+    if oneshot and not NavSet.doNav then
+        oneshot = false
+        Module.IsRunning = false
+    end
 end
 
 function Module.LocalLoop()

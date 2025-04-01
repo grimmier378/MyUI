@@ -310,9 +310,11 @@ local function setVolume(volume)
 	winmm.waveOutSetVolume(nil, leftRightVolume)
 end
 -- helpers
-local MsgPrefix = function() return string.format('\aw[\a-tAlert Master\aw] ::\ax ') end
+local function MsgPrefix()
+	return string.format('\aw[\a-tAlert Master\aw] ::\ax ')
+end
 
-local GetCharZone = function()
+local function GetCharZone()
 	return '\aw[\ao' .. Module.CharLoaded .. '\aw] [\at' .. Zone.ShortName() .. '\aw] '
 end
 
@@ -339,12 +341,12 @@ local function print_status()
 	Module.Utils.PrintOutput('AlertMaster', nil, '\a-tVolume GM Alerts: \a-y' .. tostring(volGM) .. '\ax')
 end
 
-local save_settings = function()
+local function save_settings()
 	LIP.save(settings_path, settings)
 	mq.pickle(newConfigFile, Module.Settings)
 end
 
-local check_safe_zone = function()
+local function check_safe_zone()
 	return tSafeZones[Zone.ShortName()]
 end
 
@@ -757,7 +759,7 @@ end
 -----------------------
 
 ---@param spawn MQSpawn
-local should_include_player = function(spawn)
+local function should_include_player(spawn)
 	local name = spawn.DisplayName()
 	local guild = spawn.Guild() or 'None'
 	-- if pc exists on the ignore list, skip
@@ -774,7 +776,7 @@ local should_include_player = function(spawn)
 	return true
 end
 
-local run_char_commands = function()
+local function run_char_commands()
 	if Module.Settings[CharCommands] ~= nil then
 		for k, cmd in pairs(Module.Settings[CharCommands]) do
 			mq.cmdf(cmd)
@@ -783,7 +785,7 @@ local run_char_commands = function()
 	end
 end
 
-local spawn_search_players = function(search)
+local function spawn_search_players(search)
 	local tmp = {}
 	-- if check_safe_zone() then return tmp end
 	local cnt = SpawnCount(search)()
@@ -807,7 +809,7 @@ local spawn_search_players = function(search)
 	return tmp
 end
 
-local spawn_search_npcs = function()
+local function spawn_search_npcs()
 	local tmp = {}
 	local spawns = settings[Zone.ShortName()]
 	if spawns ~= nil then
@@ -829,7 +831,7 @@ local spawn_search_npcs = function()
 	return tmp
 end
 
-local check_for_gms = function()
+local function check_for_gms()
 	if active and gms then
 		local tmp = spawn_search_players('gm')
 		if tmp ~= nil then
@@ -862,7 +864,7 @@ local check_for_gms = function()
 	end
 end
 
-local check_for_pcs = function()
+local function check_for_pcs()
 	if active and pcs then
 		local tmp = spawn_search_players('pc radius ' .. radius .. ' zradius ' .. zradius .. ' notid ' .. mq.TLO.Me.ID())
 		local charZone = '\aw[\a-o' .. Module.CharLoaded .. '\aw|\at' .. Zone.ShortName() .. '\aw] '
@@ -898,7 +900,7 @@ local check_for_pcs = function()
 	end
 end
 
-local check_for_spawns = function()
+local function check_for_spawns()
 	if active and spawns then
 		local spawnAlertsUpdated, tableUpdate = false, false
 		local charZone = '\aw[\a-o' .. Module.CharLoaded .. '\aw|\at' .. Zone.ShortName() .. '\aw] '
@@ -993,7 +995,7 @@ local check_for_spawns = function()
 	end
 end
 
-local check_for_announce = function()
+local function check_for_announce()
 	if active and announce then
 		local tmp = spawn_search_players('pc notid ' .. mq.TLO.Me.ID())
 		local charZone = '\aw[\a-o' .. Module.CharLoaded .. '\aw|\at' .. Zone.ShortName() .. '\aw] '
@@ -1024,7 +1026,7 @@ local check_for_announce = function()
 	end
 end
 
-local check_for_zone_change = function()
+local function check_for_zone_change()
 	-- if we've changed zones, clear the tables and update current zone id
 	if active and (zone_id == nil or zone_id ~= Zone.ID()) then
 		AlertWindowOpen, AlertWindow_Show = false, false
@@ -1695,7 +1697,7 @@ local function Config_GUI()
 					if keys[k] == nil then keys[k] = v end
 					if type(v) == 'boolean' then
 						local pressed = false
-						keys[k], pressed = ImGui.Checkbox(k, keys[k])
+						keys[k], pressed = Module.Utils.DrawToggle(k, keys[k], nil, nil, true)
 						if pressed then
 							Module.Settings[CharConfig][k] = keys[k]
 							set_settings()
@@ -1717,7 +1719,7 @@ local function Config_GUI()
 			local tmpVolGM = volGM or 100
 			local tmpDoGM = doSoundGM
 
-			tmpDoGM = ImGui.Checkbox('GM Alert##AlertMaster', tmpDoGM)
+			tmpDoGM = Module.Utils.DrawToggle('GM Alert##AlertMaster', tmpDoGM, nil, nil, true)
 			if tmpDoGM ~= doSoundGM then
 				doSoundGM = tmpDoGM
 				Module.Settings[CharConfig]['doSoundGM'] = doSoundGM
@@ -1750,7 +1752,7 @@ local function Config_GUI()
 			local tmpVolPC = volPC or 100
 			local tmpDoPC = doSoundPC
 
-			tmpDoPC = ImGui.Checkbox('PC Alert##AlertMaster', tmpDoPC)
+			tmpDoPC = Module.Utils.DrawToggle('PC Alert##AlertMaster', tmpDoPC, nil, nil, true)
 			if tmpDoPC ~= doSoundPC then
 				doSoundPC = tmpDoPC
 				Module.Settings[CharConfig]['doSoundPC'] = doSoundPC
@@ -1786,7 +1788,7 @@ local function Config_GUI()
 			local tmpVolPCLeft = volPCLeft or 100
 			local tmpDoPCLeft = doSoundPCLeft
 
-			tmpDoPCEntered = ImGui.Checkbox('PC Entered##AlertMaster', tmpDoPCEntered)
+			tmpDoPCEntered = Module.Utils.DrawToggle('PC Entered##AlertMaster', tmpDoPCEntered, nil, nil, true)
 			if doSoundPCEntered ~= tmpDoPCEntered then
 				doSoundPCEntered = tmpDoPCEntered
 				Module.Settings[CharConfig]['doSoundPCEntered'] = doSoundPCEntered
@@ -1812,7 +1814,7 @@ local function Config_GUI()
 				Module.Settings[CharConfig]['soundPCEntered'] = soundPCEntered
 				save_settings()
 			end
-			tmpDoPCLeft = ImGui.Checkbox('PC Left##AlertMaster', tmpDoPCLeft)
+			tmpDoPCLeft = Module.Utils.DrawToggle('PC Left##AlertMaster', tmpDoPCLeft, nil, nil, true)
 			if doSoundPCLeft ~= tmpDoPCLeft then
 				doSoundPCLeft = tmpDoPCLeft
 				Module.Settings[CharConfig]['doSoundPCLeft'] = doSoundPCLeft
@@ -1847,7 +1849,7 @@ local function Config_GUI()
 			local tmpVolNPC = volNPC or 100
 			local tmpDoNPC = doSoundNPC
 
-			tmpDoNPC = ImGui.Checkbox('NPC Alert##AlertMaster', tmpDoNPC)
+			tmpDoNPC = Module.Utils.DrawToggle('NPC Alert##AlertMaster', tmpDoNPC, nil, nil, true)
 			if doSoundNPC ~= tmpDoNPC then
 				doSoundNPC = tmpDoNPC
 				Module.Settings[CharConfig]['doSoundNPC'] = doSoundNPC
@@ -1978,8 +1980,8 @@ function Module.RenderGUI()
 	Config_GUI()
 end
 
-local load_binds = function()
-	local bind_alertmaster = function(cmd, val)
+local function load_binds()
+	local function bind_alertmaster(cmd, val)
 		local zone = Zone.ShortName()
 		local val_num = tonumber(val, 10)
 		local val_str = tostring(val):gsub("\"", "")
@@ -2425,7 +2427,7 @@ function Module.Unload()
 	-- mq.unbind('/am')
 end
 
-local setup = function()
+local function setup()
 	originalVolume = getVolume()
 	active = true
 	radius = arg[1] or 200
@@ -2454,7 +2456,7 @@ end
 
 local cTime = os.time()
 local firstRun = true
-Module.MainLoop = function()
+function Module.MainLoop()
 	-- while true do
 	if currZone ~= lastZone then
 		numAlerts = 0

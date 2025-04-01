@@ -12,12 +12,14 @@ if not loadedExeternally then
 	Module.Theme       = require('defaults.themes')
 	Module.ThemeLoader = require('lib.theme_loader')
 	Module.Colors      = require('lib.colors')
+	Module.Utils       = require('lib.common')
 else
 	Module.Path = MyUI_Path
 	Module.Colors = MyUI_Colors
 	Module.ThemeFile = MyUI_ThemeFile
 	Module.Theme = MyUI_Theme
 	Module.ThemeLoader = MyUI_ThemeLoader
+	Module.Utils = MyUI_Utils
 end
 -- Constants
 local ICON_WIDTH                                          = 40
@@ -415,6 +417,7 @@ local function create_inventory()
 			if slot.Container() and slot.Container() > 0 then
 				for j = 1, (slot.Container()), 1 do
 					if (slot.Item(j)()) then
+						local itemName = slot.Item(j).Name() or 'unknown'
 						table.insert(items, slot.Item(j))
 						tmpUsedSlots = tmpUsedSlots + 1
 						if slot.Item(j).Clicky() then
@@ -425,13 +428,13 @@ local function create_inventory()
 						end
 
 						-- check spells and songs against our spellbook
-						local isSpell = slot.Item(j).Name():find("Spell:")
-						local isSong = slot.Item(j).Name():find("Song:")
+						local isSpell = itemName:find("Spell:")
+						local isSong = itemName:find("Song:")
 						local spellName = nil
-						if isSpell then
-							spellName = slot.Item(j).Name():gsub("Spell: ", "")
-						elseif isSong then
-							spellName = slot.Item(j).Name():gsub("Song: ", "")
+						if isSpell or isSong then
+							spellName = slot.Item(j).Spell.Name() --:gsub("Spell: ", "")
+							-- elseif isSong then
+							-- 	spellName = slot.Item(j).Spell.Name() --:gsub("Song: ", "")
 						end
 						if spellName ~= nil then
 							if not book[spellName] then
@@ -495,7 +498,7 @@ local function display_bag_options()
 	if ImGui.BeginChild("OptionsChild") then
 		if ImGui.CollapsingHeader("Bag Options") then
 			local changed = false
-			sort_order.name, changed = ImGui.Checkbox("Name", sort_order.name)
+			sort_order.name, changed = Module.Utils.DrawToggle("Name", sort_order.name, nil, nil, true)
 			if changed then
 				needSort = true
 				settings.sort_order.name = sort_order.name
@@ -506,7 +509,7 @@ local function display_bag_options()
 			help_marker("Order items from your inventory sorted by the name of the item.")
 
 			local pressed = false
-			sort_order.stack, pressed = ImGui.Checkbox("Stack", sort_order.stack)
+			sort_order.stack, pressed = Module.Utils.DrawToggle("Stack", sort_order.stack, nil, nil, true)
 			if pressed then
 				needSort = true
 				settings.sort_order.stack = sort_order.stack
@@ -517,7 +520,7 @@ local function display_bag_options()
 			help_marker("Order items with the largest stacks appearing first.")
 
 			local pressed2 = false
-			show_item_background, pressed2 = ImGui.Checkbox("Show Slot Background", show_item_background)
+			show_item_background, pressed2 = Module.Utils.DrawToggle("Show Slot Background", show_item_background, nil, nil, true)
 			if pressed2 then
 				settings.show_item_background = show_item_background
 				mq.pickle(configFile, settings)
@@ -746,14 +749,19 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 	end
 	local toolTipSpell = ''
 	local colorChange = false
+	local lvlHigh = false
 	if canUse then
 		local isSpell = item.Name():find("Spell:")
 		local isSong = item.Name():find("Song:")
 		if isSpell or isSong then
-			local spellName = item.Name():gsub("Spell: ", ""):gsub("Song: ", "")
+			local spellName = item.Spell.Name() --:gsub("Spell: ", ""):gsub("Song: ", "")
+			local spellLvl = mq.TLO.Spell(spellName).Level() or 0
 			if not book[spellName] then
+				if spellLvl > MySelf.Level() then
+					lvlHigh = true
+				end
 				colorChange = true
-				toolTipSpell = mq.TLO.Spell(spellName).Level() > 0 and string.format("Lvl %s", mq.TLO.Spell(spellName).Level()) or ''
+				toolTipSpell = spellLvl > 0 and string.format("Lvl %s", spellLvl) or ''
 			else
 				toolTipSpell = "Already Know"
 			end
@@ -761,13 +769,21 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 			colorChange = true
 		end
 	end
+
 	if colorChange then
-		ImGui.PushStyleColor(ImGuiCol.Button, 0, 0.8, 0.2, 0.2)
+		if lvlHigh then
+			ImGui.PushStyleColor(ImGuiCol.Button, 0.8, 0.1, 0.2, 0.2)
+		else
+			ImGui.PushStyleColor(ImGuiCol.Button, 0, 0.8, 0.2, 0.2)
+		end
 	end
+
 	ImGui.Button(btn_label(item), iconWidth, iconHeight)
+
 	if colorChange then
 		ImGui.PopStyleColor(1)
 	end
+
 	ImGui.PopStyleColor(3)
 	ImGui.PopID()
 
@@ -1155,7 +1171,7 @@ local function RenderTabs()
 		end
 		local pressed
 		ImGui.SetNextItemWidth(100)
-		settings.HighlightUseable, pressed = ImGui.Checkbox("Highlight Useable", settings.HighlightUseable)
+		settings.HighlightUseable, pressed = Module.Utils.DrawToggle("Highlight Useable", settings.HighlightUseable)
 		if pressed then
 			mq.pickle(configFile, settings)
 		end

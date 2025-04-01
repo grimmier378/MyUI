@@ -366,7 +366,7 @@ function Module.RenderGUI()
                     needSave = true
                 end
 
-                Module.Settings.ExpPlotFillLines, pressed = ImGui.Checkbox("Shade Plot Lines", Module.Settings.ExpPlotFillLines)
+                Module.Settings.ExpPlotFillLines, pressed = Module.Utils.DrawToggle("Shade Plot Lines", Module.Settings.ExpPlotFillLines)
                 if pressed then
                     needSave = true
                 end
@@ -624,7 +624,7 @@ function Module.MainLoop()
         end
 
         XPPerSecond            = ((TrackXP.Experience.Total - PrevXPTotal) / XPTotalDivider) / horizon_or_less
-        XPToNextLevel          = XPTotalPerLevel - mq.TLO.Me.Exp()
+        XPToNextLevel          = 100 - mq.TLO.Me.PctExp()
         AAXPPerSecond          = ((TrackXP.AAExperience.Total - PrevAATotal) / XPTotalDivider) / horizon_or_less
 
         AAXPPerSecond          = AAXPPerSecond / (OnEmu and 1 or 100) -- divide by 100 to get full AA, not % values

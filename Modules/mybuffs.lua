@@ -13,15 +13,17 @@ Module.Theme            = {}
 Module.buffTable        = {}
 Module.songTable        = {}
 Module.TempSettings     = {}
+Module.MyBuffsNames     = {}
 Module.Name             = "MyBuffs"
 Module.IsRunning        = false
-
+Module.NeedSave         = false
 Module.ShowGUI,
 Module.SplitWin,
 Module.ShowConfig,
 Module.MailBoxShow,
 Module.ShowDebuffs,
-Module.showTitleBar     = true, false, false, false, false, true
+Module.ShowFavorites,
+Module.showTitleBar     = true, false, false, false, false, false, true
 Module.locked,
 Module.ShowIcons,
 Module.ShowTimer,
@@ -78,34 +80,46 @@ local ShowMenu                         = false
 local sortType                         = 'none'
 local showTableView                    = true
 local maxSongs                         = 30
-local winPositions                     = {
+local numBuffs                         = 0
+local BuffMe                           = mq.TLO.Plugin("MQ2BuffMe").IsLoaded()
+local knobColorOn                      = ImVec4(0.190, 1.000, 0.827, 0.924)
+local knobColorOff                     = ImVec4(1.000, 0.190, 0.190, 0.924)
+
+
+local winPositions = {
     Config = { x = 500, y = 500, },
     MailBox = { x = 500, y = 500, },
     Debuffs = { x = 500, y = 500, },
     Buffs = { x = 500, y = 500, },
     Songs = { x = 500, y = 500, },
+    Favorites = { x = 500, y = 500, },
 }
-local winSizes                         = {
+local winSizes     = {
     Config = { x = 300, y = 500, },
     MailBox = { x = 500, y = 500, },
     Debuffs = { x = 500, y = 500, },
     Buffs = { x = 200, y = 300, },
     Songs = { x = 200, y = 300, },
+    Favorites = { x = 400, y = 300, },
 }
 -- Timing Variables
-local clockTimer                       = mq.gettime()
-local lastTime                         = mq.gettime()
-local checkIn                          = os.time()
-local frameTime                        = 33
+local clockTimer   = mq.gettime()
+local begTimer     = os.time()
+local lastTime     = mq.gettime()
+local checkIn      = os.time()
+local frameTime    = 33
 local currZone, lastZone
 
 -- default config settings
-Module.defaults                        = {
+Module.defaults    = {
     Scale = 1.0,
     LoadTheme = 'Default',
     locked = false,
     IconSize = 24,
+    BuffBegTimer = 30,
+    BuffBeg = false,
     ShowIcons = true,
+    ShowFavorites = false,
     ShowTimer = true,
     ShowText = true,
     DoPulse = true,
@@ -130,6 +144,7 @@ Module.defaults                        = {
         Debuffs = { x = 500, y = 500, },
         Buffs = { x = 500, y = 500, },
         Songs = { x = 500, y = 500, },
+        Favorites = { x = 500, y = 500, },
     },
     WindowSizes = {
         Config = { x = 300, y = 500, },
@@ -137,10 +152,12 @@ Module.defaults                        = {
         Debuffs = { x = 500, y = 500, },
         Buffs = { x = 200, y = 300, },
         Songs = { x = 200, y = 300, },
+        Favorites = { x = 400, y = 300, },
     },
+    Favorites = {},
 }
 
-local myClass                          = mq.TLO.Me.Class.ShortName() or 'N/A'
+local myClass      = mq.TLO.Me.Class.ShortName() or 'N/A'
 
 -- Functions
 
@@ -209,7 +226,7 @@ local function GetBuff(slot)
     local buffTooltip, buffName, buffDurDisplay, buffIcon, buffID, buffBeneficial, buffHr, buffMin, buffSec, totalMin, totalSec, buffDurHMS
     local buff = mq.TLO.Me.Buff(slot)
     local duration = buff.Duration
-
+    local hasBuff = buff() ~= nil
     buffName = buff.Name() or ''
     buffIcon = buff.SpellIcon() or 0
     buffID = buff.ID() or 0
@@ -302,6 +319,10 @@ local function GetBuff(slot)
         TotalSeconds = totalSec,
         Tooltip = buffTooltip,
     }
+    if hasBuff then
+        Module.TempSettings.MyBuffsNames[buffName] = true
+    end
+    return hasBuff
 end
 
 local function GetSong(slot)
@@ -410,10 +431,16 @@ local function GetBuffs()
     changed = false
     local subject = 'Update'
     debuffOnMe = {}
+    Module.TempSettings.MyBuffsNames = {}
+    numBuffs = 0
     numSlots = mq.TLO.Me.MaxBuffSlots() or 0
     if numSlots == 0 then return end -- most likely not loaded all the way try again next cycle
     for i = 1, numSlots do
-        GetBuff(i)
+        local hasBuff = false
+        hasBuff = GetBuff(i)
+        if hasBuff then
+            numBuffs = numBuffs + 1
+        end
     end
     if mq.TLO.Me.CountSongs() > 0 then
         for i = 1, maxSongs do
@@ -480,6 +507,13 @@ local function GetBuffs()
             Module.boxes[1].SortedBuffsD = SortBuffs(Module.buffTable, 'dur')
             Module.boxes[1].SortedSongsA = SortBuffs(Module.songTable, 'alpha')
             Module.boxes[1].SortedSongsD = SortBuffs(Module.songTable, 'dur')
+        end
+    end
+    for k, v in pairs(Module.settings[Module.Name].Favorites) do
+        if Module.TempSettings.MyBuffsNames[k] ~= nil then
+            Module.MyBuffsNames[k] = true
+        else
+            Module.MyBuffsNames[k] = false
         end
     end
 end
@@ -631,6 +665,10 @@ local function loadSettings()
         end
         Module.timerColor = Module.settings[Module.Name]
     end
+    if Module.settings[Module.Name].Favorites == nil then
+        Module.settings[Module.Name].Favorites = {}
+        newSetting = true
+    end
     themeName = Module.settings[Module.Name].LoadTheme or 'Default'
     if not loadedExeternally then
         loadTheme(Module.ThemeFile)
@@ -661,6 +699,7 @@ local function loadSettings()
     useWinPos = Module.settings[Module.Name].UseWindowPositions
     Module.TempSettings.ShowOnlyGroup = Module.settings[Module.Name].ShowMyGroupOnly
     sortType = Module.settings[Module.Name].SortBy
+    Module.ShowFavorites = Module.settings[Module.Name].ShowFavorites
     if newSetting then mq.pickle(configFile, Module.settings) end
 end
 
@@ -806,6 +845,9 @@ local function BoxBuffs(id, sorted, view)
                     mq.TLO.Me.Buff(bName).Inspect()
                 end
             end
+            if ImGui.MenuItem("Add My Favorite##" .. i) then
+                Module.TempSettings.NewFav = boxBuffs[i].Name
+            end
 
             if ImGui.MenuItem("Block##" .. i) then
                 local what = string.format('blockbuff%s', boxBuffs[i].Name)
@@ -826,6 +868,7 @@ local function BoxBuffs(id, sorted, view)
                     mq.TLO.Me.Buff(bName).Remove()
                 end
             end
+
             ImGui.EndPopup()
         end
         if ImGui.IsItemHovered() then
@@ -1022,6 +1065,37 @@ local function sortedBoxes(boxes)
     return boxes
 end
 
+function Module.AddFav(name)
+    if name == nil then return end
+    if Module.settings[Module.Name].Favorites == nil then
+        Module.settings[Module.Name].Favorites = {}
+    end
+    Module.settings[Module.Name].Favorites[name] = true
+    mq.pickle(configFile, Module.settings)
+end
+
+function Module.BegBuffs()
+    if numBuffs == mq.TLO.Me.MaxBuffSlots() or not Module.settings[Module.Name].BuffBeg then
+        return
+    end
+    if not BuffMe then return end
+
+    local cnt = 1
+    for buff_name, beg_for in pairs(Module.settings[Module.Name].Favorites) do
+        if mq.TLO.Me.Buff(buff_name)() == nil then
+            Module.MyBuffsNames[buff_name] = false
+            if beg_for then
+                mq.cmdf("/timed %d /dgz /buffthem %s %s", cnt * 5, Module.CharLoaded, buff_name)
+                cnt = cnt + 1
+            end
+        else
+            Module.MyBuffsNames[buff_name] = true
+        end
+    end
+end
+
+-- When drawing:
+
 function Module.RenderGUI()
     if currZone ~= lastZone then return end
 
@@ -1126,10 +1200,27 @@ function Module.RenderGUI()
                     ImGui.EndMenu()
                 end
 
+                if ImGui.Button(Module.TempSettings.ShowOnlyGroup and Module.Icons.FA_USERS or Module.Icons.FA_USER) then
+                    Module.settings[Module.Name].ShowMyGroupOnly = not Module.settings[Module.Name].ShowMyGroupOnly
+                    Module.TempSettings.ShowOnlyGroup = Module.settings[Module.Name].ShowMyGroupOnly
+                    mq.pickle(configFile, Module.settings)
+                end
+                if ImGui.IsItemHovered() then
+                    ImGui.BeginTooltip()
+                    ImGui.Text(Module.TempSettings.ShowOnlyGroup and "Show All" or "Show Group ONLY")
+                    ImGui.EndTooltip()
+                end
+
                 local pressed = false
                 pressed, showTableView = ImGui.MenuItem(Module.Icons.FA_TABLE, nil, showTableView)
                 if pressed then
                     Module.settings[Module.Name].TableView = showTableView
+                    mq.pickle(configFile, Module.settings)
+                end
+
+                if ImGui.Button(Module.Icons.MD_FAVORITE) then
+                    Module.ShowFavorites = not Module.ShowFavorites
+                    Module.settings[Module.Name].ShowFavorites = Module.ShowFavorites
                     mq.pickle(configFile, Module.settings)
                 end
 
@@ -1231,7 +1322,7 @@ function Module.RenderGUI()
             Module.settings[Module.Name].WindowPositions.Buffs.y = curPosY
             Module.settings[Module.Name].WindowSizes.Buffs.x = winSizeX
             Module.settings[Module.Name].WindowSizes.Buffs.y = winSizeY
-            mq.pickle(configFile, Module.settings)
+            Module.TempSettings.NeedSavePositions = true
         end
         if ImGui.BeginPopupContextWindow("Options") then
             local lbl = Module.locked and " Un-Lock Window" or " Lock Window"
@@ -1246,6 +1337,11 @@ function Module.RenderGUI()
             if ImGui.MenuItem("Show Table") then
                 showTableView = not showTableView
                 Module.settings[Module.Name].TableView = showTableView
+                mq.pickle(configFile, Module.settings)
+            end
+            if ImGui.MenuItem("ShowFavorites") then
+                Module.ShowFavorites = not Module.ShowFavorites
+                Module.settings[Module.Name].ShowFavorites = Module.ShowFavorites
                 mq.pickle(configFile, Module.settings)
             end
             if ImGui.MenuItem("Split Window") then
@@ -1436,6 +1532,15 @@ function Module.RenderGUI()
                 if songTimer ~= tmpSongTimer then
                     songTimer = tmpSongTimer
                 end
+                if BuffMe then
+                    Module.settings[Module.Name].BuffBeg = Module.Utils.DrawToggle('Buff Begging##config', Module.settings[Module.Name].BuffBeg)
+                    if Module.settings[Module.Name].BuffBeg then
+                        local changed = false
+                        ImGui.SetNextItemWidth(150)
+                        Module.settings[Module.Name].BuffBegTimer, changed = ImGui.DragInt("Buff Beg Timer (Seconds)##MyBuffs", Module.settings[Module.Name].BuffBegTimer, 10, 10,
+                            600)
+                    end
+                end
             end
             --------------------- input boxes --------------------
 
@@ -1443,13 +1548,13 @@ function Module.RenderGUI()
             ImGui.SeparatorText('Toggles')
             if ImGui.CollapsingHeader('Toggles##Coll' .. Module.Name) then
                 local tmpShowIcons = Module.ShowIcons
-                tmpShowIcons = ImGui.Checkbox('Show Icons', tmpShowIcons)
+                tmpShowIcons = Module.Utils.DrawToggle('Show Icons', tmpShowIcons, nil, nil, true)
                 if tmpShowIcons ~= Module.ShowIcons then
                     Module.ShowIcons = tmpShowIcons
                 end
                 ImGui.SameLine()
                 local tmpPulseIcons = Module.DoPulse
-                tmpPulseIcons = ImGui.Checkbox('Pulse Icons', tmpPulseIcons)
+                tmpPulseIcons = Module.Utils.DrawToggle('Pulse Icons', tmpPulseIcons, nil, nil, true)
                 if tmpPulseIcons ~= Module.DoPulse then
                     Module.DoPulse = tmpPulseIcons
                 end
@@ -1466,42 +1571,42 @@ function Module.RenderGUI()
                 if ImGui.BeginTable("Toggles##", 2) then
                     ImGui.TableNextColumn()
                     local tmpShowText = Module.ShowText
-                    tmpShowText = ImGui.Checkbox('Show Text', tmpShowText)
+                    tmpShowText = Module.Utils.DrawToggle('Show Text', tmpShowText, nil, nil, true)
                     if tmpShowText ~= Module.ShowText then
                         Module.ShowText = tmpShowText
                     end
                     ImGui.TableNextColumn()
                     local tmpShowTimer = Module.ShowTimer
-                    tmpShowTimer = ImGui.Checkbox('Show Timer', tmpShowTimer)
+                    tmpShowTimer = Module.Utils.DrawToggle('Show Timer', tmpShowTimer, nil, nil, true)
                     if tmpShowTimer ~= Module.ShowTimer then
                         Module.ShowTimer = tmpShowTimer
                     end
                     ImGui.TableNextColumn()
                     local tmpScroll = Module.ShowScroll
-                    tmpScroll = ImGui.Checkbox('Show Scrollbar', tmpScroll)
+                    tmpScroll = Module.Utils.DrawToggle('Show Scrollbar', tmpScroll, nil, nil, true)
                     if tmpScroll ~= Module.ShowScroll then
                         Module.ShowScroll = tmpScroll
                     end
                     ImGui.TableNextColumn()
                     local tmpSplit = Module.SplitWin
-                    tmpSplit = ImGui.Checkbox('Split Win', tmpSplit)
+                    tmpSplit = Module.Utils.DrawToggle('Split Win', tmpSplit, nil, nil, true)
                     if tmpSplit ~= Module.SplitWin then
                         Module.SplitWin = tmpSplit
                     end
                     ImGui.TableNextColumn()
-                    Module.MailBoxShow = ImGui.Checkbox('Show MailBox', Module.MailBoxShow)
+                    Module.MailBoxShow = Module.Utils.DrawToggle('Show MailBox', Module.MailBoxShow, nil, nil, true)
                     ImGui.TableNextColumn()
-                    Module.ShowDebuffs = ImGui.Checkbox('Show Debuffs', Module.ShowDebuffs)
+                    Module.ShowDebuffs = Module.Utils.DrawToggle('Show Debuffs', Module.ShowDebuffs, nil, nil, true)
                     ImGui.TableNextColumn()
-                    Module.showTitleBar = ImGui.Checkbox('Show Title Bar', Module.showTitleBar)
+                    Module.showTitleBar = Module.Utils.DrawToggle('Show Title Bar', Module.showTitleBar, nil, nil, true)
                     ImGui.TableNextColumn()
-                    useWinPos = ImGui.Checkbox('Use Window Positions', useWinPos)
+                    useWinPos = Module.Utils.DrawToggle('Use Window Positions', useWinPos, nil, nil, true)
                     ImGui.TableNextColumn()
-                    ShowMenu = ImGui.Checkbox('Show Menu', ShowMenu)
+                    ShowMenu = Module.Utils.DrawToggle('Show Menu', ShowMenu, nil, nil, true)
                     ImGui.TableNextColumn()
-                    showTableView = ImGui.Checkbox('Show Table', showTableView)
+                    showTableView = Module.Utils.DrawToggle('Show Table', showTableView, nil, nil, true)
                     ImGui.TableNextColumn()
-                    Module.TempSettings.ShowOnlyGroup = ImGui.Checkbox('Show My Group Only', Module.TempSettings.ShowOnlyGroup)
+                    Module.TempSettings.ShowOnlyGroup = Module.Utils.DrawToggle('Show My Group Only', Module.TempSettings.ShowOnlyGroup, nil, nil, true)
                     ImGui.EndTable()
                 end
             end
@@ -1547,7 +1652,7 @@ function Module.RenderGUI()
             Module.settings[Module.Name].WindowPositions.Config.y = curPosY
             Module.settings[Module.Name].WindowSizes.Config.x = winSizeX
             Module.settings[Module.Name].WindowSizes.Config.y = winSizeY
-            mq.pickle(configFile, Module.settings)
+            Module.TempSettings.NeedSavePositions = true
         end
         Module.ThemeLoader.EndTheme(ColorCountConf, StyleCountConf)
         ImGui.SetWindowFontScale(1)
@@ -1608,12 +1713,126 @@ function Module.RenderGUI()
                 Module.settings[Module.Name].WindowSizes.Debuffs.y = winSizeY
                 Module.settings[Module.Name].WindowPositions.Debuffs.x = curPosX
                 Module.settings[Module.Name].WindowPositions.Debuffs.y = curPosY
-                mq.pickle(configFile, Module.settings)
+                Module.TempSettings.NeedSavePositions = true
             end
             Module.ThemeLoader.EndTheme(ColorCountDebuffs, StyleCountDebuffs)
             ImGui.SetWindowFontScale(1)
             ImGui.End()
         end
+    end
+
+    if Module.ShowFavorites then
+        local ColorCountFav, StyleCountFav = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
+        local winPosX, winPosY = winPositions.Favorites.x, winPositions.Favorites.y
+        local winSizeX, winSizeY = winSizes.Favorites.x, winSizes.Favorites.y
+        if useWinPos then
+            ImGui.SetNextWindowSize(ImVec2(winSizeX, winSizeY), ImGuiCond.Appearing)
+            ImGui.SetNextWindowPos(ImVec2(winPosX, winPosY), ImGuiCond.Appearing)
+        end
+        ImGui.SetNextWindowSize(400, 300, ImGuiCond.FirstUseEver)
+        local openFavs, showFavs = ImGui.Begin("MyBuffs Favorites##__" .. Module.CharLoaded, true,
+            bit32.bor(ImGuiWindowFlags.NoFocusOnAppearing))
+        ImGui.SetWindowFontScale(Scale)
+
+        if not openFavs then
+            Module.ShowFavorites = false
+            Module.settings[Module.Name].ShowFavorites = false
+            mq.pickle(configFile, Module.settings)
+        end
+        if showFavs then
+            if BuffMe then
+                local changedInt = false
+                local knobColor = Module.settings[Module.Name].BuffBeg and ImVec4(0.867, 0.774, 0.082, 1.000) or ImVec4(0.823, 0.411, 0.066, 1.000)
+
+                Module.settings[Module.Name].BuffBeg = Module.Utils.DrawToggle('Buff Begging', Module.settings[Module.Name].BuffBeg,
+                    ImVec2(46, 16),
+                    Module.settings[Module.Name].BuffBeg,
+                    false,
+                    Module.settings[Module.Name].BuffBeg and ImVec4(0.206, 0.560, 0.867, 1.000) or ImVec4(0.168, 0.797, 0.312, 1.000),
+                    Module.settings[Module.Name].BuffBeg and ImVec4(0.326, 0.152, 0.582, 1.000) or ImVec4(0.326, 0.152, 0.582, 1.000),
+                    Module.Utils.GetBreathingColor(knobColor,
+                        Module.settings[Module.Name].BuffBeg))
+
+                if Module.settings[Module.Name].BuffBeg then
+                    ImGui.SetNextItemWidth(150)
+                    Module.settings[Module.Name].BuffBegTimer, changedInt = ImGui.DragInt("Buff Beg Delay (Seconds)##MyBuffs", Module.settings[Module.Name].BuffBegTimer, 10, 10,
+                        600)
+                end
+                if changedInt then
+                    Module.NeedSave = true
+                end
+            end
+
+            local colNum = BuffMe and 4 or 2
+
+            ImGui.Spacing()
+            if ImGui.BeginTable("Favorites", colNum, ImGuiTableFlags.ScrollY) then
+                ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch, 100)
+                if BuffMe then
+                    ImGui.TableSetupColumn("Beg", ImGuiTableColumnFlags.WidthFixed, 60)
+                    ImGui.TableSetupColumn('Now', ImGuiTableColumnFlags.WidthFixed, 40)
+                end
+                ImGui.TableSetupColumn(Module.Icons.MD_DELETE, ImGuiTableColumnFlags.WidthFixed, 40)
+                ImGui.TableHeadersRow()
+                for k, v in pairs(Module.settings[Module.Name].Favorites or {}) do
+                    if v ~= nil then
+                        ImGui.TableNextRow()
+                        ImGui.TableNextColumn()
+                        local tTip = string.format("Spell: %s\nBegging: %s", k, tostring(v):upper())
+                        Module.Utils.DrawStatusIcon(mq.TLO.Spell(k).SpellIcon() or 0, 'spell', tTip, Module.iconSize)
+                        ImGui.SameLine()
+                        if Module.MyBuffsNames[k] then
+                            ImGui.TextColored(ImVec4(0.2, 1, 0.2, 0.8), k)
+                        elseif not v then
+                            ImGui.Text(k)
+                        else
+                            ImGui.TextColored(ImVec4(1, 0.2, 0.2, 0.7), k)
+                        end
+                        if BuffMe then
+                            ImGui.TableNextColumn()
+                            local clicked = false
+
+                            Module.settings[Module.Name].Favorites[k], clicked = Module.Utils.DrawToggle("##Beg_" .. k, Module.settings[Module.Name].Favorites[k],
+                                ImVec2(46, 16),
+                                Module.settings[Module.Name].Favorites[k],
+                                false,
+                                ImVec4(0.780, 0.102, 0.863, 0.910),
+                                ImVec4(0.306, 0.200, 0.800, 1.000),
+                                Module.Utils.GetBreathingColor(v and knobColorOn or knobColorOff,
+                                    Module.settings[Module.Name].Favorites[k]))
+
+                            if clicked then Module.NeedSave = true end
+
+                            ImGui.TableNextColumn()
+                            if ImGui.Button(Module.Icons.FA_BULLHORN .. "##" .. k) then
+                                mq.cmdf("/dgz /buffthem %s %s", Module.CharLoaded, k)
+                            end
+                        end
+                        ImGui.TableNextColumn()
+                        if ImGui.Button(Module.Icons.MD_DELETE .. "##Remove_" .. k) then
+                            Module.settings[Module.Name].Favorites[k] = nil
+                            mq.pickle(configFile, Module.settings)
+                        end
+                    end
+                end
+                ImGui.EndTable()
+            end
+        end
+        local curPosX, curPosY = ImGui.GetWindowPos()
+        local curSizeX, curSizeY = ImGui.GetWindowSize()
+        if curPosX ~= winPosX or curPosY ~= winPosY or curSizeX ~= winSizeX or curSizeY ~= winSizeY then
+            winPositions.Favorites.x = curPosX
+            winPositions.Favorites.y = curPosY
+            winSizeX, winSizeY = curSizeX, curSizeY
+            Module.settings[Module.Name].WindowPositions.Favorites.x = curPosX
+            Module.settings[Module.Name].WindowPositions.Favorites.y = curPosY
+            Module.settings[Module.Name].WindowSizes.Favorites.x = winSizeX
+            Module.settings[Module.Name].WindowSizes.Favorites.y = winSizeY
+            Module.TempSettings.NeedSavePositions = true
+        end
+        Module.ThemeLoader.EndTheme(ColorCountFav, StyleCountFav)
+        ImGui.SetWindowFontScale(1)
+        ImGui.End()
     end
 
     if Module.MailBoxShow then
@@ -1675,7 +1894,7 @@ function Module.RenderGUI()
             Module.settings[Module.Name].WindowPositions.MailBox.y = curPosY
             Module.settings[Module.Name].WindowSizes.MailBox.x = winSizeX
             Module.settings[Module.Name].WindowSizes.MailBox.y = winSizeY
-            mq.pickle(configFile, Module.settings)
+            Module.TempSettings.NeedSavePositions = true
         end
         Module.ThemeLoader.EndTheme(ColorCountMail, StyleCountMail)
         ImGui.End()
@@ -1751,6 +1970,17 @@ local function processCommand(...)
         elseif args[1] == 'mailbox' then
             Module.MailBoxShow = not Module.MailBoxShow
         end
+        if #args == 2 then
+            if args[1] == 'beg' then
+                if args[2] == 'on' or args[2] == 'true' then
+                    Module.settings[Module.Name].BuffBeg = true
+                    Module.Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Buff Begging \atEnabled\ax.')
+                elseif args[2] == 'off' or args[2] == 'false' then
+                    Module.settings[Module.Name].BuffBeg = false
+                    Module.Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao Buff Begging \arDisabled\ax.')
+                end
+            end
+        end
     else
         Module.Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ao No command given.')
         Module.Utils.PrintOutput('MyUI', nil, '\ayMyBuffs.\ag /mybuffs gui \ao- Toggles the GUI on and off.')
@@ -1765,6 +1995,7 @@ function Module.Unload()
 end
 
 local arguments = { ..., }
+local buffmecheck = os.time()
 
 local function init()
     if loadedExeternally then
@@ -1785,6 +2016,11 @@ local function init()
 
     mq.bind('/mybuffs', processCommand)
     Module.IsRunning = true
+
+    BuffMe = mq.TLO.Plugin("MQ2BuffMe").IsLoaded()
+    buffmecheck = os.time()
+
+    Module.BegBuffs()
     if not loadedExeternally then
         mq.imgui.init(Module.Nam, Module.RenderGUI)
         Module.LocalLoop()
@@ -1797,14 +2033,48 @@ function Module.MainLoop()
         if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
     Module.MyGroupLeader = mq.TLO.Group.Leader() or 'NoGroup'
-    if mq.gettime() - clockTimer >= 1 then
+    if Module.TempSettings.NewFav ~= nil then
+        Module.AddFav(Module.TempSettings.NewFav)
+        Module.TempSettings.NewFav = nil
+    end
+
+    local now = mq.gettime()
+    local nowTime = os.time()
+
+    if now - clockTimer >= 1 then
         currZone = mq.TLO.Zone.ID()
         if currZone ~= lastZone then
             lastZone = currZone
         end
         if not solo then CheckStale() end
         GetBuffs()
-        clockTimer = mq.gettime()
+        clockTimer = now
+    end
+
+    if Module.TempSettings.PositionTimer == nil then
+        Module.TempSettings.PositionTimer = os.time()
+    end
+
+    -- save window positions every 5 seconds if the checkbox is checked
+    if nowTime - Module.TempSettings.PositionTimer >= 5 and Module.TempSettings.NeedSavePositions and useWinPos then
+        mq.pickle(configFile, Module.settings)
+        Module.TempSettings.NeedSavePositions = false
+        Module.TempSettings.PositionTimer = nowTime
+    end
+
+    if Module.NeedSave then
+        Module.NeedSave = false
+        mq.pickle(configFile, Module.settings)
+    end
+
+    if nowTime - buffmecheck >= 5 then
+        BuffMe = mq.TLO.Plugin("MQ2BuffMe").IsLoaded()
+        buffmecheck = nowTime
+    end
+
+    if nowTime - begTimer >= Module.settings[Module.Name].BuffBegTimer then
+        Module.BegBuffs()
+        begTimer = nowTime
     end
 end
 

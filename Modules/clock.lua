@@ -44,7 +44,7 @@ local drawTimerMS = mq.gettime() -- get the current time in milliseconds
 local drawTimerS = os.time()     -- get the current time in seconds
 local Module = {}
 
-Module.Name = "Template" -- Name of the module used when loading and unloaing the modules.
+Module.Name = "Clock"    -- Name of the module used when loading and unloaing the modules.
 Module.IsRunning = false -- Keep track of running state. if not running we can unload it.
 Module.ShowGui = true
 
@@ -71,6 +71,14 @@ if not loadedExeternally then
 	MyUI_Guild       = mq.TLO.Me.Guild() or "none"
 end
 
+local gTime = string.format("%s %s", mq.TLO.GameTime.Time12():sub(1, 5), mq.TLO.GameTime.Hour() > 12 and 'PM' or 'AM')
+--[[
+	-- This is the main module template for MyUI. It is a basic template to get you started with your own modules.
+	-- You can use this as a base to build your own modules and add your own functionality.
+	-- The template will load the module and allow you to use it in the MyUI framework.
+	-- You can also use this as a standalone script if you want to run it outside of MyUI.
+
+]]
 
 --Helpers
 -- You can keep your functions local to the module the ones here are the only ones we care about from the main script.
@@ -85,6 +93,13 @@ local function CommandHandler(...)
 		end
 	end
 end
+
+--[[
+	-- This is the main function that will be called when the module is loaded.
+	-- You can use this to initialize your module and set up any variables or functions you need.
+	-- You can also use this to bind any commands or events you need to handle.
+	-- This will be called when the module is loaded and will run in the background until the module is unloaded.
+]]
 
 local function Init()
 	-- your Init code here
@@ -108,16 +123,15 @@ local winFlags = bit32.bor(
 	ImGuiWindowFlags.NoScrollWithMouse
 )
 
-local imagesDir = mq.luaDir .. '/MyUI/Images/'
 
-local images = {
-	[1] = mq.CreateTexture(imagesDir .. 'flame0.png'),
-	[2] = mq.CreateTexture(imagesDir .. 'flame1.png'),
-	[3] = mq.CreateTexture(imagesDir .. 'flame2.png'),
 
-}
-local currentImage = 1
 -- Exposed Functions
+
+--[[
+	-- This is the function that will be called to render the GUI for the module.
+	-- You can use this to create your own GUI and add any functionality you need.
+	-- This will be called every frame and will run in the background until the module is unloaded.
+]]
 function Module.RenderGUI()
 	if Module.ShowGui then
 		ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(0.1, 0.1, 0.1, 0.8))
@@ -129,33 +143,58 @@ function Module.RenderGUI()
 		if show then
 			--GUI
 			-- your code here
-			ImGui.Image(images[currentImage]:GetTextureID(), ImVec2(500, 750))
+
+			-- ImGui.Text("Char: ")
+			-- ImGui.SameLine()
+			-- ImGui.TextColored(MyUI_Colors.color('yellow'), " %s", MyUI_CharLoaded)
+
+			ImGui.PushTextWrapPos(250)
+
+			ImGui.Text("Zone:")
+			ImGui.SameLine()
+			ImGui.TextColored(MyUI_Colors.color('softblue'), " %s", mq.TLO.Zone.Name())
+
+			ImGui.Text("RealTime: ")
+			ImGui.SameLine()
+			ImGui.TextColored(MyUI_Colors.color('yellow'), os.date("%I:%M:%S %p (%A)"))
+
+			ImGui.Text("GameTime: ")
+			ImGui.SameLine()
+			ImGui.TextColored(MyUI_Colors.color('teal'), gTime)
+
+			ImGui.PopTextWrapPos()
 		end
 		ImGui.PopStyleColor()
 		ImGui.End()
 	end
 end
 
+--[[
+	-- This is the function that will be called to unload the module.
+	-- You can use this to clean up any variables or functions you need to unload.
+	-- This will be called when the module is unloaded and will run in the background until the module is unloaded.
+]]
 function Module.Unload()
 	-- undo any binds and events before unloading
 	-- leave empty if you don't have any binds or events
 	mq.unbind('/template')
 end
 
+--[[
+	-- This is the Main Loop for the module.
+	-- This will be called from the main script and will run in the background until the module is unloaded.
+	]]
 function Module.MainLoop()
 	-- This will unload the module gracefully if IsRunning state changes.
 	if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
 
 	-- This will only allow the MainLoop to run every 500ms (half a secon)
-	if mq.gettime() - drawTimerMS < 30 then
+	if mq.gettime() - drawTimerMS < 3500 then
 		return
 	else
 		-- your code here
 		drawTimerMS = mq.gettime()
-		currentImage = currentImage + 1
-		if currentImage > #images then
-			currentImage = 1
-		end
+		gTime = string.format("%s %s", mq.TLO.GameTime.Time12():sub(1, 5), mq.TLO.GameTime.Hour() > 12 and 'PM' or 'AM')
 		-- drawTimerS = os.time()
 	end
 	--[[
@@ -170,6 +209,11 @@ function Module.MainLoop()
 	]]
 end
 
+--[[
+	-- This is the Local Loop for the module.
+	-- you call this when not loading this script as a module.
+	-- This will call the MainLoop function every 1ms.
+]]
 function Module.LocalLoop()
 	while Module.IsRunning do
 		Module.MainLoop()

@@ -383,7 +383,7 @@ local function DrawEditWin(server, target, zone, desc, cmd)
 	ImGui.SameLine()
 
 	local aZones = (zone == 'allzones')
-	aZones, _ = ImGui.Checkbox("All Zones##EditDialogAllZones", aZones)
+	aZones, _ = Module.Utils.DrawToggle("All Zones##EditDialogAllZones", aZones)
 	eZone = aZones and 'allzones' or currZoneShort
 	if zone ~= eZone then
 		zone = eZone

@@ -556,13 +556,13 @@ function Module.RenderGUI()
 			iconSize = ImGui.InputInt("Icon Size##" .. Module.Name, iconSize, 1, 5)
 			if ImGui.BeginTable("##Colors", 2) then
 				ImGui.TableNextColumn()
-				autoHide = ImGui.Checkbox("Auto Hide##" .. Module.Name, autoHide)
+				autoHide = Module.Utils.DrawToggle("Auto Hide##" .. Module.Name, autoHide)
 				ImGui.TableNextColumn()
 
-				locked = ImGui.Checkbox("Lock Window##" .. Module.Name, locked)
+				locked = Module.Utils.DrawToggle("Lock Window##" .. Module.Name, locked)
 				ImGui.TableNextColumn()
 
-				showTitleBar = ImGui.Checkbox("Show Title Bar##" .. Module.Name, showTitleBar)
+				showTitleBar = Module.Utils.DrawToggle("Show Title Bar##" .. Module.Name, showTitleBar)
 				ImGui.TableNextColumn()
 				ImGui.TableNextColumn()
 

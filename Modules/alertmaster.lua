@@ -61,27 +61,35 @@ else
 	Module.Server = MyUI_Server
 	Module.Build = MyUI_Build
 end
-Module.SoundPath = string.format("%s/sounds/default/", Module.Path)
+Module.SoundPath                                                                                                                       = string.format("%s/sounds/default/",
+	Module.Path)
+local Utils                                                                                                                            = Module.Utils
+local ToggleFlags                                                                                                                      = bit32.bor(
+	Utils.ImGuiToggleFlags.PulseOnHover,
+	Utils.ImGuiToggleFlags.RightLabel)
 
 -- Variables
-local arg = { ..., }
-local amVer = '2.07'
-local SpawnCount = mq.TLO.SpawnCount
-local NearestSpawn = mq.TLO.NearestSpawn
-local smSettings = mq.configDir .. '/MQ2SpawnMaster.ini'
-local config_dir = mq.TLO.MacroQuest.Path():gsub('\\', '/')
-local settings_file = '/config/AlertMaster.ini'
-local settings_path = config_dir .. settings_file
-local smImportList = mq.configDir .. '/am_imports.lua'
-local Group = mq.TLO.Group
-local Raid = mq.TLO.Raid
-local Zone = mq.TLO.Zone
-local groupCmd = '/dgae ' -- assumes DanNet, if EQBC found we switch to '/bcca /'
-local angle = 0
-local CharConfig = 'Char_' .. mq.TLO.Me.DisplayName() .. '_Config'
-local CharCommands = 'Char_' .. mq.TLO.Me.DisplayName() .. '_Commands'
-local newConfigFile = string.format("%s/MyUI/AlertMaster/%s/%s.lua", mq.configDir, Module.Server, Module.CharLoaded)
-local defaultConfig = {
+local arg                                                                                                                              = { ..., }
+local amVer                                                                                                                            = '2.07'
+local SpawnCount                                                                                                                       = mq.TLO.SpawnCount
+local NearestSpawn                                                                                                                     = mq.TLO.NearestSpawn
+local smSettings                                                                                                                       = mq.configDir .. '/MQ2SpawnMaster.ini'
+local config_dir                                                                                                                       = mq.TLO.MacroQuest.Path():gsub('\\', '/')
+local settings_file                                                                                                                    = '/config/AlertMaster.ini'
+local settings_path                                                                                                                    = config_dir .. settings_file
+local smImportList                                                                                                                     = mq.configDir .. '/am_imports.lua'
+local Group                                                                                                                            = mq.TLO.Group
+local Raid                                                                                                                             = mq.TLO.Raid
+local Zone                                                                                                                             = mq.TLO.Zone
+local groupCmd                                                                                                                         = '/dgae ' -- assumes DanNet, if EQBC found we switch to '/bcca /'
+local angle                                                                                                                            = 0
+local CharConfig                                                                                                                       = 'Char_' ..
+	mq.TLO.Me.DisplayName() .. '_Config'
+local CharCommands                                                                                                                     = 'Char_' ..
+	mq.TLO.Me.DisplayName() .. '_Commands'
+local newConfigFile                                                                                                                    = string.format(
+	"%s/MyUI/AlertMaster/%s/%s.lua", mq.configDir, Module.Server, Module.CharLoaded)
+local defaultConfig                                                                                                                    = {
 	delay = 1,
 	remindNPC = 5,
 	remind = 30,
@@ -97,49 +105,50 @@ local defaultConfig = {
 	distfar = 1200,
 	locked = false,
 }
-local tSafeZones, spawnAlerts, spawnsSpawnMaster, settings = {}, {}, {}, {}
-local npcs, tAnnounce, tPlayers, tSpawns, tGMs = {}, {}, {}, {}, {}
-local alertTime, numAlerts = 0, 0
-local volNPC, volGM, volPC, volPCEntered, volPCLeft = 100, 100, 100, 100, 100
-local zone_id = Zone.ID() or 0
-local soundGM = 'GM.wav'
-local soundNPC = 'NPC.wav'
-local soundPC = 'PC.wav'
-local soundPCEntered = 'PCEntered.wav'
-local soundPCLeft = 'PCLeft.wav'
+local tSafeZones, spawnAlerts, spawnsSpawnMaster, settings                                                                             = {}, {}, {}, {}
+local npcs, tAnnounce, tPlayers, tSpawns, tGMs                                                                                         = {}, {}, {}, {}, {}
+local alertTime, numAlerts                                                                                                             = 0, 0
+local volNPC, volGM, volPC, volPCEntered, volPCLeft                                                                                    = 100, 100, 100, 100, 100
+local zone_id                                                                                                                          = Zone.ID() or 0
+local soundGM                                                                                                                          = 'GM.wav'
+local soundNPC                                                                                                                         = 'NPC.wav'
+local soundPC                                                                                                                          = 'PC.wav'
+local soundPCEntered                                                                                                                   = 'PCEntered.wav'
+local soundPCLeft                                                                                                                      = 'PCLeft.wav'
 local doBeep, doAlert, DoDrawArrow, haveSM, importZone, doSoundNPC, doSoundGM, doSoundPC, forceImport, doSoundPCEntered, doSoundPCLeft = false, false, false, false, false, false,
 	false, false, false, false, false
-local delay, remind, pcs, spawns, gms, announce, ignoreguild, radius, zradius, remindNPC, showAggro = 1, 30, true, true, true, false, true, 100, 100, 5, true
+local delay, remind, pcs, spawns, gms, announce, ignoreguild, radius, zradius, remindNPC, showAggro                                    = 1, 30, true, true, true, false, true, 100,
+	100, 5, true
 -- [[ UI ]] --
-local AlertWindow_Show, AlertWindowOpen, SearchWindowOpen, SearchWindow_Show, showTooltips, active = false, false, false, false, true, false
-local currentTab = "zone"
-local newSpawnName = ''
-local zSettings = false
-local useThemeName = 'Default'
-local openConfigGUI = false
-local ZoomLvl = 1.0
-local doOnce = true
-local importedZones = {}
-local originalVolume = 50
-local playTime = 0
-local playing = false
+local AlertWindow_Show, AlertWindowOpen, SearchWindowOpen, SearchWindow_Show, showTooltips, active                                     = false, false, false, false, true, false
+local currentTab                                                                                                                       = "zone"
+local newSpawnName                                                                                                                     = ''
+local zSettings                                                                                                                        = false
+local useThemeName                                                                                                                     = 'Default'
+local openConfigGUI                                                                                                                    = false
+local ZoomLvl                                                                                                                          = 1.0
+local doOnce                                                                                                                           = true
+local importedZones                                                                                                                    = {}
+local originalVolume                                                                                                                   = 50
+local playTime                                                                                                                         = 0
+local playing                                                                                                                          = false
 local currZone, lastZone
-local newSMFile = mq.configDir .. '/MyUI/MQ2SpawnMaster.ini'
+local newSMFile                                                                                                                        = mq.configDir .. '/MyUI/MQ2SpawnMaster.ini'
 
-local DistColorRanges = {
+local DistColorRanges                                                                                                                  = {
 	orange = 600, -- distance the color changes from green to orange
 	red = 1200, -- distance the color changes from orange to red
 }
 
-local Table_Cache = {
+local Table_Cache                                                                                                                      = {
 	Rules = {},
 	Unhandled = {},
 	Mobs = {},
 	Alerts = {},
 }
 
-local xTarTable = {}
-local spawnListFlags = bit32.bor(
+local xTarTable                                                                                                                        = {}
+local spawnListFlags                                                                                                                   = bit32.bor(
 	ImGuiTableFlags.Resizable,
 	ImGuiTableFlags.Sortable,
 	-- ImGuiTableFlags.SizingFixedFit,
@@ -149,8 +158,8 @@ local spawnListFlags = bit32.bor(
 	ImGuiTableFlags.ScrollY,
 	ImGuiTableFlags.Hideable
 )
-Module.IsRunning = false
-Module.GUI_Main = {
+Module.IsRunning                                                                                                                       = false
+Module.GUI_Main                                                                                                                        = {
 	Open    = false,
 	Show    = false,
 	Locked  = false,
@@ -213,7 +222,7 @@ Module.GUI_Main = {
 	},
 }
 
-Module.GUI_Alert = {
+Module.GUI_Alert                                                                                                                       = {
 	Open    = false,
 	Show    = false,
 	Locked  = false,
@@ -261,11 +270,11 @@ Module.GUI_Alert = {
 		},
 	},
 }
-Module.Settings = {}
-Module.Settings[CharConfig] = {}
-Module.Settings[CharCommands] = {}
+Module.Settings                                                                                                                        = {}
+Module.Settings[CharConfig]                                                                                                            = {}
+Module.Settings[CharCommands]                                                                                                          = {}
 ------- Sounds ----------
-local ffi = require("ffi")
+local ffi                                                                                                                              = require("ffi")
 -- C code definitions
 ffi.cdef [[
 int sndPlaySoundA(const char *pszSound, unsigned int fdwSound);
@@ -1687,19 +1696,17 @@ local function Config_GUI()
 		end
 
 		if ImGui.CollapsingHeader('Toggles##AlertMaster') then
-			local keys = {}
 			if ImGui.BeginTable('##ToggleTable', 2, ImGuiTableFlags.Resizable) then
 				ImGui.TableSetupColumn('##ToggleCol1')
 				ImGui.TableSetupColumn('##ToggleCol2')
 				ImGui.TableNextRow()
+				ImGui.TableNextColumn()
 				for k, v in pairs(Module.Settings[CharConfig]) do
 					ImGui.PushID(k)
-					if keys[k] == nil then keys[k] = v end
 					if type(v) == 'boolean' then
 						local pressed = false
-						keys[k], pressed = Module.Utils.DrawToggle(k, keys[k], nil, nil, true)
+						Module.Settings[CharConfig][k], pressed = Module.Utils.DrawToggle(k, Module.Settings[CharConfig][k], ToggleFlags, ImVec2(40, 16))
 						if pressed then
-							Module.Settings[CharConfig][k] = keys[k]
 							set_settings()
 							save_settings()
 						end
@@ -1719,7 +1726,7 @@ local function Config_GUI()
 			local tmpVolGM = volGM or 100
 			local tmpDoGM = doSoundGM
 
-			tmpDoGM = Module.Utils.DrawToggle('GM Alert##AlertMaster', tmpDoGM, nil, nil, true)
+			tmpDoGM = Module.Utils.DrawToggle('GM Alert##AlertMaster', tmpDoGM, ToggleFlags, ImVec2(40, 16))
 			if tmpDoGM ~= doSoundGM then
 				doSoundGM = tmpDoGM
 				Module.Settings[CharConfig]['doSoundGM'] = doSoundGM
@@ -1752,7 +1759,7 @@ local function Config_GUI()
 			local tmpVolPC = volPC or 100
 			local tmpDoPC = doSoundPC
 
-			tmpDoPC = Module.Utils.DrawToggle('PC Alert##AlertMaster', tmpDoPC, nil, nil, true)
+			tmpDoPC = Module.Utils.DrawToggle('PC Alert##AlertMaster', tmpDoPC, ToggleFlags, ImVec2(40, 16))
 			if tmpDoPC ~= doSoundPC then
 				doSoundPC = tmpDoPC
 				Module.Settings[CharConfig]['doSoundPC'] = doSoundPC
@@ -1788,7 +1795,7 @@ local function Config_GUI()
 			local tmpVolPCLeft = volPCLeft or 100
 			local tmpDoPCLeft = doSoundPCLeft
 
-			tmpDoPCEntered = Module.Utils.DrawToggle('PC Entered##AlertMaster', tmpDoPCEntered, nil, nil, true)
+			tmpDoPCEntered = Module.Utils.DrawToggle('PC Entered##AlertMaster', tmpDoPCEntered, ToggleFlags, ImVec2(40, 16))
 			if doSoundPCEntered ~= tmpDoPCEntered then
 				doSoundPCEntered = tmpDoPCEntered
 				Module.Settings[CharConfig]['doSoundPCEntered'] = doSoundPCEntered
@@ -1814,7 +1821,7 @@ local function Config_GUI()
 				Module.Settings[CharConfig]['soundPCEntered'] = soundPCEntered
 				save_settings()
 			end
-			tmpDoPCLeft = Module.Utils.DrawToggle('PC Left##AlertMaster', tmpDoPCLeft, nil, nil, true)
+			tmpDoPCLeft = Module.Utils.DrawToggle('PC Left##AlertMaster', tmpDoPCLeft, ToggleFlags, ImVec2(40, 16))
 			if doSoundPCLeft ~= tmpDoPCLeft then
 				doSoundPCLeft = tmpDoPCLeft
 				Module.Settings[CharConfig]['doSoundPCLeft'] = doSoundPCLeft
@@ -1849,7 +1856,7 @@ local function Config_GUI()
 			local tmpVolNPC = volNPC or 100
 			local tmpDoNPC = doSoundNPC
 
-			tmpDoNPC = Module.Utils.DrawToggle('NPC Alert##AlertMaster', tmpDoNPC, nil, nil, true)
+			tmpDoNPC = Module.Utils.DrawToggle('NPC Alert##AlertMaster', tmpDoNPC, ToggleFlags, ImVec2(40, 16))
 			if doSoundNPC ~= tmpDoNPC then
 				doSoundNPC = tmpDoNPC
 				Module.Settings[CharConfig]['doSoundNPC'] = doSoundNPC

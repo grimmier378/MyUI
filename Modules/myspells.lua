@@ -45,40 +45,53 @@ else
 	Module.ThemeFile = MyUI_ThemeFile
 	Module.Theme = MyUI_Theme
 end
-local isCaster = true
-local picker = Module.AbilityPicker.new()
-local pickerOpen = false
-local bIcon = Module.Icons.FA_BOOK
-local gIcon = Module.Icons.MD_SETTINGS
-local defaults, settings, timerColor = {}, {}, {}
-local configFile = string.format('%s/myui/MySpells/%s/MySpells_%s.lua', mq.configDir, Module.Server, Module.CharLoaded)
-local themezDir = mq.luaDir .. '/themez/init.lua'
-local themeName = 'Default'
-local casting = false
-local spellBar = {}
-local numGems = 8
-local redGem = Module.Utils.SetImage(Module.Path .. '/images/red_gem.png')
-local greenGem = Module.Utils.SetImage(Module.Path .. '/images/green_gem.png')
-local purpleGem = Module.Utils.SetImage(Module.Path .. '/images/purple_gem.png')
-local blueGem = Module.Utils.SetImage(Module.Path .. '/images/blue_gem.png')
-local orangeGem = Module.Utils.SetImage(Module.Path .. '/images/orange_gem.png')
-local yellowGem = Module.Utils.SetImage(Module.Path .. '/images/yellow_gem.png')
-local openBook = Module.Utils.SetImage(Module.Path .. '/images/open_book.png')
-local closedBook = Module.Utils.SetImage(Module.Path .. '/images/closed_book.png')
-local memSpell = -1
-local currentTime = os.time()
-local maxRow, rowCount, iconSize, scale = 1, 0, 30, 1
-local aSize, locked, castLocked, hasThemeZ, configWindowShow, loadSet, clearAll, CastTextColorByType = false, false, false, false, false, false, false, false
-local setName = 'None'
-local tmpName = ''
-local showTitle, showTitleCasting = true, false
-local interrupted = false
-local enableCastBar = false
-local debugShow = false
-local castTransparency = 1.0
-local startedCast, startCastTime, castBarShow = false, 0, false
 
-defaults = {
+local Utils                                                                                          = Module.Utils
+local ToggleFlags                                                                                    = bit32.bor(
+	Utils.ImGuiToggleFlags.PulseOnHover,
+	--Utils.ImGuiToggleFlags.SmilyKnob,
+	--Utils.ImGuiToggleFlags.GlowOnHover,
+	--Utils.ImGuiToggleFlags.KnobBorder,
+	Utils.ImGuiToggleFlags.StarKnob,
+	Utils.ImGuiToggleFlags.AnimateOnHover
+--Utils.ImGuiToggleFlags.RightLabel
+)
+
+local isCaster                                                                                       = true
+local picker                                                                                         = Module.AbilityPicker.new()
+local pickerOpen                                                                                     = false
+local bIcon                                                                                          = Module.Icons.FA_BOOK
+local gIcon                                                                                          = Module.Icons.MD_SETTINGS
+local defaults, settings, timerColor                                                                 = {}, {}, {}
+local configFile                                                                                     = string.format('%s/myui/MySpells/%s/MySpells_%s.lua', mq.configDir,
+	Module.Server, Module.CharLoaded)
+local themezDir                                                                                      = mq.luaDir .. '/themez/init.lua'
+local themeName                                                                                      = 'Default'
+local casting                                                                                        = false
+local spellBar                                                                                       = {}
+local numGems                                                                                        = 8
+local redGem                                                                                         = Module.Utils.SetImage(Module.Path .. '/images/red_gem.png')
+local greenGem                                                                                       = Module.Utils.SetImage(Module.Path .. '/images/green_gem.png')
+local purpleGem                                                                                      = Module.Utils.SetImage(Module.Path .. '/images/purple_gem.png')
+local blueGem                                                                                        = Module.Utils.SetImage(Module.Path .. '/images/blue_gem.png')
+local orangeGem                                                                                      = Module.Utils.SetImage(Module.Path .. '/images/orange_gem.png')
+local yellowGem                                                                                      = Module.Utils.SetImage(Module.Path .. '/images/yellow_gem.png')
+local openBook                                                                                       = Module.Utils.SetImage(Module.Path .. '/images/open_book.png')
+local closedBook                                                                                     = Module.Utils.SetImage(Module.Path .. '/images/closed_book.png')
+local memSpell                                                                                       = -1
+local currentTime                                                                                    = os.time()
+local maxRow, rowCount, iconSize, scale                                                              = 1, 0, 30, 1
+local aSize, locked, castLocked, hasThemeZ, configWindowShow, loadSet, clearAll, CastTextColorByType = false, false, false, false, false, false, false, false
+local setName                                                                                        = 'None'
+local tmpName                                                                                        = ''
+local showTitle, showTitleCasting                                                                    = true, false
+local interrupted                                                                                    = false
+local enableCastBar                                                                                  = false
+local debugShow                                                                                      = false
+local castTransparency                                                                               = 1.0
+local startedCast, startCastTime, castBarShow                                                        = false, 0, false
+
+defaults                                                                                             = {
 	[Module.Name] = {
 		Scale = 1.0,
 		LoadTheme = 'Default',
@@ -518,11 +531,11 @@ local function DrawConfigWin()
 	ImGui.SeparatorText("General Settings##MySpells")
 	-- if mq.TLO.Me.Class.ShortName() ~= 'BRD' then
 	castTransparency = ImGui.SliderFloat("Cast Bar Transparency##MySpells", castTransparency, 0.0, 1.0)
-	enableCastBar = Module.Utils.DrawToggle("Enable Cast Bar##MySpells", enableCastBar)
+	enableCastBar = Module.Utils.DrawToggle("Enable Cast Bar##MySpells", enableCastBar, ToggleFlags)
 	if enableCastBar then
 		ImGui.SameLine()
-		debugShow = Module.Utils.DrawToggle("Force Show CastBar##MySpells", debugShow)
-		CastTextColorByType = Module.Utils.DrawToggle("Cast Text Color By Type##MySpells", CastTextColorByType)
+		debugShow = Module.Utils.DrawToggle("Force Show CastBar##MySpells", debugShow, ToggleFlags)
+		CastTextColorByType = Module.Utils.DrawToggle("Cast Text Color By Type##MySpells", CastTextColorByType, ToggleFlags)
 		ImGui.SameLine()
 		ImGui.HelpMarker("This will change the color of the cast bar text based on the spell type.")
 	end

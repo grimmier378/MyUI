@@ -22,18 +22,23 @@ local toggleList = {
 	['Toggle-8'] = false,
 }
 
----@param draw_list ImDrawList to draw to
----@param pos ImVec2 Top-left position
----@param col ImU32 Color of the star
----@param scale number Scale factor
-function RenderStar(draw_list, pos, col, scale)
-	local h = ImGui.GetFontSize()
-	local outer_radius = h * 0.40 * scale
-	local inner_radius = outer_radius * 0.5
-	local rotationOffset = -math.pi / 2
-	local angleStep = math.pi / 5
+---@param draw_list ImDrawList Draw list to draw from
+---@param pos ImVec2 Position to start from (top-left corner of the star)
+---@param size number Diameter of the star's outer points as a circle
+---@param star_color ImU32 Color as ImU32
+---@param rotation number Rotation in radians (optional)
+---@param num_points integer Number of points to draw (default 5)
+---@param border boolean Optional border flag (default false)
+function CommonUtils.RenderStar(draw_list, pos, size, star_color, rotation, num_points, border)
+	num_points = num_points or 5
+	rotation = rotation or 0
+	if num_points < 2 then num_points = 2 end
 
-	local center = ImVec2(pos.x + h * 0.5, pos.y + h * 0.5 * scale)
+	local outer_radius = size * 0.5
+	local inner_radius = outer_radius * 0.5
+	local center = ImVec2(pos.x + outer_radius, pos.y + outer_radius)
+	local angle_step = math.pi / num_points -- half the points are inner
+	local points = {}
 
 	local function polarToVec2(angleRad, distance)
 		return ImVec2(
@@ -42,76 +47,17 @@ function RenderStar(draw_list, pos, col, scale)
 		)
 	end
 
-	local points = {}
-	for i = 0, 4 do
-		local outerAngle = i * 2 * math.pi / 5 + rotationOffset
-		table.insert(points, polarToVec2(outerAngle, outer_radius))
-
-		local innerAngle = outerAngle + angleStep
-		table.insert(points, polarToVec2(innerAngle, inner_radius))
+	for i = 0, num_points * 2 - 1 do
+		local angle = rotation + (i * angle_step)
+		local radius = (i % 2 == 0) and outer_radius or inner_radius
+		table.insert(points, polarToVec2(angle, radius))
 	end
 
-	draw_list:AddConvexPolyFilled(points, col)
-end
-
----@param id string Unique ID for the button
----@param value boolean Current toggle state
----@param on_color ImVec4|nil Color when ON default(green)
----@param off_color ImVec4|nil Color when OFF default(red)
----@param height number|nil Height of the toggle default(20)
----@param width number|nil Width of the toggle default(height * 2)
----@return boolean value New toggle value
----@return boolean clicked Whether the value changed
-local function DrawToggle(id, value, on_color, off_color, height, width)
-	height = height or 20
-	width = width or height * 2
-	on_color = on_color or ImVec4(0.2, 0.8, 0.2, 1) -- Default green
-	off_color = off_color or ImVec4(0.8, 0.2, 0.2, 1) -- Default red
-
-	local label = id:match("^(.-)##")              -- Capture text before ##
-
-	if not id:find("##") then                      -- no ID tag so the id is the label
-		label = id
+	if border then
+		draw_list:AddCircle(center, outer_radius, ImGui.GetColorU32(0.1, 0.1, 0.1, 0.4), 32, 2)
 	end
 
-	if label and label ~= "" then
-		ImGui.Text(string.format("%s:", label))
-		ImGui.SameLine()
-	end
-
-	local clicked = false
-	local draw_list = ImGui.GetWindowDrawList()
-	local pos = { x = 0, y = 0, }
-	pos.x, pos.y = ImGui.GetCursorScreenPos()
-	local radius = height * 0.5
-
-	-- Set up bounding box
-	ImGui.InvisibleButton(id, width, height)
-	if ImGui.IsItemClicked() then
-		value = not value
-		clicked = true
-	end
-
-	local t = value and 1.0 or 0.0
-	local knob_x = pos.x + radius + t * (width - height)
-
-	-- Background
-	draw_list:AddRectFilled(
-		ImVec2(pos.x, pos.y),
-		ImVec2(pos.x + width, pos.y + height),
-		ImGui.GetColorU32(value and on_color or off_color),
-		height * 0.5
-	)
-
-	-- Knob
-	draw_list:AddCircleFilled(
-		ImVec2(knob_x, pos.y + radius),
-		radius * 0.8,
-		ImGui.GetColorU32(ImVec4(1, 1, 1, 1)),
-		0
-	)
-
-	return value, clicked
+	draw_list:AddConvexPolyFilled(points, star_color)
 end
 
 ---@param id string Unique ID for the button
@@ -159,7 +105,7 @@ function DrawStarToggle(id, value, on_color, off_color, width, height)
 	)
 
 	-- Knob (Star!)
-	RenderStar(draw_list, ImVec2(knob_x - radius * 0.5, pos.y), ImGui.GetColorU32(ImVec4(1, 1, 1, 1)), radius / (height))
+	CommonUtils.RenderStar(draw_list, ImVec2(knob_x - radius * 0.5, pos.y), ImGui.GetColorU32(ImVec4(1, 1, 1, 1)), radius / (height))
 
 	return value, clicked
 end

@@ -39,6 +39,13 @@ MyUI_SettingsFile    = MyUI_ConfPath .. MyUI_CharLoaded .. '.lua'
 MyUI_MyChatLoaded    = false
 MyUI_MyChatHandler   = nil
 
+local ToggleFlags    = bit32.bor(
+	MyUI_Utils.ImGuiToggleFlags.RightLabel,
+	MyUI_Utils.ImGuiToggleFlags.PulseOnHover,
+	MyUI_Utils.ImGuiToggleFlags.StarKnob,
+	MyUI_Utils.ImGuiToggleFlags.AnimateOnHover
+)
+
 local default_list   = {
 	'AAParty',
 	'ChatRelay',
@@ -450,7 +457,15 @@ local function MyUI_Render()
 							local pressed = false
 							ImGui.TableNextColumn()
 							ImGui.SetNextItemWidth(120)
-							local new_state = ImGui.Checkbox(module_data.name, module_data.enabled)
+							local new_state = MyUI_Utils.DrawToggle(module_data.name,
+								module_data.enabled,
+								ToggleFlags,
+								ImVec2(46, 20),
+								ImVec4(0.026, 0.519, 0.791, 1.000),
+								ImVec4(1, 0.2, 0.2, 0.8),
+								ImVec4(1.000, 0.785, 0.000, 1.000),
+								7
+							)
 
 							-- If checkbox changed, set flags for processing
 							if new_state ~= module_data.enabled then

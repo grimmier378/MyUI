@@ -82,57 +82,203 @@ function CommonUtils.DrawStatusIcon(iconID, type, txt, iconSize)
 	end
 end
 
----@param draw_list ImDrawList to draw to
----@param pos ImVec2 Top-left position (of star)
----@param size number Size of the star (diameter)
----@param col ImU32 Color
-function CommonUtils.RenderStar(draw_list, pos, size, col)
-	local outer_radius = size * 0.5
-	local inner_radius = outer_radius * 0.5
-	local rotationOffset = -math.pi / 2
-	local angleStep = math.pi / 5
+CommonUtils.ImGuiToggleFlags = {
+	None           = 0,
+	StarKnob       = bit32.lshift(1, 0),
+	RightLabel     = bit32.lshift(1, 1),
+	AnimateKnob    = bit32.lshift(1, 2),
+	SmilyKnob      = bit32.lshift(1, 3),
+	GlowOnHover    = bit32.lshift(1, 4),
+	AnimateOnHover = bit32.lshift(1, 5),
+	PulseOnHover   = bit32.lshift(1, 6),
+	KnobBorder     = bit32.lshift(1, 7),
+}
 
+---@param draw_list ImDrawList Draw list to draw from
+---@param pos ImVec2 Posion to start from (top-left corner of the star)
+---@param size number Diameter of the star's outter points as a circle
+---@param star_color ImU32 Color as ImU32
+---@param rotation number Rotation in radians (optional)
+---@param num_points integer Number of points to draw (default 5)
+---@param border boolean Optional border flag (default false)
+function CommonUtils.RenderStar(draw_list, pos, size, star_color, rotation, num_points, border)
+	num_points = num_points or 5
+	rotation = rotation or 0
+	-- less than 4 points and we can't draw a star, 3 points should be a triangle, 2 is a line etc.
+	if num_points < 4 then
+		num_points = 4
+	end
+	local outer_radius = size * 0.5
 	local center = ImVec2(pos.x + outer_radius, pos.y + outer_radius)
 
-	local function polarToVec2(angleRad, distance)
-		return ImVec2(
-			center.x + math.cos(angleRad) * distance,
-			center.y + math.sin(angleRad) * distance
-		)
-	end
+	-- Build the base triangle (tip up, unrotated)
+	local triangleBase = outer_radius * math.tan(math.pi / num_points)
+	local base_half = triangleBase * 0.5
 
-	local points = {}
-	for i = 0, 4 do
-		local outerAngle = i * 2 * math.pi / 5 + rotationOffset
-		table.insert(points, polarToVec2(outerAngle, outer_radius))
-		local innerAngle = outerAngle + angleStep
-		table.insert(points, polarToVec2(innerAngle, inner_radius))
-	end
+	local base_triangle = {
+		ImVec2(center.x, center.y - outer_radius),
+		ImVec2(center.x + base_half, center.y),
+		ImVec2(center.x - base_half, center.y),
+	}
 
-	draw_list:AddConvexPolyFilled(points, col)
+	for i = 0, num_points - 1 do
+		local angle = rotation + (2 * math.pi / num_points) * i
+
+		-- Rotate each point individually so we can get a better looking star.
+		-- trying to draw out the lines was making a fat point at the top this is cleaner and scales easier
+		-- thank you to the java code i found on https://stackoverflow.com/questions/14580033/algorithm-for-drawing-a-5-point-star
+
+		local rotated_triangle = {}
+		for _, p in ipairs(base_triangle) do
+			table.insert(rotated_triangle, CommonUtils.RotatePoint(p, center, angle))
+		end
+		if border then
+			draw_list:AddCircle(center, outer_radius, ImGui.GetColorU32(0.1, 0.1, 0.1, 0.4), 32, 2)
+		end
+		draw_list:AddConvexPolyFilled(rotated_triangle, star_color)
+	end
 end
 
----@param id string Unique ID for the button
----@param value boolean Current toggle state
----@param size ImVec2|number|nil Size as ImVec2 or a number if a number is passed it will be used as height and width will be height * 2
----@param star_knob boolean|nil If true the knob will be a star
----@param right_label boolean|nil If true the label will be on the right side of the toggle
----@param on_color ImVec4|nil Color when ON default(green)
----@param off_color ImVec4|nil Color when OFF default(red)
----@param knob_color ImVec4|nil Color of the knob default(white)
----@return boolean value New toggle value
----@return boolean clicked Whether the value changed
-function CommonUtils.DrawToggle(id, value, size, star_knob, right_label, on_color, off_color, knob_color)
+-- ---@param draw_list ImDrawList Draw list to draw from
+-- ---@param pos ImVec2 Position to start from (top-left corner of the star)
+-- ---@param size number Diameter of the star's outer points as a circle
+-- ---@param star_color ImU32 Color as ImU32
+-- ---@param rotation number Rotation in radians (optional)
+-- ---@param num_points integer Number of points to draw (default 5)
+-- ---@param border boolean Optional border flag (default false)
+-- function CommonUtils.RenderStar(draw_list, pos, size, star_color, rotation, num_points, border)
+-- 	num_points = num_points or 5
+-- 	rotation = rotation or 0
+-- 	if num_points < 2 then num_points = 2 end
+
+-- 	local outer_radius = size * 0.5
+-- 	local inner_radius = outer_radius * 0.5
+-- 	local center = ImVec2(pos.x + outer_radius, pos.y + outer_radius)
+-- 	local angle_step = math.pi / num_points -- half the points are inner
+-- 	local points = {}
+
+-- 	local function polarToVec2(angleRad, distance)
+-- 		return ImVec2(
+-- 			center.x + math.cos(angleRad) * distance,
+-- 			center.y + math.sin(angleRad) * distance
+-- 		)
+-- 	end
+
+-- 	for i = 0, num_points * 2 - 1 do
+-- 		local angle = rotation + (i * angle_step)
+-- 		local radius = (i % 2 == 0) and outer_radius or inner_radius
+-- 		table.insert(points, polarToVec2(angle, radius))
+-- 	end
+
+-- 	if border then
+-- 		draw_list:AddCircle(center, outer_radius, ImGui.GetColorU32(0.1, 0.1, 0.1, 0.4), 32, 2)
+-- 	end
+
+-- 	draw_list:AddConvexPolyFilled(points, star_color)
+-- end
+
+---@param draw_list ImDrawList to draw to
+---@param pos ImVec2 Top-left position (of moon)
+---@param size number Size of the moon (diameter)
+---@param col ImU32 Color
+---@param bg_color ImVec4 Background color (shadow color)
+---@param rotation number Optional rotation in radians
+---@param border boolean Optional border flag (default false)
+function CommonUtils.RenderMoon(draw_list, pos, size, col, bg_color, rotation, border)
+	local outer_radius = size * 0.5
+	local center = ImVec2(pos.x + outer_radius, pos.y + outer_radius)
+
+
+	-- Draw big circle (moon body)
+	draw_list:AddCircleFilled(center, outer_radius, col, 32)
+
+	-- Cutout crescent: black first
+	local offset = outer_radius * 0.6
+	local cutout_center = ImVec2(center.x + offset, center.y)
+
+	-- Apply rotation if specified
+	if rotation and rotation ~= 0 then
+		cutout_center = CommonUtils.RotatePoint(cutout_center, center, rotation)
+	end
+
+	draw_list:AddCircleFilled(
+		cutout_center,
+		outer_radius,
+		ImGui.GetColorU32(0, 0, 0, 1),
+		32
+	)
+
+	-- Overlay semi-transparent bg color
+	draw_list:AddCircleFilled(
+		cutout_center,
+		outer_radius,
+		ImGui.GetColorU32(bg_color),
+		32
+	)
+	if border then
+		draw_list:AddCircle(center, outer_radius, ImGui.GetColorU32(0.1, 0.1, 0.1, 0.5), 32, 2)
+	end
+end
+
+--[[
+	* DrawToggle
+	* A toggle button that can be used to switch between two states (on/off) (true\false).
+	* It can also display a star or moon shape as the knob.
+	* The function takes various parameters to customize its appearance and behavior.
+	* The function returns the updated value of the toggle and whether it was clicked.
+	* some Flags you can pass in are ImGuiToggleFlags.StarKnob, ImGuiToggleFlags.RightLabel, ImGuiToggleFlags.AnimateKnob
+	* The function also supports custom colors for the toggle button and knob.
+	* The function can also animate the knob (roatating stars or a rocking moon).
+	* The function can also display a label on the right side of the toggle button.
+	* The function can also set the size of the toggle button (width, height) or just height and width will be defaulted to height * 2.0
+	* The function can also set the number of points for the star knob (default 5).
+	]]
+---@param id string Label and Id for the toggle button)
+---@param value boolean Current value of the toggle button
+---@param flags integer|nil combined bit flags (ImGuiToggleFlags.None, ImGuiToggleFlags.StarKnob, ImGuiToggleFlags.RightLabel, ImGuiToggleFlags.AnimateKnob)
+---@param size ImVec2|number|nil -- ImVec2 Size of the toggle button (width, height) or height value if single number and width will default to height * 2.0
+---@param on_color ImVec4|integer|nil Color for ON state, or number of points if passing star points
+---@param off_color ImVec4|integer|nil ImVec4 Color for the Toggle when Off , or number of points if passing star points
+---@param knob_color ImVec4|integer|nil ImVec4 Color for the Knob , or its the number of points if passing star points
+---@param num_points integer|nil the number of points for the star knob (default 5)
+---@return boolean value
+---@return boolean clicked
+function CommonUtils.DrawToggle(id, value, flags, size, on_color, off_color, knob_color, num_points)
 	if not id or value == nil then return false, false end
 	-- setup any defaults for mising params
 	size = type(size) == 'number' and ImVec2(size * 2, size) or size or ImVec2(32, 16)
 	local height = size.y or 16
 	local width = size.x or height * 2
+	-- if you omit a color you can still pass the number as the number of points
+	if type(on_color) == 'number' then
+		num_points = on_color
+		on_color = nil
+	elseif type(off_color) == 'number' then
+		num_points = off_color
+		off_color = nil
+	elseif type(knob_color) == 'number' then
+		num_points = knob_color
+		knob_color = nil
+	end
+
 	on_color = on_color or ImGui.GetStyleColorVec4(ImGuiCol.FrameBgActive)
 	off_color = off_color or ImGui.GetStyleColorVec4(ImGuiCol.FrameBg)
 	knob_color = knob_color or ImVec4(1, 1, 1, 1) -- default white
-	star_knob = star_knob or false
-	right_label = right_label or false
+
+	local star_knob = flags and bit32.band(flags, CommonUtils.ImGuiToggleFlags.StarKnob) ~= 0
+	local right_label = flags and bit32.band(flags, CommonUtils.ImGuiToggleFlags.RightLabel) ~= 0
+	local animate_knob = flags and bit32.band(flags, CommonUtils.ImGuiToggleFlags.AnimateKnob) ~= 0
+	local smily_knob = flags and bit32.band(flags, CommonUtils.ImGuiToggleFlags.SmilyKnob) ~= 0
+	local glow_on_hover = flags and bit32.band(flags, CommonUtils.ImGuiToggleFlags.GlowOnHover) ~= 0
+	local animate_on_hover = flags and bit32.band(flags, CommonUtils.ImGuiToggleFlags.AnimateOnHover) ~= 0
+	local pulse_on_hover = flags and bit32.band(flags, CommonUtils.ImGuiToggleFlags.PulseOnHover) ~= 0
+	local knob_border = flags and bit32.band(flags, CommonUtils.ImGuiToggleFlags.KnobBorder) ~= 0
+
+	if smily_knob then
+		star_knob = false
+	end
+
+	num_points = num_points or 5
 
 	-- pull the label from the ID if there is one
 	local label = id:match("^(.-)##") -- Capture text before ##
@@ -160,9 +306,37 @@ function CommonUtils.DrawToggle(id, value, size, star_knob, right_label, on_colo
 		clicked = true
 	end
 
+	-- detect hovering for applying hover effects
+	local is_hovered = ImGui.IsItemHovered()
+	local should_animate = animate_knob or (animate_on_hover and is_hovered)
+	local final_knob_col = ImGui.GetColorU32(knob_color)
+
+	if pulse_on_hover and is_hovered then
+		local pulse_strength = 0.5 + 0.5 * math.sin(os.clock() * 4)
+		if knob_color.x == 1 and knob_color.y == 1 and knob_color.z == 1 then
+			-- Special case: white glows warm yellow
+			local new_color = ImVec4(
+				1,
+				math.min(1, 1 - 0.2 * pulse_strength),
+				math.min(1, 1 - 0.4 * pulse_strength),
+				knob_color.w
+			)
+			final_knob_col = ImGui.GetColorU32(new_color)
+		else
+			local new_color = ImVec4(
+				math.min(1, knob_color.x + pulse_strength * 0.4),
+				math.min(1, knob_color.y + pulse_strength * 0.4),
+				math.min(1, knob_color.z + pulse_strength * 0.4),
+				knob_color.w
+			)
+			final_knob_col = ImGui.GetColorU32(new_color)
+		end
+	end
+
 	local t = value and 1.0 or 0.0
 	local knob_x = pos.x + radius + t * (width - height)
-
+	local center = ImVec2(knob_x, pos.y + radius)
+	local fill_radius = radius * 0.8
 	-- Background
 	draw_list:AddRectFilled(
 		ImVec2(pos.x, pos.y),
@@ -171,17 +345,51 @@ function CommonUtils.DrawToggle(id, value, size, star_knob, right_label, on_colo
 		height * 0.5
 	)
 
-	if not star_knob then
-		-- Knob (circle)
+	if star_knob then
+		if value then
+			local star_rotation = os.clock() * 1.5 -- spinning speed
+			if not should_animate then
+				star_rotation = 0
+			end
+			CommonUtils.RenderStar(
+				draw_list,
+				ImVec2(knob_x - fill_radius, pos.y + radius - fill_radius),
+				radius * 1.6,
+				final_knob_col,
+				star_rotation,
+				num_points,
+				knob_border)
+		else
+			local moon_rotation = math.sin(os.clock() * 2) * (math.pi / 18)
+			if not should_animate then
+				moon_rotation = 0
+			end
+			CommonUtils.RenderMoon(draw_list, ImVec2(knob_x - fill_radius, pos.y + radius - fill_radius), radius * 1.6,
+				final_knob_col, off_color, moon_rotation, knob_border)
+		end
+	elseif smily_knob then
+		-- smily or froown based on value
+		CommonUtils.RenderSmiley(draw_list, ImVec2(knob_x - fill_radius, pos.y + radius - fill_radius), radius * 1.6,
+			final_knob_col, value)
+	else
+		-- Knob (circle) -- default circle toggle
+		local radiusOutline = radius * 0.85
+
 		draw_list:AddCircleFilled(
-			ImVec2(knob_x, pos.y + radius),
-			radius * 0.8,
-			ImGui.GetColorU32(knob_color),
+			center,
+			fill_radius,
+			final_knob_col,
 			0
 		)
-	else
-		-- Knob (Star!)
-		CommonUtils.RenderStar(draw_list, ImVec2(knob_x - radius * 0.8, pos.y + radius - radius * 0.8), radius * 1.6, ImGui.GetColorU32(knob_color))
+		-- Draw outline
+		if knob_border then
+			draw_list:AddCircle(center, fill_radius, ImGui.GetColorU32(0, 0, 0, 1), 32, 2)
+		end
+	end
+
+	-- apply any glow over the knob on hover
+	if glow_on_hover and is_hovered then
+		CommonUtils.DrawGlowAura(draw_list, center, fill_radius, knob_color)
 	end
 
 	-- Label on the right side of the toggle
@@ -191,6 +399,123 @@ function CommonUtils.DrawToggle(id, value, size, star_knob, right_label, on_colo
 	end
 
 	return value, clicked
+end
+
+---@param draw_list ImDrawList
+---@param pos ImVec2 Top-left position (for face center calculation)
+---@param size number Diameter of face
+---@param col ImU32 Color for face fill
+---@param value boolean Value of the toggle (true for smiley, false for frown)
+function CommonUtils.RenderSmiley(draw_list, pos, size, col, value)
+	local center = ImVec2(pos.x + size * 0.5, pos.y + size * 0.5)
+	local radius = size * 0.5
+
+	-- Draw face color inside
+	draw_list:AddCircleFilled(center, radius * 0.9, col, 32)
+
+	-- Eyes
+	local eye_offset_x = radius * 0.4
+	local eye_offset_y = radius * 0.3
+	local eye_radius = radius * 0.1
+
+	draw_list:AddCircleFilled(ImVec2(center.x - eye_offset_x, center.y - eye_offset_y), eye_radius, ImGui.GetColorU32(0, 0, 0, 1), 12)
+	draw_list:AddCircleFilled(ImVec2(center.x + eye_offset_x, center.y - eye_offset_y), eye_radius, ImGui.GetColorU32(0, 0, 0, 1), 12)
+
+	-- Mouth (smile)
+	local mouth_radius = radius * 0.6
+	local mouth_center = ImVec2(center.x, center.y + radius * 0.2)
+
+	if not value then
+		-- Mouth (frown)
+		mouth_center = ImVec2(center.x, center.y + radius * 0.8) -- Move center *lower* for frown
+		draw_list:PathArcTo(mouth_center, mouth_radius * 0.5, math.pi * 1.25, math.pi * 1.75, 16)
+	else
+		-- Smiling arc (bottom half circle) kinda
+		draw_list:PathArcTo(mouth_center, mouth_radius * 0.5, math.pi * 0.25, math.pi * 0.75, 16)
+	end
+
+	draw_list:PathStroke(ImGui.GetColorU32(0, 0, 0, 1), ImDrawFlags.RoundCornersAll, radius * 0.08)
+	-- Draw black outline
+	draw_list:AddCircle(center, radius * 0.9, ImGui.GetColorU32(0, 0, 0, 1), 32, 2)
+end
+
+---
+
+---@param draw_list ImDrawList
+---@param pos ImVec2 Top-left position
+---@param size number
+---@param col ImU32
+function CommonUtils.RenderFrown(draw_list, pos, size, col)
+	local center = ImVec2(pos.x + size * 0.5, pos.y + size * 0.5)
+	local radius = size * 0.5
+
+	-- Outline might apply this to the default circle toggle as well not sure though.
+	-- draw_list:AddCircleFilled(center, radius, ImGui.GetColorU32(0, 0, 0, 1), 32)
+	draw_list:AddCircleFilled(center, radius * 0.9, col, 32)
+
+	-- Eyes
+	local eye_offset_x = radius * 0.4
+	local eye_offset_y = radius * 0.3
+	local eye_radius = radius * 0.1
+
+	draw_list:AddCircleFilled(ImVec2(center.x - eye_offset_x, center.y - eye_offset_y), eye_radius, ImGui.GetColorU32(0, 0, 0, 1), 12)
+	draw_list:AddCircleFilled(ImVec2(center.x + eye_offset_x, center.y - eye_offset_y), eye_radius, ImGui.GetColorU32(0, 0, 0, 1), 12)
+
+	-- Mouth (frown)
+	local mouth_radius = radius * 0.6
+	local mouth_center = ImVec2(center.x, center.y + radius * 0.8) -- Move center *lower* for frown
+
+	-- Frown arc (top of a circle pointing down) hard to see if small but scales nicely
+	draw_list:PathArcTo(mouth_center, mouth_radius * 0.5, math.pi * 1.25, math.pi * 1.75, 16)
+	draw_list:PathStroke(ImGui.GetColorU32(0, 0, 0, 1), ImDrawFlags.RoundCornersAll, radius * 0.08)
+	draw_list:AddCircle(center, radius, ImGui.GetColorU32(0, 0, 0, 1), 32, 2)
+end
+
+-- Glow Aura
+---@param draw_list ImDrawList
+---@param center ImVec2 Center position (knob center)
+---@param base_radius number Base radius of the knob
+---@param base_color ImVec4 Base color of the knob
+---@param time_offset number|nil Optional clock offset for breathing
+function CommonUtils.DrawGlowAura(draw_list, center, base_radius, base_color, time_offset)
+	time_offset = time_offset or 0
+	local t = (os.clock() + time_offset) * 2
+	local breathe = 0.5 + 0.5 * math.sin(t)
+
+	-- Adjust alpha separately for inner/outer glow
+	local aura_color_inner = ImVec4(
+		base_color.x,
+		base_color.y,
+		base_color.z,
+		0.3 * breathe
+
+	)
+	local aura_color_outer = ImVec4(
+		base_color.x,
+		base_color.y,
+		base_color.z,
+		0.2 * breathe * breathe * (3 - 2 * breathe)
+	)
+
+	-- Glow expands outward
+	local glow_radius_inner = base_radius * 1.2
+	local glow_radius_outer = base_radius * 1.6
+
+	-- Draw the outer softer aura first
+	draw_list:AddCircleFilled(
+		center,
+		glow_radius_outer,
+		ImGui.GetColorU32(aura_color_outer),
+		32
+	)
+
+	-- Then a stronger inner glow
+	draw_list:AddCircleFilled(
+		center,
+		glow_radius_inner,
+		ImGui.GetColorU32(aura_color_inner),
+		32
+	)
 end
 
 function CommonUtils.GetBreathingColor(base_color, do_breathe)
@@ -478,97 +803,6 @@ function CommonUtils.DrawAnimatedFrame(textureMap, rowNum, colNum, colPerAnimati
 	ImGui.SetCursorPos(cursorX, cursorY)
 end
 
--- --- File Picker Dialog Stuff --
-
--- CommonUtils.SelectedFilePath = string.format('%s/', mq.TLO.MacroQuest.Path()) -- Default config folder path prefix
--- CommonUtils.CurrentDirectory = mq.TLO.MacroQuest.Path()
--- CommonUtils.SelectedFile = nil
-
--- local lfs = MyUI_PackageMan.Require('luafilesystem', 'lfs')
--- CommonUtils.ShowSaveFileSelector = false
--- CommonUtils.ShowOpenFileSelector = false
-
--- -- Function to get the contents of a directory
--- function CommonUtils.GetDirectoryContents(path)
--- 	local folders = {}
--- 	local files = {}
--- 	for file in lfs.dir(path) do
--- 		if file ~= "." and file ~= ".." then
--- 			local f = path .. '/' .. file
--- 			local attr = lfs.attributes(f)
--- 			if attr.mode == "directory" then
--- 				table.insert(folders, file)
--- 			elseif attr.mode == "file" then
--- 				table.insert(files, file)
--- 			end
--- 		end
--- 	end
--- 	return folders, files
--- end
-
--- -- Function to draw the folder button tree
--- function CommonUtils.DrawFolderButtonTree(currentPath)
--- 	local folders = {}
--- 	for folder in string.gmatch(currentPath, "[^/]+") do
--- 		table.insert(folders, folder)
--- 	end
-
--- 	local path = ""
--- 	for i, folder in ipairs(folders) do
--- 		path = path .. folder .. "/"
--- 		ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.2, 0.2, 0.2, 1))
--- 		local btnLblFolder = string.format("^%s", mq.TLO.MacroQuest.Path())
--- 		btnLblFolder = folder:gsub(btnLblFolder, "...")
--- 		if ImGui.Button(btnLblFolder) then
--- 			CommonUtils.CurrentDirectory = path:gsub("/$", "")
--- 		end
--- 		ImGui.PopStyleColor()
--- 		if i < #folders then
--- 			ImGui.SameLine()
--- 			ImGui.Text("/")
--- 			ImGui.SameLine()
--- 		end
--- 	end
--- end
-
--- -- Function to draw the file selector
--- function CommonUtils.DrawFileSelector()
--- 	-- CommonUtils.DrawFolderButtonTree(CommonUtils.CurrentDirectory)
--- 	ImGui.Separator()
--- 	local folders, files = CommonUtils.GetDirectoryContents(CommonUtils.CurrentDirectory)
--- 	if CommonUtils.CurrentDirectory ~= mq.TLO.MacroQuest.Path() then
--- 		if ImGui.Button("Back") then
--- 			CommonUtils.CurrentDirectory = CommonUtils.CurrentDirectory:match("(.*)/[^/]+$")
--- 		end
--- 		ImGui.SameLine()
--- 	end
--- 	local tmpFolder = CommonUtils.CurrentDirectory:gsub(mq.TLO.MacroQuest.Path() .. "/", "")
--- 	ImGui.SetNextItemWidth(180)
--- 	if ImGui.BeginCombo("Select Folder", tmpFolder) then
--- 		for _, folder in ipairs(folders) do
--- 			if ImGui.Selectable(folder) then
--- 				CommonUtils.CurrentDirectory = CommonUtils.CurrentDirectory .. '/' .. folder
--- 			end
--- 		end
--- 		ImGui.EndCombo()
--- 	end
-
--- 	local tmpfile = CommonUtils.SelectedFilePath:gsub(CommonUtils.CurrentDirectory .. "/", "")
--- 	ImGui.SetNextItemWidth(180)
--- 	if ImGui.BeginCombo("Select File", tmpfile or "Select a file") then
--- 		for _, file in ipairs(files) do
--- 			if ImGui.Selectable(file) then
--- 				CommonUtils.SelectedFile = file
--- 				CommonUtils.SelectedFilePath = CommonUtils.CurrentDirectory .. '/' .. CommonUtils.SelectedFile
--- 				CommonUtils.ShowOpenFileSelector = false
--- 			end
--- 		end
--- 		ImGui.EndCombo()
--- 	end
--- 	if ImGui.Button('Cancel##Open') then
--- 		CommonUtils.ShowOpenFileSelector = false
--- 	end
--- end
 function CommonUtils.directions(heading)
 	-- convert headings from letter values to degrees
 	local dirToDeg = {
@@ -601,13 +835,29 @@ function CommonUtils.getRelativeDirection(spawnDir)
 	return difference
 end
 
-function CommonUtils.RotatePoint(p, cx, cy, degAngle)
-	local radians = math.rad(degAngle)
-	local cosA = math.cos(radians)
-	local sinA = math.sin(radians)
-	local newX = cosA * (p.x - cx) - sinA * (p.y - cy) + cx
-	local newY = sinA * (p.x - cx) + cosA * (p.y - cy) + cy
-	return ImVec2(newX, newY)
+-- function CommonUtils.RotatePoint(p, cx, cy, degAngle)
+-- 	local radians = math.rad(degAngle)
+-- 	local cosA = math.cos(radians)
+-- 	local sinA = math.sin(radians)
+-- 	local newX = cosA * (p.x - cx) - sinA * (p.y - cy) + cx
+-- 	local newY = sinA * (p.x - cx) + cosA * (p.y - cy) + cy
+-- 	return ImVec2(newX, newY)
+-- end
+
+--- Function to rotate aa point around a center point by a given angle
+---@param point ImVec2 Point Coordinates
+---@param center ImVec2 Center Coordinates to rotate around
+---@param angle number Angle in radians to roatate the point
+---@return ImVec2 -- New point cooridnates after rotating
+function CommonUtils.RotatePoint(point, center, angle)
+	local s = math.sin(angle)
+	local c = math.cos(angle)
+	local dx = point.x - center.x
+	local dy = point.y - center.y
+	return ImVec2(
+		center.x + (dx * c - dy * s),
+		center.y + (dx * s + dy * c)
+	)
 end
 
 function CommonUtils.DrawArrow(topPoint, width, height, color, angle)
@@ -620,9 +870,9 @@ function CommonUtils.DrawArrow(topPoint, width, height, color, angle)
 	local center_y = (p1.y + p2.y + p3.y) / 3
 	-- rotate
 	angle = angle + .01
-	p1 = CommonUtils.RotatePoint(p1, center_x, center_y, angle)
-	p2 = CommonUtils.RotatePoint(p2, center_x, center_y, angle)
-	p3 = CommonUtils.RotatePoint(p3, center_x, center_y, angle)
+	p1 = CommonUtils.RotatePoint(p1, ImVec2(center_x, center_y), angle)
+	p2 = CommonUtils.RotatePoint(p2, ImVec2(center_x, center_y), angle)
+	p3 = CommonUtils.RotatePoint(p3, ImVec2(center_x, center_y), angle)
 	draw_list:AddTriangleFilled(p1, p2, p3, ImGui.GetColorU32(color))
 end
 

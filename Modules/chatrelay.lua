@@ -39,7 +39,12 @@ else
     Module.Path = MyUI_Path
 end
 Module.ImgPath                          = Module.Path .. "images/phone.png"
-
+local Utils                             = Module.Utils
+local ToggleFlags                       = bit32.bor(
+    Utils.ImGuiToggleFlags.PulseOnHover,
+    --Utils.ImGuiToggleFlags.SmilyKnob,
+    --Utils.ImGuiToggleFlags.AnimateOnHover,
+    Utils.ImGuiToggleFlags.RightLabel)
 local winFlags                          = bit32.bor(ImGuiWindowFlags.None)
 local currZone, lastZone, configFile, mode
 local guildChat                         = {}
@@ -489,12 +494,14 @@ function Module.RenderGUI()
                 end
             end
             ImGui.Text("Chat Relay Settings")
-            RelayTells = Module.Utils.DrawToggle("Relay Tells", RelayTells, nil, nil, true)
-            RelayGuild = Module.Utils.DrawToggle("Relay Guild", RelayGuild, nil, nil, true)
+            RelayTells = Module.Utils.DrawToggle("Relay Tells", RelayTells, ToggleFlags)
+            RelayGuild = Module.Utils.DrawToggle("Relay Guild", RelayGuild, ToggleFlags)
 
             ImGui.Separator()
-            settings[Module.DisplayName].ShowOnNewMessage = Module.Utils.DrawToggle("Show on New Message", settings[Module.DisplayName].ShowOnNewMessage, nil, nil, true)
-            settings[Module.DisplayName].EscapeToMin = Module.Utils.DrawToggle("Escape to Minimize", settings[Module.DisplayName].EscapeToMin, nil, nil, true)
+            settings[Module.DisplayName].ShowOnNewMessage = Module.Utils.DrawToggle("Show on New Message", settings[Module.DisplayName].ShowOnNewMessage,
+                ToggleFlags)
+            settings[Module.DisplayName].EscapeToMin = Module.Utils.DrawToggle("Escape to Minimize", settings[Module.DisplayName].EscapeToMin,
+                ToggleFlags)
 
             ImGui.SetNextItemWidth(100)
             settings[Module.DisplayName].IconSize = ImGui.SliderInt("Icon Size", settings[Module.DisplayName].IconSize, 10, 50)

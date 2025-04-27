@@ -30,6 +30,10 @@ else
     Module.Colors      = MyUI_Colors
     Module.Server      = MyUI_Server
 end
+local Utils                                                             = Module.Utils
+local ToggleFlags                                                       = bit32.bor(Utils.ImGuiToggleFlags.StarKnob,
+    Utils.ImGuiToggleFlags.PulseOnHover,
+    Utils.ImGuiToggleFlags.RightLabel)
 local myself                                                            = mq.TLO.Me
 local MyGroupLeader                                                     = mq.TLO.Group.Leader() or "NoGroup"
 local themeID                                                           = 1
@@ -755,11 +759,11 @@ function Module.RenderGUI()
 
             MailBoxShow = Module.Utils.DrawToggle("Show MailBox##", MailBoxShow)
             ImGui.SameLine()
-            TempSettings.alphaSort = Module.Utils.DrawToggle("Alpha Sort##", TempSettings.alphaSort, nil, false, true)
-            TempSettings.showTooltip = Module.Utils.DrawToggle("Show Tooltip##", TempSettings.showTooltip, nil, false, true)
-            TempSettings.MyGroupOnly = Module.Utils.DrawToggle("My Group Only##", TempSettings.MyGroupOnly, nil, false, true)
-            TempSettings.LockWindow = Module.Utils.DrawToggle("Lock Window##", TempSettings.LockWindow, nil, false, true)
-            TempSettings.ShowLeader = Module.Utils.DrawToggle("Show Leader##", TempSettings.ShowLeader, nil, false, true)
+            TempSettings.alphaSort = Module.Utils.DrawToggle("Alpha Sort##", TempSettings.alphaSort, ToggleFlags)
+            TempSettings.showTooltip = Module.Utils.DrawToggle("Show Tooltip##", TempSettings.showTooltip, ToggleFlags)
+            TempSettings.MyGroupOnly = Module.Utils.DrawToggle("My Group Only##", TempSettings.MyGroupOnly, ToggleFlags)
+            TempSettings.LockWindow = Module.Utils.DrawToggle("Lock Window##", TempSettings.LockWindow, ToggleFlags)
+            TempSettings.ShowLeader = Module.Utils.DrawToggle("Show Leader##", TempSettings.ShowLeader, ToggleFlags)
             if ImGui.Button("Save & Close") then
                 settings = dofile(configFile)
                 settings[Module.DisplayName].Scale = TempSettings.scale

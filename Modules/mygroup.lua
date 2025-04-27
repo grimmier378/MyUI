@@ -37,7 +37,15 @@ else
     Module.Theme = MyUI_Theme
     Module.ThemeLoader = MyUI_ThemeLoader
 end
-
+local Utils              = Module.Utils
+local ToggleFlags        = bit32.bor(
+    Utils.ImGuiToggleFlags.PulseOnHover,
+    --Utils.ImGuiToggleFlags.SmilyKnob,
+    Utils.ImGuiToggleFlags.GlowOnHover,
+    Utils.ImGuiToggleFlags.KnobBorder,
+    --Utils.ImGuiToggleFlags.StarKnob,
+    Utils.ImGuiToggleFlags.AnimateOnHover,
+    Utils.ImGuiToggleFlags.RightLabel)
 local gIcon              = Module.Icons.MD_SETTINGS
 local winFlag            = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.MenuBar)
 local iconSize           = 15
@@ -112,6 +120,7 @@ defaults                 = {
         ShowMoveStatus = true,
         NavDist = 10,
         ShowLevel = true,
+        ShowValOnBar = false,
     },
 }
 
@@ -256,6 +265,7 @@ local function GetInfoToolTip(id, raid)
 end
 
 local function DrawGroupMember(id)
+    local barSize = settings[Module.Name].ShowValOnBar and 12 or 7
     local member = mq.TLO.Group.Member(id)
     local r, g, b, a = 1, 1, 1, 1
     if member == 'NULL' then return end
@@ -438,7 +448,19 @@ local function DrawGroupMember(id)
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
         end
     end
-    ImGui.ProgressBar((hpPct / 100), ImGui.GetContentRegionAvail(), 7 * Scale, '##pctHps' .. id)
+    local cursorX, cursorY = ImGui.GetCursorPos()
+    ImGui.ProgressBar((hpPct / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctHps' .. id)
+    if settings[Module.Name].ShowValOnBar then
+        ImGui.SetCursorPos(cursorX + 2, cursorY)
+
+        local txtLabel = groupData[memberName] ~= nil and
+            string.format("%d / %d", groupData[memberName].CurHP, groupData[memberName].MaxHP) or
+            string.format("%d%%", hpPct)
+
+        ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
+
+        ImGui.Text(txtLabel)
+    end
     ImGui.PopStyleColor()
 
 
@@ -455,16 +477,35 @@ local function DrawGroupMember(id)
                 else
                     ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('light blue2')))
                 end
-                ImGui.ProgressBar((mpPct / 100), ImGui.GetContentRegionAvail(), 7 * Scale, '##pctMana' .. id)
+                cursorX, cursorY = ImGui.GetCursorPos()
+                ImGui.ProgressBar((mpPct / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctMana' .. id)
                 ImGui.PopStyleColor()
+                if settings[Module.Name].ShowValOnBar then
+                    ImGui.SetCursorPos(cursorX + 2, cursorY)
+
+                    local txtLabel = groupData[memberName] ~= nil and
+                        string.format("%d / %d", groupData[memberName].CurMana, groupData[memberName].MaxMana) or
+                        string.format("%d%%", mpPct)
+
+                    ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
+
+                    ImGui.Text(txtLabel)
+                end
             end
         end
     end
     if showEnd then
         --My Endurance bar
+        cursorX, cursorY = ImGui.GetCursorPos()
         ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('yellow2')))
-        ImGui.ProgressBar((enPct / 100), ImGui.GetContentRegionAvail(), 7 * Scale, '##pctEndurance' .. id)
+        ImGui.ProgressBar((enPct / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctEndurance' .. id)
         ImGui.PopStyleColor()
+        if settings[Module.Name].ShowValOnBar then
+            local txtLabel = groupData[memberName] ~= nil and string.format("%d / %d", groupData[memberName].CurEnd, groupData[memberName].MaxEnd) or string.format("%d%%", enPct)
+            ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
+
+            ImGui.Text(txtLabel)
+        end
     end
 
     ImGui.EndGroup()
@@ -778,7 +819,7 @@ local function DrawSelf()
     local memberName = mySelf.Name()
     local r, g, b, a = 1, 1, 1, 1
     if mySelf == 'NULL' then return end
-
+    local barSize = settings[Module.Name].ShowValOnBar and 12 or 7
     local sizeX, sizeY = ImGui.GetContentRegionAvail()
     ImGui.BeginGroup()
     local colCount = settings[Module.Name].ShowLevel and 4 or 3
@@ -882,14 +923,24 @@ local function DrawSelf()
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
         end
     end
-    ImGui.ProgressBar(((tonumber(mySelf.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), 7 * Scale, '##pctHpsSelf')
+    local cursorX, cursorY = ImGui.GetCursorPos()
+    ImGui.ProgressBar(((tonumber(mySelf.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctHpsSelf')
     ImGui.PopStyleColor()
-
     if ImGui.IsItemHovered() then
         ImGui.BeginTooltip()
         GetInfoToolTip(0, false)
         ImGui.EndTooltip()
     end
+    if settings[Module.Name].ShowValOnBar then
+        ImGui.SetCursorPos(cursorX + 2, cursorY)
+
+        local txtLabel = string.format("%d / %d", mySelf.CurrentHPs(), mySelf.MaxHPs())
+
+        ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
+
+        ImGui.Text(txtLabel)
+    end
+
 
     --My Mana Bar
     if showMana then
@@ -904,25 +955,43 @@ local function DrawSelf()
                 else
                     ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('light blue2')))
                 end
-                ImGui.ProgressBar(((tonumber(mySelf.PctMana() or 0)) / 100), ImGui.GetContentRegionAvail(), 7 * Scale, '##pctManaSelf')
+                cursorX, cursorY = ImGui.GetCursorPos()
+                ImGui.ProgressBar(((tonumber(mySelf.PctMana() or 0)) / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctManaSelf')
                 ImGui.PopStyleColor()
                 if ImGui.IsItemHovered() then
                     ImGui.BeginTooltip()
                     GetInfoToolTip(0, false)
                     ImGui.EndTooltip()
                 end
+                if settings[Module.Name].ShowValOnBar then
+                    ImGui.SetCursorPos(cursorX + 2, cursorY)
+
+                    local txtLabel = string.format("%d / %d", mySelf.CurrentMana(), mySelf.MaxMana())
+
+                    ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
+
+                    ImGui.Text(txtLabel)
+                end
             end
         end
     end
     if showEnd then
         --My Endurance bar
+        cursorX, cursorY = ImGui.GetCursorPos()
         ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('yellow2')))
-        ImGui.ProgressBar(((tonumber(mySelf.PctEndurance() or 0)) / 100), ImGui.GetContentRegionAvail(), 7 * Scale, '##pctEnduranceSelf')
+        ImGui.ProgressBar(((tonumber(mySelf.PctEndurance() or 0)) / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctEnduranceSelf')
         ImGui.PopStyleColor()
         if ImGui.IsItemHovered() then
             ImGui.BeginTooltip()
             GetInfoToolTip(0, false)
             ImGui.EndTooltip()
+        end
+        if settings[Module.Name].ShowValOnBar then
+            local txtLabel = string.format("%d / %d", mySelf.CurrentEndurance(), mySelf.MaxEndurance())
+
+            ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
+
+            ImGui.Text(txtLabel)
         end
     end
 
@@ -1031,9 +1100,6 @@ function Module.RenderGUI()
 
             if mq.TLO.Me.GroupSize() > 0 then
                 ImGui.SameLine()
-            end
-
-            if mq.TLO.Me.GroupSize() > 0 then
                 if ImGui.SmallButton('Disband') then
                     mq.cmdf("/disband")
                 end
@@ -1286,7 +1352,7 @@ function Module.RenderGUI()
                     end
                 end
 
-                settings[Module.Name].MouseOver = Module.Utils.DrawToggle('Mouse Over', settings[Module.Name].MouseOver, nil, nil, true)
+                settings[Module.Name].MouseOver = Module.Utils.DrawToggle('Mouse Over', settings[Module.Name].MouseOver, ToggleFlags)
                 settings[Module.Name].WinTransparency = ImGui.SliderFloat('Window Transparency##' .. Module.Name, settings[Module.Name].WinTransparency, 0.1, 1.0)
                 ImGui.SeparatorText("Scaling##" .. Module.Name)
                 -- Slider for adjusting zoom level
@@ -1313,49 +1379,50 @@ function Module.RenderGUI()
                 ImGui.TableNextColumn()
 
                 local tmpComms = useEQBC
-                tmpComms = Module.Utils.DrawToggle('Use EQBC##' .. Module.Name, tmpComms, nil, nil, true)
+                tmpComms = Module.Utils.DrawToggle('Use EQBC##' .. Module.Name, tmpComms, ToggleFlags)
                 if tmpComms ~= useEQBC then
                     useEQBC = tmpComms
                 end
                 ImGui.TableNextColumn()
                 local tmpMana = showMana
-                tmpMana = Module.Utils.DrawToggle('Mana##' .. Module.Name, tmpMana, nil, nil, true)
+                tmpMana = Module.Utils.DrawToggle('Mana##' .. Module.Name, tmpMana, ToggleFlags)
                 if tmpMana ~= showMana then
                     showMana = tmpMana
                 end
                 ImGui.TableNextColumn()
 
                 local tmpEnd = showEnd
-                tmpEnd = Module.Utils.DrawToggle('Endurance##' .. Module.Name, tmpEnd, nil, nil, true)
+                tmpEnd = Module.Utils.DrawToggle('Endurance##' .. Module.Name, tmpEnd, ToggleFlags)
                 if tmpEnd ~= showEnd then
                     showEnd = tmpEnd
                 end
                 ImGui.TableNextColumn()
 
                 local tmpPet = showPet
-                tmpPet = Module.Utils.DrawToggle('Show Pet##' .. Module.Name, tmpPet, nil, nil, true)
+                tmpPet = Module.Utils.DrawToggle('Show Pet##' .. Module.Name, tmpPet, ToggleFlags)
                 if tmpPet ~= showPet then
                     showPet = tmpPet
                 end
                 ImGui.TableNextColumn()
-                settings[Module.Name].ShowDummy = Module.Utils.DrawToggle('Show Dummy##' .. Module.Name, settings[Module.Name].ShowDummy, nil, nil, true)
+                settings[Module.Name].ShowDummy = Module.Utils.DrawToggle('Show Dummy##' .. Module.Name, settings[Module.Name].ShowDummy, ToggleFlags)
                 ImGui.TableNextColumn()
-                settings[Module.Name].ShowRoleIcons = Module.Utils.DrawToggle('Show Role Icons##' .. Module.Name, settings[Module.Name].ShowRoleIcons, nil, nil, true)
+                settings[Module.Name].ShowRoleIcons = Module.Utils.DrawToggle('Show Role Icons##' .. Module.Name, settings[Module.Name].ShowRoleIcons, ToggleFlags)
                 ImGui.TableNextColumn()
-                settings[Module.Name].DynamicHP = Module.Utils.DrawToggle('Dynamic HP##' .. Module.Name, settings[Module.Name].DynamicHP, nil, nil, true)
+                settings[Module.Name].DynamicHP = Module.Utils.DrawToggle('Dynamic HP##' .. Module.Name, settings[Module.Name].DynamicHP, ToggleFlags)
                 ImGui.TableNextColumn()
-                settings[Module.Name].DynamicMP = Module.Utils.DrawToggle('Dynamic MP##' .. Module.Name, settings[Module.Name].DynamicMP, nil, nil, true)
+                settings[Module.Name].DynamicMP = Module.Utils.DrawToggle('Dynamic MP##' .. Module.Name, settings[Module.Name].DynamicMP, ToggleFlags)
                 ImGui.TableNextColumn()
-                hideTitle = Module.Utils.DrawToggle('Hide Title Bar##' .. Module.Name, hideTitle, nil, nil, true)
+                hideTitle = Module.Utils.DrawToggle('Hide Title Bar##' .. Module.Name, hideTitle, ToggleFlags)
                 ImGui.TableNextColumn()
-                showSelf = Module.Utils.DrawToggle('Show Self##' .. Module.Name, showSelf, nil, nil, true)
+                showSelf = Module.Utils.DrawToggle('Show Self##' .. Module.Name, showSelf, ToggleFlags)
                 ImGui.TableNextColumn()
-                showRaidWindow = Module.Utils.DrawToggle('Show Raid##' .. Module.Name, showRaidWindow, nil, nil, true)
+                showRaidWindow = Module.Utils.DrawToggle('Show Raid##' .. Module.Name, showRaidWindow, ToggleFlags)
                 ImGui.TableNextColumn()
-                settings[Module.Name].ShowLevel = Module.Utils.DrawToggle('Show Level##' .. Module.Name, settings[Module.Name].ShowLevel, nil, nil, true)
+                settings[Module.Name].ShowLevel = Module.Utils.DrawToggle('Show Level##' .. Module.Name, settings[Module.Name].ShowLevel, ToggleFlags)
                 ImGui.TableNextColumn()
-                showMoveStatus = Module.Utils.DrawToggle('Show Move Status##' .. Module.Name, showMoveStatus, nil, nil, true)
+                showMoveStatus = Module.Utils.DrawToggle('Show Move Status##' .. Module.Name, showMoveStatus, ToggleFlags)
                 ImGui.TableNextColumn()
+                settings[Module.Name].ShowValOnBar = Module.Utils.DrawToggle('Show Value on Bar##' .. Module.Name, settings[Module.Name].ShowValOnBar, ToggleFlags)
                 ImGui.EndTable()
             end
             local tmpDist

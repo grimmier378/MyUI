@@ -56,6 +56,13 @@ else
     Module.ThemeLoader = MyUI_ThemeLoader
     Module.Path = MyUI_Path
 end
+local Utils                            = Module.Utils
+local ToggleFlags                      = bit32.bor(
+    Utils.ImGuiToggleFlags.PulseOnHover,
+    --Utils.ImGuiToggleFlags.SmilyKnob,
+    Utils.ImGuiToggleFlags.StarKnob,
+    Utils.ImGuiToggleFlags.AnimateOnHover,
+    Utils.ImGuiToggleFlags.RightLabel)
 
 local configFileOld                    = mq.configDir .. '/Module.Configs.lua'
 local configFile                       = string.format("%s/MyUI/MyBuffs/%s/%s.lua", mq.configDir,
@@ -82,11 +89,8 @@ local showTableView                    = true
 local maxSongs                         = 30
 local numBuffs                         = 0
 local BuffMe                           = mq.TLO.Plugin("MQ2BuffMe").IsLoaded()
-local knobColorOn                      = ImVec4(0.190, 1.000, 0.827, 0.924)
-local knobColorOff                     = ImVec4(1.000, 0.190, 0.190, 0.924)
 
-
-local winPositions = {
+local winPositions                     = {
     Config = { x = 500, y = 500, },
     MailBox = { x = 500, y = 500, },
     Debuffs = { x = 500, y = 500, },
@@ -94,7 +98,7 @@ local winPositions = {
     Songs = { x = 500, y = 500, },
     Favorites = { x = 500, y = 500, },
 }
-local winSizes     = {
+local winSizes                         = {
     Config = { x = 300, y = 500, },
     MailBox = { x = 500, y = 500, },
     Debuffs = { x = 500, y = 500, },
@@ -102,16 +106,17 @@ local winSizes     = {
     Songs = { x = 200, y = 300, },
     Favorites = { x = 400, y = 300, },
 }
+local sortedKeysFavorites              = {}
 -- Timing Variables
-local clockTimer   = mq.gettime()
-local begTimer     = os.time()
-local lastTime     = mq.gettime()
-local checkIn      = os.time()
-local frameTime    = 33
+local clockTimer                       = mq.gettime()
+local begTimer                         = os.time()
+local lastTime                         = mq.gettime()
+local checkIn                          = os.time()
+local frameTime                        = 33
 local currZone, lastZone
 
 -- default config settings
-Module.defaults    = {
+Module.defaults                        = {
     Scale = 1.0,
     LoadTheme = 'Default',
     locked = false,
@@ -157,7 +162,7 @@ Module.defaults    = {
     Favorites = {},
 }
 
-local myClass      = mq.TLO.Me.Class.ShortName() or 'N/A'
+local myClass                          = mq.TLO.Me.Class.ShortName() or 'N/A'
 
 -- Functions
 
@@ -700,6 +705,8 @@ local function loadSettings()
     Module.TempSettings.ShowOnlyGroup = Module.settings[Module.Name].ShowMyGroupOnly
     sortType = Module.settings[Module.Name].SortBy
     Module.ShowFavorites = Module.settings[Module.Name].ShowFavorites
+    Module.SortFavorites()
+
     if newSetting then mq.pickle(configFile, Module.settings) end
 end
 
@@ -1065,12 +1072,35 @@ local function sortedBoxes(boxes)
     return boxes
 end
 
+function Module.SortFavorites()
+    local tmpTbl = {}
+    if Module.settings[Module.Name].Favorites == nil then return end
+    for k, v in pairs(Module.settings[Module.Name].Favorites) do
+        table.insert(tmpTbl, { name = k, enabled = v, })
+    end
+    table.sort(tmpTbl, function(a, b)
+        --[[
+        -- group by value and sort by name
+
+        if a.enabled == b.enabled then
+            return a.name < b.name
+        end
+        return a.enabled and not b.enabled
+            ]]
+
+        -- sorty by name only the above gets messy when toggling
+        return a.name < b.name
+    end)
+    sortedKeysFavorites = tmpTbl
+end
+
 function Module.AddFav(name)
     if name == nil then return end
     if Module.settings[Module.Name].Favorites == nil then
         Module.settings[Module.Name].Favorites = {}
     end
     Module.settings[Module.Name].Favorites[name] = true
+    Module.SortFavorites()
     mq.pickle(configFile, Module.settings)
 end
 
@@ -1095,7 +1125,11 @@ function Module.BegBuffs()
 end
 
 -- When drawing:
-
+local settingsToggleFlags = bit32.bor(
+--Utils.ImGuiToggleFlags.SmilyKnob,
+    Utils.ImGuiToggleFlags.PulseOnHover,
+    Utils.ImGuiToggleFlags.RightLabel
+)
 function Module.RenderGUI()
     if currZone ~= lastZone then return end
 
@@ -1533,7 +1567,8 @@ function Module.RenderGUI()
                     songTimer = tmpSongTimer
                 end
                 if BuffMe then
-                    Module.settings[Module.Name].BuffBeg = Module.Utils.DrawToggle('Buff Begging##config', Module.settings[Module.Name].BuffBeg)
+                    Module.settings[Module.Name].BuffBeg = Module.Utils.DrawToggle('Buff Begging##config', Module.settings[Module.Name].BuffBeg, settingsToggleFlags, ImVec2(46, 20),
+                        nil, nil, ImVec4(1, 1, 0.2, 0.8))
                     if Module.settings[Module.Name].BuffBeg then
                         local changed = false
                         ImGui.SetNextItemWidth(150)
@@ -1548,13 +1583,13 @@ function Module.RenderGUI()
             ImGui.SeparatorText('Toggles')
             if ImGui.CollapsingHeader('Toggles##Coll' .. Module.Name) then
                 local tmpShowIcons = Module.ShowIcons
-                tmpShowIcons = Module.Utils.DrawToggle('Show Icons', tmpShowIcons, nil, nil, true)
+                tmpShowIcons = Module.Utils.DrawToggle('Show Icons', tmpShowIcons, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
                 if tmpShowIcons ~= Module.ShowIcons then
                     Module.ShowIcons = tmpShowIcons
                 end
                 ImGui.SameLine()
                 local tmpPulseIcons = Module.DoPulse
-                tmpPulseIcons = Module.Utils.DrawToggle('Pulse Icons', tmpPulseIcons, nil, nil, true)
+                tmpPulseIcons = Module.Utils.DrawToggle('Pulse Icons', tmpPulseIcons, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
                 if tmpPulseIcons ~= Module.DoPulse then
                     Module.DoPulse = tmpPulseIcons
                 end
@@ -1571,42 +1606,43 @@ function Module.RenderGUI()
                 if ImGui.BeginTable("Toggles##", 2) then
                     ImGui.TableNextColumn()
                     local tmpShowText = Module.ShowText
-                    tmpShowText = Module.Utils.DrawToggle('Show Text', tmpShowText, nil, nil, true)
+                    tmpShowText = Module.Utils.DrawToggle('Show Text', tmpShowText, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
                     if tmpShowText ~= Module.ShowText then
                         Module.ShowText = tmpShowText
                     end
                     ImGui.TableNextColumn()
                     local tmpShowTimer = Module.ShowTimer
-                    tmpShowTimer = Module.Utils.DrawToggle('Show Timer', tmpShowTimer, nil, nil, true)
+                    tmpShowTimer = Module.Utils.DrawToggle('Show Timer', tmpShowTimer, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
                     if tmpShowTimer ~= Module.ShowTimer then
                         Module.ShowTimer = tmpShowTimer
                     end
                     ImGui.TableNextColumn()
                     local tmpScroll = Module.ShowScroll
-                    tmpScroll = Module.Utils.DrawToggle('Show Scrollbar', tmpScroll, nil, nil, true)
+                    tmpScroll = Module.Utils.DrawToggle('Show Scrollbar', tmpScroll, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
                     if tmpScroll ~= Module.ShowScroll then
                         Module.ShowScroll = tmpScroll
                     end
                     ImGui.TableNextColumn()
                     local tmpSplit = Module.SplitWin
-                    tmpSplit = Module.Utils.DrawToggle('Split Win', tmpSplit, nil, nil, true)
+                    tmpSplit = Module.Utils.DrawToggle('Split Win', tmpSplit, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
                     if tmpSplit ~= Module.SplitWin then
                         Module.SplitWin = tmpSplit
                     end
                     ImGui.TableNextColumn()
-                    Module.MailBoxShow = Module.Utils.DrawToggle('Show MailBox', Module.MailBoxShow, nil, nil, true)
+                    Module.MailBoxShow = Module.Utils.DrawToggle('Show MailBox', Module.MailBoxShow, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
                     ImGui.TableNextColumn()
-                    Module.ShowDebuffs = Module.Utils.DrawToggle('Show Debuffs', Module.ShowDebuffs, nil, nil, true)
+                    Module.ShowDebuffs = Module.Utils.DrawToggle('Show Debuffs', Module.ShowDebuffs, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
                     ImGui.TableNextColumn()
-                    Module.showTitleBar = Module.Utils.DrawToggle('Show Title Bar', Module.showTitleBar, nil, nil, true)
+                    Module.showTitleBar = Module.Utils.DrawToggle('Show Title Bar', Module.showTitleBar, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
                     ImGui.TableNextColumn()
-                    useWinPos = Module.Utils.DrawToggle('Use Window Positions', useWinPos, nil, nil, true)
+                    useWinPos = Module.Utils.DrawToggle('Use Window Positions', useWinPos, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
                     ImGui.TableNextColumn()
-                    ShowMenu = Module.Utils.DrawToggle('Show Menu', ShowMenu, nil, nil, true)
+                    ShowMenu = Module.Utils.DrawToggle('Show Menu', ShowMenu, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
                     ImGui.TableNextColumn()
-                    showTableView = Module.Utils.DrawToggle('Show Table', showTableView, nil, nil, true)
+                    showTableView = Module.Utils.DrawToggle('Show Table', showTableView, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
                     ImGui.TableNextColumn()
-                    Module.TempSettings.ShowOnlyGroup = Module.Utils.DrawToggle('Show My Group Only', Module.TempSettings.ShowOnlyGroup, nil, nil, true)
+                    Module.TempSettings.ShowOnlyGroup = Module.Utils.DrawToggle('Show My Group Only', Module.TempSettings.ShowOnlyGroup, settingsToggleFlags, ImVec2(46, 20), nil,
+                        nil, ImVec4(1, 1, 0.2, 0.8))
                     ImGui.EndTable()
                 end
             end
@@ -1742,16 +1778,13 @@ function Module.RenderGUI()
         if showFavs then
             if BuffMe then
                 local changedInt = false
-                local knobColor = Module.settings[Module.Name].BuffBeg and ImVec4(0.867, 0.774, 0.082, 1.000) or ImVec4(0.823, 0.411, 0.066, 1.000)
 
                 Module.settings[Module.Name].BuffBeg = Module.Utils.DrawToggle('Buff Begging', Module.settings[Module.Name].BuffBeg,
-                    ImVec2(46, 16),
-                    Module.settings[Module.Name].BuffBeg,
-                    false,
-                    Module.settings[Module.Name].BuffBeg and ImVec4(0.206, 0.560, 0.867, 1.000) or ImVec4(0.168, 0.797, 0.312, 1.000),
-                    Module.settings[Module.Name].BuffBeg and ImVec4(0.326, 0.152, 0.582, 1.000) or ImVec4(0.326, 0.152, 0.582, 1.000),
-                    Module.Utils.GetBreathingColor(knobColor,
-                        Module.settings[Module.Name].BuffBeg))
+                    bit32.bor(ToggleFlags, Utils.ImGuiToggleFlags.PulseOnHover),
+                    ImVec2(46, 20),
+                    ImVec4(0.026, 0.519, 0.791, 1.000),
+                    ImVec4(1, 0.2, 0.2, 0.8),
+                    ImVec4(1.000, 0.785, 0.000, 1.000))
 
                 if Module.settings[Module.Name].BuffBeg then
                     ImGui.SetNextItemWidth(150)
@@ -1774,44 +1807,47 @@ function Module.RenderGUI()
                 end
                 ImGui.TableSetupColumn(Module.Icons.MD_DELETE, ImGuiTableColumnFlags.WidthFixed, 40)
                 ImGui.TableHeadersRow()
-                for k, v in pairs(Module.settings[Module.Name].Favorites or {}) do
-                    if v ~= nil then
+                for _, data in ipairs(sortedKeysFavorites or {}) do
+                    if Module.settings[Module.Name].Favorites[data.name] ~= nil then
+                        local key = data.name
+                        local val = Module.settings[Module.Name].Favorites[key]
                         ImGui.TableNextRow()
                         ImGui.TableNextColumn()
-                        local tTip = string.format("Spell: %s\nBegging: %s", k, tostring(v):upper())
-                        Module.Utils.DrawStatusIcon(mq.TLO.Spell(k).SpellIcon() or 0, 'spell', tTip, Module.iconSize)
+                        local tTip = string.format("Spell: %s\nBegging: %s", key, tostring(val):upper())
+                        Module.Utils.DrawStatusIcon(mq.TLO.Spell(key).SpellIcon() or 0, 'spell', tTip, Module.iconSize)
                         ImGui.SameLine()
-                        if Module.MyBuffsNames[k] then
-                            ImGui.TextColored(ImVec4(0.2, 1, 0.2, 0.8), k)
-                        elseif not v then
-                            ImGui.Text(k)
+                        if Module.MyBuffsNames[key] then
+                            ImGui.TextColored(ImVec4(0.2, 1, 0.2, 0.8), key)
+                        elseif not val then
+                            ImGui.Text(key)
                         else
-                            ImGui.TextColored(ImVec4(1, 0.2, 0.2, 0.7), k)
+                            ImGui.TextColored(ImVec4(1, 0.2, 0.2, 0.7), key)
                         end
                         if BuffMe then
                             ImGui.TableNextColumn()
                             local clicked = false
 
-                            Module.settings[Module.Name].Favorites[k], clicked = Module.Utils.DrawToggle("##Beg_" .. k, Module.settings[Module.Name].Favorites[k],
-                                ImVec2(46, 16),
-                                Module.settings[Module.Name].Favorites[k],
-                                false,
-                                ImVec4(0.780, 0.102, 0.863, 0.910),
-                                ImVec4(0.306, 0.200, 0.800, 1.000),
-                                Module.Utils.GetBreathingColor(v and knobColorOn or knobColorOff,
-                                    Module.settings[Module.Name].Favorites[k]))
+                            Module.settings[Module.Name].Favorites[key], clicked = Module.Utils.DrawToggle("##Beg_" .. key, Module.settings[Module.Name].Favorites[key],
+                                bit32.bor(ToggleFlags, Utils.ImGuiToggleFlags.PulseOnHover),
+                                ImVec2(46, 20),
+                                ImVec4(0.026, 0.519, 0.791, 1.000),
+                                ImVec4(1, 0.2, 0.2, 0.8),
+                                ImVec4(1.000, 0.785, 0.000, 1.000))
 
                             if clicked then Module.NeedSave = true end
 
                             ImGui.TableNextColumn()
-                            if ImGui.Button(Module.Icons.FA_BULLHORN .. "##" .. k) then
-                                mq.cmdf("/dgz /buffthem %s %s", Module.CharLoaded, k)
+                            if ImGui.Button(Module.Icons.FA_BULLHORN .. "##" .. key) then
+                                mq.cmdf("/dgz /buffthem %s %s", Module.CharLoaded, key)
                             end
                         end
                         ImGui.TableNextColumn()
-                        if ImGui.Button(Module.Icons.MD_DELETE .. "##Remove_" .. k) then
-                            Module.settings[Module.Name].Favorites[k] = nil
-                            mq.pickle(configFile, Module.settings)
+                        if ImGui.Button(Module.Icons.MD_DELETE .. "##Remove_" .. key) then
+                            if Module.TempSettings.RemoveFav == nil then
+                                Module.TempSettings.RemoveFav = {}
+                            end
+                            table.insert(Module.TempSettings.RemoveFav, key)
+                            Module.NeedSave = true
                         end
                     end
                 end
@@ -2063,6 +2099,13 @@ function Module.MainLoop()
     end
 
     if Module.NeedSave then
+        if Module.TempSettings.RemoveFav ~= nil then
+            for _, name in ipairs(Module.TempSettings.RemoveFav) do
+                Module.settings[Module.Name].Favorites[name] = nil
+            end
+            Module.TempSettings.RemoveFav = nil
+        end
+        Module.SortFavorites()
         Module.NeedSave = false
         mq.pickle(configFile, Module.settings)
     end

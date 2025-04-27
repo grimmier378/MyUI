@@ -34,19 +34,28 @@ else
 	Module.ThemeFile = MyUI_ThemeFile
 	Module.ThemeLoader = MyUI_ThemeLoader
 end
-Module.TempSettings = {}
-Module.ButtonLabels = {}
-
+Module.TempSettings                                                               = {}
+Module.ButtonLabels                                                               = {}
+local Utils                                                                       = Module.Utils
+local ToggleFlags                                                                 = bit32.bor(
+	Utils.ImGuiToggleFlags.PulseOnHover,
+	--Utils.ImGuiToggleFlags.SmilyKnob,
+	--Utils.ImGuiToggleFlags.GlowOnHover,
+	Utils.ImGuiToggleFlags.KnobBorder,
+	--Utils.ImGuiToggleFlags.StarKnob,
+	Utils.ImGuiToggleFlags.AnimateOnHover
+--Utils.ImGuiToggleFlags.RightLabel
+)
 -- Variables
-local themeName = 'Default'
-local defaults, settings, btnInfo = {}, {}, {}
-local showMainGUI, showConfigGUI = true, false
-local scale = 1
-local locked, hasThemeZ = false, false
+local themeName                                                                   = 'Default'
+local defaults, settings, btnInfo                                                 = {}, {}, {}
+local showMainGUI, showConfigGUI                                                  = true, false
+local scale                                                                       = 1
+local locked, hasThemeZ                                                           = false, false
 local petHP, petTarg, petDist, petBuffs, petName, petTargHP, petLvl, petBuffCount = 0, nil, 0, {}, 'No Pet', 0, -1, 0
-local lastCheck = 0
-local myPet = mq.TLO.Pet
-local btnKeys = {
+local lastCheck                                                                   = 0
+local myPet                                                                       = mq.TLO.Pet
+local btnKeys                                                                     = {
 	"Attack",
 	"Back",
 	"Taunt",
@@ -64,7 +73,7 @@ local btnKeys = {
 	"qAttack",
 	"gHold",
 }
-btnInfo = {
+btnInfo                                                                           = {
 	attack = false,
 	back = false,
 	taunt = false,
@@ -83,19 +92,20 @@ btnInfo = {
 	ghold = false,
 }
 -- GUI Settings
-local winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoFocusOnAppearing)
-local animSpell = mq.FindTextureAnimation('A_SpellIcons')
-local iconSize = 20
-local autoHide = false
-local showTitleBar = true
+local winFlags                                                                    = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoFocusOnAppearing)
+local animSpell                                                                   = mq.FindTextureAnimation('A_SpellIcons')
+local iconSize                                                                    = 20
+local autoHide                                                                    = false
+local showTitleBar                                                                = true
 
 -- File Paths
-local configFileOld = string.format('%s/MyUI/%s/%s_Configs.lua', mq.configDir, Module.Name, Module.Name)
-local configFile = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, Module.Name, Module.Server, Module.CharLoaded)
-local themezDir = mq.luaDir .. '/themez/init.lua'
+local configFileOld                                                               = string.format('%s/MyUI/%s/%s_Configs.lua', mq.configDir, Module.Name, Module.Name)
+local configFile                                                                  = string.format('%s/MyUI/%s/%s/%s.lua', mq.configDir, Module.Name, Module.Server, Module
+	.CharLoaded)
+local themezDir                                                                   = mq.luaDir .. '/themez/init.lua'
 
 -- Default Settings
-defaults = {
+defaults                                                                          = {
 	Scale = 1.0,
 	LoadTheme = 'Default',
 	AutoHide = false,
@@ -556,13 +566,13 @@ function Module.RenderGUI()
 			iconSize = ImGui.InputInt("Icon Size##" .. Module.Name, iconSize, 1, 5)
 			if ImGui.BeginTable("##Colors", 2) then
 				ImGui.TableNextColumn()
-				autoHide = Module.Utils.DrawToggle("Auto Hide##" .. Module.Name, autoHide)
+				autoHide = Module.Utils.DrawToggle("Auto Hide##" .. Module.Name, autoHide, ToggleFlags)
 				ImGui.TableNextColumn()
 
-				locked = Module.Utils.DrawToggle("Lock Window##" .. Module.Name, locked)
+				locked = Module.Utils.DrawToggle("Lock Window##" .. Module.Name, locked, ToggleFlags)
 				ImGui.TableNextColumn()
 
-				showTitleBar = Module.Utils.DrawToggle("Show Title Bar##" .. Module.Name, showTitleBar)
+				showTitleBar = Module.Utils.DrawToggle("Show Title Bar##" .. Module.Name, showTitleBar, ToggleFlags)
 				ImGui.TableNextColumn()
 				ImGui.TableNextColumn()
 

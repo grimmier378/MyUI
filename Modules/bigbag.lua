@@ -21,6 +21,11 @@ else
 	Module.ThemeLoader = MyUI_ThemeLoader
 	Module.Utils = MyUI_Utils
 end
+local Utils                                               = Module.Utils
+local ToggleFlags                                         = bit32.bor(
+	Utils.ImGuiToggleFlags.PulseOnHover,
+	Utils.ImGuiToggleFlags.SmilyKnob,
+	Utils.ImGuiToggleFlags.RightLabel)
 -- Constants
 local ICON_WIDTH                                          = 40
 local ICON_HEIGHT                                         = 40
@@ -498,7 +503,7 @@ local function display_bag_options()
 	if ImGui.BeginChild("OptionsChild") then
 		if ImGui.CollapsingHeader("Bag Options") then
 			local changed = false
-			sort_order.name, changed = Module.Utils.DrawToggle("Name", sort_order.name, nil, nil, true)
+			sort_order.name, changed = Module.Utils.DrawToggle("Name", sort_order.name, ToggleFlags)
 			if changed then
 				needSort = true
 				settings.sort_order.name = sort_order.name
@@ -509,7 +514,7 @@ local function display_bag_options()
 			help_marker("Order items from your inventory sorted by the name of the item.")
 
 			local pressed = false
-			sort_order.stack, pressed = Module.Utils.DrawToggle("Stack", sort_order.stack, nil, nil, true)
+			sort_order.stack, pressed = Module.Utils.DrawToggle("Stack", sort_order.stack, ToggleFlags)
 			if pressed then
 				needSort = true
 				settings.sort_order.stack = sort_order.stack
@@ -520,7 +525,7 @@ local function display_bag_options()
 			help_marker("Order items with the largest stacks appearing first.")
 
 			local pressed2 = false
-			show_item_background, pressed2 = Module.Utils.DrawToggle("Show Slot Background", show_item_background, nil, nil, true)
+			show_item_background, pressed2 = Module.Utils.DrawToggle("Show Slot Background", show_item_background, ToggleFlags)
 			if pressed2 then
 				settings.show_item_background = show_item_background
 				mq.pickle(configFile, settings)
@@ -1171,7 +1176,7 @@ local function RenderTabs()
 		end
 		local pressed
 		ImGui.SetNextItemWidth(100)
-		settings.HighlightUseable, pressed = Module.Utils.DrawToggle("Highlight Useable", settings.HighlightUseable)
+		settings.HighlightUseable, pressed = Module.Utils.DrawToggle("Highlight Useable", settings.HighlightUseable, Utils.ImGuiToggleFlags.StarKnob)
 		if pressed then
 			mq.pickle(configFile, settings)
 		end

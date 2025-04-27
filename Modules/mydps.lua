@@ -24,33 +24,41 @@ else
 	Module.ThemeFile = MyUI_ThemeFile
 	Module.Theme = MyUI_Theme
 end
-Module.PetName = mq.TLO.Pet.DisplayName() or 'NoPet'
-Module.TempSettings = {}
-local ActorDPS = nil
-local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, Module.Name, Module.Server, Module.CharLoaded)
-local damTable, settings = {}, {}
-local winFlags = bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoTitleBar)
-local started = false
-local clickThrough = false
-local showDataWin = false
-local dataWinData = {
+Module.PetName                                                                                                                     = mq.TLO.Pet.DisplayName() or 'NoPet'
+Module.TempSettings                                                                                                                = {}
+local Utils                                                                                                                        = Module.Utils
+local ToggleFlags                                                                                                                  = bit32.bor(
+	Utils.ImGuiToggleFlags.PulseOnHover,
+	--Utils.ImGuiToggleFlags.SmilyKnob,
+	--Utils.ImGuiToggleFlags.StarKnob,
+	Utils.ImGuiToggleFlags.RightLabel)
+local ActorDPS                                                                                                                     = nil
+local configFile                                                                                                                   = string.format("%s/MyUI/%s/%s/%s.lua",
+	mq.configDir, Module.Name, Module.Server, Module.CharLoaded)
+local damTable, settings                                                                                                           = {}, {}
+local winFlags                                                                                                                     = bit32.bor(ImGuiWindowFlags.None,
+	ImGuiWindowFlags.NoTitleBar)
+local started                                                                                                                      = false
+local clickThrough                                                                                                                 = false
+local showDataWin                                                                                                                  = false
+local dataWinData                                                                                                                  = {
 	data = {},
 	seq = nil,
 	labelName = nil,
 }
-local tableSize = 0
-local sequenceCounter, battleCounter = 0, 0
-local dpsStartTime = os.time()
-local previewBG = false
+local tableSize                                                                                                                    = 0
+local sequenceCounter, battleCounter                                                                                               = 0, 0
+local dpsStartTime                                                                                                                 = os.time()
+local previewBG                                                                                                                    = false
 local dmgTotal, dmgCounter, dsCounter, dmgTotalDS, dmgTotalBattle, dmgBattCounter, critHealsTotal, critTotalBattle, dotTotalBattle = 0, 0, 0, 0, 0, 0, 0, 0, 0
-local workingTable, battlesHistory, actorsTable, actorsWorking = {}, {}, {}, {}
-local enteredCombat = false
-local battleStartTime, leftCombatTime = 0, 0
-local firstRun = true
-local themeName = "Default"
-local tempSettings = {}
-local MyLeader = 'None'
-local defaults = {
+local workingTable, battlesHistory, actorsTable, actorsWorking                                                                     = {}, {}, {}, {}
+local enteredCombat                                                                                                                = false
+local battleStartTime, leftCombatTime                                                                                              = 0, 0
+local firstRun                                                                                                                     = true
+local themeName                                                                                                                    = "Default"
+local tempSettings                                                                                                                 = {}
+local MyLeader                                                                                                                     = 'None'
+local defaults                                                                                                                     = {
 	Options = {
 		sortNewest             = true,
 		showType               = true,
@@ -955,67 +963,67 @@ local function DrawOptions()
 		if ImGui.BeginTable("Options", colToggles, ImGuiTableFlags.Borders) then
 			ImGui.TableNextColumn()
 
-			tempSettings.showHistory = Module.Utils.DrawToggle("Show Battle History", tempSettings.showHistory, nil, nil, true)
+			tempSettings.showHistory = Module.Utils.DrawToggle("Show Battle History", tempSettings.showHistory, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Show the Battle History Window.")
 			ImGui.TableNextColumn()
-			tempSettings.showCombatWindow = Module.Utils.DrawToggle("Show Combat Spam History", tempSettings.showCombatWindow, nil, nil, true)
+			tempSettings.showCombatWindow = Module.Utils.DrawToggle("Show Combat Spam History", tempSettings.showCombatWindow, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Show the Combat Spam Window.")
 			ImGui.TableNextColumn()
-			tempSettings.showType = Module.Utils.DrawToggle("Show Type", tempSettings.showType, nil, nil, true)
+			tempSettings.showType = Module.Utils.DrawToggle("Show Type", tempSettings.showType, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Show the type of attack.")
 			ImGui.TableNextColumn()
-			tempSettings.showTarget = Module.Utils.DrawToggle("Show Target", tempSettings.showTarget, nil, nil, true)
+			tempSettings.showTarget = Module.Utils.DrawToggle("Show Target", tempSettings.showTarget, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Show the target of the attack. or YOU MISS")
 			ImGui.TableNextColumn()
-			tempSettings.sortNewest = Module.Utils.DrawToggle("Sort Newest Combat Spam on top", tempSettings.sortNewest, nil, nil, true)
+			tempSettings.sortNewest = Module.Utils.DrawToggle("Sort Newest Combat Spam on top", tempSettings.sortNewest, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Sort Combat Spam the newest on top.")
 			ImGui.TableNextColumn()
-			tempSettings.sortHistory = Module.Utils.DrawToggle("Sort Newest History on top", tempSettings.sortHistory, nil, nil, true)
+			tempSettings.sortHistory = Module.Utils.DrawToggle("Sort Newest History on top", tempSettings.sortHistory, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Sort Battle History Table the newest on top.")
 			ImGui.TableNextColumn()
-			tempSettings.sortParty = Module.Utils.DrawToggle("Sort Party DPS on top", tempSettings.sortParty, nil, nil, true)
+			tempSettings.sortParty = Module.Utils.DrawToggle("Sort Party DPS on top", tempSettings.sortParty, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Sort Party DPS the highest on top. Refrehses at about 30fps so you can read it otherwise its jumps around to fast")
 			ImGui.TableNextColumn()
-			tempSettings.showMyMisses = Module.Utils.DrawToggle("Show My Misses", tempSettings.showMyMisses, nil, nil, true)
+			tempSettings.showMyMisses = Module.Utils.DrawToggle("Show My Misses", tempSettings.showMyMisses, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Show your misses.")
 			ImGui.TableNextColumn()
-			tempSettings.showMissMe = Module.Utils.DrawToggle("Show Missed Me", tempSettings.showMissMe, nil, nil, true)
+			tempSettings.showMissMe = Module.Utils.DrawToggle("Show Missed Me", tempSettings.showMissMe, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Show NPC missed you.")
 			ImGui.TableNextColumn()
-			tempSettings.showHitMe = Module.Utils.DrawToggle("Show Hit Me", tempSettings.showHitMe, nil, nil, true)
+			tempSettings.showHitMe = Module.Utils.DrawToggle("Show Hit Me", tempSettings.showHitMe, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Show NPC hit you.")
 			ImGui.TableNextColumn()
-			tempSettings.showCritHeals = Module.Utils.DrawToggle("Show Crit Heals", tempSettings.showCritHeals, nil, nil, true)
+			tempSettings.showCritHeals = Module.Utils.DrawToggle("Show Crit Heals", tempSettings.showCritHeals, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Show Critical Heals.")
 			ImGui.TableNextColumn()
-			tempSettings.showDS = Module.Utils.DrawToggle("Show Damage Shield", tempSettings.showDS, nil, nil, true)
+			tempSettings.showDS = Module.Utils.DrawToggle("Show Damage Shield", tempSettings.showDS, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Show Damage Shield Spam Damage.")
 			ImGui.TableNextColumn()
-			tempSettings.dpsTimeSpanReport = Module.Utils.DrawToggle("Do DPS over Time Reporting", tempSettings.dpsTimeSpanReport, nil, nil, true)
+			tempSettings.dpsTimeSpanReport = Module.Utils.DrawToggle("Do DPS over Time Reporting", tempSettings.dpsTimeSpanReport, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Report DPS over a set time span.")
 			ImGui.TableNextColumn()
-			tempSettings.dpsBattleReport = Module.Utils.DrawToggle("Do DPS Battle Reporting", tempSettings.dpsBattleReport, nil, nil, true)
+			tempSettings.dpsBattleReport = Module.Utils.DrawToggle("Do DPS Battle Reporting", tempSettings.dpsBattleReport, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Report DPS For last Battle.")
 			ImGui.TableNextColumn()
-			tempSettings.announceDNET = Module.Utils.DrawToggle("Announce to DanNet Group", tempSettings.announceDNET, nil, nil, true)
+			tempSettings.announceDNET = Module.Utils.DrawToggle("Announce to DanNet Group", tempSettings.announceDNET, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Announce DPS Reports to DanNet Group.")
 			ImGui.TableNextColumn()
-			tempSettings.announceActors = Module.Utils.DrawToggle("Announce to Actors", tempSettings.announceActors, nil, nil, true)
+			tempSettings.announceActors = Module.Utils.DrawToggle("Announce to Actors", tempSettings.announceActors, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Announce DPS Battle Reports to Actors.")
 			ImGui.EndTable()

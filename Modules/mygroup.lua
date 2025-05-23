@@ -517,7 +517,8 @@ local function DrawGroupMember(id)
 
         if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) and ImGui.IsKeyDown(ImGuiMod.Ctrl) then
             mq.cmdf("/dex %s /foreground", member.Name())
-        elseif ImGui.IsItemHovered() and member.Present() and ImGui.IsMouseClicked(0) then
+        end
+        if member.Present() and ImGui.IsMouseReleased(0) then
             mq.cmdf("/target id %s", member.ID())
 
             Module.Utils.GiveItem(member.ID() or 0)
@@ -534,7 +535,9 @@ local function DrawGroupMember(id)
             ImGui.PopStyleColor()
             if ImGui.IsItemHovered() then
                 ImGui.SetTooltip('%s\n%d%% health', member.Pet.DisplayName(), member.Pet.PctHPs())
-                Module.Utils.GiveItem(member.Pet.ID() or 0)
+                if ImGui.IsMouseReleased(0) then
+                    Module.Utils.GiveItem(member.Pet.ID() or 0)
+                end
             end
         end
         ImGui.EndGroup()

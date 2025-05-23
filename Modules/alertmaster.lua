@@ -134,6 +134,7 @@ local playTime                                                                  
 local playing                                                                                                                          = false
 local currZone, lastZone
 local newSMFile                                                                                                                        = mq.configDir .. '/MyUI/MQ2SpawnMaster.ini'
+local execCommands                                                                                                                     = false
 
 local DistColorRanges                                                                                                                  = {
 	orange = 600, -- distance the color changes from green to orange
@@ -887,6 +888,7 @@ local function check_for_pcs()
 						playSound(soundPC)
 					end
 					-- run commands here
+					run_char_commands()
 				elseif (remind ~= nil and remind > 0) and tPlayers[name] ~= nil and os.difftime(os.time(), tPlayers[name].time) > remind then
 					tPlayers[name].time = v.time
 					if doSoundPC then
@@ -1472,7 +1474,7 @@ local function DrawSearchWindow()
 				ImGui.SetWindowFontScale(ZoomLvl)
 				if ImGui.BeginTable('##RulesTable', 8, Module.GUI_Main.Table.Flags) then
 					ImGui.TableSetupScrollFreeze(0, 1)
-					ImGui.TableSetupColumn(MyUI_Icons.FA_USER_PLUS, bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.NoSort), 15, Module.GUI_Main.Table.Column_ID
+					ImGui.TableSetupColumn(Module.Icons.FA_USER_PLUS, bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.NoSort), 15, Module.GUI_Main.Table.Column_ID
 						.Remove)
 					ImGui.TableSetupColumn("Name", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.DefaultSort), 120, Module.GUI_Main.Table.Column_ID.MobName)
 					ImGui.TableSetupColumn("Lvl", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.DefaultSort), 30, Module.GUI_Main.Table.Column_ID.MobLvl)
@@ -1480,7 +1482,7 @@ local function DrawSearchWindow()
 					ImGui.TableSetupColumn("Aggro", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.DefaultSort), 30, Module.GUI_Main.Table.Column_ID.MobAggro)
 					ImGui.TableSetupColumn("ID", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.DefaultSort), 30, Module.GUI_Main.Table.Column_ID.MobID)
 					ImGui.TableSetupColumn("Loc", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.NoSort), 90, Module.GUI_Main.Table.Column_ID.MobLoc)
-					ImGui.TableSetupColumn(MyUI_Icons.FA_COMPASS, bit32.bor(ImGuiTableColumnFlags.NoResize, ImGuiTableColumnFlags.NoSort, ImGuiTableColumnFlags.WidthFixed), 15,
+					ImGui.TableSetupColumn(Module.Icons.FA_COMPASS, bit32.bor(ImGuiTableColumnFlags.NoResize, ImGuiTableColumnFlags.NoSort, ImGuiTableColumnFlags.WidthFixed), 15,
 						Module.GUI_Main.Table.Column_ID.MobDirection)
 					ImGui.TableHeadersRow()
 					local sortSpecs = ImGui.TableGetSortSpecs()

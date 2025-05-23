@@ -56,6 +56,7 @@ local augments                                            = {}
 local bank_items                                          = {}
 local bank_augments                                       = {}
 local book                                                = {}
+local trade_list                                          = {}
 local display_tables                                      = {
 	augments = {},
 	items = {},
@@ -64,6 +65,7 @@ local display_tables                                      = {
 	bank_augments = {},
 }
 local needSort                                            = true
+local checkAll                                            = false
 local coin_type                                           = 0
 local coin_qty                                            = ''
 
@@ -84,11 +86,11 @@ local MyClass                                             = MySelf.Class()
 local myCopper, mySilver, myGold, myPlat, myWeight, myStr = 0, 0, 0, 0, 0, 0
 local bankCopper, bankSilver, bankGold, bankPlat          = 0, 0, 0, 0
 local book_timer                                          = 0
-
+local doTrade                                             = false
 local defaults                                            = {
 	MIN_SLOTS_WARN = 3,
 	show_item_background = true,
-	sort_order = { name = false, stack = false, },
+	sort_order = { name = false, stack = false, item_type = false, },
 	themeName = "Default",
 	toggleKey = '',
 	toggleModKey = 'None',
@@ -140,6 +142,11 @@ local function loadSettings()
 	themeName = settings.themeName ~= nil and settings.themeName or defaults.themeName
 	MIN_SLOTS_WARN = settings.MIN_SLOTS_WARN ~= nil and settings.MIN_SLOTS_WARN or defaults.MIN_SLOTS_WARN
 	show_item_background = settings.show_item_background ~= nil and settings.show_item_background or defaults.show_item_background
+	for k, v in pairs(settings.sort_order) do
+		if defaults.sort_order[k] == nil then
+			settings.sort_order[k] = defaults.sort_order[k]
+		end
+	end
 	sort_order = settings.sort_order ~= nil and settings.sort_order or defaults.sort_order
 	if toggleModKey == 'None' then
 		toggleModKey2 = 'None'
@@ -170,7 +177,37 @@ end
 -- Sort routines
 local function sort_inventory()
 	-- Various Sorting
-	if sort_order.name and sort_order.stack then
+	if sort_order.item_type and sort_order.name and sort_order.stack then
+		-- sort by item type, then name, then stacksize
+		table.sort(items, function(a, b)
+			if a.Type() == b.Type() then
+				if a.Name() == b.Name() then
+					return a.Stack() > b.Stack()
+				else
+					return a.Name() < b.Name()
+				end
+			else
+				return a.Type() < b.Type()
+			end
+		end)
+		table.sort(bank_items, function(a, b)
+			if a.Type() == b.Type() then
+				if a.Name() == b.Name() then
+					return a.Stack() > b.Stack()
+				else
+					return a.Name() < b.Name()
+				end
+			else
+				return a.Type() < b.Type()
+			end
+		end)
+	elseif sort_order.item_type and sort_order.name and not sort_order.stack then
+		table.sort(items, function(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Name() < b.Name()) end)
+		table.sort(bank_items, function(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Name() < b.Name()) end)
+	elseif sort_order.item_type and sort_order.stack and not sort_order.name then
+		table.sort(items, function(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Stack() > b.Stack()) end)
+		table.sort(bank_items, function(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Stack() > b.Stack()) end)
+	elseif sort_order.name and sort_order.stack and not sort_order.item_type then
 		table.sort(items, function(a, b) return a.Stack() > b.Stack() or (a.Stack() == b.Stack() and a.Name() < b.Name()) end)
 		table.sort(bank_items, function(a, b) return a.Stack() > b.Stack() or (a.Stack() == b.Stack() and a.Name() < b.Name()) end)
 	elseif sort_order.stack then
@@ -179,6 +216,9 @@ local function sort_inventory()
 	elseif sort_order.name then
 		table.sort(items, function(a, b) return a.Name() < b.Name() end)
 		table.sort(bank_items, function(a, b) return a.Name() < b.Name() end)
+	elseif sort_order.item_type then
+		table.sort(items, function(a, b) return a.Type() < b.Type() end)
+		table.sort(bank_items, function(a, b) return a.Type() < b.Type() end)
 		-- else
 		-- table.sort(items)
 	end
@@ -419,16 +459,19 @@ local function create_inventory()
 		end
 		for i = 23, 34, 1 do
 			local slot = mq.TLO.Me.Inventory(i)
-			if slot.Container() and slot.Container() > 0 then
+			if slot.Container() and (slot.Container() or 0) > 0 then
 				for j = 1, (slot.Container()), 1 do
 					if (slot.Item(j)()) then
 						local itemName = slot.Item(j).Name() or 'unknown'
 						table.insert(items, slot.Item(j))
+						if trade_list[itemName] == nil and not slot.Item(j).NoDrop() and not slot.Item(j).NoTrade() then
+							trade_list[itemName] = false -- Initialize trade_list with item names
+						end
 						tmpUsedSlots = tmpUsedSlots + 1
 						if slot.Item(j).Clicky() then
 							table.insert(clickies, slot.Item(j))
 						end
-						if slot.Item(j).AugType() > 0 then
+						if (slot.Item(j).AugType() or 0) > 0 then
 							table.insert(augments, slot.Item(j))
 						end
 
@@ -523,6 +566,17 @@ local function display_bag_options()
 			end
 			ImGui.SameLine()
 			help_marker("Order items with the largest stacks appearing first.")
+
+			local pressed3 = false
+			sort_order.item_type, pressed3 = Module.Utils.DrawToggle("Item Type", sort_order.item_type, ToggleFlags)
+			if pressed3 then
+				needSort = true
+				settings.sort_order.item_type = sort_order.item_type
+				mq.pickle(configFile, settings)
+				clicked = true
+			end
+			ImGui.SameLine()
+			help_marker("Order items by their type (e.g. Armor, 1H Slash, etc.)")
 
 			local pressed2 = false
 			show_item_background, pressed2 = Module.Utils.DrawToggle("Show Slot Background", show_item_background, ToggleFlags)
@@ -977,7 +1031,16 @@ end
 
 local function display_details()
 	ImGui.SetWindowFontScale(1.0)
-	if ImGui.BeginTable("Details", 8, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.ScrollY, ImGuiTableFlags.Resizable, ImGuiTableFlags.Hideable, ImGuiTableFlags.Reorderable)) then
+	if ImGui.Button("Trade Selected Items") then
+		doTrade = true
+	end
+	ImGui.SameLine()
+	checkAll = false
+	if ImGui.Button("Check All") then
+		checkAll = true
+	end
+	if ImGui.BeginTable("Details", 9, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.ScrollY, ImGuiTableFlags.Resizable, ImGuiTableFlags.Hideable, ImGuiTableFlags.Reorderable)) then
+		ImGui.TableSetupColumn('Trade', ImGuiTableColumnFlags.WidthFixed, 25)
 		ImGui.TableSetupColumn('Icon', ImGuiTableColumnFlags.WidthStretch)
 		ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthFixed, 100)
 		ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthStretch)
@@ -1003,6 +1066,20 @@ local function display_details()
 					lbl = charges
 				end
 				ImGui.TableNextRow()
+				ImGui.TableNextColumn()
+				if trade_list[item.Name()] ~= nil then
+					if checkAll then
+						trade_list[item.Name()] = true -- Check all items if the button is pressed
+					end
+					trade_list[item.Name()], _ = ImGui.Checkbox(string.format("##Trade_%s", index), trade_list[item.Name()])
+				else
+					ImGui.TextColored(ImVec4(0.51, 0.4, 0.1, 1), "NA")
+					if ImGui.IsItemHovered() then
+						ImGui.BeginTooltip()
+						ImGui.Text("This item is NO TRADE")
+						ImGui.EndTooltip()
+					end
+				end
 				ImGui.TableNextColumn()
 				draw_item_icon(item, 20, 20, 'details' .. index, true)
 				ImGui.TableNextColumn()
@@ -1036,6 +1113,76 @@ local function display_details()
 		end
 		ImGui.EndTable()
 	end
+end
+
+local function ClickTrade()
+	mq.delay(3000)
+	if mq.TLO.Window("TradeWnd").Open() then
+		mq.TLO.Window("TradeWnd").Child("TRDW_Trade_Button").LeftMouseUp()
+	end
+	mq.delay(3000)
+	if mq.TLO.Window("GiveWnd").Open() then
+		mq.TLO.Window("GiveWnd").Child("GVW_Give_Button").LeftMouseUp()
+	end
+	mq.delay(3000)
+end
+
+local function TradeItems()
+	local target = mq.TLO.Target
+	if not target() and not target.Type() == "PC" and (target.Name() or "unknown") ~= MyUI_CharLoaded then
+		printf('[\ayBigBag\ax] \amTarget is NOT selected\ax')
+		doTrade = false
+		return
+	end
+	local target_id = target.ID() or 0
+	if target.Distance() > 15 then
+		mq.cmdf("/nav id %s dist=12", target_id)
+		while mq.TLO.Navigation.Active() do
+			mq.delay(1000, function() return not mq.TLO.Navigation.Active() end)
+		end
+	end
+
+	local counter = 1
+	for itemName, trade in pairs(trade_list) do
+		if trade then
+			if mq.TLO.FindItem(itemName).ID() ~= nil then
+				local itemSlot = mq.TLO.FindItem('=' .. itemName).ItemSlot() or 0
+				local itemSlot2 = mq.TLO.FindItem('=' .. itemName).ItemSlot2() or 0
+				if itemSlot == 0 or itemSlot2 == 0 then
+					goto Next -- Skip if we don't have a valid item slot
+				end
+				local pickup1 = itemSlot - 22
+				local pickup2 = itemSlot2 + 1
+
+				--grab the whole stack, or specific amount
+				mq.cmd('/shift /itemnotify in pack' .. pickup1 .. ' ' .. pickup2 .. ' leftmouseup')
+				-- mq.cmdf("/itemnotify %s leftmouseup", itemName)
+				mq.delay(3000, function() return mq.TLO.Cursor() ~= nil end)
+				if (mq.TLO.Cursor.Container() or 0) > 0 then
+					mq.cmd("/autoinventory")
+					mq.delay(3000, function() return mq.TLO.Cursor() == nil end)
+				end
+				if mq.TLO.Cursor() ~= nil then
+					mq.cmd("/click left target")
+				end
+				mq.delay(3000, function() return mq.TLO.Cursor() == nil end)
+
+				if counter == 8 then
+					ClickTrade()
+					mq.delay(3000, function() return not mq.TLO.Window("TradeWnd").Open() end)
+					counter = 1
+				else
+					counter = counter + 1
+				end
+			end
+			::Next::
+			trade_list[itemName] = false -- Reset the trade list for this item
+		end
+	end
+	ClickTrade()
+	doTrade = false
+	trade_list = {}
+	create_inventory()
 end
 
 local function BigButtonTooltip()
@@ -1289,6 +1436,10 @@ function Module.MainLoop()
 	if os.time() - coin_timer > 2 then
 		UpdateCoin()
 		coin_timer = os.time()
+	end
+
+	if doTrade then
+		TradeItems()
 	end
 
 	myWeight = MySelf.CurrentWeight()

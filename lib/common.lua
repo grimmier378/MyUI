@@ -755,11 +755,9 @@ end
 
 function CommonUtils.GiveItem(target_id)
 	if target_id == nil then return end
-	if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
-		mq.cmdf("/target id %s", target_id)
-		if mq.TLO.Cursor() or mq.TLO.Me.CursorPlatinum() > 0 or mq.TLO.Me.CursorGold() > 0 or mq.TLO.Me.CursorSilver() > 0 or mq.TLO.Me.CursorCopper() > 0 then
-			mq.cmdf('/multiline ; /tar id %s; /timed 5, /click left target', target_id)
-		end
+	mq.cmdf("/target id %s", target_id)
+	if mq.TLO.Cursor() or mq.TLO.Me.CursorPlatinum() > 0 or mq.TLO.Me.CursorGold() > 0 or mq.TLO.Me.CursorSilver() > 0 or mq.TLO.Me.CursorCopper() > 0 then
+		mq.cmdf('/multiline ; /tar id %s; /timed 5, /click left target', target_id)
 	end
 end
 

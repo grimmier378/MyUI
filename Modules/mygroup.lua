@@ -809,7 +809,9 @@ local function DrawRaidMember(id)
             ImGui.PopStyleColor()
             if ImGui.IsItemHovered() then
                 ImGui.SetTooltip('%s\n%d%% health', member.Pet.DisplayName(), member.Pet.PctHPs())
-                Module.Utils.GiveItem(member.Pet.ID() or 0)
+                if ImGui.IsMouseReleased(0) then
+                    Module.Utils.GiveItem(member.Pet.ID() or 0)
+                end
             end
         end
         ImGui.EndGroup()

@@ -1,37 +1,96 @@
-local mq = require('mq')
-local ImGui = require 'ImGui'
-local drawTimerMS = mq.gettime() -- get the current time in milliseconds
-local drawTimerS = os.time()     -- get the current time in seconds
-local Module = {}
-local MySelf = mq.TLO.Me
-local genAA = {}
-local classAA = {}
-local archAA = {}
-local specAA = {}
-local doTrain = false
+local mq                = require('mq')
+local ImGui             = require 'ImGui'
+local drawTimerMS       = mq.gettime() -- get the current time in milliseconds
+local drawTimerS        = os.time()    -- get the current time in seconds
+local Module            = {}
+local MySelf            = mq.TLO.Me
+local genAA             = {}
+local classAA           = {}
+local archAA            = {}
+local specAA            = {}
+local doTrain           = false
+local selectedAA        = "none"
+local availAA           = MySelf.AAPoints() or 0
+local spentAA           = MySelf.AAPointsSpent() or 0
+local totalAA           = MySelf.AAPointsTotal() or 0
+local toTrain           = {}
+local EQ_ICON_OFFSET    = 500
+local animMini          = mq.FindTextureAnimation("A_DragItem")
 
-Module.Name = "MyAA"     -- Name of the module used when loading and unloaing the modules.
-Module.IsRunning = false -- Keep track of running state. if not running we can unload it.
-Module.ShowGui = true
-
+Module.Name             = "MyAA" -- Name of the module used when loading and unloaing the modules.
+Module.IsRunning        = false  -- Keep track of running state. if not running we can unload it.
+Module.ShowGui          = false
 -- check if the script is being loaded as a Module (externally) or as a Standalone script.
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 if not loadedExeternally then
-	Module.Utils       = require('lib.common')    -- common functions for use in other scripts
-	Module.Icons       = require('mq.ICONS')      -- FAWESOME ICONS
-	Module.Colors      = require('lib.colors')    -- color table for GUI returns ImVec4
-	Module.ThemeLoader = require('lib.theme_loader') -- Load the theme loader
+	Module.Utils       = require('lib.common')                -- common functions for use in other scripts
+	Module.Icons       = require('mq.ICONS')                  -- FAWESOME ICONS
+	Module.Colors      = require('lib.colors')                -- color table for GUI returns ImVec4
+	Module.ThemeLoader = require('lib.theme_loader')          -- Load the theme loader
 	Module.CharLoaded  = MySelf.CleanName()
+	Module.Server      = mq.TLO.MacroQuest.Server() or "Unknown" -- Get the server name
 else
 	Module.Utils       = MyUI_Utils
 	Module.Icons       = MyUI_Icons
 	Module.Colors      = MyUI_Colors
 	Module.ThemeLoader = MyUI_ThemeLoader
 	Module.CharLoaded  = MyUI_CharLoaded
+	Module.Server      = MyUI_Server or "Unknown" -- Get the server name
 end
-local availAA = MySelf.AAPoints() or 0
-local toTrain = {}
+
+local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, Module.Name, Module.Server, Module.CharLoaded)
+
+
+local defaults       = {
+	showUI = true, -- Show the UI by default
+	showBtn = true, -- Show the button by default
+	scale = 1.0, -- Scale of the UI
+}
+
+Module.Settings      = {}
+
+local tableFlags     = bit32.bor(
+	ImGuiTableFlags.ScrollY,
+	ImGuiTableFlags.BordersOuter,
+	ImGuiTableFlags.BordersInner,
+	ImGuiTableFlags.Resizable,
+	ImGuiTableFlags.Reorderable,
+	ImGuiTableFlags.Hideable,
+	ImGuiTableFlags.ScrollX,
+	ImGuiTableFlags.RowBg
+)
+
+local childFlags     = bit32.bor(
+	ImGuiChildFlags.Border
+-- ImGuiChildFlags.ResizeY
+)
+
+local buttonWinFlags = bit32.bor(
+	ImGuiWindowFlags.NoTitleBar,
+	ImGuiWindowFlags.NoResize,
+	ImGuiWindowFlags.NoScrollbar,
+	ImGuiWindowFlags.NoFocusOnAppearing,
+	ImGuiWindowFlags.AlwaysAutoResize
+)
+
+local function LoadSettings()
+	if not Module.Utils.File.Exists(configFile) then
+		mq.pickle(configFile, defaults)
+		printf("\ayConfig file not found. Creating new config file: %s", configFile)
+	end
+	local config = dofile(configFile) or {}
+	if type(config) == "table" then
+		for k, v in pairs(defaults) do
+			if config[k] == nil then
+				config[k] = v
+			end
+		end
+	end
+	Module.Settings = config
+	Module.ShowGui = Module.Settings.showUI
+end
+
 --Helpers
 local function CommandHandler(...)
 	local args = { ..., }
@@ -47,6 +106,7 @@ end
 
 local function Init()
 	-- your Init code here
+	LoadSettings() -- Load the settings from the config file
 	mq.bind('/myaa', CommandHandler)
 	Module.IsRunning = true
 	Module.Utils.PrintOutput('MyUI', false, "\a-w[\at%s\a-w] \agLoaded\aw!", Module.Name)
@@ -62,9 +122,11 @@ local function Init()
 end
 
 function Module.GetAALists(which)
-	availAA = MySelf.AAPoints() or 0
-	local tmp = {}
-	local list = mq.TLO.Window("AAWindow/AAW_GeneralList")
+	availAA       = MySelf.AAPoints() or 0
+	spentAA       = MySelf.AAPointsSpent() or 0
+	totalAA       = MySelf.AAPointsTotal() or 0
+	local tmp     = {}
+	local list    = mq.TLO.Window("AAWindow/AAW_GeneralList")
 	local maxList = mq.TLO.Window("AAWindow/AAW_GeneralList").Items() or 0
 	if which == 'general' then
 		list = mq.TLO.Window("AAWindow/AAW_GeneralList")
@@ -95,17 +157,6 @@ function Module.GetAALists(which)
 	return tmp
 end
 
-local tableFlags = bit32.bor(
-	ImGuiTableFlags.ScrollY,
-	ImGuiTableFlags.BordersOuter,
-	ImGuiTableFlags.BordersInner,
-	ImGuiTableFlags.Resizable,
-	ImGuiTableFlags.Reorderable,
-	ImGuiTableFlags.Hideable,
-	ImGuiTableFlags.ScrollX,
-	ImGuiTableFlags.RowBg
-)
-
 local function DrawAATable(which_Table, label)
 	local ListName = mq.TLO.Window("AAWindow/AAW_GeneralList")
 	if label == "General" then
@@ -120,45 +171,101 @@ local function DrawAATable(which_Table, label)
 		return
 	end
 	local sizeX, sizeY = ImGui.GetContentRegionAvail()
-	if ImGui.BeginTable(label .. "##table2", 5, tableFlags, ImVec2(0, sizeY * 0.75)) then
-		ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch)
-		ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 100)
-		ImGui.TableSetupColumn("Cost", ImGuiTableColumnFlags.WidthFixed, 40)
-		ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 100)
-		ImGui.TableSetupColumn("Train", ImGuiTableColumnFlags.WidthFixed, 100)
-		ImGui.TableSetupScrollFreeze(0, 1) -- Make the first row always visible
-		ImGui.TableHeadersRow()
-		ImGui.TableNextRow()
-		for _, data in ipairs(which_Table) do
-			ImGui.PushID(data.Name .. data.Type)
-			ImGui.TableNextColumn()
-			if ImGui.Selectable(data.Name .. "##" .. data.Type, false, ImGuiSelectableFlags.SpanAllColumns) then
-				local rowNum = ListName.List(data.Name, 1)() or 0 -- Select the AA in the AA window
-				ListName.Select(rowNum)               -- Select the AA in the AA window
-			end
-			ImGui.TableNextColumn()
-			ImGui.Text(string.format("%s / %s", data.Current or 0, data.Max or 0))
-			ImGui.TableNextColumn()
-			ImGui.Text(data.Cost or "N/A")
-			ImGui.TableNextColumn()
-			ImGui.Text(data.Type or "N/A")
-			ImGui.TableNextColumn()
-			local cost = tonumber(data.Cost) or 0
-			local cur = tonumber(data.Current) or 0
-			local max = tonumber(data.Max) or 0
-			if availAA >= cost and cur < max then
-				if ImGui.SmallButton("train##" .. data.Name) then
-					local rowNum = ListName.List(data.Name, 1)() or 0 -- Select the AA in the AA window
-					toTrain[data.Name] = { row = rowNum, list = ListName, } -- Store the row number and list for later use
-					doTrain = true
-				end
-			end
-			ImGui.PopID()
-		end
+	if ImGui.BeginChild("Child##" .. label, ImVec2(sizeX, sizeY * 0.7), childFlags) then
+		ImGui.SetWindowFontScale(Module.Settings.scale)
 
-		ImGui.EndTable()
+		if ImGui.BeginTable(label .. "##_table", 5, tableFlags) then
+			ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch)
+			ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 100)
+			ImGui.TableSetupColumn("Cost", ImGuiTableColumnFlags.WidthFixed, 40)
+			ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 100)
+			ImGui.TableSetupColumn("Train", ImGuiTableColumnFlags.WidthFixed, 100)
+			ImGui.TableSetupScrollFreeze(0, 1) -- Make the first row always visible
+			ImGui.TableHeadersRow()
+			ImGui.TableNextRow()
+			for _, data in ipairs(which_Table) do
+				ImGui.PushID(data.Name .. data.Type)
+				ImGui.TableNextColumn()
+				local isSelected = (selectedAA == data.Name)
+				if ImGui.Selectable(data.Name .. "##" .. data.Type, isSelected) then
+					local rowNum = ListName.List(data.Name, 1)() or 0 -- Select the AA in the AA window
+					ListName.Select(rowNum)            -- Select the AA in the AA window
+					selectedAA = data.Name
+				end
+				ImGui.TableNextColumn()
+				ImGui.Text(string.format("%s / %s", data.Current or 0, data.Max or 0))
+				ImGui.TableNextColumn()
+				ImGui.Text(data.Cost or "N/A")
+				ImGui.TableNextColumn()
+				ImGui.Text(data.Type or "N/A")
+				ImGui.TableNextColumn()
+				local cost = tonumber(data.Cost) or 0
+				local cur = tonumber(data.Current) or 0
+				local max = tonumber(data.Max) or 0
+				if availAA >= cost and cur < max then
+					if ImGui.SmallButton("train##" .. data.Name) then
+						selectedAA = data.Name
+						local rowNum = ListName.List(data.Name, 1)() or 0 -- Select the AA in the AA window
+						toTrain[data.Name] = { row = rowNum, list = ListName, } -- Store the row number and list for later use
+						doTrain = true
+					end
+				end
+				ImGui.PopID()
+			end
+			ImGui.EndTable()
+		end
+		ImGui.SetWindowFontScale(1)
 	end
+	ImGui.EndChild()
 end
+
+local function RenderBtn()
+	-- apply_style()
+	ImGui.SetNextWindowPos(ImVec2(200, 20), ImGuiCond.FirstUseEver)
+	local openBtn, showBtn = ImGui.Begin(string.format(Module.Name .. "##MiniBtn" .. Module.CharLoaded), true, buttonWinFlags)
+	if not openBtn then
+		showBtn = false
+	end
+
+	if showBtn then
+		local cursorPosX, cursorPosY = ImGui.GetCursorScreenPos()
+		animMini:SetTextureCell(2305 - EQ_ICON_OFFSET)
+		ImGui.DrawTextureAnimation(animMini, 34, 34, true)
+		ImGui.SetCursorScreenPos(cursorPosX, cursorPosY)
+		ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
+		ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0.5, 0.5, 0, 0.5))
+		ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
+		if ImGui.Button("##" .. Module.Name, ImVec2(34, 34)) then
+			Module.ShowGui = not Module.ShowGui
+			Module.Settings.showUI = Module.ShowGui
+			mq.pickle(configFile, Module.Settings)
+		end
+		ImGui.PopStyleColor(3)
+		-- if ImGui.IsItemHovered() then
+		-- 	if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
+		-- 		Module.Settings.showUI = not Module.Settings.showUI
+		-- 		mq.pickle(configFile, Module.Settings)
+		-- 	end
+		-- end
+	end
+	if ImGui.IsWindowHovered() then
+		ImGui.BeginTooltip()
+		ImGui.Text(Module.Name)
+		ImGui.Text("Left-click to toggle UI")
+		-- ImGui.Text("Right-click for options")
+		ImGui.Text("Available AA: %s", availAA)
+		ImGui.EndTooltip()
+	end
+	-- if ImGui.BeginPopupContextWindow("ItemTrackerContext") then
+	-- 	if ImGui.MenuItem(Module.Settings.lockWindow and "Unlock Window" or "Lock Window") then
+	-- 		Module.Settings.lockWindow = not Module.Settings.lockWindow
+	-- 		mq.pickle(configFile, Module.Settings)
+	-- 	end
+	-- 	ImGui.EndPopup()
+	-- end
+	ImGui.End()
+end
+local tabPage = mq.TLO.Window("AAWindow/AAW_Subwindows")
 
 -- Exposed Functions
 function Module.RenderGUI()
@@ -169,41 +276,68 @@ function Module.RenderGUI()
 		if not open then
 			show = false
 			Module.ShowGui = false
-			Module.IsRunning = false
+			Module.Settings.showUI = Module.ShowGui
+			mq.pickle(configFile, Module.Settings)
 		end
 		if show then
 			local sizeX, sizeY = ImGui.GetContentRegionAvail()
-			ImGui.Text("Available AA: %s", availAA)
+			Module.Settings.showBtn, _ = ImGui.Checkbox("Show Mini Button", Module.Settings.showBtn)
+			ImGui.SameLine()
+			ImGui.SetNextItemWidth(100)
+			Module.Settings.scale, _ = ImGui.SliderFloat("Scale", Module.Settings.scale, 0.5, 2.0, "%.1f")
+			ImGui.SetWindowFontScale(Module.Settings.scale)
 
+			ImGui.Text("Available AA:")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color("yellow"), "%s", availAA)
+			ImGui.SameLine()
+			ImGui.Text("Spent:")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color("teal"), "%s", spentAA)
+			ImGui.SameLine()
+			ImGui.Text("Total AA:")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('tangarine'), "%s", totalAA)
+			if _ then
+				mq.pickle(configFile, Module.Settings)
+			end
 			if ImGui.BeginTabBar("MyAA") then
 				if ImGui.BeginTabItem("General") then
+					tabPage.SetCurrentTab(1)
 					DrawAATable(genAA, "General")
 					ImGui.EndTabItem()
 				end
 				if ImGui.BeginTabItem("Archtype") then
+					tabPage.SetCurrentTab(2)
 					DrawAATable(archAA, "Archtype")
 					ImGui.EndTabItem()
 				end
 				if ImGui.BeginTabItem("Class") then
+					tabPage.SetCurrentTab(3)
 					DrawAATable(classAA, "Class")
 					ImGui.EndTabItem()
 				end
 				if ImGui.BeginTabItem("Special") then
+					tabPage.SetCurrentTab(4)
 					DrawAATable(specAA, "Special")
 					ImGui.EndTabItem()
 				end
 				ImGui.EndTabBar()
 			end
 			ImGui.Separator()
-			if ImGui.BeginChild("AA Description", ImVec2(sizeX, sizeY * 0.2), bit32.bor(ImGuiChildFlags.Border)) then
+			if ImGui.BeginChild("AA Description", ImVec2(sizeX, sizeY * 0.2), childFlags) then
 				ImGui.PushTextWrapPos(sizeX - 20)
-				ImGui.Text(mq.TLO.Window("AAWindow/AAW_Description").Text():gsub("<BR>", "\n"))
+				ImGui.Text(mq.TLO.Window("AAWindow/AAW_Description").Text():gsub("<BR>", "\n"):gsub("%%", " "))
 				ImGui.PopTextWrapPos()
 			end
 			ImGui.EndChild()
+			ImGui.SetWindowFontScale(1)
 		end
 
 		ImGui.End()
+	end
+	if Module.Settings.showBtn then
+		RenderBtn()
 	end
 end
 
@@ -227,7 +361,7 @@ function Module.MainLoop()
 		for name, data in pairs(toTrain) do
 			if data.row and data.list then
 				data.list.Select(data.row)                  -- Select the AA in the AA window
-				mq.delay(300)
+				mq.delay(30)
 				mq.TLO.Window("AAWindow/AAW_TrainButton").LeftMouseUp() -- Click the Train button
 			end
 		end

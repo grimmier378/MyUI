@@ -66,6 +66,7 @@ local default_list   = {
 	"XPTrack",
 	"MyStats",
 	"iTrack",
+	"MyAA",
 	--"MyDots",
 }
 
@@ -94,6 +95,7 @@ MyUI_DefaultConfig   = {
 		[17] = { name = 'XPTrack', enabled = false, }, -- Customized Fork of Derple's XPTrack
 		[18] = { name = 'MyStats', enabled = false, },
 		[19] = { name = 'iTrack', enabled = false, },
+		[20] = { name = 'MyAA', enabled = false, },
 		--[20] = { name = 'MyDots', enabled = false, }, -- Customized Fork of Zathus' MyDots
 	},
 }

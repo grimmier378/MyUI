@@ -224,6 +224,11 @@ local function renderMain()
 		-- Add Item UI
 		ImGui.Text("Items to Track")
 		tmpTxt = ImGui.InputTextWithHint("##ItemInput", "Enter Item Name...", tmpTxt)
+		if ImGui.IsItemHovered() and mq.TLO.Cursor() ~= nil then
+			tmpTxt = mq.TLO.Cursor.Name() or tmpTxt
+			mq.cmd("/autoinventory")
+			needSave = true
+		end
 		ImGui.SameLine()
 		if ImGui.Button("Add") and tmpTxt ~= "" then
 			needSave = true

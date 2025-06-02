@@ -812,6 +812,8 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 	if canUse then
 		local isSpell = item.Name():find("Spell:")
 		local isSong = item.Name():find("Song:")
+		local iType = item.Type() or ''
+
 		if isSpell or isSong then
 			local spellName = item.Spell.Name() --:gsub("Spell: ", ""):gsub("Song: ", "")
 			local spellLvl = mq.TLO.Spell(spellName).Level() or 0
@@ -825,7 +827,11 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 				toolTipSpell = "Already Know"
 			end
 		else
-			colorChange = true
+			if iType == 'Combinable' or iType == 'Food' or iType == 'Drink' then
+				colorChange = false
+			else
+				colorChange = true
+			end
 		end
 	end
 

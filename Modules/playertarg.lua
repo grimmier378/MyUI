@@ -334,7 +334,7 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
     ImGui.SetCursorPos(cursor_x + 2, cursor_y + 2)
     local sName = spell.Name() or '??'
     local sDur = spell.Duration.TotalSeconds() or 0
-    ImGui.PushID(tostring(iconID) .. sName .. "_invis_btn")
+    ImGui.PushID(string.format("%s_%s_%s_invis_btn", iconID, sName, i))
     if sDur < 18 and sDur > 0 and pulse then
         local flashColor = IM_COL32(0, 0, 0, flashAlpha)
         ImGui.GetWindowDrawList():AddRectFilled(ImGui.GetCursorScreenPosVec() + 1,

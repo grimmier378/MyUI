@@ -243,7 +243,13 @@ local function GetInfoToolTip(id, raid)
         ImGui.TextColored(Module.Colors.color('green'), "Distance: %0.1f", member.Distance() or 9999)
         ImGui.TextColored(Module.Colors.color('softblue'), "Zone: %s", mq.TLO.Zone.Name())
     end
-
+    if member.Pet() ~= 'NO PET' then
+        ImGui.Text('%s (%d%% health)', member.Pet.DisplayName(), member.Pet.PctHPs())
+        ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('green2')))
+        ImGui.SetNextItemWidth(120)
+        ImGui.ProgressBar(((tonumber(member.Pet.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), 5 * RaidScale, '##PetHp' .. id)
+        ImGui.PopStyleColor()
+    end
     local entry = false
     if mq.TLO.Group.MainTank.ID() == member.ID() then
         if entry then ImGui.SameLine() end

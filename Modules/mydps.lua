@@ -57,6 +57,7 @@ local battleStartTime, leftCombatTime                                           
 local firstRun                                                                                                                     = true
 local themeName                                                                                                                    = "Default"
 local tempSettings                                                                                                                 = {}
+local dataWindows                                                                                                                  = {}
 local MyLeader                                                                                                                     = 'None'
 local defaults                                                                                                                     = {
 	Options = {
@@ -715,14 +716,12 @@ local color = {
 
 local function ShowData(labelName, data, seq)
 	if not showDataWin then return end
-	local open, show = ImGui.Begin("Battle Details", true, ImGuiWindowFlags.AlwaysAutoResize)
+	local open, show = ImGui.Begin("Battle Details##" .. labelName, true, ImGuiWindowFlags.AlwaysAutoResize)
 	if not open then
-		dataWinData = {
-			data = {},
-			seq = nil,
-			labelName = nil,
-		}
-		showDataWin = false
+		dataWindows[labelName] = nil
+		if dataWindows == nil then
+			showDataWin = false
+		end
 	end
 	if show then
 		ImGui.Text("Battle Details %s", labelName)
@@ -825,7 +824,6 @@ local function DrawHistory(tbl)
 				local selected, pressed = false, false
 				selected, pressed = ImGui.Selectable(labelName, selected, ImGuiSelectableFlags.SpanAllColumns)
 				if pressed then
-					showDataWin = false
 					dataWinData["data"] = data
 					dataWinData["seq"] = seq
 					dataWinData['labelName'] = labelName
@@ -1161,8 +1159,18 @@ function Module.RenderGUI()
 		ImGui.End()
 	end
 
-	if showDataWin and dataWinData.labelName ~= nil then
-		ShowData(dataWinData.labelName, dataWinData.data, dataWinData.seq)
+	if showDataWin then
+		if dataWinData.labelName ~= nil then
+			dataWindows[dataWinData.labelName] = { data = dataWinData.data, seq = dataWinData.seq, }
+			dataWinData = {
+				data = {},
+				seq = nil,
+				labelName = nil,
+			}
+		end
+		for k, v in pairs(dataWindows) do
+			ShowData(k, v.data, v.seq)
+		end
 	end
 end
 

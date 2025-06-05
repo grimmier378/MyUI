@@ -242,6 +242,7 @@ local function GetSpells(slot)
 		local sClicked
 		local sID, sIcon, sFizzle
 		local sCastTime
+		local sDescription = 'No description available'
 		if spellBar[slotNum] == nil then
 			spellBar[slotNum] = {}
 		end
@@ -258,6 +259,7 @@ local function GetSpells(slot)
 			sIcon = mq.TLO.Spell(sName).SpellIcon() or -1
 			sCastTime = mq.TLO.Spell(sName).MyCastTime.Seconds() or -1
 			sFizzle = mq.TLO.Spell(sName).FizzleTime() or -1
+			sDescription = mq.TLO.Spell(sName).Description() or 'No description available'
 		else
 			sName = "Empty"
 			sID = -1
@@ -266,6 +268,7 @@ local function GetSpells(slot)
 			sRecast = -1
 			sCastTime = -1
 			sFizzle = -1
+			sDescription = 'No description available'
 		end
 
 		spellBar[slotNum].sCastTime = sCastTime
@@ -275,6 +278,7 @@ local function GetSpells(slot)
 		spellBar[slotNum].sClicked = sClicked
 		spellBar[slotNum].sFizzle = sFizzle
 		spellBar[slotNum].sRecast = sRecast
+		spellBar[slotNum].Description = sDescription
 	end
 
 	if slot == nil then
@@ -650,6 +654,10 @@ function Module.RenderGUI()
 							ImGui.TextColored(Module.Colors.color('teal'), "%d", curMana)
 							ImGui.TextColored(Module.Colors.color('white'), "Recast: %d", spellBar[i].sRecast)
 							ImGui.TextColored(Module.Colors.color('tangerine'), "Cast Time: %d", spellBar[i].sCastTime)
+							ImGui.Separator()
+							ImGui.PushTextWrapPos(150)
+							ImGui.Text(spellBar[i].Description or 'No description available')
+							ImGui.PopTextWrapPos()
 							ImGui.Separator()
 
 							ImGui.Unindent(4)

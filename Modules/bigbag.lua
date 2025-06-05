@@ -889,7 +889,7 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 	end
 	if clickable then
 		if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
-			if mq.TLO.Me.Casting() ~= nil or MyClass == 'BRD' then return end
+			if mq.TLO.Me.Casting() ~= nil then return end
 			if item.ItemSlot2() == -1 then
 				mq.cmd("/itemnotify " .. item.ItemSlot() .. " leftmouseup")
 			else
@@ -901,7 +901,7 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 			local link = item.ItemLink('CLICKABLE')()
 			mq.cmdf('/executelink %s', link)
 		elseif ImGui.IsItemClicked(ImGuiMouseButton.Right) then
-			if mq.TLO.Me.Casting() ~= nil or MyClass == 'BRD' then return end
+			if mq.TLO.Me.Casting() ~= nil then return end
 			mq.cmdf('/useitem "%s"', item.Name())
 			clicked = true
 		end

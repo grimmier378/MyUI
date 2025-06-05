@@ -181,11 +181,13 @@ end
 local function sortedBoxes(boxes)
     if TempSettings.alphaSort then
         table.sort(boxes, function(a, b)
+            if a == nil or b == nil then return false end
             if a.GroupLeader == b.GroupLeader then return a.Name < b.Name end
             return a.GroupLeader < b.GroupLeader
         end)
     else
         table.sort(boxes, function(a, b)
+            if a == nil or b == nil then return false end
             return a.GroupLeader < b.GroupLeader
         end)
     end

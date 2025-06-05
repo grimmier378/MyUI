@@ -233,7 +233,7 @@ end
 	* The function can also set the size of the toggle button (width, height) or just height and width will be defaulted to height * 2.0
 	* The function can also set the number of points for the star knob (default 5).
 	]]
----@param id string Label and Id for the toggle button)
+---@param id string Label and Id for the toggle button) clicking the label or the toggle will toggle the value
 ---@param value boolean Current value of the toggle button
 ---@param flags integer|nil combined bit flags (ImGuiToggleFlags.None, ImGuiToggleFlags.StarKnob, ImGuiToggleFlags.RightLabel, ImGuiToggleFlags.AnimateKnob)
 ---@param size ImVec2|number|nil -- ImVec2 Size of the toggle button (width, height) or height value if single number and width will default to height * 2.0
@@ -287,13 +287,17 @@ function CommonUtils.DrawToggle(id, value, flags, size, on_color, off_color, kno
 	if not id:find("##") then -- no ID tag so the id is the label
 		label = id
 	end
+	local clicked = false
 
 	if not right_label and label and label ~= "" then
 		ImGui.Text(string.format("%s:", label))
+		if ImGui.IsItemClicked() then
+			value = not value
+			clicked = true
+		end
 		ImGui.SameLine()
 	end
 
-	local clicked = false
 	local draw_list = ImGui.GetWindowDrawList()
 	local pos = { x = 0, y = 0, }
 	pos.x, pos.y = ImGui.GetCursorScreenPos()
@@ -396,6 +400,10 @@ function CommonUtils.DrawToggle(id, value, flags, size, on_color, off_color, kno
 	if right_label and label and label ~= "" then
 		ImGui.SameLine()
 		ImGui.Text(string.format("%s", label))
+		if ImGui.IsItemClicked() then
+			value = not value
+			clicked = true
+		end
 	end
 
 	return value, clicked

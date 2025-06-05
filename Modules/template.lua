@@ -70,8 +70,23 @@ if not loadedExeternally then
 	MyUI_Build       = mq.TLO.MacroQuest.BuildName()
 	MyUI_Guild       = mq.TLO.Me.Guild() or "none"
 end
+local rSize = mq.TLO.Raid.Members() or 0
+local raidMembers = {}
 
+local function SortTable(table_to_sort)
+	if #table_to_sort <= 0 then
+		return {}
+	end
+	table.sort(table_to_sort, function(a, b)
+		if a.class == b.class then
+			return a.name < b.name
+		else
+			return a.class < b.class
+		end
+	end)
 
+	return table_to_sort
+end
 --Helpers
 -- You can keep your functions local to the module the ones here are the only ones we care about from the main script.
 local function CommandHandler(...)
@@ -86,12 +101,34 @@ local function CommandHandler(...)
 	end
 end
 
+local function getMembers()
+	local temp = {}
+	for i = 1, rSize do
+		local member = mq.TLO.Raid.Member(i)
+		if member() then
+			local memberName = member.Name() or "Unknown"
+			local present = (mq.TLO.SpawnCount(string.format("PC =%s", memberName))() or 0) > 0
+			local memberClass = member.Class.ShortName() or "Unknown"
+			local hasCorpse = (mq.TLO.SpawnCount(string.format("pccorpse %s", memberName))() or 0) > 0
+
+			table.insert(temp, {
+				name = memberName,
+				class = memberClass,
+				present = present,
+				corpse = hasCorpse,
+				distance = member.Distance() or 99999,
+			})
+		end
+	end
+	return SortTable(temp)
+end
+
 local function Init()
 	-- your Init code here
 	mq.bind('/template', CommandHandler)
 	Module.IsRunning = true
 	MyUI_Utils.PrintOutput('main', true, "\ayModule \a-w[\at%s\a-w] \agLoaded\aw!", Module.Name)
-
+	raidMembers = getMembers()
 	-- for standalone mode we need to init the GUI and use a real loop
 	if not loadedExeternally then
 		mq.imgui.init(Module.Name, Module.RenderGUI)
@@ -108,17 +145,13 @@ local winFlags = bit32.bor(
 	ImGuiWindowFlags.NoScrollWithMouse
 )
 
-local imagesDir = mq.luaDir .. '/MyUI/Images/'
 
-local images = {
-	[1] = mq.CreateTexture(imagesDir .. 'flame0.png'),
-	[2] = mq.CreateTexture(imagesDir .. 'flame1.png'),
-	[3] = mq.CreateTexture(imagesDir .. 'flame2.png'),
-
-}
-local currentImage = 1
 -- Exposed Functions
 function Module.RenderGUI()
+	if rSize <= 0 and #raidMembers <= 0 then
+		Module.ShowGui = false
+		return
+	end
 	if Module.ShowGui then
 		ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(0.1, 0.1, 0.1, 0.8))
 		local open, show = ImGui.Begin(Module.Name .. "##" .. MyUI_CharLoaded, true, winFlags)
@@ -129,7 +162,24 @@ function Module.RenderGUI()
 		if show then
 			--GUI
 			-- your code here
-			ImGui.Image(images[currentImage]:GetTextureID(), ImVec2(500, 750))
+			for _, data in ipairs(raidMembers or {}) do
+				local displayString = string.format("%s - %s", data.name, data.class)
+				if data.corpse then
+					ImGui.TextColored(MyUI_Colors.color("yellow"), "Corpse -")
+					ImGui.SameLine()
+				end
+				if data.present then
+					ImGui.TextColored(MyUI_Colors.color("softblue"), displayString)
+				else
+					ImGui.TextColored(MyUI_Colors.color("tangarine"), displayString)
+				end
+				ImGui.SameLine()
+				if data.distance > 100 then
+					ImGui.TextColored(MyUI_Colors.color("tangarine"), "(%0.1f)", mq.TLO.Spawn(string.format("=%s", data.name)).Distance() or 99999)
+				else
+					ImGui.TextColored(MyUI_Colors.color("yellow"), "(%0.1f)", mq.TLO.Spawn(string.format("=%s", data.name)).Distance() or 99999)
+				end
+			end
 		end
 		ImGui.PopStyleColor()
 		ImGui.End()
@@ -147,14 +197,19 @@ function Module.MainLoop()
 	if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
 
 	-- This will only allow the MainLoop to run every 500ms (half a secon)
-	if mq.gettime() - drawTimerMS < 30 then
+	if mq.gettime() - drawTimerMS < 1000 then
 		return
 	else
 		-- your code here
 		drawTimerMS = mq.gettime()
-		currentImage = currentImage + 1
-		if currentImage > #images then
-			currentImage = 1
+		rSize = mq.TLO.Raid.Members() or 0
+		raidMembers = getMembers()
+
+		if rSize > 0 then
+			Module.ShowGui = true
+		else
+			Module.ShowGui = false
+			raidMembers = {}
 		end
 		-- drawTimerS = os.time()
 	end

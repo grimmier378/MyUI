@@ -202,6 +202,7 @@ local function DrawAATable(which_Table, label)
 				local cost = tonumber(data.Cost) or 0
 				local cur = tonumber(data.Current) or 0
 				local max = tonumber(data.Max) or 0
+				mq.TLO.AltAbility(data.Name).ID()
 				if availAA >= cost and cur < max then
 					if ImGui.SmallButton("train##" .. data.Name) then
 						selectedAA = data.Name

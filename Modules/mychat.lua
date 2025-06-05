@@ -717,7 +717,7 @@ function Module.EventChat(channelID, eventName, line, spam)
                             -- print(npcName)
                             if gSize > 0 then
                                 for g = 1, gSize do
-                                    if mq.TLO.Spawn(string.format("%s", npcName)).Master() == mq.TLO.Group.Member(g).Name() then
+                                    if mq.TLO.Spawn(string.format("%s", npcName)).Master.Name() == mq.TLO.Group.Member(g).Name() then
                                         fString = string.gsub(fString, 'PT3', npcName)
                                         -- print(npcName)
                                         tagged = true

@@ -25,6 +25,7 @@ MyUI_CharLoaded      = mq.TLO.Me.DisplayName()
 MyUI_Server          = mq.TLO.EverQuest.Server()
 MyUI_Build           = mq.TLO.MacroQuest.BuildName()
 MyUI_Guild           = mq.TLO.Me.Guild() or "none"
+MyUI_CharClass       = mq.TLO.Me.Class.ShortName() or "none"
 
 local MyActor        = MyUI_Actor.register('myui', function(message) end)
 local mods           = {}
@@ -38,6 +39,7 @@ MyUI_ConfPath        = mq.configDir .. '/MyUI/' .. MyUI_Server:gsub(" ", "_") ..
 MyUI_SettingsFile    = MyUI_ConfPath .. MyUI_CharLoaded .. '.lua'
 MyUI_MyChatLoaded    = false
 MyUI_MyChatHandler   = nil
+
 
 local ToggleFlags    = bit32.bor(
 	MyUI_Utils.ImGuiToggleFlags.RightLabel,

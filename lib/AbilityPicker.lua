@@ -124,6 +124,7 @@ local function AddSpellToMap(picker, spell)
             Category = spell.Category(),
             AERange = spell.AERange(),
             PushBack = spell.PushBack(),
+            Description = spell.Description() or 'none',
             TargetType =
                 spell.TargetType(),
             Icon = spell.SpellIcon(),
@@ -432,6 +433,17 @@ local function DrawCatSubCatTree(picker, tbl, type)
                             SelectAbility(picker, type, ability.ID, ability.Name, ability.RankName, ability.Level)
                         end
                         if ability.TargetType then ImGui.PopStyleColor() end
+                        if ImGui.IsItemHovered() then
+                            ImGui.BeginTooltip()
+                            ImGui.Text("(%s)", ability.Level)
+                            ImGui.SameLine()
+                            ImGui.TextColored(ImVec4(0, 1, 1, 1), ability.Name)
+                            ImGui.Separator()
+                            ImGui.PushTextWrapPos(150)
+                            ImGui.Text(ability.Description or 'No description available')
+                            ImGui.PopTextWrapPos()
+                            ImGui.EndTooltip()
+                        end
                     end
                     ImGui.TreePop()
                 end

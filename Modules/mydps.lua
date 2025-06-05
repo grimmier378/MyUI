@@ -705,7 +705,7 @@ local function checkColor(t)
 end
 
 local color = {
-	red    = ImVec4(1, 0, 0, 1),
+	red    = ImVec4(0.981, 0.484, 0.484, 1.000),
 	green  = ImVec4(0, 1, 0, 1),
 	blue   = ImVec4(0, 0, 1, 1),
 	yellow = ImVec4(1, 1, 0, 1),
@@ -788,7 +788,7 @@ local function ShowData(labelName, data, seq)
 	ImGui.End()
 end
 
-local function DrawHistory(tbl)
+local function DrawHistory(tbl, isHistory)
 	if settings.Options.showHistory ~= tempSettings.showHistory then
 		settings.Options.showHistory = tempSettings.showHistory
 		mq.pickle(configFile, settings)
@@ -819,14 +819,16 @@ local function DrawHistory(tbl)
 				ImGui.TableNextRow()
 				ImGui.TableNextColumn()
 				local labelName = data.name ~= nil and data.name or Module.CharLoaded
+
 				textColor = labelName == Module.CharLoaded and color.teal or color.white
+
 				ImGui.PushStyleColor(ImGuiCol.Text, textColor)
 				local selected, pressed = false, false
 				selected, pressed = ImGui.Selectable(labelName, selected, ImGuiSelectableFlags.SpanAllColumns)
 				if pressed then
 					dataWinData["data"] = data
 					dataWinData["seq"] = seq
-					dataWinData['labelName'] = labelName
+					dataWinData['labelName'] = (isHistory and seq ~= "Current") and string.format("%s_%s", labelName, seq) or labelName
 					showDataWin = true
 				end
 				ImGui.PopStyleColor()
@@ -1141,7 +1143,7 @@ function Module.RenderGUI()
 		if showReport then
 			if ImGui.BeginTabBar("MyDPS##") then
 				if ImGui.BeginTabItem("My History") then
-					DrawHistory(battlesHistory)
+					DrawHistory(battlesHistory, true)
 					ImGui.EndTabItem()
 				end
 				if settings.Options.announceActors and ImGui.BeginTabItem("Party") then

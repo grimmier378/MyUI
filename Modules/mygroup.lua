@@ -64,6 +64,7 @@ local showGroupWindow    = false
 local mouseHover         = false
 local defaults, settings = {}, {}
 local groupData          = {}
+local noActorData        = {}
 local mailBox            = {}
 local raidKeys           = {}
 local raidLootIdx        = 0
@@ -81,9 +82,11 @@ local raidSize           = mq.TLO.Raid.Members() or 0
 local raidLeader         = mq.TLO.Raid.Leader() or 'N/A'
 local tPlayerFlags       = bit32.bor(ImGuiTableFlags.NoBordersInBody, ImGuiTableFlags.NoPadInnerX, ImGuiTableFlags.NoPadOuterX, ImGuiTableFlags.Resizable,
     ImGuiTableFlags.SizingFixedFit)
-local lastRaidSort       = os.clock()
+local lastRaidSort       = 0
+local refreshTimer       = 0
 
-local manaClass          = {
+
+local manaClass = {
     [1] = 'WIZ',
     [2] = 'MAG',
     [3] = 'NEC',
@@ -98,7 +101,7 @@ local manaClass          = {
     [12] = 'SHD',
 }
 
-defaults                 = {
+defaults        = {
     [Module.Name] = {
         Scale = 1.0,
         RaidScale = 1.0,
@@ -224,51 +227,50 @@ local function GetInfoToolTip(id, raid)
     else
         ImGui.TextColored(Module.Colors.color('tangarine'), memberName)
         ImGui.SameLine()
-        ImGui.Text("Level: %d", member.Level())
-        ImGui.Text("Class: %s", member.Class.ShortName())
-        if member.PctHPs() ~= nil then
-            ImGui.TextColored(Module.Colors.color('pink2'), "Health: %d of 100", member.PctHPs())
+        ImGui.Text("Level: %d", member.Level() or 0)
+        ImGui.Text("Class: %s", member.Class.ShortName() or "unknown")
+        if noActorData[memberName] ~= nil then
+            ImGui.TextColored(Module.Colors.color('pink2'), "Health: %d of 100", noActorData[memberName].HPpct or 0)
+
+            ImGui.TextColored(Module.Colors.color('light blue'), "Mana: %d of 100", noActorData[memberName].MPpct or 0)
+            ImGui.TextColored(Module.Colors.color('yellow'), "End: %d of 100", noActorData[memberName].ENDpct or 0)
+            if noActorData[memberName].Sitting then
+                ImGui.TextColored(Module.Colors.color('tangarine'), Module.Icons.FA_MOON_O)
+            else
+                ImGui.TextColored(Module.Colors.color('green'), Module.Icons.FA_SMILE_O)
+            end
+            ImGui.TextColored(Module.Colors.color('green'), "Distance: %0.1f", member.Distance() or 9999)
+            ImGui.TextColored(Module.Colors.color('softblue'), "Zone: %s", noActorData[memberName].Zone or 'Unknown')
         end
-        if member.PctMana() ~= nil then
-            ImGui.TextColored(Module.Colors.color('light blue'), "Mana: %d of 100", member.PctMana())
-        end
-        if member.PctEndurance() ~= nil then
-            ImGui.TextColored(Module.Colors.color('yellow'), "End: %d of 100", member.PctEndurance())
-        end
-        if member.Sitting() then
-            ImGui.TextColored(Module.Colors.color('tangarine'), Module.Icons.FA_MOON_O)
-        else
-            ImGui.TextColored(Module.Colors.color('green'), Module.Icons.FA_SMILE_O)
-        end
-        ImGui.TextColored(Module.Colors.color('green'), "Distance: %0.1f", member.Distance() or 9999)
-        ImGui.TextColored(Module.Colors.color('softblue'), "Zone: %s", mq.TLO.Zone.Name())
     end
-    if member.Pet() ~= 'NO PET' then
-        ImGui.Text('%s (%d%% health)', member.Pet.DisplayName(), member.Pet.PctHPs())
+    if member.Pet() ~= nil and member.Pet() ~= 'NO PET' then
+        ImGui.Text('%s (%d%% health)', member.Pet.DisplayName() or 'none', member.Pet.PctHPs() or 0)
         ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('green2')))
         ImGui.SetNextItemWidth(120)
         ImGui.ProgressBar(((tonumber(member.Pet.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), 5 * RaidScale, '##PetHp' .. id)
         ImGui.PopStyleColor()
     end
     local entry = false
-    if mq.TLO.Group.MainTank.ID() == member.ID() then
+    if (mq.TLO.Group.MainTank.ID() or -1) == (member.ID() or 0) then
         if entry then ImGui.SameLine() end
         Module.Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
         entry = true
     end
 
-    if mq.TLO.Group.MainAssist.ID() == member.ID() then
+    if (mq.TLO.Group.MainAssist.ID() or -1) == (member.ID() or 0) then
         if entry then ImGui.SameLine() end
         Module.Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
         entry = true
     end
 
-    if mq.TLO.Group.Puller.ID() == member.ID() then
+    if (mq.TLO.Group.Puller.ID() or -1) == (member.ID() or 0) then
         if entry then ImGui.SameLine() end
         Module.Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
         entry = true
     end
 end
+
+
 
 local function DrawGroupMember(id)
     local barSize = settings[Module.Name].ShowValOnBar and 12 or 7
@@ -284,6 +286,7 @@ local function DrawGroupMember(id)
     local sitting
     local level
     local velo
+    local needRefresh = os.clock() - refreshTimer >= 1
     if groupData[memberName] ~= nil then
         hpPct = groupData[memberName].CurHP / groupData[memberName].MaxHP * 100
         mpPct = groupData[memberName].CurMana / groupData[memberName].MaxMana * 100
@@ -293,15 +296,30 @@ local function DrawGroupMember(id)
         sitting = groupData[memberName].Sitting
         level = groupData[memberName].Level or 0
         velo = groupData[memberName].Velocity or 0
+        noActorData[memberName] = nil
     else
-        hpPct = member.PctHPs() or 0
-        mpPct = member.PctMana() or 0
-        enPct = member.PctEndurance() or 0
-        zne = member.Present() and mq.TLO.Zone.Name() or 'Unknown'
-        cls = member.Class.ShortName() or 'Unknown'
-        sitting = member.Sitting()
-        level = member.Level() or 0
-        velo = member.Speed() or 0
+        if noActorData[memberName] == nil or needRefresh then
+            noActorData[memberName] = {
+                Name = memberName or 'Unknown',
+                Level = member.Level() or 0,
+                Class = member.Class.ShortName() or 'Unknown',
+                HPpct = member.PctHPs() or 0,
+                MPpct = member.PctMana() or 0,
+                ENDpct = member.PctEndurance() or 0,
+                Sitting = member.Sitting() or false,
+                Speed = member.Speed() or 0,
+                Zone = (member.Present() and mq.TLO.Zone.Name()) or 'Unknown',
+            }
+            refreshTimer = os.clock()
+        end
+        hpPct = noActorData[memberName].HPpct or 0
+        mpPct = noActorData[memberName].MPpct or 0
+        enPct = noActorData[memberName].ENDpct or 0
+        zne = noActorData[memberName].Zone or 'Unknown'
+        cls = noActorData[memberName].Class or 'Unknown'
+        sitting = noActorData[memberName].Sitting or false
+        level = noActorData[memberName].Level or 0
+        velo = noActorData[memberName].Speed or 0
     end
     ImGui.PushID(memberName)
     ImGui.BeginGroup()
@@ -318,7 +336,7 @@ local function DrawGroupMember(id)
         -- Name
         ImGui.TableNextColumn()
 
-        if mq.TLO.Group.Leader.ID() == member.ID() then
+        if (mq.TLO.Group.Leader.ID() or -1) == (member.ID() or 0) then
             ImGui.TextColored(0, 1, 1, 1, 'F%d', id + 1)
             ImGui.SameLine()
             ImGui.TextColored(0, 1, 1, 1, memberName)
@@ -598,19 +616,21 @@ function Module.DrawContext(member)
     ImGui.PopID()
 end
 
+local raidRefresh = 0
 local function DrawRaidMember(id)
     local member = mq.TLO.Raid.Member(id)
-    local memberName = member.Name()
     local r, g, b, a = 1, 1, 1, 1
-    if member == 'NULL' then return end
+    if not member() then return end
+    local memberName = member.Name()
     local memberDistance = member.Distance() or 9999
-    local hpPct = 0
-    local mpPct = 0
-    local enPct = 0
+    local hpPct
+    local mpPct
+    local enPct
     local cls
     local sitting
     local level
     local velo
+    local needRefresh = os.clock() - raidRefresh >= 1
     if groupData[memberName] ~= nil then
         hpPct = (groupData[memberName].CurHP / groupData[memberName].MaxHP * 100) or 0
         mpPct = groupData[memberName].CurMana / groupData[memberName].MaxMana * 100
@@ -619,14 +639,28 @@ local function DrawRaidMember(id)
         sitting = groupData[memberName].Sitting
         level = groupData[memberName].Level or 0
         velo = groupData[memberName].Velocity or 0
+        noActorData[memberName] = nil
     else
-        hpPct = member.PctHPs() or 0
-        mpPct = member.PctMana() or 0
-        enPct = member.PctEndurance() or 0
-        cls = member.Class.ShortName() or 'Unknown'
-        sitting = member.Sitting()
-        level = member.Level() or 0
-        velo = member.Speed() or 0
+        if noActorData[memberName] == nil or needRefresh then
+            noActorData[memberName] = {
+                Name = memberName or 'Unknown',
+                Level = member.Level() or 0,
+                Class = member.Class.ShortName() or 'Unknown',
+                HPpct = member.PctHPs() or 0,
+                MPpct = member.PctMana() or 0,
+                ENDpct = member.PctEndurance() or 0,
+                Sitting = member.Sitting() or false,
+                Speed = member.Speed() or 0,
+            }
+            raidRefresh = os.clock()
+        end
+        hpPct = noActorData[memberName].HPpct or 0
+        mpPct = noActorData[memberName].MPpct or 0
+        enPct = noActorData[memberName].ENDpct or 0
+        cls = noActorData[memberName].Class or 'Unknown'
+        sitting = noActorData[memberName].Sitting or false
+        level = noActorData[memberName].Level or 0
+        velo = noActorData[memberName].Speed or 0
     end
 
     ImGui.BeginChild("##RaidMember" .. tostring(id), 0.0, (90 * RaidScale), bit32.bor(ImGuiChildFlags.Border), ImGuiWindowFlags.NoScrollbar)
@@ -1477,22 +1511,17 @@ end
 -- Actors
 
 local function CheckStale()
-    local now = os.time()
+    local now = os.clock()
     local found = false
-    for i = 1, #groupData do
-        if groupData[0].Check == nil then
-            table.remove(groupData, i)
-            found = true
-            break
+    for k, v in pairs(groupData or {}) do
+        if v.Check == nil then
+            groupData[k].Check = now
         else
-            if now - groupData[i].Check > 900 then
-                table.remove(groupData, i)
-                found = true
-                break
+            if now - v.Check > 60 then
+                groupData[k] = nil
             end
         end
     end
-    if found then CheckStale() end
 end
 
 local function GenerateContent(sub)
@@ -1510,7 +1539,7 @@ local function GenerateContent(sub)
         MaxMana  = mq.TLO.Me.MaxMana(),
         CurEnd   = mq.TLO.Me.CurrentEndurance(),
         MaxEnd   = mq.TLO.Me.MaxEndurance(),
-        Check    = os.time(),
+        Check    = os.clock(),
         Level    = mq.TLO.Me.Level(),
         Class    = mq.TLO.Me.Class.ShortName(),
         Sitting  = mq.TLO.Me.Sitting(),
@@ -1530,7 +1559,7 @@ local function MessageHandler()
         local maxMana     = MemberEntry.MaxMana or 0
         local curEnd      = MemberEntry.CurEnd or 0
         local maxEnd      = MemberEntry.MaxEnd or 0
-        local check       = MemberEntry.Check or os.time()
+        local check       = os.clock()
         local zone        = MemberEntry.Zone or 'Unknown'
         local velocity    = MemberEntry.Velocity or 0
         local found       = false
@@ -1553,7 +1582,7 @@ local function MessageHandler()
             end
             -- end
             return
-            -- checkIn = os.time()
+            -- checkIn = os.clock()
         elseif subject == 'Goodbye' then
             groupData[who] = nil
         end
@@ -1591,7 +1620,6 @@ local function MessageHandler()
                 }
             end
         end
-        if check == 0 then CheckStale() end
     end)
 end
 
@@ -1614,6 +1642,7 @@ local function getMyInfo()
         Pet = mq.TLO.Me.Pet() or 0,
         Zone = Module.MyZone,
         Velocity = mq.TLO.Me.Speed() or 0,
+        Check = os.clock(),
     }
     if mygroupActor ~= nil then
         mygroupActor:send({ mailbox = Module.ActorMailBox, script = 'mygroup', }, GenerateContent('Update'))

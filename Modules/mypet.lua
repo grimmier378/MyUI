@@ -373,9 +373,10 @@ function Module.RenderGUI()
 						ImGui.EndGroup()
 						if ImGui.IsItemHovered() then
 							if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
-								mq.cmdf("/target id %s", myPet.ID() or 0)
+								mq.TLO.Pet.DoTarget()
 								if mq.TLO.Cursor() ~= nil then
-									Module.Utils.GiveItem(myPet.ID())
+									-- Module.Utils.GiveItem(myPet.ID())
+									mq.TLO.Pet.LeftClick()
 								end
 							end
 						end
@@ -673,7 +674,7 @@ function Module.MainLoop()
 	local timeDiff = mq.gettime() - clockTimer
 	if timeDiff > 10 then
 		petName = myPet.DisplayName() or 'No Pet'
-		local curTime = os.time()
+		local curTime = os.clock()
 		-- Process ImGui Window Flag Changes
 		winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoFocusOnAppearing)
 		winFlags = locked and bit32.bor(ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoResize, winFlags) or winFlags

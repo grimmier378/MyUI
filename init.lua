@@ -41,14 +41,14 @@ MyUI_MyChatLoaded    = false
 MyUI_MyChatHandler   = nil
 
 
-local ToggleFlags    = bit32.bor(
+local ToggleFlags                = bit32.bor(
 	MyUI_Utils.ImGuiToggleFlags.RightLabel,
 	MyUI_Utils.ImGuiToggleFlags.PulseOnHover,
 	MyUI_Utils.ImGuiToggleFlags.StarKnob,
 	MyUI_Utils.ImGuiToggleFlags.AnimateOnHover
 )
 
-local default_list   = {
+local default_list               = {
 	'AAParty',
 	'ChatRelay',
 	'DialogDB',
@@ -72,7 +72,7 @@ local default_list   = {
 	--"MyDots",
 }
 
-MyUI_DefaultConfig   = {
+MyUI_DefaultConfig               = {
 	ShowMain = true,
 	ThemeName = 'Default',
 	mods_list = {
@@ -101,13 +101,15 @@ MyUI_DefaultConfig   = {
 		--[20] = { name = 'MyDots', enabled = false, }, -- Customized Fork of Zathus' MyDots
 	},
 }
-MyUI_Settings        = {}
-MyUI_TempSettings    = {}
-MyUI_Theme           = {}
-MyUI_ThemeFile       = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
-MyUI_ThemeName       = 'Default'
+MyUI_Settings                    = {}
+MyUI_TempSettings                = {}
+MyUI_Theme                       = {}
+MyUI_ThemeFile                   = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
+MyUI_ThemeName                   = 'Default'
+MyUI_TempSettings.MyChatWinName  = nil
+MyUI_TempSettings.MyChatFocusKey = nil
 
-local MyUI_IsRunning = false
+local MyUI_IsRunning             = false
 
 local function LoadTheme()
 	if MyUI_Utils.File.Exists(MyUI_ThemeFile) then
@@ -299,62 +301,108 @@ local function ProcessModuleChanges()
 	end
 end
 
-local function DrawContextMenu()
-	if mq.TLO.Plugin('MQ2DanNet').IsLoaded() then
-		ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('teal'))
-		if ImGui.MenuItem('Start MyGroup Clients') then
-			mq.cmd('/dgge /lua run myui client')
-		end
-		ImGui.PopStyleColor()
+local function DrawContextItem(group_type)
+	if not group_type then return end
+	local gpCmd = group_type == 'raid' and 'dgre' or 'dgge'
+	local gpCmdAll = group_type == 'raid' and 'dgra' or 'dgga'
+	local label = group_type == 'raid' and 'MyRaid' or 'MyGroup'
 
-		ImGui.Spacing()
-
-		ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('tangarine'))
-		if ImGui.MenuItem('Stop MyGroup Clients') then
-			mq.cmd('/dgge /myui quit')
-		end
-		ImGui.PopStyleColor()
-
-		ImGui.Spacing()
-
-		ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('pink2'))
-		if ImGui.MenuItem('Stop MyGroup ALL') then
-			mq.cmd('/dgga /myui quit')
-		end
-		ImGui.PopStyleColor()
-
-		ImGui.Spacing()
-
-		ImGui.Separator()
-
-		ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('teal'))
-		if ImGui.MenuItem('Start AllGroups Clients') then
-			mq.cmd('/dge all /lua run myui client')
-		end
-		ImGui.Spacing()
-
-		ImGui.PopStyleColor()
-
-		ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('tangarine'))
-		if ImGui.MenuItem('Stop AllGroups Clients') then
-			mq.cmd('/dge all /myui quit')
-		end
-		ImGui.PopStyleColor()
-		ImGui.Spacing()
-
-		ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('pink2'))
-		if ImGui.MenuItem('Stop EVERYONE') then
-			mq.cmd('/dgae /myui quit')
-		end
-		ImGui.PopStyleColor()
+	if group_type == 'all' then
+		gpCmd = 'dge all'
+		gpCmdAll = 'dgae'
+		label = 'AllGroups'
 	end
+
+	ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('teal'))
+	if ImGui.MenuItem(string.format('Start %s Clients', label)) then
+		mq.cmdf('/%s /lua run myui client', gpCmd)
+	end
+	ImGui.PopStyleColor()
 
 	ImGui.Spacing()
 
-	ImGui.Separator()
+	ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('tangarine'))
+	if ImGui.MenuItem(string.format('Stop %s Clients', label)) then
+		mq.cmdf('/%s /myui quit', gpCmd)
+	end
+	ImGui.PopStyleColor()
+
+	ImGui.Spacing()
+
+	ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('pink2'))
+	if ImGui.MenuItem(string.format('Stop %s ALL', label)) then
+		mq.cmdf('/%s /myui quit', gpCmdAll)
+	end
+	ImGui.PopStyleColor()
+end
+
+local function DrawContextMenu()
+	if mq.TLO.Plugin('MQ2DanNet').IsLoaded() then
+		if mq.TLO.Raid.Members() > 0 then
+			DrawContextItem('raid')
+			ImGui.Spacing()
+			ImGui.Separator()
+		elseif mq.TLO.Group.Members() > 0 then
+			DrawContextItem('group')
+			ImGui.Spacing()
+			ImGui.Separator()
+		end
+
+		DrawContextItem('all')
+		ImGui.Spacing()
+		ImGui.Separator()
+	end
+
 	if ImGui.MenuItem('Exit') then
 		MyUI_IsRunning = false
 	end
+end
+
+local function RenderDebug()
+	if not MyUI_TempSettings.Debug then
+		return
+	end
+	local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
+	ImGui.SetNextWindowSize(ImVec2(400, 200), ImGuiCond.FirstUseEver)
+	ImGui.SetNextWindowPos(ImVec2(100, 100), ImGuiCond.FirstUseEver)
+	local open_debug, show_debug = ImGui.Begin(MyUI_ScriptName .. " Debug##" .. MyUI_CharLoaded, true)
+	if not open_debug then
+		MyUI_TempSettings.Debug = false
+		show_debug = false
+	end
+	if show_debug then
+		local totalTime = 0
+		local tempSort = GetSortedModuleNames()
+		if ImGui.BeginTable("Module Processing", 2, ImGuiTableFlags.Borders) then
+			ImGui.TableSetupColumn("Module Name", ImGuiTableColumnFlags.WidthFixed, 150)
+			ImGui.TableSetupColumn("Time (ms)", ImGuiTableColumnFlags.WidthFixed, 100)
+			ImGui.TableHeadersRow()
+
+			for _, name in ipairs(tempSort or {}) do
+				if MyUI_TempSettings.ModuleProcessing[name] ~= nil then
+					ImGui.TableNextRow()
+					ImGui.TableNextColumn()
+					ImGui.Indent()
+					ImGui.Text(MyUI_TempSettings.ModuleProcessing[name].ModName)
+					ImGui.Unindent()
+					ImGui.TableNextColumn()
+					ImGui.Indent()
+					ImGui.Text(string.format("%.0f", MyUI_TempSettings.ModuleProcessing[name].Timer or 0))
+					ImGui.Unindent()
+					totalTime = totalTime + (MyUI_TempSettings.ModuleProcessing[name].Timer or 0)
+				end
+			end
+			ImGui.EndTable()
+		end
+		ImGui.Separator()
+		ImGui.Text("Total Time:")
+		local ttSec = totalTime / 1000
+		ImGui.SameLine()
+		ImGui.TextColored(MyUI_Colors.color(ttSec < 1 and 'green' or (ttSec < 2 and 'yellow' or 'red')), "%.3f seconds", ttSec)
+	end
+
+	MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
+	ImGui.End()
 end
 
 local function RenderMini()
@@ -372,7 +420,13 @@ local function RenderMini()
 	end
 	if ImGui.BeginPopupContextWindow() then
 		DrawContextMenu()
+		ImGui.Separator()
 		ImGui.EndPopup()
+	end
+	if MyUI_TempSettings.MyChatWinName ~= nil and MyUI_TempSettings.MyChatFocusKey ~= nil then
+		if ImGui.IsKeyPressed(ImGuiKey[MyUI_TempSettings.MyChatFocusKey]) then
+			ImGui.SetWindowFocus(MyUI_TempSettings.MyChatWinName)
+		end
 	end
 	MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
 	ImGui.End()
@@ -486,6 +540,7 @@ local function MyUI_Render()
 				ImGui.SetNextItemWidth(150)
 				MyUI_TempSettings.AddModule = ImGui.InputText("Add Custom Module", MyUI_TempSettings.AddModule or '')
 
+				MyUI_TempSettings.Debug = MyUI_Utils.DrawToggle("Debug Mode", MyUI_TempSettings.Debug, ToggleFlags, 16, 7)
 				if MyUI_TempSettings.AddModule ~= '' then
 					if ImGui.Button("Add") then
 						MyUI_TempSettings.AddCustomModule = true
@@ -519,13 +574,17 @@ local function MyUI_Render()
 			ImGui.End()
 		end
 
-		RenderMini()
-
 		RenderModules()
+
+		RenderDebug()
 	end
+	RenderMini()
 end
 
+MyUI_TempSettings.ModuleProcessing = {}
+MyUI_TempSettings.Debug = false
 local function MyUI_Main()
+	local ModTimer
 	while MyUI_IsRunning do
 		if mq.TLO.EverQuest.GameState() ~= "INGAME" then mq.exit() end
 		mq.doevents()
@@ -533,9 +592,26 @@ local function MyUI_Main()
 		for idx, data in ipairs(MyUI_Settings.mods_list) do
 			if data.enabled then
 				mq.doevents()
+				if MyUI_TempSettings.Debug then
+					ModTimer = os.clock()
+				else
+					ModTimer = 0
+				end
 				if MyUI_Modules[data.name].MainLoop ~= nil then MyUI_Modules[data.name].MainLoop() end
+				-- printf("Module: \at%s\ax took \ay%.2f ms\ax to run", data.name, (os.clock() - ModTimer) * 1000)
+				if MyUI_TempSettings.Debug then
+					if MyUI_TempSettings.ModuleProcessing[data.name] == nil then
+						MyUI_TempSettings.ModuleProcessing[data.name] = {}
+					end
+					MyUI_TempSettings.ModuleProcessing[data.name] = { ModName = data.name, Timer = (os.clock() - ModTimer) * 1000, }
+				else
+					MyUI_TempSettings.ModuleProcessing[data.name] = nil
+				end
+			else
+				MyUI_TempSettings.ModuleProcessing[data.name] = nil
 			end
 		end
+		mq.doevents()
 		mq.delay(1)
 	end
 end

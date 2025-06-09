@@ -16,7 +16,7 @@ function Module.loadAll(module_list)
 				modules[module] = dofile(moduleName)
 				count = count + 1
 				MyUI_InitPctComplete = ((count / #module_list) * 100)
-				MyUI_CurLoading = "Loading Module: " .. module .. " .."
+				MyUI_CurLoading = module
 				mq.delay(1)
 				break
 			end
@@ -31,7 +31,7 @@ function Module.loadAll(module_list)
 			modules[module] = dofile(moduleName)
 			count = count + 1
 			MyUI_InitPctComplete = ((count / #module_list) * 100)
-			MyUI_CurLoading = "Loading Module: " .. module .. " .."
+			MyUI_CurLoading = module
 			mq.delay(1)
 
 			::continue::

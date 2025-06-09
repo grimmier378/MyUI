@@ -1,35 +1,37 @@
-local mq                = require('mq')
-local ImGui             = require('ImGui')
-local Actors            = require('actors')
-local CommonUtils       = require('mq.Utils')
+local mq                     = require('mq')
+local ImGui                  = require('ImGui')
+local Actors                 = require('actors')
+local CommonUtils            = require('mq.Utils')
 
-local mailboxName       = "ItemTracker"
+local mailboxName            = "ItemTracker"
 local actor
-local trackedItems      = {}
-local itemData          = {}
-local saveFileName      = mq.configDir .. "/itemtracker.lua"
-local mainWindowFlags   = bit32.bor(ImGuiWindowFlags.None)
-local buttonWinFlags    = bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoCollapse)
+local trackedItems           = {}
+local itemData               = {}
+local saveFileName           = mq.configDir .. "/itemtracker.lua"
+local mainWindowFlags        = bit32.bor(ImGuiWindowFlags.None)
+local buttonWinFlags         = bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoCollapse)
 
-local removedItems      = {}
-local myName            = mq.TLO.Me.CleanName()
+local removedItems           = {}
+local myName                 = mq.TLO.Me.CleanName()
 
 -- variables for UI
-local tmpTxt            = ""
-local needSave          = false
-local Module            = {}
-local loadedExeternally = MyUI_ScriptName ~= nil
-Module.Name             = "iTrack"
-Module.IsRunning        = false
-Module.Settings         = {}
-Module.Server           = mq.TLO.EverQuest.Server()
+local tmpTxt                 = ""
+local needSave               = false
+local Module                 = {}
+local loadedExeternally      = MyUI_ScriptName ~= nil
+Module.Name                  = "iTrack"
+Module.IsRunning             = false
+Module.Settings              = {}
+Module.Server                = mq.TLO.EverQuest.Server()
+Module.TempSettings          = {}
+Module.TempSettings.Counters = {}
 -- local animItems         = mq.FindTextureAnimation("A_DragItem")
 -- local animBox           = mq.FindTextureAnimation("A_RecessedBox")
-local animMini          = mq.FindTextureAnimation("A_DragItem")
-local EQ_ICON_OFFSET    = 500
-local configFile        = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, Module.Name, Module.Server, myName)
+local animMini               = mq.FindTextureAnimation("A_DragItem")
+local EQ_ICON_OFFSET         = 500
+local configFile             = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, Module.Name, Module.Server, myName)
 
-local defaults          = {
+local defaults               = {
 	showUI = true,
 	lockWindow = false,
 }
@@ -275,11 +277,15 @@ local function renderMain()
 			ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(0, 1, 1, 1))
 			ImGui.TextWrapped(selectedItem)
 			ImGui.PopStyleColor()
+
+			ImGui.SameLine()
+			ImGui.TextColored(colYellow, "Count: " .. (Module.TempSettings.Counters[selectedItem] or 0))
 			if ImGui.BeginTable("ItemTable", 3, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.Resizable)) then
 				ImGui.TableSetupColumn("Character")
 				ImGui.TableSetupColumn("Inventory")
 				ImGui.TableSetupColumn("Bank")
 				ImGui.TableHeadersRow()
+				local counter = 0
 				for char, data in pairs(itemData[selectedItem]) do
 					if type(data) ~= 'boolean' then
 						local colInv = (data.inventory or 0) > 0 and colYellow or colWhite
@@ -294,8 +300,10 @@ local function renderMain()
 						ImGui.TextColored(colInv, tostring(data.inventory or 0))
 						ImGui.TableSetColumnIndex(2)
 						ImGui.TextColored(colBank, tostring(data.bank or 0))
+						counter = counter + data.inventory + data.bank
 					end
 				end
+				Module.TempSettings.Counters[selectedItem] = counter or 0
 				ImGui.EndTable()
 			end
 		elseif selectedItem then

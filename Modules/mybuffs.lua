@@ -230,8 +230,14 @@ end
 local function GetBuff(slot)
     local buffTooltip, buffName, buffDurDisplay, buffIcon, buffID, buffBeneficial, buffHr, buffMin, buffSec, totalMin, totalSec, buffDurHMS
     local buff = mq.TLO.Me.Buff(slot)
-    local duration = buff.Duration
     local hasBuff = buff() ~= nil
+    -- if not hasBuff then
+    --     Module.TempSettings.MyBuffsNames[buffName] = nil
+    --     Module.buffTable[slot] = nil
+    --     return false
+    -- end
+    local duration = buff.Duration
+
     buffName = buff.Name() or ''
     buffIcon = buff.SpellIcon() or 0
     buffID = buff.ID() or 0
@@ -324,14 +330,17 @@ local function GetBuff(slot)
         TotalSeconds = totalSec,
         Tooltip = buffTooltip,
     }
-    if hasBuff then
-        Module.TempSettings.MyBuffsNames[buffName] = true
-    end
+    Module.TempSettings.MyBuffsNames[buffName] = true
+
     return hasBuff
 end
 
 local function GetSong(slot)
     local songTooltip, songName, songDurationDisplay, songIcon, songID, songBeneficial, songHr, songMin, songSec, totalMin, totalSec, songDurHMS
+    local hasSong = mq.TLO.Me.Song(slot)() ~= nil
+    -- if not hasSong then
+    --     Module.songTable[slot] = nil
+    -- end
     songName = mq.TLO.Me.Song(slot).Name() or ''
     songIcon = mq.TLO.Me.Song(slot).SpellIcon() or 0
     songID = songName ~= '' and (mq.TLO.Me.Song(slot).ID() or 0) or 0
@@ -2077,14 +2086,14 @@ function Module.MainLoop()
     local now = mq.gettime()
     local nowTime = os.time()
 
-    if now - clockTimer >= 1 then
+    if now - clockTimer > 500 then
         currZone = mq.TLO.Zone.ID()
         if currZone ~= lastZone then
             lastZone = currZone
         end
         if not solo then CheckStale() end
         GetBuffs()
-        clockTimer = now
+        clockTimer = mq.gettime()
     end
 
     if Module.TempSettings.PositionTimer == nil then

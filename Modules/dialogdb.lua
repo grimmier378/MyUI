@@ -40,6 +40,7 @@ local cmdGroup        = '/dgge'
 local cmdZone         = '/dgza'
 local cmdChar         = '/dex'
 local cmdSelf         = '/say'
+local cmdRaid         = '/dgr'
 local tmpDesc         = ''
 local autoAdd         = false
 local DEBUG           = false
@@ -66,15 +67,19 @@ local winFlags        = bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.
 local delay           = 1
 local currZoneShort   = mq.TLO.Zone.ShortName() or 'None'
 local msgPref         = "\aw[\atDialogDB\aw] "
+local gSize, rSize    = 0, 0
 
 Module.Config         = {
 	cmdGroup = cmdGroup,
 	cmdZone = cmdZone,
 	cmdChar = cmdChar,
 	cmdSelf = cmdSelf,
+	cmdRaid = cmdRaid,
 	autoAdd = false,
 	themeName = Module.themeName,
 }
+
+Module.CommandString  = ''
 
 local function loadTheme()
 	if Module.Utils.File.Exists(Module.ThemeFile) then
@@ -123,6 +128,7 @@ local function loadSettings()
 				cmdChar = cmdChar,
 				autoAdd = autoAdd,
 				cmdSelf = cmdSelf,
+				cmdRaid = cmdRaid,
 				themeName = Module.themeName,
 			}
 		end
@@ -131,11 +137,12 @@ local function loadSettings()
 		mq.pickle(dialogConfig, Module.Config)
 	else
 		Module.Config = dofile(dialogConfig)
-		cmdGroup = Module.Config.cmdGroup
-		cmdZone = Module.Config.cmdZone
-		cmdChar = Module.Config.cmdChar
-		cmdSelf = Module.Config.cmdSelf
-		autoAdd = Module.Config.autoAdd
+		cmdGroup = Module.Config.cmdGroup ~= nil and Module.Config.cmdGroup or cmdGroup
+		cmdZone = Module.Config.cmdZone ~= nil and Module.Config.cmdZone or cmdZone
+		cmdChar = Module.Config.cmdChar ~= nil and Module.Config.cmdChar or cmdChar
+		cmdSelf = Module.Config.cmdSelf ~= nil and Module.Config.cmdSelf or cmdSelf
+		autoAdd = Module.Config.autoAdd ~= nil and Module.Config.autoAdd or false
+		cmdRaid = Module.Config.cmdRaid ~= nil and Module.Config.cmdRaid or cmdRaid
 		Module.themeName = Module.Config.themeName or 'Default'
 	end
 
@@ -461,43 +468,52 @@ local function DrawConfigWin()
 
 	ImGui.SeparatorText("Command's Config")
 
-	ImGui.BeginTable("Command Config##DialogConfigTable", 2, ImGuiTableFlags.Borders)
-	ImGui.TableSetupColumn("##DialogConfigCol1", ImGuiTableColumnFlags.WidthFixed, 380)
-	ImGui.TableSetupColumn("##DialogConfigCol2", ImGuiTableColumnFlags.WidthStretch)
-	ImGui.TableNextRow()
-	ImGui.TableNextColumn()
-	tmpGpCmd, _ = ImGui.InputText("Group Command##DialogConfig", tmpGpCmd)
-	if tmpGpCmd ~= cmdGroup then
-		cmdGroup = tmpGpCmd:gsub(" $", "")
+	if ImGui.BeginTable("Command Config##DialogConfigTable", 2, ImGuiTableFlags.Borders) then
+		ImGui.TableSetupColumn("##DialogConfigCol1", ImGuiTableColumnFlags.WidthFixed, 380)
+		ImGui.TableSetupColumn("##DialogConfigCol2", ImGuiTableColumnFlags.WidthStretch)
+		ImGui.TableNextRow()
+		ImGui.TableNextColumn()
+		tmpGpCmd, _ = ImGui.InputText("Group Command##DialogConfig", tmpGpCmd)
+		if tmpGpCmd ~= cmdGroup then
+			cmdGroup = tmpGpCmd:gsub(" $", "")
+		end
+		ImGui.TableNextColumn()
+		if ImGui.Button("Set Group Command##DialogConfig") then
+			Module.Config.cmdGroup = tmpGpCmd:gsub(" $", "")
+			mq.pickle(dialogConfig, Module.Config)
+		end
+		ImGui.TableNextColumn()
+		tmpZnCmd, _ = ImGui.InputText("Zone Command##DialogConfig", tmpZnCmd)
+		if tmpZnCmd ~= cmdZone then
+			cmdZone = tmpZnCmd:gsub(" $", "")
+		end
+		ImGui.TableNextColumn()
+		if ImGui.Button("Set Zone Command##DialogConfig") then
+			Module.Config.cmdZone = tmpZnCmd:gsub(" $", "")
+			mq.pickle(dialogConfig, Module.Config)
+		end
+		ImGui.TableNextColumn()
+		Module.Config.cmdRaid, _ = ImGui.InputText("Raid Command##DialogConfig", Module.Config.cmdRaid)
+		if Module.Config.cmdRaid ~= cmdRaid then
+			cmdRaid = Module.Config.cmdRaid:gsub(" $", "")
+		end
+		ImGui.TableNextColumn()
+		if ImGui.Button("Set Raid Command##DialogConfig") then
+			Module.Config.cmdRaid = cmdRaid:gsub(" $", "")
+			mq.pickle(dialogConfig, Module.Config)
+		end
+		ImGui.TableNextColumn()
+		tmpChCmd, _ = ImGui.InputText("Character Command##DialogConfig", tmpChCmd)
+		if tmpChCmd ~= cmdChar then
+			cmdChar = tmpChCmd:gsub(" $", "")
+		end
+		ImGui.TableNextColumn()
+		if ImGui.Button("Set Character Command##DialogConfig") then
+			Module.Config.cmdChar = tmpChCmd:gsub(" $", "")
+			mq.pickle(dialogConfig, Module.Config)
+		end
+		ImGui.EndTable()
 	end
-	ImGui.TableNextColumn()
-	if ImGui.Button("Set Group Command##DialogConfig") then
-		Module.Config.cmdGroup = tmpGpCmd:gsub(" $", "")
-		mq.pickle(dialogConfig, Module.Config)
-	end
-	ImGui.TableNextRow()
-	ImGui.TableNextColumn()
-	tmpZnCmd, _ = ImGui.InputText("Zone Command##DialogConfig", tmpZnCmd)
-	if tmpZnCmd ~= cmdZone then
-		cmdZone = tmpZnCmd:gsub(" $", "")
-	end
-	ImGui.TableNextColumn()
-	if ImGui.Button("Set Zone Command##DialogConfig") then
-		Module.Config.cmdZone = tmpZnCmd:gsub(" $", "")
-		mq.pickle(dialogConfig, Module.Config)
-	end
-	ImGui.TableNextRow()
-	ImGui.TableNextColumn()
-	tmpChCmd, _ = ImGui.InputText("Character Command##DialogConfig", tmpChCmd)
-	if tmpChCmd ~= cmdChar then
-		cmdChar = tmpChCmd:gsub(" $", "")
-	end
-	ImGui.TableNextColumn()
-	if ImGui.Button("Set Character Command##DialogConfig") then
-		Module.Config.cmdChar = tmpChCmd:gsub(" $", "")
-		mq.pickle(dialogConfig, Module.Config)
-	end
-	ImGui.EndTable()
 	if ImGui.Button("Select Theme##DialogConfig") then
 		Module.themeGUI = not Module.themeGUI
 	end
@@ -771,8 +787,8 @@ local function DrawMainWin()
 					if (searchString ~= "" and string.find(stripString(desc:lower()), stripString(searchString:lower()))) or (searchString == "") then
 						local isSelected = (desc == tmpDesc)
 						if ImGui.Selectable(desc, isSelected) then
-							tmpDesc = desc
-							_G["cmdString"] = dialogCombined[desc] -- Global to maintain state outside of this function
+							tmpDesc              = desc
+							Module.CommandString = dialogCombined[desc] -- Global to maintain state outside of this function
 						end
 						if isSelected then
 							ImGui.SetItemDefaultFocus()
@@ -786,40 +802,64 @@ local function DrawMainWin()
 
 			if ImGui.Button(eyeCon) then showCmds = not showCmds end
 			if showCmds then
-				if _G["cmdString"] and _G["cmdString"] ~= '' then
+				if Module.CommandString and Module.CommandString ~= '' then
 					ImGui.Separator()
+
 					if ImGui.Button('Say ##DialogDBCombined') then
 						if not DEBUG then
-							mq.cmdf("%s", _G["cmdString"])
+							mq.cmdf("%s", Module.CommandString)
 						else
-							Module.Utils.PrintOutput('MyUI', nil, "%s", _G["cmdString"])
+							Module.Utils.PrintOutput('MyUI', nil, "%s", Module.CommandString)
 						end
 						searchString = ""
 					end
-					if mq.TLO.Me.GroupSize() > 1 then
-						ImGui.SameLine()
+
+					ImGui.SameLine()
+
+					if ImGui.Button('Hail') then
+						mq.cmd('/say hail')
+					end
+
+					if ImGui.Button('Zone Members ##DialogDBCombined') then
+						if cmdZone:find("^/d") then
+							cmdZone = cmdZone .. " "
+						end
+						if not DEBUG then
+							mq.cmdf("/multiline ; %s/target id %s; /timed 5, %s%s", cmdZone, CurrTarID, cmdZone, Module.CommandString)
+						else
+							Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s/target id %s; /timed 5, %s%s", cmdZone, CurrTarID, cmdZone, Module.CommandString)
+						end
+						searchString = ""
+					end
+
+					ImGui.SameLine()
+
+					local tmpDelay = delay
+					ImGui.SetNextItemWidth(75)
+					tmpDelay = ImGui.InputInt("Delay##DialogDBCombined", tmpDelay, 1, 1)
+					if tmpDelay < 0 then tmpDelay = 0 end
+					if tmpDelay ~= delay then
+						delay = tmpDelay
+					end
+
+					if gSize > 1 then
 						if ImGui.Button('Group Say ##DialogDBCombined') then
 							if cmdGroup:find("^/d") then
 								cmdGroup = cmdGroup .. " "
 							end
 							if not DEBUG then
-								mq.cmdf("/multiline ; %s/target id %s; /timed 5, %s%s", cmdGroup, CurrTarID, cmdGroup, _G["cmdString"])
+								mq.cmdf("/multiline ; %s/target id %s; /timed 5, %s%s", cmdGroup, CurrTarID, cmdGroup, Module.CommandString)
 							else
-								Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s/target %s; /timed 5, %s%s", cmdGroup, CurrTarget, cmdGroup, _G["cmdString"])
+								Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s/target %s; /timed 5, %s%s", cmdGroup, CurrTarget, cmdGroup, Module.CommandString)
 							end
 							searchString = ""
 						end
+
 						ImGui.SameLine()
-						local tmpDelay = delay
-						ImGui.SetNextItemWidth(75)
-						tmpDelay = ImGui.InputInt("Delay##DialogDBCombined", tmpDelay, 1, 1)
-						if tmpDelay < 0 then tmpDelay = 0 end
-						if tmpDelay ~= delay then
-							delay = tmpDelay
-						end
+
 						if ImGui.Button('Group Say Delayed ##DialogDBCombined') then
 							local cDelay = delay * 10
-							for i = 1, mq.TLO.Me.GroupSize() - 1 do
+							for i = 1, gSize - 1 do
 								if i == 1 then cDelay = 10 end
 								if mq.TLO.Group.Member(i).Present() then
 									if mq.TLO.Group.Member(i).Distance() < 100 then
@@ -830,41 +870,98 @@ local function DrawMainWin()
 											pName = pName .. " "
 										end
 										if not DEBUG then
-											mq.cmdf("/multiline ; %s %s/target id %s; %s %s/timed %s, %s", cmdChar, pName, CurrTarID, cmdChar, pName, cDelay, _G["cmdString"])
+											mq.cmdf("/multiline ; %s %s/timed %s /target id %s; %s %s/timed %s, %s", cmdChar, pName, cDelay, CurrTarID, cmdChar, pName, cDelay,
+												Module.CommandString)
 										else
 											Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s %s/target %s; %s %s/timed %s, %s", cmdChar, pName, CurrTarget, cmdChar, pName,
 												cDelay,
-												_G["cmdString"])
+												Module.CommandString)
+										end
+										cDelay = cDelay + (delay * 10)
+									end
+								end
+							end
+
+							if not DEBUG then
+								mq.cmdf("/timed %s, %s", cDelay, Module.CommandString)
+							else
+								Module.Utils.PrintOutput('MyUI', nil, "/timed %s, %s", cDelay, Module.CommandString)
+							end
+							searchString = ""
+						end
+					end
+
+					-- raid
+
+					if rSize > 0 then
+						if ImGui.Button('Raid Say ##DialogDBCombined') then
+							if cmdRaid:find("^/d") then
+								cmdRaid = cmdRaid .. " "
+							end
+							if not DEBUG then
+								mq.cmdf("/multiline ; %s/target id %s; /timed 5, %s%s", cmdRaid, CurrTarID, cmdRaid, Module.CommandString)
+							else
+								Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s/target %s; /timed 5, %s%s", cmdRaid, CurrTarget, cmdRaid, Module.CommandString)
+							end
+							searchString = ""
+						end
+
+						ImGui.SameLine()
+
+						if ImGui.Button('Raid Say Delayed ##DialogDBCombined') then
+							local cDelay = delay * 10
+							for i = 1, rSize do
+								if i == 1 then cDelay = 10 end
+								local member = mq.TLO.Spawn(string.format("=%s", (mq.TLO.Raid.Member(i).Name() or "unknown member")))
+								if member() then
+									if (mq.TLO.Raid.Member(i).Distance() or 9999) < 100 then
+										local pName = mq.TLO.Raid.Member(i).Name()
+										if cmdChar:find("/bct") then
+											pName = pName .. " /"
+										else
+											pName = pName .. " "
+										end
+										if not DEBUG then
+											mq.cmdf("/multiline ; %s %s/timed %s /target id %s; %s %s/timed %s, %s", cmdChar, pName, cDelay, CurrTarID, cmdChar, pName, cDelay,
+												Module.CommandString)
+										else
+											Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s %s/target %s; %s %s/timed %s, %s", cmdChar, pName, CurrTarget, cmdChar, pName,
+												cDelay,
+												Module.CommandString)
 										end
 										cDelay = cDelay + (delay * 10)
 									end
 								end
 							end
 							if not DEBUG then
-								mq.cmdf("/timed %s, %s", cDelay, _G["cmdString"])
+								mq.cmdf("/timed %s, %s", cDelay, Module.CommandString)
 							else
-								Module.Utils.PrintOutput('MyUI', nil, "/timed %s, %s", cDelay, _G["cmdString"])
+								Module.Utils.PrintOutput('MyUI', nil, "/timed %s, %s", cDelay, Module.CommandString)
 							end
 							searchString = ""
 						end
-						ImGui.SameLine()
-						if ImGui.Button('Zone Members ##DialogDBCombined') then
-							if cmdZone:find("^/d") then
-								cmdZone = cmdZone .. " "
-							end
-							if not DEBUG then
-								mq.cmdf("/multiline ; %s/target id %s; /timed 5, %s%s", cmdZone, CurrTarID, cmdZone, _G["cmdString"])
-							else
-								Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s/target id %s; /timed 5, %s%s", cmdZone, CurrTarID, cmdZone, _G["cmdString"])
-							end
-							searchString = ""
-						end
-						ImGui.SameLine()
+					end
+
+					if gSize > 1 then
 						if ImGui.Button("Group Hail") then
 							if not DEBUG then
-								mq.cmdf("/dgz /multiline ; /target id %s; /timed 5, /say hail", CurrTarID)
+								mq.cmdf("%s /multiline ; /target id %s; /timed 5, /say hail", cmdGroup, CurrTarID)
 							else
-								Module.Utils.PrintOutput('MyUI', nil, "/dgz /multiline ; /target id %s; /timed 5, /say hail", CurrTar)
+								Module.Utils.PrintOutput('MyUI', nil, "%s /multiline ; /target id %s; /timed 5, /say hail", cmdGroup, CurrTar)
+							end
+							searchString = ""
+						end
+						if rSize > 0 then
+							ImGui.SameLine()
+						end
+					end
+
+					if rSize > 0 then
+						if ImGui.Button("Raid Hail") then
+							if not DEBUG then
+								mq.cmdf("%s /multiline ; /target id %s; /timed 5, /say hail", cmdRaid, CurrTarID)
+							else
+								Module.Utils.PrintOutput('MyUI', nil, "%s /multiline ; /target id %s; /timed 5, /say hail", cmdRaid, CurrTar)
 							end
 							searchString = ""
 						end
@@ -913,9 +1010,14 @@ local function init()
 	setEvents()
 	mq.bind('/dialogdb', bind)
 	currZoneShort = mq.TLO.Zone.ShortName() or 'None'
+	gSize = mq.TLO.Me.GroupSize()
+	rSize = mq.TLO.Raid.Members()
+
 	lastZone = currZoneShort
 	Module.Utils.PrintOutput('MyUI', nil, "%s\agDialog DB \aoLoaded... \at/dialogdb help \aoDisplay Help", msgPref)
 	Module.IsRunning = true
+
+
 	if not loadedExeternally then
 		mq.imgui.init(Module.Nam, Module.RenderGUI)
 		Module.LocalLoop()
@@ -928,7 +1030,7 @@ function Module.MainLoop()
 		if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
 	end
 	local elapsedTime = mq.gettime() - clockTimer
-	if elapsedTime >= 16 then
+	if elapsedTime >= 30 then
 		currZoneShort = mq.TLO.Zone.ShortName() or 'None'
 		if currZoneShort ~= lastZone then
 			tmpDesc = ''
@@ -939,6 +1041,8 @@ function Module.MainLoop()
 			Module.editGUI = false
 			lastZone = currZoneShort
 			searchString = ""
+			gSize = mq.TLO.Me.GroupSize()
+			rSize = mq.TLO.Raid.Members()
 		end
 		if checkDialog() then
 			Module.ShowDialog = true
@@ -946,6 +1050,7 @@ function Module.MainLoop()
 			Module.ShowDialog = false
 			if CurrTarget ~= mq.TLO.Target.DisplayName() then tmpDesc = '' end
 		end
+		clockTimer = mq.gettime()
 	end
 	mq.doevents()
 end

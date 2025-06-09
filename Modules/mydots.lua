@@ -629,9 +629,11 @@ local function renderMultiTargetDots()
         end
         ImGui.PushStyleColor(ImGuiCol.Button, buttonColor[1], buttonColor[2], buttonColor[3], buttonColor[4])
         if ImGui.Button(targetData.name .. " (Lvl " .. targetData.level .. ")##" .. targetID, windowWidth - spacing, 0) then
-            mq.cmdf("/target id %d", targetData.id)
+            mq.TLO.Spawn(targetData.id).DoTarget()
         end
+
         ImGui.PopStyleColor()
+
         if isWhiteCon then
             ImGui.PopStyleColor()
         end

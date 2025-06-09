@@ -115,6 +115,7 @@ defaults                                            = {
     TargetTextColor = { 1, 1, 1, 1, },
     NoAggroColor = { 0.8, 0.0, 1.0, 1.0, },
     HaveAggroColor = { 0.78, 0.20, 0.05, 0.8, },
+    ShowToT = false,
 }
 
 -- Functions
@@ -399,6 +400,37 @@ local function targetBuffs(count)
     ImGui.EndGroup()
 end
 
+function Module.RenderTargetOfTarget()
+    if not mq.TLO.Target.AggroHolder() then return end
+    if not settings[Module.Name].ShowToT then return end
+
+    ImGui.SetNextWindowSize(250, 100, ImGuiCond.FirstUseEver)
+    local openTot, drawToT = ImGui.Begin("Target of Target##" .. Module.Name, true)
+    if drawToT then
+        ImGui.SetWindowFontScale(FontScale)
+        local tot = mq.TLO.Target.AggroHolder
+        if tot() then
+            ImGui.Text(tot.CleanName() or '?')
+            if settings[Module.Name].DynamicHP then
+                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorHpMin, colorHpMax, tot.PctHPs())))
+            else
+                if tot.PctHPs() < 25 then
+                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('orange')))
+                else
+                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
+                end
+            end
+            local yPos = ImGui.GetCursorPosY() - 2
+            ImGui.ProgressBar(((tonumber(tot.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), ProgressSizeTarget, '##' .. tot.PctHPs())
+            ImGui.PopStyleColor()
+            ImGui.SetCursorPosY(yPos)
+            ImGui.SetCursorPosX((ImGui.GetContentRegionAvail() - (ImGui.CalcTextSize("HP: 1000") * 0.5)) * 0.5)
+            ImGui.Text("HP: %d%%", tot.PctHPs() or 0)
+        end
+    end
+    ImGui.End()
+end
+
 -- GUI
 local function PlayerTargConf_GUI()
     if not openConfigGUI then return end
@@ -572,6 +604,8 @@ local function PlayerTargConf_GUI()
 
         ImGui.Spacing()
 
+        settings[Module.Name].ShowToT = Module.Utils.DrawToggle('Show Target of Target', settings[Module.Name].ShowToT, ToggleFlags)
+        ImGui.Spacing()
         -- breath bar settings
         if ImGui.CollapsingHeader("Breath Meter##" .. Module.Name) then
             local tmpbreath = settings[Module.Name].EnableBreathBar
@@ -746,7 +780,8 @@ local function drawTarget()
         ImGui.EndGroup()
         if ImGui.IsItemHovered() and ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
             if mq.TLO.Cursor() then
-                Module.Utils.GiveItem(target.ID() or 0)
+                target.LeftClick()
+                -- Module.Utils.GiveItem(target.ID() or 0)
             end
         end
         --Target Buffs
@@ -1083,6 +1118,10 @@ function Module.RenderGUI()
         end
         Module.ThemeLoader.EndTheme(ColorCountBreath, StyleCountBreath)
         ImGui.End()
+    end
+
+    if settings[Module.Name].ShowToT then
+        Module.RenderTargetOfTarget()
     end
 
     if openConfigGUI then

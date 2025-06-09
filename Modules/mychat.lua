@@ -2460,7 +2460,13 @@ end
 
 function Module.MainLoop()
     if loadedExeternally then
-        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+        MyUI_TempSettings.MyChatWinName = string.format('My Chat - Main')
+        MyUI_TempSettings.MyChatFocusKey = Module.Settings.keyName
+        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then
+            MyUI_TempSettings.MyChatWinName = nil
+            MyUI_TempSettings.MyChatFocusKey = nil
+            return
+        end
     end
 
     local lastTime = os.time()

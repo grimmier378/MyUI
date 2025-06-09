@@ -57,6 +57,7 @@ local bank_items                                          = {}
 local bank_augments                                       = {}
 local book                                                = {}
 local trade_list                                          = {}
+local sell_list                                           = {}
 local display_tables                                      = {
 	augments = {},
 	items = {},
@@ -290,14 +291,26 @@ local function draw_qty_win()
 	end
 end
 
+local function comma_value(amount)
+	local formatted = amount
+	local k = 0
+	while true do
+		formatted, k = string.gsub(formatted, "^(-?%d+)(%d%d%d)", '%1,%2')
+		if (k == 0) then
+			break
+		end
+	end
+	return formatted
+end
+
 local function draw_currency()
 	animItems:SetTextureCell(644 - EQ_ICON_OFFSET)
 	ImGui.DrawTextureAnimation(animItems, 20, 20)
 	ImGui.SameLine()
-	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", myPlat)
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", comma_value(myPlat))
 	if ImGui.IsItemHovered() then
 		ImGui.BeginTooltip()
-		ImGui.Text("%s Platinum", myPlat)
+		ImGui.Text("%s Platinum", comma_value(myPlat))
 		ImGui.EndTooltip()
 		if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
 			show_qty_win = true
@@ -310,10 +323,10 @@ local function draw_currency()
 	animItems:SetTextureCell(645 - EQ_ICON_OFFSET)
 	ImGui.DrawTextureAnimation(animItems, 20, 20)
 	ImGui.SameLine()
-	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", myGold)
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", comma_value(myGold))
 	if ImGui.IsItemHovered() then
 		ImGui.BeginTooltip()
-		ImGui.Text("%s Gold", myGold)
+		ImGui.Text("%s Gold", comma_value(myGold))
 		ImGui.EndTooltip()
 		if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
 			show_qty_win = true
@@ -326,10 +339,10 @@ local function draw_currency()
 	animItems:SetTextureCell(646 - EQ_ICON_OFFSET)
 	ImGui.DrawTextureAnimation(animItems, 20, 20)
 	ImGui.SameLine()
-	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", mySilver)
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", comma_value(mySilver))
 	if ImGui.IsItemHovered() then
 		ImGui.BeginTooltip()
-		ImGui.Text("%s Silver", mySilver)
+		ImGui.Text("%s Silver", comma_value(mySilver))
 		ImGui.EndTooltip()
 		if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
 			show_qty_win = true
@@ -342,10 +355,10 @@ local function draw_currency()
 	animItems:SetTextureCell(647 - EQ_ICON_OFFSET)
 	ImGui.DrawTextureAnimation(animItems, 20, 20)
 	ImGui.SameLine()
-	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", myCopper)
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", comma_value(myCopper))
 	if ImGui.IsItemHovered() then
 		ImGui.BeginTooltip()
-		ImGui.Text("%s Copper", myCopper)
+		ImGui.Text("%s Copper", comma_value(myCopper))
 		ImGui.EndTooltip()
 		if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
 			show_qty_win = true
@@ -359,10 +372,10 @@ local function draw_bank_coin()
 	animItems:SetTextureCell(644 - EQ_ICON_OFFSET)
 	ImGui.DrawTextureAnimation(animItems, 20, 20)
 	ImGui.SameLine()
-	ImGui.TextColored(ImVec4(0, 1, 1, 1), " %s", bankPlat)
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), " %s", comma_value(bankPlat))
 	if ImGui.IsItemHovered() then
 		ImGui.BeginTooltip()
-		ImGui.Text("%s Platinum", bankPlat)
+		ImGui.Text("%s Platinum", comma_value(bankPlat))
 		ImGui.EndTooltip()
 	end
 
@@ -371,10 +384,10 @@ local function draw_bank_coin()
 	animItems:SetTextureCell(645 - EQ_ICON_OFFSET)
 	ImGui.DrawTextureAnimation(animItems, 20, 20)
 	ImGui.SameLine()
-	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", bankGold)
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", comma_value(bankGold))
 	if ImGui.IsItemHovered() then
 		ImGui.BeginTooltip()
-		ImGui.Text("%s Gold", bankGold)
+		ImGui.Text("%s Gold", comma_value(bankGold))
 		ImGui.EndTooltip()
 	end
 
@@ -383,10 +396,10 @@ local function draw_bank_coin()
 	animItems:SetTextureCell(646 - EQ_ICON_OFFSET)
 	ImGui.DrawTextureAnimation(animItems, 20, 20)
 	ImGui.SameLine()
-	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", bankSilver)
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", comma_value(bankSilver))
 	if ImGui.IsItemHovered() then
 		ImGui.BeginTooltip()
-		ImGui.Text("%s Silver", bankSilver)
+		ImGui.Text("%s Silver", comma_value(bankSilver))
 		ImGui.EndTooltip()
 	end
 
@@ -395,10 +408,10 @@ local function draw_bank_coin()
 	animItems:SetTextureCell(647 - EQ_ICON_OFFSET)
 	ImGui.DrawTextureAnimation(animItems, 20, 20)
 	ImGui.SameLine()
-	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", bankCopper)
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", comma_value(bankCopper))
 	if ImGui.IsItemHovered() then
 		ImGui.BeginTooltip()
-		ImGui.Text("%s Copper", bankCopper)
+		ImGui.Text("%s Copper", comma_value(bankCopper))
 		ImGui.EndTooltip()
 	end
 	ImGui.SeparatorText('Items in Bank:')
@@ -1169,7 +1182,7 @@ local function TradeItems()
 					mq.delay(3000, function() return mq.TLO.Cursor() == nil end)
 				end
 				if mq.TLO.Cursor() ~= nil then
-					mq.cmd("/click left target")
+					mq.TLO.Target.LeftClick()
 				end
 				mq.delay(3000, function() return mq.TLO.Cursor() == nil end)
 

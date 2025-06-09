@@ -106,17 +106,22 @@ local function getMembers()
 	for i = 1, rSize do
 		local member = mq.TLO.Raid.Member(i)
 		if member() then
-			local memberName = member.Name() or "Unknown"
+			local memberName = member.Name() or "Unknown_Member"
 			local present = (mq.TLO.SpawnCount(string.format("PC =%s", memberName))() or 0) > 0
 			local memberClass = member.Class.ShortName() or "Unknown"
-			local hasCorpse = (mq.TLO.SpawnCount(string.format("pccorpse %s", memberName))() or 0) > 0
-
+			local hasCorpse = mq.TLO.Spawn(string.format("%s's corpse", memberName))() ~= nil
+			local checkLD = string.format("=%s", memberName)
+			if mq.TLO.Spawn(checkLD).Linkdead() then
+				present = false
+				memberClass = "** LD **"
+			end
 			table.insert(temp, {
 				name = memberName,
 				class = memberClass,
 				present = present,
 				corpse = hasCorpse,
 				distance = member.Distance() or 99999,
+				corpseDistance = hasCorpse and mq.TLO.Spawn(string.format("%s's corpse", memberName)).Distance() or -1,
 			})
 		end
 	end
@@ -167,17 +172,19 @@ function Module.RenderGUI()
 				if data.corpse then
 					ImGui.TextColored(MyUI_Colors.color("yellow"), "Corpse -")
 					ImGui.SameLine()
+					ImGui.Text("(%0.1f)", data.corpseDistance)
+					ImGui.SameLine()
 				end
 				if data.present then
 					ImGui.TextColored(MyUI_Colors.color("softblue"), displayString)
+					ImGui.SameLine()
+					if data.distance > 100 then
+						ImGui.TextColored(MyUI_Colors.color("tangarine"), "(%0.1f)", mq.TLO.Spawn(string.format("=%s", data.name)).Distance() or 99999)
+					else
+						ImGui.TextColored(MyUI_Colors.color("yellow"), "(%0.1f)", mq.TLO.Spawn(string.format("=%s", data.name)).Distance() or 99999)
+					end
 				else
 					ImGui.TextColored(MyUI_Colors.color("tangarine"), displayString)
-				end
-				ImGui.SameLine()
-				if data.distance > 100 then
-					ImGui.TextColored(MyUI_Colors.color("tangarine"), "(%0.1f)", mq.TLO.Spawn(string.format("=%s", data.name)).Distance() or 99999)
-				else
-					ImGui.TextColored(MyUI_Colors.color("yellow"), "(%0.1f)", mq.TLO.Spawn(string.format("=%s", data.name)).Distance() or 99999)
 				end
 			end
 		end
@@ -203,7 +210,7 @@ function Module.MainLoop()
 		-- your code here
 		drawTimerMS = mq.gettime()
 		rSize = mq.TLO.Raid.Members() or 0
-		raidMembers = getMembers()
+		if rSize > 0 then raidMembers = getMembers() end
 
 		if rSize > 0 then
 			Module.ShowGui = true

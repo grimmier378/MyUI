@@ -47,7 +47,8 @@ local Module = {}
 Module.Name = "Clock"    -- Name of the module used when loading and unloaing the modules.
 Module.IsRunning = false -- Keep track of running state. if not running we can unload it.
 Module.ShowGui = true
-
+Module.CurZone = mq.TLO.Zone.Name() or "Unknown"
+Module.Ping = mq.TLO.EverQuest.Ping() or 0
 -- check if the script is being loaded as a Module (externally) or as a Standalone script.
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
@@ -152,15 +153,21 @@ function Module.RenderGUI()
 
 			ImGui.Text("Zone:")
 			ImGui.SameLine()
-			ImGui.TextColored(MyUI_Colors.color('softblue'), " %s", mq.TLO.Zone.Name())
+			ImGui.TextColored(MyUI_Colors.color('softblue'), " %s", Module.CurZone)
 
-			ImGui.Text("RealTime: ")
+			ImGui.Text("RealTime:")
 			ImGui.SameLine()
 			ImGui.TextColored(MyUI_Colors.color('yellow'), os.date("%I:%M:%S %p (%A)"))
 
-			ImGui.Text("GameTime: ")
+			ImGui.Text("GameTime:")
 			ImGui.SameLine()
 			ImGui.TextColored(MyUI_Colors.color('teal'), gTime)
+
+			ImGui.Text("ping:")
+			ImGui.SameLine()
+			local pingColor = Module.Ping < 100 and 'green' or (Module.Ping < 200 and 'yellow' or (Module.Ping < 500 and 'tangarine' or 'red2'))
+			ImGui.TextColored(MyUI_Colors.color(pingColor), "%d ms", Module.Ping)
+
 
 			ImGui.PopTextWrapPos()
 		end
@@ -195,6 +202,8 @@ function Module.MainLoop()
 		-- your code here
 		drawTimerMS = mq.gettime()
 		gTime = string.format("%s %s", mq.TLO.GameTime.Time12():sub(1, 5), mq.TLO.GameTime.Hour() > 12 and 'PM' or 'AM')
+		Module.CurZone = mq.TLO.Zone.Name() or "Unknown"
+		Module.Ping = mq.TLO.EverQuest.Ping() or 0
 		-- drawTimerS = os.time()
 	end
 	--[[

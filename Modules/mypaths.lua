@@ -42,8 +42,13 @@ else
     Module.MyClass     = MyUI_CharClass
 end
 
-Module.TempSettings = {}
-
+Module.TempSettings                                              = {}
+Module.Status                                                    = 'Idle'
+Module.lastHP                                                    = 0
+Module.lastMP                                                    = 0
+Module.intPauseTime                                              = 0
+Module.curWpPauseTime                                            = 0
+Module.cycleTime                                                 = 0
 
 -- Variables
 local themeName                                                  = 'Default'
@@ -51,19 +56,17 @@ local defaults, settings, debugMessages                          = {}, {}, {}
 local Paths, ChainedPaths                                        = {}, {}
 local newPath                                                    = ''
 local saveChainName                                              = ''
-local curTime                                                    = os.time()
+local curTime                                                    = os.clock()
 local lastTime                                                   = curTime
 local deleteWP, deleteWPStep                                     = false, 0
-local status, lastStatus                                         = 'Idle', ''
+local lastStatus                                                 = ''
 local tmpLoc                                                     = ''
 local currZone, lastZone                                         = '', ''
-local lastHP, lastMP, intPauseTime, curWpPauseTime               = 0, 0, 0, 0
 local lastRecordedWP                                             = ''
 local PathStartClock, PathStartTime                              = nil, nil
 local oneshot                                                    = false
 local rwStatus, gwStatus                                         = '', ''
 local interruptInProgress                                        = false
-
 local NavSet                                                     = {
     ChainPath        = 'Select Path...',
     ChainStart       = false,
@@ -388,7 +391,7 @@ local function RecordWaypoint(name)
         tmpLastWP = tmpLastWP:sub(1, #yx - 1)
         distToLast = mq.TLO.Math.Distance(tmpLastWP)()
         if distToLast < NavSet.RecordMinDist and NavSet.autoRecord then
-            status = "Recording: Distance to Last WP is less than " .. NavSet.RecordMinDist .. "!"
+            Module.Status = "Recording: Distance to Last WP is less than " .. NavSet.RecordMinDist .. "!"
             if DEBUG and not InterruptSet.reported then
                 table.insert(debugMessages,
                     { Time = os.date("%H:%M:%S"), Zone = zone, Path = name, WP = 'Record WP', Status = 'Distance to Last WP is less than ' .. NavSet.RecordMinDist .. ' units!', })
@@ -425,7 +428,7 @@ local function RecordWaypoint(name)
     mq.pickle(pathsFile, Paths)
 
     if NavSet.autoRecord then
-        status = "Recording: Waypoint #" .. index .. " Added!"
+        Module.Status = "Recording: Waypoint #" .. index .. " Added!"
     end
 
     if DEBUG then
@@ -524,7 +527,7 @@ local function CreatePath(name)
 end
 
 local function AutoRecordPath(name)
-    curTime = os.time()
+    curTime = os.clock()
     if curTime - lastTime > NavSet.RecordDelay then
         RecordWaypoint(name)
         lastTime = curTime
@@ -614,33 +617,26 @@ local function raidDistance()
 end
 
 local function checkCorpses(which)
-    local deadCount = mq.TLO.SpawnCount(string.format('pccorpse radius %s zradius 50', 100))() or 0
-    if deadCount == 0 then return false end
-    local corpseList = {}
-    local member     = which == 'Party' and mq.TLO.Group.Member or mq.TLO.Raid.Member
-    if deadCount > 0 then
-        for i = 1, deadCount do
-            local corpse = mq.TLO.NearestSpawn(string.format('%d, pcorpse radius %d zradius 50', i, 100))
-            if corpse() then
-                corpseList[corpse.CleanName():gsub("'s corpse", "")] = true
-            end
-        end
-    end
-    if corpseList ~= nil then
-        if which == 'Party' then
-            for i = 0, MySelf.GroupSize() - 1 do
-                if member(i).Name() then
-                    if corpseList[member(i).Name()] then
-                        return true
-                    end
+    local member = which == 'Party' and mq.TLO.Group.Member or mq.TLO.Raid.Member
+    if which == 'Party' then
+        for i = 0, MySelf.GroupSize() do
+            if member(i)() then
+                local memberName = member(i).Name() or "Unknown_member"
+                local hasCorpse = mq.TLO.Spawn(string.format("%s's corpse", memberName))() ~= nil
+                if hasCorpse then
+                    Module.Status = string.format('Paused for Party Corpse. %s', memberName)
+                    return hasCorpse
                 end
             end
-        elseif which == 'Raid' then
-            for i = 1, mq.TLO.Raid.Members() do
-                if member(i).Name() then
-                    if corpseList[member(i).Name()] then
-                        return true
-                    end
+        end
+    elseif which == 'Raid' then
+        for i = 1, mq.TLO.Raid.Members() do
+            if member(i)() then
+                local memberName = member(i).Name() or "Unknown_member"
+                local hasCorpse = mq.TLO.Spawn(string.format("%s's corpse", memberName))() ~= nil
+                if hasCorpse then
+                    Module.Status = string.format('Paused for Raid Corpse. %s', memberName)
+                    return hasCorpse
                 end
             end
         end
@@ -653,7 +649,7 @@ local function groupWatch(watchType)
     local myClass = MySelf.Class.ShortName()
     local gsize = MySelf.GroupSize() or 0
 
-    if watchType == "Self" then
+    if watchType ~= 'None' then
         if MySelf.PctHPs() < settings[Module.Name].WatchHealth then
             MySelf.Sit()
             gwStatus = string.format('Paused for SELF Health Watch. [%s] %s%%', MySelf.Name(), MySelf.PctHPs())
@@ -695,18 +691,6 @@ local function groupWatch(watchType)
                         return true
                     end
                 end
-                if myClass == 'CLR' or myClass == 'DRU' or myClass == 'SHM' then
-                    if MySelf.PctHPs() < settings[Module.Name].WatchHealth then
-                        gwStatus = string.format('Paused for GROUP Health Watch. [%s] %s%%', MySelf.Name(), MySelf.PctHPs())
-                        MySelf.Sit()
-                        return true
-                    end
-                    if manaClass[myClass] and MySelf.PctMana() < settings[Module.Name].WatchMana then
-                        MySelf.Sit()
-                        gwStatus = string.format('Paused for GROUP Mana Watch. [%s] %s%%', MySelf.Name(), MySelf.PctMana())
-                        return true
-                    end
-                end
             end
             if watchType == 'All' then
                 if mq.TLO.Spawn(string.format("=%s", member.Name() or "unknown_member"))() then
@@ -717,7 +701,7 @@ local function groupWatch(watchType)
                     for x = 1, #manaClass do
                         if member.Class.ShortName() == manaClass[x] then
                             if member.PctMana() < settings[Module.Name].WatchMana then
-                                status = string.format('Paused for GROUP Mana Watch.')
+                                Module.Status = string.format('Paused for GROUP Mana Watch.')
                                 return true
                             end
                         end
@@ -726,18 +710,6 @@ local function groupWatch(watchType)
                     gwStatus = string.format('Paused for Group Member %s not Present.', member.Name() or "link_dead")
                     return true
                 end
-                if MySelf.PctHPs() < settings[Module.Name].WatchHealth then
-                    gwStatus = string.format('Paused for GROUP Health Watch.')
-                    MySelf.Sit()
-                    return true
-                end
-                for x = 1, #manaClass do
-                    if manaClass[x] == myClass and MySelf.PctMana() < settings[Module.Name].WatchMana then
-                        MySelf.Sit()
-                        gwStatus = string.format('Paused for GROUP Mana Watch.')
-                        return true
-                    end
-                end
             end
             -- mq.delay(1)
         end
@@ -745,12 +717,16 @@ local function groupWatch(watchType)
     return false
 end
 
+Module.LastTargeted = {}
+
 local function raidWatch(watchType)
     if watchType == 'None' then return false end
     local myClass = MySelf.Class.ShortName()
     local rsize = mq.TLO.Raid.Members() or 0
-
-    if watchType == "Self" then
+    if rSize == 0 then
+        return false
+    end
+    if watchType ~= "None" then
         if MySelf.PctHPs() < settings[Module.Name].RaidWatchHealth then
             MySelf.Sit()
             return true
@@ -772,7 +748,9 @@ local function raidWatch(watchType)
             local memberName = member.Name() or 'link_dead'
             local memberClass = member.Class.ShortName() or 'unknown'
             local memberHP = member.PctHPs() or 101
-
+            if Module.LastTargeted[memberName] == nil then
+                Module.LastTargeted[memberName] = 0
+            end
             if not mq.TLO.Spawn(string.format("=%s", memberName))() then
                 -- if (mq.TLO.SpawnCount(string.format("PC \"=%s\"", memberName))() or 0) > 0 then
                 rwStatus = string.format('Paused for Raid Member %s not Present.', memberName)
@@ -782,36 +760,37 @@ local function raidWatch(watchType)
             if watchType == 'Healer' then
                 if memberClass == 'CLR' or memberClass == 'DRU' or memberClass == 'SHM' then
                     if memberHP < settings[Module.Name].RaidWatchHealth then
-                        rwStatus = string.format('Paused for RAID HEALER Health. [%s] %s%%', memberName, memberHP)
-                        mq.cmdf("/target %s", memberName)
-                        mq.delay(1)
-                        if mq.TLO.Target() and mq.TLO.Target.CleanName() == memberName and mq.TLO.Target.PctHPs() >= settings[Module.Name].RaidWatchHealth then
-                            goto next
+                        local member = mq.TLO.Spawn(string.format("=%s", memberName))
+                        if member() ~= nil then
+                            rwStatus = string.format('Paused for RAID HEALER Health. [%s] %s%%', memberName, memberHP)
+                            if os.clock() - Module.LastTargeted[memberName] > 3 then
+                                Module.LastTargeted[memberName] = os.clock()
+
+                                mq.TLO.Spawn(member.ID()).DoTarget() -- Ensure the target is set to the member
+                                mq.delay(1)
+                                if mq.TLO.Target() and mq.TLO.Target.CleanName() == memberName and mq.TLO.Target.PctHPs() >= settings[Module.Name].RaidWatchHealth then
+                                    goto next
+                                end
+                            end
+                            return true
                         end
-                        return true
-                    end
-                end
-                if myClass == 'CLR' or myClass == 'DRU' or myClass == 'SHM' then
-                    if MySelf.PctHPs() < settings[Module.Name].RaidWatchHealth then
-                        rwStatus = string.format('Paused for RAID  Health Watch. [%s] %s%%', MySelf.Name(), MySelf.PctHPs())
-                        MySelf.Sit()
-                        return true
                     end
                 end
             elseif watchType == 'All' then
                 if memberHP < settings[Module.Name].RaidWatchHealth then
-                    rwStatus = string.format('Paused for RAID Health Watch. [%s] %s%%', memberName, memberHP)
-                    mq.cmdf("/target %s", memberName)
-                    mq.delay(1)
-                    if mq.TLO.Target() and mq.TLO.Target.CleanName() == memberName and mq.TLO.Target.PctHPs() >= settings[Module.Name].RaidWatchHealth then
-                        goto next
+                    local member = mq.TLO.Spawn(string.format("=%s", memberName))
+                    if member() ~= nil then
+                        rwStatus = string.format('Paused for RAID Health Watch. [%s] %s%%', memberName, memberHP)
+                        if os.clock() - Module.LastTargeted[memberName] > 3 then
+                            Module.LastTargeted[memberName] = os.clock()
+                            mq.TLO.Spawn(member.ID()).DoTarget() -- Ensure the target is set to the member
+                            mq.delay(1)
+                            if mq.TLO.Target() and mq.TLO.Target.CleanName() == memberName and mq.TLO.Target.PctHPs() >= settings[Module.Name].RaidWatchHealth then
+                                goto next
+                            end
+                        end
+                        return true
                     end
-                    return true
-                end
-                if MySelf.PctHPs() < settings[Module.Name].RaidWatchHealth then
-                    rwStatus = string.format('Paused for RAID Health Watch. [%s] %s%%', MySelf.Name(), MySelf.PctHPs())
-                    MySelf.Sit()
-                    return true
                 end
             else
                 return false
@@ -823,6 +802,43 @@ local function raidWatch(watchType)
     return false
 end
 
+function Module.CheckSitting()
+    if not mq.TLO.Me.Sitting() then return false end
+    local curHP, curMP, curEndur = (mq.TLO.Me.PctHPs() or 0), (mq.TLO.Me.PctMana() or 0), (mq.TLO.Me.PctEndurance() or 0)
+    -- mq.delay(10)
+
+    if curHP - Module.lastHP > 5 or curMP - Module.lastMP > 5 then
+        Module.Status = string.format('Paused for Sitting. HP %s MP %s', curHP, curMP)
+        Module.lastHP, Module.lastMP = curHP, curMP
+    end
+
+    if settings[Module.Name].AutoStand then
+        if curHP >= 99 and (manaClass[Module.myClass] and curMP >= 99) and curEndur > 50 then
+            mq.TLO.Me.Stand()
+            Module.Status = 'Idle'
+            return false
+        end
+    end
+    return true
+end
+
+function Module.CheckXTargets()
+    for i = 1, mq.TLO.Me.XTargetSlots() do
+        if mq.TLO.Me.XTarget(i) ~= nil then
+            local xType = mq.TLO.Me.XTarget(i).Type() or 'none'
+            local xMaster = 'none'
+            local xID = mq.TLO.Me.XTarget(i).ID() or 0
+            if mq.TLO.Me.XTarget(i).Master() then
+                xMaster = mq.TLO.Me.XTarget(i).Master.Type() or 'none'
+            end
+            if (xID > 0 and xType ~= 'PC' and xMaster ~= "PC") then
+                Module.Status = string.format('Paused for XTarget. XTarg Count %s', mq.TLO.Me.XTarget())
+                return true
+            end
+        end
+    end
+    return false
+end
 
 local function CheckInterrupts()
     if not InterruptSet.interruptsOn then return false end
@@ -836,47 +852,48 @@ local function CheckInterrupts()
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
-        status = 'Paused for Looting.'
+        Module.Status = 'Paused for Looting.'
         flag = true
     elseif mq.TLO.Window('AdvancedLootWnd').Open() and InterruptSet.stopForLoot then
         if not interruptInProgress then
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
-        status = 'Paused for Looting.'
+        Module.Status = 'Paused for Looting.'
         flag = true
     elseif mq.TLO.Me.Combat() and InterruptSet.stopForCombat then
         if not interruptInProgress then
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
-        status = 'Paused for Combat.'
+        Module.Status = 'Paused for Combat.'
         flag = true
-    elseif xCount > 0 and InterruptSet.stopForXtar then
-        for i = 1, mq.TLO.Me.XTargetSlots() do
-            if mq.TLO.Me.XTarget(i) ~= nil then
-                local xType = mq.TLO.Me.XTarget(i).Type() or 'none'
-                local xMaster = 'none'
-                local xID = mq.TLO.Me.XTarget(i).ID() or 0
-                if mq.TLO.Me.XTarget(i).Master then
-                    xMaster = mq.TLO.Me.XTarget(i).Master.Type() or 'none'
-                end
-                if (xID > 0 and xType ~= 'PC' and xMaster ~= "PC") then
-                    if not interruptInProgress then
-                        mq.cmdf("/nav stop log=off")
-                        interruptInProgress = true
-                    end
-                    status = string.format('Paused for XTarget. XTarg Count %s', mq.TLO.Me.XTarget())
-                    flag = true
-                end
-            end
+    elseif InterruptSet.stopForSitting and Module.CheckSitting() then
+        if not interruptInProgress then
+            mq.cmdf("/nav stop log=off")
+            interruptInProgress = true
+            Module.Status = string.format('Paused for Sitting. HP %s MP %s', MySelf.PctHPs() or 0, MySelf.PctMana() or 0)
         end
+        flag = true
+    elseif xCount > 0 and InterruptSet.stopForXtar and Module.CheckXTargets() then
+        if not interruptInProgress then
+            mq.cmdf("/nav stop log=off")
+            interruptInProgress = true
+        end
+        flag = true
+    elseif (mq.TLO.Window('CastingWindow').Open() or mq.TLO.Me.Casting()) and Module.MyClass ~= 'BRD' and InterruptSet.stopForCasting then
+        if not interruptInProgress then
+            mq.cmdf("/nav stop log=off")
+            interruptInProgress = true
+        end
+        Module.Status = 'Paused for Casting.'
+        flag = true
     elseif mq.TLO.Me.Rooted() and InterruptSet.stopForRoot then
         if not interruptInProgress then
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
-        status = 'Paused for Rooted.'
+        Module.Status = 'Paused for Rooted.'
         flag = true
         ---@diagnostic disable-next-line: undefined-field
     elseif mq.TLO.Me.Feared() and InterruptSet.stopForFear then
@@ -884,34 +901,27 @@ local function CheckInterrupts()
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
-        status = 'Paused for Feared.'
+        Module.Status = 'Paused for Feared.'
         flag = true
     elseif mq.TLO.Me.Mezzed() and InterruptSet.stopForMez then
         if not interruptInProgress then
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
-        status = 'Paused for Mezzed.'
+        Module.Status = 'Paused for Mezzed.'
         flag = true
     elseif mq.TLO.Me.Charmed() and InterruptSet.stopForCharm then
         if not interruptInProgress then
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
-        status = 'Paused for Charmed.'
-        flag = true
-    elseif mq.TLO.Me.Casting() ~= nil and mq.TLO.Me.Class.ShortName() ~= 'BRD' and InterruptSet.stopForCasting then
-        if not interruptInProgress then
-            mq.cmdf("/nav stop log=off")
-            interruptInProgress = true
-        end
-        status = 'Paused for Casting.'
+        Module.Status = 'Paused for Charmed.'
         flag = true
     elseif not mq.TLO.Me.Invis() and InterruptSet.stopForInvis then
         if not interruptInProgress then
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
-            status = 'Paused for Invis.'
+            Module.Status = 'Paused for Invis.'
         end
 
         flag = true
@@ -920,33 +930,17 @@ local function CheckInterrupts()
         if not interruptInProgress then
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
-            status = 'Paused for Double Invis.'
+            Module.Status = 'Paused for Double Invis.'
         end
 
         flag = true
         invis = true
-    elseif settings[Module.Name].GroupWatch and groupWatch(settings[Module.Name].WatchType) then
-        if not interruptInProgress then
-            mq.cmdf("/nav stop log=off")
-            interruptInProgress = true
-        end
-        status = gwStatus
-        gwStatus = ''
-        flag = true
-    elseif settings[Module.Name].RaidWatch and raidWatch(settings[Module.Name].RaidWatchType) then
-        if not interruptInProgress then
-            mq.cmdf("/nav stop log=off")
-            interruptInProgress = true
-        end
-        status = rwStatus
-        rwStatus = ''
-        flag = true
     elseif InterruptSet.stopForDist and groupDistance() then
         if not interruptInProgress then
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
-        status = gwStatus
+        Module.Status = gwStatus
         gwStatus = ''
         flag = true
     elseif InterruptSet.stopForRaid and raidDistance() then
@@ -954,7 +948,7 @@ local function CheckInterrupts()
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
-        status = rwStatus
+        Module.Status = rwStatus
         rwStatus = ''
         flag = true
     elseif InterruptSet.stopForPartyCorpse and checkCorpses('Party') then
@@ -962,42 +956,35 @@ local function CheckInterrupts()
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
-        status = 'Paused for Party Corpse.'
         flag = true
     elseif InterruptSet.stopForRaidCorpse and checkCorpses('Raid') then
         if not interruptInProgress then
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
         end
-        status = 'Paused for Raid Corpse.'
         flag = true
-    elseif mq.TLO.Me.Sitting() and InterruptSet.stopForSitting then
-        local curHP, curMP, curEndur = mq.TLO.Me.PctHPs(), mq.TLO.Me.PctMana(), mq.TLO.Me.PctEndurance or 0
-        -- mq.delay(10)
+    elseif settings[Module.Name].GroupWatch and groupWatch(settings[Module.Name].WatchType) then
         if not interruptInProgress then
             mq.cmdf("/nav stop log=off")
             interruptInProgress = true
-            status = string.format('Paused for Sitting. HP %s MP %s', curHP, curMP)
         end
-        if curHP - lastHP > 5 or curMP - lastMP > 5 then
-            status = string.format('Paused for Sitting. HP %s MP %s', curHP, curMP)
-            lastHP, lastMP = curHP, curMP
-        end
-
+        Module.Status = gwStatus
+        gwStatus = ''
         flag = true
-
-        if settings[Module.Name].AutoStand then
-            if curHP >= 99 and (manaClass[Module.myClass] and curMP >= 99) and curEndur > 50 then
-                mq.TLO.Me.Stand()
-                status = 'Idle'
-                flag = false
-            end
+    elseif settings[Module.Name].RaidWatch and raidWatch(settings[Module.Name].RaidWatchType) then
+        if not interruptInProgress then
+            mq.cmdf("/nav stop log=off")
+            interruptInProgress = true
         end
+        Module.Status = rwStatus
+        rwStatus = ''
+        flag = true
     end
+
     if flag then
-        InterruptSet.PauseStart = os.time()
-        intPauseTime = InterruptSet.interruptDelay
-        if invis then intPauseTime = settings[Module.Name].InvisDelay end
+        InterruptSet.PauseStart = os.clock()
+        Module.intPauseTime = InterruptSet.interruptDelay
+        if invis then Module.intPauseTime = settings[Module.Name].InvisDelay end
     else
         interruptInProgress = false
     end
@@ -1077,7 +1064,7 @@ local function NavigatePath(name)
 
         if tmp == nil then
             NavSet.doNav = false
-            status = 'Idle'
+            Module.Status = 'Idle'
             return
         end
 
@@ -1093,18 +1080,18 @@ local function NavigatePath(name)
 
             local tmpDist = mq.TLO.Math.Distance(tmpDestLoc)() or 0
             mq.cmdf("/nav locyxz %s dist=%s log=off", tmp[i].loc, NavSet.StopDist)
-            status = "Nav to WP #: " .. tmp[i].step .. " Distance: " .. string.format("%.2f", tmpDist)
-            mq.delay(1)
+            Module.Status = "Nav to WP #: " .. tmp[i].step .. " Distance: " .. string.format("%.2f", tmpDist)
+            mq.delay(3000, function() return mq.TLO.Navigation.Active() end)
             -- mq.delay(3000, function () return MySelf.Speed() > 0 end)
             -- coroutine.yield()  -- Yield here to allow updates
-            while mq.TLO.Math.Distance(tmpDestLoc)() > NavSet.StopDist do
+            while mq.TLO.Math.Distance(tmpDestLoc)() > NavSet.StopDist or mq.TLO.Navigation.Active() do
                 if not NavSet.doNav then
                     goto EndNav
                 end
                 if currZone ~= lastZone then
                     NavSet.SelectedPath = 'None'
                     NavSet.doNav = false
-                    intPauseTime = 0
+                    Module.intPauseTime = 0
                     InterruptSet.PauseStart = 0
 
                     goto EndNav
@@ -1120,7 +1107,7 @@ local function NavigatePath(name)
                         tmpDestLoc = tmpDestLoc:sub(1, #yx - 1)
                         mq.cmdf("/nav locyxz %s dist=%s log=off", tmp[i].loc, NavSet.StopDist)
                         tmpDist = mq.TLO.Math.Distance(tmpDestLoc)() or 0
-                        status = "Nav to WP #: " .. tmp[i].step .. " Distance: " .. string.format("%.2f", tmpDist)
+                        Module.Status = "Nav to WP #: " .. tmp[i].step .. " Distance: " .. string.format("%.2f", tmpDist)
                         coroutine.yield()
                         if not NavSet.doNav then goto EndNav end
                     end
@@ -1139,7 +1126,7 @@ local function NavigatePath(name)
             if NavSet.doSingle then
                 NavSet.doNav = false
                 NavSet.doSingle = false
-                status = 'Idle - Arrived at Destination!'
+                Module.Status = 'Idle - Arrived at Destination!'
                 NavSet.LoopCount = 0
                 goto EndNav
             end
@@ -1162,25 +1149,25 @@ local function NavigatePath(name)
                 ToggleSwitches()
             end
             -- Check for Delay at Waypoint
-            curWpPauseTime = tmp[i].delay
+            Module.curWpPauseTime = tmp[i].delay
             if tmp[i].delay > 0 then
-                status = string.format("Paused %s seconds at WP #: %s", tmp[i].delay, tmp[i].step)
-                curWpPauseTime = tmp[i].delay
-                NavSet.PauseStart = os.time()
+                Module.Status = string.format("Paused %s seconds at WP #: %s", tmp[i].delay, tmp[i].step)
+                Module.curWpPauseTime = tmp[i].delay
+                NavSet.PauseStart = os.clock()
                 coroutine.yield()
                 if not NavSet.doNav then goto EndNav end
                 -- coroutine.yield()  -- Yield here to allow updates
             elseif NavSet.WpPause > 0 then
-                status = string.format("Global Paused %s seconds at WP #: %s", NavSet.WpPause, tmp[i].step)
-                curWpPauseTime = NavSet.WpPause
-                NavSet.PauseStart = os.time()
+                Module.Status = string.format("Global Paused %s seconds at WP #: %s", NavSet.WpPause, tmp[i].step)
+                Module.curWpPauseTime = NavSet.WpPause
+                NavSet.PauseStart = os.clock()
                 coroutine.yield()
                 if not NavSet.doNav then goto EndNav end
                 -- coroutine.yield()  -- Yield here to allow updates
                 -- else
                 --     if InterruptSet.interruptFound and tmp[i].delay == 0 then
                 --         curWpPauseTime = 0
-                --         NavSet.PauseStart = os.time()
+                --         NavSet.PauseStart = os.clock()
                 --         coroutine.yield()
                 --         if not NavSet.doNav then goto EndNav end
                 --     end
@@ -1211,7 +1198,7 @@ local function NavigatePath(name)
     end
     ::EndNav::
     NavSet.doNav = false
-    status = 'Idle - Arrived at Destination!'
+    Module.Status = 'Idle - Arrived at Destination!'
     NavSet.LoopCount = 0
 end
 
@@ -1312,6 +1299,7 @@ local function DrawStatus()
     ImGui.BeginGroup()
     -- Set Window Font Scale
     ImGui.SetWindowFontScale(scale)
+
     if showHUD and ImGui.IsWindowHovered() then
         mousedOverFlag = true
         if ImGui.IsMouseDoubleClicked(0) then
@@ -1360,6 +1348,7 @@ local function DrawStatus()
     ]]
     ImGui.Text("Nav Type: ")
     ImGui.SameLine()
+
     if not NavSet.doNav then
         ImGui.TextColored(ImVec4(0, 1, 0, 1), "None")
     else
@@ -1383,57 +1372,61 @@ local function DrawStatus()
             ImGui.TextColored(ImVec4(0, 1, 0, 1), "No")
         end
     end
-    local tmpStatus = status
+    local winWidth = ImGui.GetWindowWidth() or 0
+    local wrapwidth = winWidth > 0 and (winWidth - 5) or 350
+    ImGui.PushTextWrapPos(wrapwidth)
+
+    local tmpStatus = Module.Status
     if tmpStatus:find("Distance:") then
         tmpStatus = tmpStatus:sub(1, tmpStatus:find("Distance:") - 1)
     end
-    ImGui.PushTextWrapPos(350)
-    if status:find("Idle") then
+    if Module.Status:find("Idle") then
         ImGui.Text("Status: ")
         ImGui.SameLine()
-        ImGui.TextColored(ImVec4(0, 1, 1, 1), status)
-    elseif status:find("Paused") then
+        ImGui.TextColored(ImVec4(0, 1, 1, 1), Module.Status)
+    elseif Module.Status:find("Paused") then
         ImGui.Text("Status: ")
         ImGui.SameLine()
-        if status:find("Mana") then
-            ImGui.TextColored(ImVec4(0.000, 0.438, 0.825, 1.000), status)
-        elseif status:find("Health") then
-            ImGui.TextColored(ImVec4(0.928, 0.352, 0.035, 1.000), status)
+        if Module.Status:find("Mana") then
+            ImGui.TextColored(ImVec4(0.000, 0.438, 0.825, 1.000), Module.Status)
+        elseif Module.Status:find("Health") then
+            ImGui.TextColored(ImVec4(0.928, 0.352, 0.035, 1.000), Module.Status)
         else
-            ImGui.TextColored(ImVec4(0.9, 0.4, 0.4, 1), status)
+            ImGui.TextColored(ImVec4(0.9, 0.4, 0.4, 1), Module.Status)
         end
-    elseif status:find("Arrived") then
+    elseif Module.Status:find("Arrived") then
         ImGui.Text("Status: ")
         ImGui.SameLine()
-        ImGui.TextColored(ImVec4(0, 1, 0, 1), status)
-    elseif status:find("Last WP is less than") then
-        ImGui.TextColored(ImVec4(0.9, 0.4, 0.4, 1), status)
-    elseif status:find("Recording") then
-        ImGui.TextColored(ImVec4(0.4, 0.9, 0.4, 1), status)
-    elseif status:find("Nav to WP") then
+        ImGui.TextColored(ImVec4(0, 1, 0, 1), Module.Status)
+    elseif Module.Status:find("Last WP is less than") then
+        ImGui.TextColored(ImVec4(0.9, 0.4, 0.4, 1), Module.Status)
+    elseif Module.Status:find("Recording") then
+        ImGui.TextColored(ImVec4(0.4, 0.9, 0.4, 1), Module.Status)
+    elseif Module.Status:find("Nav to WP") then
         ImGui.Text("Status: ")
         ImGui.SameLine()
         ImGui.TextColored(ImVec4(1, 1, 0, 1), tmpStatus)
     else
         ImGui.Text("Status: ")
         ImGui.SameLine()
-        ImGui.TextColored(ImVec4(1, 1, 1, 1), status)
+        ImGui.TextColored(ImVec4(1, 1, 1, 1), Module.Status)
     end
-    ImGui.PopTextWrapPos()
     if PathStartClock ~= nil then
         ImGui.Text("Start Time: ")
         ImGui.SameLine()
         ImGui.TextColored(0, 1, 1, 1, "%s", PathStartClock)
-        ImGui.SameLine()
+
         ImGui.Text("Elapsed : ")
         ImGui.SameLine()
-        local timeDiff = os.time() - PathStartTime
+        local timeDiff = os.clock() - PathStartTime
         local hours = math.floor(timeDiff / 3600)
         local minutes = math.floor((timeDiff % 3600) / 60)
         local seconds = timeDiff % 60
 
         ImGui.TextColored(0, 1, 0, 1, string.format("%02d:%02d:%02d", hours, minutes, seconds))
     end
+    ImGui.PopTextWrapPos()
+
     ImGui.EndGroup()
 end
 
@@ -1450,7 +1443,9 @@ local function RenderDebugMessages(scale)
         if ImGui.IsItemHovered() then
             ImGui.SetTooltip("Clear Debug Messages")
         end
-
+        ImGui.Text("Process Time: ")
+        ImGui.SameLine()
+        ImGui.TextColored(ImVec4(0, 1, 1, 1), "%0.2f s", Module.TempSettings.Cycle or 0)
         ImGui.Separator()
         ImGui.SetWindowFontScale(scale)
         if ImGui.BeginTable('DebugTable', 5, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.Resizable, ImGuiTableFlags.Reorderable, ImGuiTableFlags.Hideable), ImVec2(0.0, 0.0)) then
@@ -1486,6 +1481,714 @@ local function RenderDebugMessages(scale)
     ImGui.SetWindowFontScale(1)
 end
 
+function Module.RenderControls(scale, working_table)
+    ImGui.SeparatorText("Select a Path")
+    if working_table == nil then
+        working_table = sortPathsTable(currZone, NavSet.SelectedPath) or {}
+    end
+
+    if not NavSet.doNav then
+        ImGui.SetNextItemWidth(120)
+        -- if ImGui.BeginCombo("##SelectPath", NavSet.SelectedPath) then
+        --     ImGui.SetWindowFontScale(scale)
+        --     if not Paths[currZone] then Paths[currZone] = {} end
+        --     for name, data in pairs(Paths[currZone]) do
+        --         local isSelected = name == NavSet.SelectedPath
+        --         if ImGui.Selectable(name, isSelected) then
+        --             NavSet.SelectedPath = name
+        --         end
+        --     end
+        --     ImGui.EndCombo()
+        -- end
+        local tmpP = {}
+        if ImGui.BeginCombo("Path##SelectPath", NavSet.SelectedPath) then
+            ImGui.SetWindowFontScale(scale)
+            if not Paths[currZone] then Paths[currZone] = {} end
+            for k, data in pairs(Paths[currZone]) do
+                table.insert(tmpP, k)
+            end
+            table.sort(tmpP)
+            for k, name in pairs(tmpP) do
+                local isSelected = name == NavSet.SelectedPath
+                if ImGui.Selectable(name, isSelected) then
+                    NavSet.SelectedPath = name
+                end
+            end
+            ImGui.EndCombo()
+        end
+        ImGui.SameLine()
+        if ImGui.Button(Module.Icons.MD_DELETE_SWEEP .. '##ClearSelectedPath') then
+            NavSet.SelectedPath = 'None'
+        end
+        ImGui.SameLine()
+        ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(1, 0.4, 0.4, 0.4))
+        if ImGui.Button(Module.Icons.MD_DELETE) then
+            DeletePath(NavSet.SelectedPath)
+            NavSet.SelectedPath = 'None'
+        end
+        ImGui.PopStyleColor()
+        if ImGui.IsItemHovered() then
+            ImGui.SetWindowFontScale(scale)
+            ImGui.SetTooltip("Delete Path")
+        end
+    else
+        ImGui.Text("Navigation Active")
+    end
+    ImGui.Spacing()
+    if ImGui.CollapsingHeader("Manage Paths##") then
+        ImGui.SetNextItemWidth(150)
+        newPath = ImGui.InputTextWithHint("##NewPathName", "New Path Name", newPath)
+        ImGui.SameLine()
+        ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
+        if ImGui.Button(Module.Icons.MD_CREATE) then
+            CreatePath(newPath)
+            NavSet.SelectedPath = newPath
+            newPath = ''
+        end
+        ImGui.PopStyleColor()
+        if ImGui.IsItemHovered() then
+            ImGui.SetTooltip("Create New Path")
+        end
+        ImGui.SameLine()
+        if NavSet.SelectedPath ~= 'None' then
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.911, 0.461, 0.085, 1.000))
+            if ImGui.Button(Module.Icons.MD_CONTENT_COPY) then
+                CreatePath(newPath)
+                for i = 1, #Paths[currZone][NavSet.SelectedPath] do
+                    table.insert(Paths[currZone][newPath], Paths[currZone][NavSet.SelectedPath][i])
+                end
+                UpdatePath(currZone, newPath)
+                NavSet.SelectedPath = newPath
+                newPath = ''
+            end
+            ImGui.PopStyleColor()
+            if ImGui.IsItemHovered() then
+                ImGui.SetWindowFontScale(scale)
+                ImGui.SetTooltip("Copy Path")
+            end
+        else
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.500, 0.500, 0.500, 1.000))
+            ImGui.Button(Module.Icons.MD_CONTENT_COPY .. "##Dummy")
+            ImGui.PopStyleColor()
+        end
+        ImGui.SameLine()
+        if NavSet.SelectedPath ~= 'None' then
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.911, 0.461, 0.085, 1.000))
+            if ImGui.Button(Module.Icons.FA_SHARE .. "##ExportSelected") then
+                local exportData = export_paths(currZone, NavSet.SelectedPath, Paths[currZone][NavSet.SelectedPath])
+                ImGui.LogToClipboard()
+                ImGui.LogText(exportData)
+                ImGui.LogFinish()
+                Module.Utils.PrintOutput('MyUI', nil, '\ayPath data copied to clipboard!\ax')
+            end
+            ImGui.PopStyleColor()
+        else
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.500, 0.500, 0.500, 1.000))
+            ImGui.Button(Module.Icons.FA_SHARE .. "##Dummy")
+            ImGui.PopStyleColor()
+        end
+        if ImGui.IsItemHovered() then
+            ImGui.SetWindowFontScale(scale)
+            ImGui.SetTooltip("Export: " .. currZone .. " : " .. NavSet.SelectedPath)
+        end
+        if ImGui.SmallButton("Write lua File") then
+            mq.pickle(pathsFile, Paths)
+        end
+        ImGui.Spacing()
+        if ImGui.CollapsingHeader("Share Paths##") then
+            importString = ImGui.InputTextWithHint("##ImportString", "Paste Import String", importString)
+            ImGui.SameLine()
+            if importString ~= '' then
+                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
+                if ImGui.Button(Module.Icons.FA_DOWNLOAD .. "##ImportPath") then
+                    local imported = import_paths(importString)
+                    if imported then
+                        for zone, paths in pairs(imported) do
+                            if not Paths[zone] then Paths[zone] = {} end
+                            for pathName, pathData in pairs(paths) do
+                                Paths[zone][pathName] = pathData
+                                if currZone == zone then NavSet.SelectedPath = pathName end
+                            end
+                        end
+                        importString = ''
+                        UpdatePath(currZone, NavSet.SelectedPath)
+                    end
+                end
+                ImGui.PopStyleColor()
+            else
+                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.500, 0.500, 0.500, 1.000))
+                ImGui.Button(Module.Icons.FA_DOWNLOAD .. "##Dummy")
+                ImGui.PopStyleColor()
+            end
+            if ImGui.IsItemHovered() then
+                ImGui.SetTooltip("Import Path")
+            end
+            ImGui.SeparatorText('Export Paths')
+            ImGui.SetNextItemWidth(120)
+            if ImGui.BeginCombo("Zone##SelectExportZone", exportZone) then
+                if not Paths[exportZone] then Paths[exportZone] = {} end
+                for name, data in pairs(Paths) do
+                    local isSelected = name == exportZone
+                    if ImGui.Selectable(name, isSelected) then
+                        exportZone = name
+                    end
+                end
+                ImGui.EndCombo()
+            end
+            if exportZone ~= 'Select Zone...' then
+                ImGui.SetNextItemWidth(120)
+                if ImGui.BeginCombo("Path##SelectExportPath", exportPathName) then
+                    if not Paths[exportZone] then Paths[exportZone] = {} end
+                    for name, data in pairs(Paths[exportZone]) do
+                        local isSelected = name == exportPathName
+                        if ImGui.Selectable(name, isSelected) then
+                            exportPathName = name
+                        end
+                    end
+                    ImGui.EndCombo()
+                end
+            end
+            ImGui.SameLine()
+            if exportZone ~= 'Select Zone...' and exportPathName ~= 'Select Path...' then
+                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.911, 0.461, 0.085, 1.000))
+                if ImGui.Button(Module.Icons.FA_SHARE .. "##ExportZonePath") then
+                    local exportData = export_paths(exportZone, exportPathName, Paths[exportZone][exportPathName])
+                    ImGui.LogToClipboard()
+                    ImGui.LogText(exportData)
+                    ImGui.LogFinish()
+                    Module.Utils.PrintOutput('MyUI', nil, '\ayPath data copied to clipboard!\ax')
+                end
+                ImGui.PopStyleColor()
+            else
+                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.500, 0.500, 0.500, 1.000))
+                ImGui.Button(Module.Icons.FA_SHARE .. "##Dummy2")
+                ImGui.PopStyleColor()
+            end
+            if ImGui.IsItemHovered() then
+                ImGui.SetTooltip("Export:  " .. exportZone .. " : " .. exportPathName)
+            end
+        end
+    end
+    ImGui.Spacing()
+    ImGui.Separator()
+    if ImGui.CollapsingHeader("Chain Paths##") then
+        if NavSet.SelectedPath ~= 'None' then
+            ImGui.PushID(NavSet.SelectedPath)
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
+            if ImGui.Button(Module.Icons.MD_PLAYLIST_ADD .. " [" .. NavSet.SelectedPath .. "]##") then
+                if not ChainedPaths then ChainedPaths = {} end
+                table.insert(ChainedPaths, { Zone = currZone, Path = NavSet.SelectedPath, Type = 'Normal', })
+            end
+            ImGui.PopStyleColor()
+            ImGui.PopID()
+        else
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.500, 0.500, 0.500, 1.000))
+            ImGui.Button(Module.Icons.MD_PLAYLIST_ADD .. "##Dummy")
+            ImGui.PopStyleColor()
+        end
+        if ImGui.IsItemHovered() then
+            ImGui.SetWindowFontScale(scale)
+            ImGui.SetTooltip("Add " .. currZone .. ": " .. NavSet.SelectedPath .. " to Chain")
+        end
+
+        if #ChainedPaths > 0 then
+            NavSet.ChainLoop = ImGui.Checkbox('Loop Chain', NavSet.ChainLoop)
+            ImGui.SameLine()
+
+            ImGui.SetNextItemWidth(100)
+            saveChainName = ImGui.InputTextWithHint("##ChainName", "Chain Name", saveChainName)
+            ImGui.SameLine()
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
+            if ImGui.Button(Module.Icons.MD_SAVE) then
+                if saveChainName ~= '' then
+                    saveChain(saveChainName)
+                    saveChainName = ''
+                end
+            end
+            ImGui.PopStyleColor()
+        end
+        if SavedChains ~= nil then
+            if ImGui.BeginCombo("##SelectChain", NavSet.SelectedChain) then
+                ImGui.SetWindowFontScale(scale)
+                for name, data in pairs(SavedChains) do
+                    local isSelected = name == NavSet.SelectedChain
+                    if ImGui.Selectable(name, isSelected) then
+                        NavSet.SelectedChain = name
+                    end
+                end
+                ImGui.EndCombo()
+            end
+            ImGui.SameLine()
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
+            if ImGui.Button(Module.Icons.MD_PLAYLIST_ADD .. "##LoadChain") then
+                loadSavedChain(NavSet.SelectedChain)
+            end
+            ImGui.PopStyleColor()
+        end
+
+        local tmpCZ, tmpCP = {}, {}
+        for name, data in pairs(Paths) do
+            table.insert(tmpCZ, name)
+        end
+        table.sort(tmpCZ)
+        ImGui.SetNextItemWidth(120)
+
+        if ImGui.BeginCombo("Zone##SelectChainZone", NavSet.ChainZone) then
+            ImGui.SetWindowFontScale(scale)
+            if not Paths[NavSet.ChainZone] then Paths[NavSet.ChainZone] = {} end
+            for k, name in pairs(tmpCZ) do
+                local isSelected = name == NavSet.ChainZone
+                if ImGui.Selectable(name, isSelected) then
+                    NavSet.ChainZone = name
+                end
+            end
+            ImGui.EndCombo()
+        end
+        if NavSet.ChainZone ~= 'Select Zone...' then
+            ImGui.SetNextItemWidth(120)
+
+            if ImGui.BeginCombo("Path##SelectChainPath", NavSet.ChainPath) then
+                ImGui.SetWindowFontScale(scale)
+                if not Paths[NavSet.ChainZone] then Paths[NavSet.ChainZone] = {} end
+                for k, data in pairs(Paths[NavSet.ChainZone]) do
+                    table.insert(tmpCP, k)
+                end
+                table.sort(tmpCP)
+                for k, name in pairs(tmpCP) do
+                    local isSelected = name == NavSet.ChainPath
+                    if ImGui.Selectable(name, isSelected) then
+                        NavSet.ChainPath = name
+                    end
+                end
+                ImGui.EndCombo()
+            end
+        end
+        ImGui.SameLine()
+
+        if NavSet.ChainZone ~= 'Select Zone...' and NavSet.ChainPath ~= 'Select Path...' then
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
+            if ImGui.Button(Module.Icons.MD_PLAYLIST_ADD .. " [" .. NavSet.ChainPath .. "]##") then
+                if not ChainedPaths then ChainedPaths = {} end
+                table.insert(ChainedPaths, { Zone = NavSet.ChainZone, Path = NavSet.ChainPath, Type = 'Normal', })
+            end
+            ImGui.PopStyleColor()
+        else
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.500, 0.500, 0.500, 1.000))
+            ImGui.Button(Module.Icons.MD_PLAYLIST_ADD .. "##Dummy2")
+            ImGui.PopStyleColor()
+        end
+        if ImGui.IsItemHovered() then
+            ImGui.SetTooltip("Add " .. NavSet.ChainZone .. ": " .. NavSet.ChainPath .. " to Chain")
+        end
+        if #ChainedPaths > 0 then
+            ImGui.SameLine()
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(1, 0.4, 0.4, 0.4))
+            if ImGui.Button(Module.Icons.MD_DELETE_SWEEP .. "##") then
+                ChainedPaths = {}
+            end
+            ImGui.PopStyleColor()
+
+            if ImGui.IsItemHovered() then
+                ImGui.SetTooltip("Clear Chain")
+            end
+            ImGui.SeparatorText("Chain Paths:")
+            for i = 1, #ChainedPaths do
+                ImGui.SetNextItemWidth(100)
+                local chainType = { 'Normal', 'Loop', 'PingPong', 'Reverse', }
+                if ImGui.BeginCombo("##PathType_" .. i, ChainedPaths[i].Type) then
+                    if not Paths[currZone] then Paths[currZone] = {} end
+                    for k, v in pairs(chainType) do
+                        local isSelected = v == ChainedPaths[i].Type
+                        if ImGui.Selectable(v, isSelected) then
+                            ChainedPaths[i].Type = v
+                        end
+                    end
+                    ImGui.EndCombo()
+                end
+                ImGui.SameLine()
+                ImGui.TextColored(0.0, 1, 1, 1, "%s", ChainedPaths[i].Zone)
+                ImGui.SameLine()
+                if ChainedPaths[i].Path == NavSet.ChainPath then
+                    ImGui.TextColored(1, 1, 0, 1, "%s", ChainedPaths[i].Path)
+                else
+                    ImGui.TextColored(0.0, 1, 0, 1, "%s", ChainedPaths[i].Path)
+                end
+            end
+        end
+    end
+    ImGui.Spacing()
+    if NavSet.SelectedPath ~= 'None' or #ChainedPaths > 0 then
+        local closestWaypointIndex = FindIndexClosestWaypoint(working_table)
+        -- Navigation Controls
+        if ImGui.CollapsingHeader("Navigation##") then
+            if not NavSet.doNav then
+                NavSet.doReverse = ImGui.Checkbox('Reverse Order', NavSet.doReverse)
+                ImGui.SameLine()
+            end
+            NavSet.doLoop = ImGui.Checkbox('Loop Path', NavSet.doLoop)
+            ImGui.SameLine()
+            NavSet.doPingPong = ImGui.Checkbox('Ping Pong', NavSet.doPingPong)
+            if NavSet.doPingPong then
+                NavSet.doLoop = true
+            end
+            ImGui.Separator()
+            if not Paths[currZone] then Paths[currZone] = {} end
+            if NavSet.doPause and NavSet.doNav then
+                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
+
+                if ImGui.Button(Module.Icons.FA_PLAY_CIRCLE_O) then
+                    NavSet.doPause = false
+                    NavSet.PausedActiveGN = false
+                    table.insert(debugMessages,
+                        { Time = os.date("%H:%M:%S"), Zone = currZone, Path = NavSet.SelectedPath, WP = 'Resume', Status = 'Resumed Navigation!', })
+                end
+                ImGui.PopStyleColor()
+
+                if ImGui.IsItemHovered() then
+                    ImGui.SetTooltip("Resume Navigation")
+                end
+                ImGui.SameLine()
+            elseif not NavSet.doPause and NavSet.doNav then
+                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(1, 0.4, 0.4, 0.4))
+
+                if ImGui.Button(Module.Icons.FA_PAUSE) then
+                    NavSet.doPause = true
+                    mq.cmd("/nav stop log=off")
+                    table.insert(debugMessages,
+                        { Time = os.date("%H:%M:%S"), Zone = currZone, Path = NavSet.SelectedPath, WP = 'Pause', Status = 'Paused Navigation!', })
+                end
+                ImGui.PopStyleColor()
+
+                if ImGui.IsItemHovered() then
+                    ImGui.SetTooltip("Pause Navigation")
+                end
+                ImGui.SameLine()
+            end
+            local tmpLabel = NavSet.doNav and Module.Icons.FA_STOP or Module.Icons.FA_PLAY
+            if NavSet.doNav then
+                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(1.0, 0.4, 0.4, 0.4))
+            else
+                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1.0, 0.4, 0.4))
+            end
+            if ImGui.Button(tmpLabel) then
+                NavSet.PausedActiveGN = false
+                NavSet.doNav = not NavSet.doNav
+                NavSet.ChainStart = false
+                if not NavSet.doNav then
+                    mq.cmdf("/nav stop log=off")
+                    NavSet.ChainStart = false
+                    PathStartClock, PathStartTime = nil, nil
+                else
+                    PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.clock()
+                end
+            end
+            ImGui.PopStyleColor()
+
+            if ImGui.IsItemHovered() then
+                if NavSet.doNav then
+                    ImGui.SetTooltip("Stop Navigation")
+                else
+                    ImGui.SetTooltip("Start Navigation")
+                end
+            end
+            ImGui.SameLine()
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1.0, 0.4, 0.4))
+            if ImGui.Button(Module.Icons.FA_PLAY .. " Closest WP") then
+                NavSet.CurrentStepIndex = closestWaypointIndex
+                NavSet.doNav = true
+                NavSet.PausedActiveGN = false
+                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.clock()
+            end
+            ImGui.PopStyleColor()
+            if ImGui.IsItemHovered() then
+                ImGui.SetTooltip("Start Navigation at Closest Waypoint")
+            end
+            ImGui.SetNextItemWidth(100)
+            NavSet.StopDist = ImGui.InputInt("Stop Distance##" .. Module.Name, NavSet.StopDist, 1, 50)
+            ImGui.SetNextItemWidth(100)
+            NavSet.WpPause = ImGui.InputInt("Global Pause##" .. Module.Name, NavSet.WpPause, 1, 5)
+        end
+    end
+end
+
+function Module.RenderPathData(scale, working_table)
+    if working_table == nil then
+        working_table = sortPathsTable(currZone, NavSet.SelectedPath) or {}
+    end
+    if NavSet.SelectedPath ~= 'None' then
+        if ImGui.CollapsingHeader("Manage Waypoints##") then
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
+            if ImGui.Button(Module.Icons.MD_ADD_LOCATION) then
+                RecordWaypoint(NavSet.SelectedPath)
+            end
+            ImGui.PopStyleColor()
+            if ImGui.IsItemHovered() then
+                ImGui.SetTooltip("Add Waypoint")
+            end
+
+            ImGui.SameLine()
+            local label = Module.Icons.MD_FIBER_MANUAL_RECORD
+            if NavSet.autoRecord then
+                label = Module.Icons.FA_STOP_CIRCLE
+                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(1.0, 0.4, 0.4, 0.4))
+            else
+                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1.0, 0.4, 0.4))
+            end
+            if ImGui.Button(label) then
+                NavSet.autoRecord = not NavSet.autoRecord
+                if NavSet.autoRecord then
+                    if DEBUG then
+                        table.insert(debugMessages,
+                            {
+                                Time = os.date("%H:%M:%S"),
+                                Zone = mq.TLO.Zone.ShortName(),
+                                Path = NavSet.SelectedPath,
+                                WP = 'Start Recording',
+                                Status =
+                                'Start Recording Waypoints!',
+                            })
+                    end
+                else
+                    if DEBUG then
+                        table.insert(debugMessages,
+                            {
+                                Time = os.date("%H:%M:%S"),
+                                Zone = mq.TLO.Zone.ShortName(),
+                                Path = NavSet.SelectedPath,
+                                WP = 'Stop Recording',
+                                Status =
+                                'Stop Recording Waypoints!',
+                            })
+                    end
+                end
+            end
+            ImGui.PopStyleColor()
+
+            if ImGui.IsItemHovered() then
+                ImGui.SetTooltip("Auto Record Waypoints")
+            end
+            ImGui.SameLine()
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(1.0, 0.4, 0.4, 0.4))
+            if ImGui.Button(Module.Icons.MD_DELETE_SWEEP) then
+                ClearWaypoints(NavSet.SelectedPath)
+            end
+            ImGui.PopStyleColor()
+            if ImGui.IsItemHovered() then
+                ImGui.SetTooltip("Clear Waypoints")
+            end
+            ImGui.SameLine()
+            ImGui.SetNextItemWidth(100)
+            NavSet.RecordDelay = ImGui.InputInt("Rec Delay##" .. Module.Name, NavSet.RecordDelay, 1, 10)
+        end
+        ImGui.Separator()
+    end
+    ImGui.Spacing()
+    if ImGui.CollapsingHeader("Waypoint Table##Header") then
+        -- Waypoint Table
+        if NavSet.SelectedPath ~= 'None' then
+            local closestWaypointIndex = FindIndexClosestWaypoint(working_table)
+
+            ImGui.SetWindowFontScale(scale)
+            if ImGui.BeginTable('PathTable##WpList', 6, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.ScrollX, ImGuiTableFlags.Resizable, ImGuiTableFlags.Reorderable, ImGuiTableFlags.Hideable), -1, -1) then
+                ImGui.TableSetupColumn('WP#', ImGuiTableColumnFlags.WidthFixed, 40)
+                ImGui.TableSetupColumn('Loc', ImGuiTableColumnFlags.WidthFixed, 120)
+                ImGui.TableSetupColumn('Delay', ImGuiTableColumnFlags.WidthFixed, 90)
+                ImGui.TableSetupColumn('Actions', ImGuiTableColumnFlags.WidthFixed, 100)
+                ImGui.TableSetupColumn('Door', ImGuiTableColumnFlags.WidthFixed, 90)
+                ImGui.TableSetupColumn('Move', ImGuiTableColumnFlags.WidthFixed, 120)
+                ImGui.TableSetupScrollFreeze(0, 1)
+                ImGui.TableHeadersRow()
+
+                for i = 1, #working_table do
+                    ImGui.PushID(i)
+                    ImGui.TableNextRow()
+                    ImGui.TableSetColumnIndex(0)
+                    if working_table[i].step == working_table[NavSet.CurrentStepIndex].step then
+                        ImGui.TextColored(ImVec4(0, 1, 0, 1), "%s", working_table[i].step)
+                        if ImGui.IsItemHovered() then
+                            ImGui.SetTooltip("Current Waypoint")
+                        end
+                    else
+                        ImGui.Text("%s", working_table[i].step)
+                    end
+
+                    if i == closestWaypointIndex then
+                        ImGui.SameLine()
+                        ImGui.TextColored(ImVec4(1, 1, 0, 1), Module.Icons.MD_STAR)
+                        if ImGui.IsItemHovered() then
+                            ImGui.SetTooltip("Closest Waypoint")
+                        end
+                    end
+                    -- if tmpTable[i].step == tmpTable[currentStepIndex].step then
+                    --     ImGui.SameLine()
+                    --     ImGui.TextColored(ImVec4(0, 1, 1, 1), Icon.MD_STAR)
+                    --     if ImGui.IsItemHovered() then
+                    --         ImGui.SetTooltip("Current Waypoint")
+                    --     end
+                    -- end
+                    ImGui.TableSetColumnIndex(1)
+                    ImGui.Text(working_table[i].loc)
+                    if not NavSet.doNav then
+                        if ImGui.BeginPopupContextItem("WP_" .. working_table[i].step) then
+                            if ImGui.MenuItem('Nav to WP ' .. working_table[i].step) then
+                                NavSet.CurrentStepIndex = i
+                                NavSet.doNav = true
+                                NavSet.doLoop = false
+                                NavSet.doSingle = true
+                                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.clock()
+                            end
+
+                            if ImGui.MenuItem('Start Path Here: WP ' .. working_table[i].step) then
+                                NavSet.CurrentStepIndex = i
+                                NavSet.doNav = true
+                                NavSet.doLoop = false
+                                NavSet.doSingle = false
+                                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.clock()
+                            end
+                            if ImGui.MenuItem('Start Loop Here: WP ' .. working_table[i].step) then
+                                NavSet.CurrentStepIndex = i
+                                NavSet.doNav = true
+                                NavSet.doLoop = true
+                                NavSet.doSingle = false
+                                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.clock()
+                            end
+
+                            ImGui.EndPopup()
+                        end
+                    end
+                    ImGui.TableSetColumnIndex(2)
+                    ImGui.SetNextItemWidth(90)
+                    local changed, changedCmd = false, false
+                    working_table[i].delay, changed = ImGui.InputInt("##delay_" .. i, working_table[i].delay, 1, 1)
+                    if changed then
+                        for k, v in pairs(Paths[currZone][NavSet.SelectedPath]) do
+                            if v.step == working_table[i].step then
+                                Paths[currZone][NavSet.SelectedPath][k].delay = working_table[i].delay
+                                UpdatePath(currZone, NavSet.SelectedPath)
+                            end
+                        end
+                    end
+                    if ImGui.IsItemHovered() then
+                        ImGui.SetTooltip("Delay in Seconds")
+                    end
+                    ImGui.TableSetColumnIndex(3)
+                    ImGui.SetNextItemWidth(-1)
+                    working_table[i].cmd, changedCmd = ImGui.InputText("##cmd_" .. i, working_table[i].cmd)
+                    if changedCmd then
+                        for k, v in pairs(Paths[currZone][NavSet.SelectedPath]) do
+                            if v.step == working_table[i].step then
+                                Paths[currZone][NavSet.SelectedPath][k].cmd = working_table[i].cmd
+                                UpdatePath(currZone, NavSet.SelectedPath)
+                            end
+                        end
+                    end
+                    if ImGui.IsItemHovered() then
+                        ImGui.SetTooltip(working_table[i].cmd)
+                    end
+                    ImGui.TableSetColumnIndex(4)
+                    local changedDoor, changedDoorRev = false, false
+                    working_table[i].door, changedDoor = ImGui.Checkbox(Module.Icons.FA_FORWARD .. "##door_" .. i, working_table[i].door)
+                    if changedDoor then
+                        for k, v in pairs(Paths[currZone][NavSet.SelectedPath]) do
+                            if v.step == working_table[i].step then
+                                Paths[currZone][NavSet.SelectedPath][k].door = working_table[i].door
+                                UpdatePath(currZone, NavSet.SelectedPath)
+                            end
+                        end
+                    end
+                    if ImGui.IsItemHovered() then
+                        ImGui.SetTooltip("Door Forward")
+                    end
+                    ImGui.SameLine(0, 0)
+                    working_table[i].doorRev, changedDoorRev = ImGui.Checkbox(Module.Icons.FA_BACKWARD .. "##doorRev_" .. i, working_table[i].doorRev)
+                    if changedDoorRev then
+                        for k, v in pairs(Paths[currZone][NavSet.SelectedPath]) do
+                            if v.step == working_table[i].step then
+                                Paths[currZone][NavSet.SelectedPath][k].doorRev = working_table[i].doorRev
+                                UpdatePath(currZone, NavSet.SelectedPath)
+                            end
+                        end
+                    end
+                    if ImGui.IsItemHovered() then
+                        ImGui.SetTooltip("Door Reverse")
+                    end
+                    ImGui.TableSetColumnIndex(5)
+                    if not NavSet.doNav then
+                        if ImGui.Button(Module.Icons.FA_TRASH .. "##_" .. i) then
+                            deleteWP = true
+                            deleteWPStep = working_table[i].step
+                        end
+                        if ImGui.IsItemHovered() then
+                            ImGui.SetTooltip("Delete WP")
+                        end
+                        -- if not doReverse then
+                        ImGui.SameLine(0, 0)
+                        if ImGui.Button(Module.Icons.MD_UPDATE .. '##Update_' .. i) then
+                            working_table[i].loc = MySelf.LocYXZ()
+                            -- Update Paths table
+                            for k, v in pairs(Paths[currZone][NavSet.SelectedPath]) do
+                                if v.step == working_table[i].step then
+                                    Paths[currZone][NavSet.SelectedPath][k] = working_table[i]
+                                end
+                            end
+                            -- Paths[currZone][selectedPath][tmpTable[i].step].loc = MySelf.LocYXZ()
+                            UpdatePath(currZone, NavSet.SelectedPath)
+                        end
+                        if ImGui.IsItemHovered() then
+                            ImGui.SetTooltip("Update Loc")
+                        end
+                        -- end
+                        ImGui.SameLine(0, 0)
+                        if i > 1 and ImGui.Button(Module.Icons.FA_CHEVRON_UP .. "##up_" .. i) then
+                            -- Swap items in tmpTable
+                            local tmp = working_table[i]
+                            working_table[i] = working_table[i - 1]
+                            working_table[i - 1] = tmp
+
+                            -- Update step values
+                            working_table[i].step, working_table[i - 1].step = working_table[i - 1].step, working_table[i].step
+
+                            -- Update Paths table
+                            for k, v in pairs(Paths[currZone][NavSet.SelectedPath]) do
+                                if v.step == working_table[i].step then
+                                    Paths[currZone][NavSet.SelectedPath][k] = working_table[i]
+                                elseif v.step == working_table[i - 1].step then
+                                    Paths[currZone][NavSet.SelectedPath][k] = working_table[i - 1]
+                                end
+                            end
+                            UpdatePath(currZone, NavSet.SelectedPath)
+                        end
+                        ImGui.SameLine(0, 0)
+                        if i < #working_table and ImGui.Button(Module.Icons.FA_CHEVRON_DOWN .. "##down_" .. i) then
+                            -- Swap items in tmpTable
+                            local tmp = working_table[i]
+                            working_table[i] = working_table[i + 1]
+                            working_table[i + 1] = tmp
+
+                            -- Update step values
+                            working_table[i].step, working_table[i + 1].step = working_table[i + 1].step, working_table[i].step
+
+                            -- Update Paths table
+                            for k, v in pairs(Paths[currZone][NavSet.SelectedPath]) do
+                                if v.step == working_table[i].step then
+                                    Paths[currZone][NavSet.SelectedPath][k] = working_table[i]
+                                elseif v.step == working_table[i + 1].step then
+                                    Paths[currZone][NavSet.SelectedPath][k] = working_table[i + 1]
+                                end
+                            end
+                            UpdatePath(currZone, NavSet.SelectedPath)
+                        end
+                    end
+                    ImGui.PopID()
+                end
+                ImGui.EndTable()
+            end
+        else
+            ImGui.Text("No Path Selected")
+        end
+    end
+end
+
 function Module.RenderGUI()
     -- Main Window
     if showMainGUI then
@@ -1505,7 +2208,6 @@ function Module.RenderGUI()
         -- Check if the window is showing
         if showMain then
             local tmpTable = sortPathsTable(currZone, NavSet.SelectedPath) or {}
-            local closestWaypointIndex = FindIndexClosestWaypoint(tmpTable)
             local curWPTxt = 1
             tmpLoc = ''
             local xy = 0
@@ -1574,7 +2276,7 @@ function Module.RenderGUI()
                     sFlag = true
                     DrawStatus()
                     if NavSet.doNav then
-                        ImGui.Text("Current Destination Waypoint: ")
+                        ImGui.Text("Destination Waypoint: ")
                         ImGui.SameLine()
                         ImGui.TextColored(0, 1, 0, 1, "%s", curWPTxt)
                         ImGui.Text("Distance to Waypoint: ")
@@ -1632,7 +2334,7 @@ function Module.RenderGUI()
                     if ImGui.Button(Module.Icons.FA_PLAY) then
                         NavSet.PausedActiveGN = false
                         NavSet.doNav = true
-                        PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                        PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.clock()
                     end
                     ImGui.PopStyleColor()
                     if ImGui.IsItemHovered() then
@@ -1644,26 +2346,26 @@ function Module.RenderGUI()
                 ImGui.SameLine()
                 ImGui.Text("Status: ")
                 ImGui.SameLine()
-                if status:find("Idle") then
-                    ImGui.TextColored(ImVec4(0, 1, 1, 1), status)
-                elseif status:find("Paused") then
-                    if status:find("Mana") then
-                        ImGui.TextColored(ImVec4(0.000, 0.438, 0.825, 1.000), status)
-                    elseif status:find("Health") then
-                        ImGui.TextColored(ImVec4(0.928, 0.352, 0.035, 1.000), status)
+                if Module.Status:find("Idle") then
+                    ImGui.TextColored(ImVec4(0, 1, 1, 1), Module.Status)
+                elseif Module.Status:find("Paused") then
+                    if Module.Status:find("Mana") then
+                        ImGui.TextColored(ImVec4(0.000, 0.438, 0.825, 1.000), Module.Status)
+                    elseif Module.Status:find("Health") then
+                        ImGui.TextColored(ImVec4(0.928, 0.352, 0.035, 1.000), Module.Status)
                     else
-                        ImGui.TextColored(ImVec4(0.9, 0.4, 0.4, 1), status)
+                        ImGui.TextColored(ImVec4(0.9, 0.4, 0.4, 1), Module.Status)
                     end
-                elseif status:find("Last WP is less than") then
-                    ImGui.TextColored(ImVec4(0.9, 0.4, 0.4, 1), status)
-                elseif status:find("Recording") then
-                    ImGui.TextColored(ImVec4(0.4, 0.9, 0.4, 1), status)
-                elseif status:find("Arrived") then
-                    ImGui.TextColored(ImVec4(0, 1, 0, 1), status)
-                elseif status:find("Nav to WP") then
+                elseif Module.Status:find("Last WP is less than") then
+                    ImGui.TextColored(ImVec4(0.9, 0.4, 0.4, 1), Module.Status)
+                elseif Module.Status:find("Recording") then
+                    ImGui.TextColored(ImVec4(0.4, 0.9, 0.4, 1), Module.Status)
+                elseif Module.Status:find("Arrived") then
+                    ImGui.TextColored(ImVec4(0, 1, 0, 1), Module.Status)
+                elseif Module.Status:find("Nav to WP") then
                     local tmpDist = mq.TLO.Math.Distance(tmpLoc)() or 0
                     local dist = string.format("%.2f", tmpDist)
-                    local tmpStatus = status
+                    local tmpStatus = Module.Status
                     if tmpStatus:find("Distance") then
                         tmpStatus = tmpStatus:sub(1, tmpStatus:find("Distance:") - 1)
                         tmpStatus = string.format("%s Distance: %s", tmpStatus, dist)
@@ -1677,7 +2379,7 @@ function Module.RenderGUI()
                     ImGui.SameLine()
                     ImGui.Text("Elapsed : ")
                     ImGui.SameLine()
-                    local timeDiff = os.time() - PathStartTime
+                    local timeDiff = os.clock() - PathStartTime
                     local hours = math.floor(timeDiff / 3600)
                     local minutes = math.floor((timeDiff % 3600) / 60)
                     local seconds = timeDiff % 60
@@ -1690,709 +2392,30 @@ function Module.RenderGUI()
             -- ImGui.BeginChild("Tabs##MainTabs", -1, -1,ImGuiChildFlags.AutoResizeX)
             if ImGui.BeginTabBar('MainTabBar') then
                 ImGui.SetWindowFontScale(scale)
-                if ImGui.BeginTabItem('Controls') then
-                    if ImGui.BeginChild("Tabs##Controls", -1, -1, ImGuiChildFlags.AutoResizeX) then
-                        ImGui.SeparatorText("Select a Path")
-                        if not NavSet.doNav then
-                            ImGui.SetNextItemWidth(120)
-                            -- if ImGui.BeginCombo("##SelectPath", NavSet.SelectedPath) then
-                            --     ImGui.SetWindowFontScale(scale)
-                            --     if not Paths[currZone] then Paths[currZone] = {} end
-                            --     for name, data in pairs(Paths[currZone]) do
-                            --         local isSelected = name == NavSet.SelectedPath
-                            --         if ImGui.Selectable(name, isSelected) then
-                            --             NavSet.SelectedPath = name
-                            --         end
-                            --     end
-                            --     ImGui.EndCombo()
-                            -- end
-                            local tmpP = {}
-                            if ImGui.BeginCombo("Path##SelectPath", NavSet.SelectedPath) then
-                                ImGui.SetWindowFontScale(scale)
-                                if not Paths[currZone] then Paths[currZone] = {} end
-                                for k, data in pairs(Paths[currZone]) do
-                                    table.insert(tmpP, k)
-                                end
-                                table.sort(tmpP)
-                                for k, name in pairs(tmpP) do
-                                    local isSelected = name == NavSet.SelectedPath
-                                    if ImGui.Selectable(name, isSelected) then
-                                        NavSet.SelectedPath = name
-                                    end
-                                end
-                                ImGui.EndCombo()
+                if not Module.TempSettings.ControlsPopped then
+                    if ImGui.BeginTabItem('Controls') then
+                        if ImGui.BeginChild("Tabs##Controls", -1, -1, ImGuiChildFlags.AutoResizeX) then
+                            if ImGui.SmallButton(Module.Icons.MD_OPEN_IN_NEW .. "##ControlsPopout") then
+                                Module.TempSettings.ControlsPopped = true
                             end
-                            ImGui.SameLine()
-                            if ImGui.Button(Module.Icons.MD_DELETE_SWEEP .. '##ClearSelectedPath') then
-                                NavSet.SelectedPath = 'None'
-                            end
-                            ImGui.SameLine()
-                            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(1, 0.4, 0.4, 0.4))
-                            if ImGui.Button(Module.Icons.MD_DELETE) then
-                                DeletePath(NavSet.SelectedPath)
-                                NavSet.SelectedPath = 'None'
-                            end
-                            ImGui.PopStyleColor()
-                            if ImGui.IsItemHovered() then
-                                ImGui.SetWindowFontScale(scale)
-                                ImGui.SetTooltip("Delete Path")
-                            end
-                        else
-                            ImGui.Text("Navigation Active")
+                            Module.RenderControls(scale, tmpTable)
                         end
-                        ImGui.Spacing()
-                        if ImGui.CollapsingHeader("Manage Paths##") then
-                            ImGui.SetNextItemWidth(150)
-                            newPath = ImGui.InputTextWithHint("##NewPathName", "New Path Name", newPath)
-                            ImGui.SameLine()
-                            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
-                            if ImGui.Button(Module.Icons.MD_CREATE) then
-                                CreatePath(newPath)
-                                NavSet.SelectedPath = newPath
-                                newPath = ''
-                            end
-                            ImGui.PopStyleColor()
-                            if ImGui.IsItemHovered() then
-                                ImGui.SetTooltip("Create New Path")
-                            end
-                            ImGui.SameLine()
-                            if NavSet.SelectedPath ~= 'None' then
-                                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.911, 0.461, 0.085, 1.000))
-                                if ImGui.Button(Module.Icons.MD_CONTENT_COPY) then
-                                    CreatePath(newPath)
-                                    for i = 1, #Paths[currZone][NavSet.SelectedPath] do
-                                        table.insert(Paths[currZone][newPath], Paths[currZone][NavSet.SelectedPath][i])
-                                    end
-                                    UpdatePath(currZone, newPath)
-                                    NavSet.SelectedPath = newPath
-                                    newPath = ''
-                                end
-                                ImGui.PopStyleColor()
-                                if ImGui.IsItemHovered() then
-                                    ImGui.SetWindowFontScale(scale)
-                                    ImGui.SetTooltip("Copy Path")
-                                end
-                            else
-                                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.500, 0.500, 0.500, 1.000))
-                                ImGui.Button(Module.Icons.MD_CONTENT_COPY .. "##Dummy")
-                                ImGui.PopStyleColor()
-                            end
-                            ImGui.SameLine()
-                            if NavSet.SelectedPath ~= 'None' then
-                                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.911, 0.461, 0.085, 1.000))
-                                if ImGui.Button(Module.Icons.FA_SHARE .. "##ExportSelected") then
-                                    local exportData = export_paths(currZone, NavSet.SelectedPath, Paths[currZone][NavSet.SelectedPath])
-                                    ImGui.LogToClipboard()
-                                    ImGui.LogText(exportData)
-                                    ImGui.LogFinish()
-                                    Module.Utils.PrintOutput('MyUI', nil, '\ayPath data copied to clipboard!\ax')
-                                end
-                                ImGui.PopStyleColor()
-                            else
-                                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.500, 0.500, 0.500, 1.000))
-                                ImGui.Button(Module.Icons.FA_SHARE .. "##Dummy")
-                                ImGui.PopStyleColor()
-                            end
-                            if ImGui.IsItemHovered() then
-                                ImGui.SetWindowFontScale(scale)
-                                ImGui.SetTooltip("Export: " .. currZone .. " : " .. NavSet.SelectedPath)
-                            end
-                            if ImGui.SmallButton("Write lua File") then
-                                mq.pickle(pathsFile, Paths)
-                            end
-                            ImGui.Spacing()
-                            if ImGui.CollapsingHeader("Share Paths##") then
-                                importString = ImGui.InputTextWithHint("##ImportString", "Paste Import String", importString)
-                                ImGui.SameLine()
-                                if importString ~= '' then
-                                    ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
-                                    if ImGui.Button(Module.Icons.FA_DOWNLOAD .. "##ImportPath") then
-                                        local imported = import_paths(importString)
-                                        if imported then
-                                            for zone, paths in pairs(imported) do
-                                                if not Paths[zone] then Paths[zone] = {} end
-                                                for pathName, pathData in pairs(paths) do
-                                                    Paths[zone][pathName] = pathData
-                                                    if currZone == zone then NavSet.SelectedPath = pathName end
-                                                end
-                                            end
-                                            importString = ''
-                                            UpdatePath(currZone, NavSet.SelectedPath)
-                                        end
-                                    end
-                                    ImGui.PopStyleColor()
-                                else
-                                    ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.500, 0.500, 0.500, 1.000))
-                                    ImGui.Button(Module.Icons.FA_DOWNLOAD .. "##Dummy")
-                                    ImGui.PopStyleColor()
-                                end
-                                if ImGui.IsItemHovered() then
-                                    ImGui.SetTooltip("Import Path")
-                                end
-                                ImGui.SeparatorText('Export Paths')
-                                ImGui.SetNextItemWidth(120)
-                                if ImGui.BeginCombo("Zone##SelectExportZone", exportZone) then
-                                    if not Paths[exportZone] then Paths[exportZone] = {} end
-                                    for name, data in pairs(Paths) do
-                                        local isSelected = name == exportZone
-                                        if ImGui.Selectable(name, isSelected) then
-                                            exportZone = name
-                                        end
-                                    end
-                                    ImGui.EndCombo()
-                                end
-                                if exportZone ~= 'Select Zone...' then
-                                    ImGui.SetNextItemWidth(120)
-                                    if ImGui.BeginCombo("Path##SelectExportPath", exportPathName) then
-                                        if not Paths[exportZone] then Paths[exportZone] = {} end
-                                        for name, data in pairs(Paths[exportZone]) do
-                                            local isSelected = name == exportPathName
-                                            if ImGui.Selectable(name, isSelected) then
-                                                exportPathName = name
-                                            end
-                                        end
-                                        ImGui.EndCombo()
-                                    end
-                                end
-                                ImGui.SameLine()
-                                if exportZone ~= 'Select Zone...' and exportPathName ~= 'Select Path...' then
-                                    ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.911, 0.461, 0.085, 1.000))
-                                    if ImGui.Button(Module.Icons.FA_SHARE .. "##ExportZonePath") then
-                                        local exportData = export_paths(exportZone, exportPathName, Paths[exportZone][exportPathName])
-                                        ImGui.LogToClipboard()
-                                        ImGui.LogText(exportData)
-                                        ImGui.LogFinish()
-                                        Module.Utils.PrintOutput('MyUI', nil, '\ayPath data copied to clipboard!\ax')
-                                    end
-                                    ImGui.PopStyleColor()
-                                else
-                                    ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.500, 0.500, 0.500, 1.000))
-                                    ImGui.Button(Module.Icons.FA_SHARE .. "##Dummy2")
-                                    ImGui.PopStyleColor()
-                                end
-                                if ImGui.IsItemHovered() then
-                                    ImGui.SetTooltip("Export:  " .. exportZone .. " : " .. exportPathName)
-                                end
-                            end
-                        end
-                        ImGui.Spacing()
-                        ImGui.Separator()
-                        if ImGui.CollapsingHeader("Chain Paths##") then
-                            if NavSet.SelectedPath ~= 'None' then
-                                ImGui.PushID(NavSet.SelectedPath)
-                                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
-                                if ImGui.Button(Module.Icons.MD_PLAYLIST_ADD .. " [" .. NavSet.SelectedPath .. "]##") then
-                                    if not ChainedPaths then ChainedPaths = {} end
-                                    table.insert(ChainedPaths, { Zone = currZone, Path = NavSet.SelectedPath, Type = 'Normal', })
-                                end
-                                ImGui.PopStyleColor()
-                                ImGui.PopID()
-                            else
-                                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.500, 0.500, 0.500, 1.000))
-                                ImGui.Button(Module.Icons.MD_PLAYLIST_ADD .. "##Dummy")
-                                ImGui.PopStyleColor()
-                            end
-                            if ImGui.IsItemHovered() then
-                                ImGui.SetWindowFontScale(scale)
-                                ImGui.SetTooltip("Add " .. currZone .. ": " .. NavSet.SelectedPath .. " to Chain")
-                            end
-
-                            if #ChainedPaths > 0 then
-                                NavSet.ChainLoop = ImGui.Checkbox('Loop Chain', NavSet.ChainLoop)
-                                ImGui.SameLine()
-
-                                ImGui.SetNextItemWidth(100)
-                                saveChainName = ImGui.InputTextWithHint("##ChainName", "Chain Name", saveChainName)
-                                ImGui.SameLine()
-                                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
-                                if ImGui.Button(Module.Icons.MD_SAVE) then
-                                    if saveChainName ~= '' then
-                                        saveChain(saveChainName)
-                                        saveChainName = ''
-                                    end
-                                end
-                                ImGui.PopStyleColor()
-                            end
-                            if SavedChains ~= nil then
-                                if ImGui.BeginCombo("##SelectChain", NavSet.SelectedChain) then
-                                    ImGui.SetWindowFontScale(scale)
-                                    for name, data in pairs(SavedChains) do
-                                        local isSelected = name == NavSet.SelectedChain
-                                        if ImGui.Selectable(name, isSelected) then
-                                            NavSet.SelectedChain = name
-                                        end
-                                    end
-                                    ImGui.EndCombo()
-                                end
-                                ImGui.SameLine()
-                                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
-                                if ImGui.Button(Module.Icons.MD_PLAYLIST_ADD .. "##LoadChain") then
-                                    loadSavedChain(NavSet.SelectedChain)
-                                end
-                                ImGui.PopStyleColor()
-                            end
-
-                            local tmpCZ, tmpCP = {}, {}
-                            for name, data in pairs(Paths) do
-                                table.insert(tmpCZ, name)
-                            end
-                            table.sort(tmpCZ)
-                            ImGui.SetNextItemWidth(120)
-
-                            if ImGui.BeginCombo("Zone##SelectChainZone", NavSet.ChainZone) then
-                                ImGui.SetWindowFontScale(scale)
-                                if not Paths[NavSet.ChainZone] then Paths[NavSet.ChainZone] = {} end
-                                for k, name in pairs(tmpCZ) do
-                                    local isSelected = name == NavSet.ChainZone
-                                    if ImGui.Selectable(name, isSelected) then
-                                        NavSet.ChainZone = name
-                                    end
-                                end
-                                ImGui.EndCombo()
-                            end
-                            if NavSet.ChainZone ~= 'Select Zone...' then
-                                ImGui.SetNextItemWidth(120)
-
-                                if ImGui.BeginCombo("Path##SelectChainPath", NavSet.ChainPath) then
-                                    ImGui.SetWindowFontScale(scale)
-                                    if not Paths[NavSet.ChainZone] then Paths[NavSet.ChainZone] = {} end
-                                    for k, data in pairs(Paths[NavSet.ChainZone]) do
-                                        table.insert(tmpCP, k)
-                                    end
-                                    table.sort(tmpCP)
-                                    for k, name in pairs(tmpCP) do
-                                        local isSelected = name == NavSet.ChainPath
-                                        if ImGui.Selectable(name, isSelected) then
-                                            NavSet.ChainPath = name
-                                        end
-                                    end
-                                    ImGui.EndCombo()
-                                end
-                            end
-                            ImGui.SameLine()
-
-                            if NavSet.ChainZone ~= 'Select Zone...' and NavSet.ChainPath ~= 'Select Path...' then
-                                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
-                                if ImGui.Button(Module.Icons.MD_PLAYLIST_ADD .. " [" .. NavSet.ChainPath .. "]##") then
-                                    if not ChainedPaths then ChainedPaths = {} end
-                                    table.insert(ChainedPaths, { Zone = NavSet.ChainZone, Path = NavSet.ChainPath, Type = 'Normal', })
-                                end
-                                ImGui.PopStyleColor()
-                            else
-                                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.500, 0.500, 0.500, 1.000))
-                                ImGui.Button(Module.Icons.MD_PLAYLIST_ADD .. "##Dummy2")
-                                ImGui.PopStyleColor()
-                            end
-                            if ImGui.IsItemHovered() then
-                                ImGui.SetTooltip("Add " .. NavSet.ChainZone .. ": " .. NavSet.ChainPath .. " to Chain")
-                            end
-                            if #ChainedPaths > 0 then
-                                ImGui.SameLine()
-                                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(1, 0.4, 0.4, 0.4))
-                                if ImGui.Button(Module.Icons.MD_DELETE_SWEEP .. "##") then
-                                    ChainedPaths = {}
-                                end
-                                ImGui.PopStyleColor()
-
-                                if ImGui.IsItemHovered() then
-                                    ImGui.SetTooltip("Clear Chain")
-                                end
-                                ImGui.SeparatorText("Chain Paths:")
-                                for i = 1, #ChainedPaths do
-                                    ImGui.SetNextItemWidth(100)
-                                    local chainType = { 'Normal', 'Loop', 'PingPong', 'Reverse', }
-                                    if ImGui.BeginCombo("##PathType_" .. i, ChainedPaths[i].Type) then
-                                        if not Paths[currZone] then Paths[currZone] = {} end
-                                        for k, v in pairs(chainType) do
-                                            local isSelected = v == ChainedPaths[i].Type
-                                            if ImGui.Selectable(v, isSelected) then
-                                                ChainedPaths[i].Type = v
-                                            end
-                                        end
-                                        ImGui.EndCombo()
-                                    end
-                                    ImGui.SameLine()
-                                    ImGui.TextColored(0.0, 1, 1, 1, "%s", ChainedPaths[i].Zone)
-                                    ImGui.SameLine()
-                                    if ChainedPaths[i].Path == NavSet.ChainPath then
-                                        ImGui.TextColored(1, 1, 0, 1, "%s", ChainedPaths[i].Path)
-                                    else
-                                        ImGui.TextColored(0.0, 1, 0, 1, "%s", ChainedPaths[i].Path)
-                                    end
-                                end
-                            end
-                        end
-                        ImGui.Spacing()
-                        if NavSet.SelectedPath ~= 'None' or #ChainedPaths > 0 then
-                            -- Navigation Controls
-                            if ImGui.CollapsingHeader("Navigation##") then
-                                if not NavSet.doNav then
-                                    NavSet.doReverse = ImGui.Checkbox('Reverse Order', NavSet.doReverse)
-                                    ImGui.SameLine()
-                                end
-                                NavSet.doLoop = ImGui.Checkbox('Loop Path', NavSet.doLoop)
-                                ImGui.SameLine()
-                                NavSet.doPingPong = ImGui.Checkbox('Ping Pong', NavSet.doPingPong)
-                                if NavSet.doPingPong then
-                                    NavSet.doLoop = true
-                                end
-                                ImGui.Separator()
-                                if not Paths[currZone] then Paths[currZone] = {} end
-                                if NavSet.doPause and NavSet.doNav then
-                                    ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
-
-                                    if ImGui.Button(Module.Icons.FA_PLAY_CIRCLE_O) then
-                                        NavSet.doPause = false
-                                        NavSet.PausedActiveGN = false
-                                        table.insert(debugMessages,
-                                            { Time = os.date("%H:%M:%S"), Zone = currZone, Path = NavSet.SelectedPath, WP = 'Resume', Status = 'Resumed Navigation!', })
-                                    end
-                                    ImGui.PopStyleColor()
-
-                                    if ImGui.IsItemHovered() then
-                                        ImGui.SetTooltip("Resume Navigation")
-                                    end
-                                    ImGui.SameLine()
-                                elseif not NavSet.doPause and NavSet.doNav then
-                                    ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(1, 0.4, 0.4, 0.4))
-
-                                    if ImGui.Button(Module.Icons.FA_PAUSE) then
-                                        NavSet.doPause = true
-                                        mq.cmd("/nav stop log=off")
-                                        table.insert(debugMessages,
-                                            { Time = os.date("%H:%M:%S"), Zone = currZone, Path = NavSet.SelectedPath, WP = 'Pause', Status = 'Paused Navigation!', })
-                                    end
-                                    ImGui.PopStyleColor()
-
-                                    if ImGui.IsItemHovered() then
-                                        ImGui.SetTooltip("Pause Navigation")
-                                    end
-                                    ImGui.SameLine()
-                                end
-                                local tmpLabel = NavSet.doNav and Module.Icons.FA_STOP or Module.Icons.FA_PLAY
-                                if NavSet.doNav then
-                                    ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(1.0, 0.4, 0.4, 0.4))
-                                else
-                                    ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1.0, 0.4, 0.4))
-                                end
-                                if ImGui.Button(tmpLabel) then
-                                    NavSet.PausedActiveGN = false
-                                    NavSet.doNav = not NavSet.doNav
-                                    NavSet.ChainStart = false
-                                    if not NavSet.doNav then
-                                        mq.cmdf("/nav stop log=off")
-                                        NavSet.ChainStart = false
-                                        PathStartClock, PathStartTime = nil, nil
-                                    else
-                                        PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
-                                    end
-                                end
-                                ImGui.PopStyleColor()
-
-                                if ImGui.IsItemHovered() then
-                                    if NavSet.doNav then
-                                        ImGui.SetTooltip("Stop Navigation")
-                                    else
-                                        ImGui.SetTooltip("Start Navigation")
-                                    end
-                                end
-                                ImGui.SameLine()
-                                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1.0, 0.4, 0.4))
-                                if ImGui.Button(Module.Icons.FA_PLAY .. " Closest WP") then
-                                    NavSet.CurrentStepIndex = closestWaypointIndex
-                                    NavSet.doNav = true
-                                    NavSet.PausedActiveGN = false
-                                    PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
-                                end
-                                ImGui.PopStyleColor()
-                                if ImGui.IsItemHovered() then
-                                    ImGui.SetTooltip("Start Navigation at Closest Waypoint")
-                                end
-                                ImGui.SetNextItemWidth(100)
-                                NavSet.StopDist = ImGui.InputInt("Stop Distance##" .. Module.Name, NavSet.StopDist, 1, 50)
-                                ImGui.SetNextItemWidth(100)
-                                NavSet.WpPause = ImGui.InputInt("Global Pause##" .. Module.Name, NavSet.WpPause, 1, 5)
-                            end
-                        end
+                        ImGui.EndChild()
+                        ImGui.EndTabItem()
                     end
-                    ImGui.EndChild()
-                    ImGui.EndTabItem()
                 end
-                if ImGui.BeginTabItem('Path Data') then
-                    if ImGui.BeginChild("Tabs##PathTab", -1, -1, ImGuiChildFlags.AutoResizeX) then
-                        if NavSet.SelectedPath ~= 'None' then
-                            if ImGui.CollapsingHeader("Manage Waypoints##") then
-                                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1, 0.4, 0.4))
-                                if ImGui.Button(Module.Icons.MD_ADD_LOCATION) then
-                                    RecordWaypoint(NavSet.SelectedPath)
-                                end
-                                ImGui.PopStyleColor()
-                                if ImGui.IsItemHovered() then
-                                    ImGui.SetTooltip("Add Waypoint")
-                                end
-
-                                ImGui.SameLine()
-                                local label = Module.Icons.MD_FIBER_MANUAL_RECORD
-                                if NavSet.autoRecord then
-                                    label = Module.Icons.FA_STOP_CIRCLE
-                                    ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(1.0, 0.4, 0.4, 0.4))
-                                else
-                                    ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0.4, 1.0, 0.4, 0.4))
-                                end
-                                if ImGui.Button(label) then
-                                    NavSet.autoRecord = not NavSet.autoRecord
-                                    if NavSet.autoRecord then
-                                        if DEBUG then
-                                            table.insert(debugMessages,
-                                                {
-                                                    Time = os.date("%H:%M:%S"),
-                                                    Zone = mq.TLO.Zone.ShortName(),
-                                                    Path = NavSet.SelectedPath,
-                                                    WP = 'Start Recording',
-                                                    Status =
-                                                    'Start Recording Waypoints!',
-                                                })
-                                        end
-                                    else
-                                        if DEBUG then
-                                            table.insert(debugMessages,
-                                                {
-                                                    Time = os.date("%H:%M:%S"),
-                                                    Zone = mq.TLO.Zone.ShortName(),
-                                                    Path = NavSet.SelectedPath,
-                                                    WP = 'Stop Recording',
-                                                    Status =
-                                                    'Stop Recording Waypoints!',
-                                                })
-                                        end
-                                    end
-                                end
-                                ImGui.PopStyleColor()
-
-                                if ImGui.IsItemHovered() then
-                                    ImGui.SetTooltip("Auto Record Waypoints")
-                                end
-                                ImGui.SameLine()
-                                ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(1.0, 0.4, 0.4, 0.4))
-                                if ImGui.Button(Module.Icons.MD_DELETE_SWEEP) then
-                                    ClearWaypoints(NavSet.SelectedPath)
-                                end
-                                ImGui.PopStyleColor()
-                                if ImGui.IsItemHovered() then
-                                    ImGui.SetTooltip("Clear Waypoints")
-                                end
-                                ImGui.SameLine()
-                                ImGui.SetNextItemWidth(100)
-                                NavSet.RecordDelay = ImGui.InputInt("Rec Delay##" .. Module.Name, NavSet.RecordDelay, 1, 10)
+                if not Module.TempSettings.PathDataPopped then
+                    if ImGui.BeginTabItem('Path Data') then
+                        if ImGui.BeginChild("Tabs##PathTab", -1, -1, ImGuiChildFlags.AutoResizeX) then
+                            if ImGui.SmallButton(Module.Icons.MD_OPEN_IN_NEW .. "##PathDataPopout") then
+                                Module.TempSettings.PathDataPopped = true
                             end
-                            ImGui.Separator()
+                            Module.RenderPathData(scale, tmpTable)
                         end
-                        ImGui.Spacing()
-                        if ImGui.CollapsingHeader("Waypoint Table##Header") then
-                            -- Waypoint Table
-                            if NavSet.SelectedPath ~= 'None' then
-                                ImGui.SetWindowFontScale(scale)
-                                if ImGui.BeginTable('PathTable##WpList', 6, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.ScrollX, ImGuiTableFlags.Resizable, ImGuiTableFlags.Reorderable, ImGuiTableFlags.Hideable), -1, -1) then
-                                    ImGui.TableSetupColumn('WP#', ImGuiTableColumnFlags.WidthFixed, 40)
-                                    ImGui.TableSetupColumn('Loc', ImGuiTableColumnFlags.WidthFixed, 120)
-                                    ImGui.TableSetupColumn('Delay', ImGuiTableColumnFlags.WidthFixed, 90)
-                                    ImGui.TableSetupColumn('Actions', ImGuiTableColumnFlags.WidthFixed, 100)
-                                    ImGui.TableSetupColumn('Door', ImGuiTableColumnFlags.WidthFixed, 90)
-                                    ImGui.TableSetupColumn('Move', ImGuiTableColumnFlags.WidthFixed, 120)
-                                    ImGui.TableSetupScrollFreeze(0, 1)
-                                    ImGui.TableHeadersRow()
 
-                                    for i = 1, #tmpTable do
-                                        ImGui.PushID(i)
-                                        ImGui.TableNextRow()
-                                        ImGui.TableSetColumnIndex(0)
-                                        if tmpTable[i].step == tmpTable[NavSet.CurrentStepIndex].step then
-                                            ImGui.TextColored(ImVec4(0, 1, 0, 1), "%s", tmpTable[i].step)
-                                            if ImGui.IsItemHovered() then
-                                                ImGui.SetTooltip("Current Waypoint")
-                                            end
-                                        else
-                                            ImGui.Text("%s", tmpTable[i].step)
-                                        end
-
-                                        if i == closestWaypointIndex then
-                                            ImGui.SameLine()
-                                            ImGui.TextColored(ImVec4(1, 1, 0, 1), Module.Icons.MD_STAR)
-                                            if ImGui.IsItemHovered() then
-                                                ImGui.SetTooltip("Closest Waypoint")
-                                            end
-                                        end
-                                        -- if tmpTable[i].step == tmpTable[currentStepIndex].step then
-                                        --     ImGui.SameLine()
-                                        --     ImGui.TextColored(ImVec4(0, 1, 1, 1), Icon.MD_STAR)
-                                        --     if ImGui.IsItemHovered() then
-                                        --         ImGui.SetTooltip("Current Waypoint")
-                                        --     end
-                                        -- end
-                                        ImGui.TableSetColumnIndex(1)
-                                        ImGui.Text(tmpTable[i].loc)
-                                        if not NavSet.doNav then
-                                            if ImGui.BeginPopupContextItem("WP_" .. tmpTable[i].step) then
-                                                if ImGui.MenuItem('Nav to WP ' .. tmpTable[i].step) then
-                                                    NavSet.CurrentStepIndex = i
-                                                    NavSet.doNav = true
-                                                    NavSet.doLoop = false
-                                                    NavSet.doSingle = true
-                                                    PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
-                                                end
-
-                                                if ImGui.MenuItem('Start Path Here: WP ' .. tmpTable[i].step) then
-                                                    NavSet.CurrentStepIndex = i
-                                                    NavSet.doNav = true
-                                                    NavSet.doLoop = false
-                                                    NavSet.doSingle = false
-                                                    PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
-                                                end
-                                                if ImGui.MenuItem('Start Loop Here: WP ' .. tmpTable[i].step) then
-                                                    NavSet.CurrentStepIndex = i
-                                                    NavSet.doNav = true
-                                                    NavSet.doLoop = true
-                                                    NavSet.doSingle = false
-                                                    PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
-                                                end
-
-                                                ImGui.EndPopup()
-                                            end
-                                        end
-                                        ImGui.TableSetColumnIndex(2)
-                                        ImGui.SetNextItemWidth(90)
-                                        local changed, changedCmd = false, false
-                                        tmpTable[i].delay, changed = ImGui.InputInt("##delay_" .. i, tmpTable[i].delay, 1, 1)
-                                        if changed then
-                                            for k, v in pairs(Paths[currZone][NavSet.SelectedPath]) do
-                                                if v.step == tmpTable[i].step then
-                                                    Paths[currZone][NavSet.SelectedPath][k].delay = tmpTable[i].delay
-                                                    UpdatePath(currZone, NavSet.SelectedPath)
-                                                end
-                                            end
-                                        end
-                                        if ImGui.IsItemHovered() then
-                                            ImGui.SetTooltip("Delay in Seconds")
-                                        end
-                                        ImGui.TableSetColumnIndex(3)
-                                        ImGui.SetNextItemWidth(-1)
-                                        tmpTable[i].cmd, changedCmd = ImGui.InputText("##cmd_" .. i, tmpTable[i].cmd)
-                                        if changedCmd then
-                                            for k, v in pairs(Paths[currZone][NavSet.SelectedPath]) do
-                                                if v.step == tmpTable[i].step then
-                                                    Paths[currZone][NavSet.SelectedPath][k].cmd = tmpTable[i].cmd
-                                                    UpdatePath(currZone, NavSet.SelectedPath)
-                                                end
-                                            end
-                                        end
-                                        if ImGui.IsItemHovered() then
-                                            ImGui.SetTooltip(tmpTable[i].cmd)
-                                        end
-                                        ImGui.TableSetColumnIndex(4)
-                                        local changedDoor, changedDoorRev = false, false
-                                        tmpTable[i].door, changedDoor = ImGui.Checkbox(Module.Icons.FA_FORWARD .. "##door_" .. i, tmpTable[i].door)
-                                        if changedDoor then
-                                            for k, v in pairs(Paths[currZone][NavSet.SelectedPath]) do
-                                                if v.step == tmpTable[i].step then
-                                                    Paths[currZone][NavSet.SelectedPath][k].door = tmpTable[i].door
-                                                    UpdatePath(currZone, NavSet.SelectedPath)
-                                                end
-                                            end
-                                        end
-                                        if ImGui.IsItemHovered() then
-                                            ImGui.SetTooltip("Door Forward")
-                                        end
-                                        ImGui.SameLine(0, 0)
-                                        tmpTable[i].doorRev, changedDoorRev = ImGui.Checkbox(Module.Icons.FA_BACKWARD .. "##doorRev_" .. i, tmpTable[i].doorRev)
-                                        if changedDoorRev then
-                                            for k, v in pairs(Paths[currZone][NavSet.SelectedPath]) do
-                                                if v.step == tmpTable[i].step then
-                                                    Paths[currZone][NavSet.SelectedPath][k].doorRev = tmpTable[i].doorRev
-                                                    UpdatePath(currZone, NavSet.SelectedPath)
-                                                end
-                                            end
-                                        end
-                                        if ImGui.IsItemHovered() then
-                                            ImGui.SetTooltip("Door Reverse")
-                                        end
-                                        ImGui.TableSetColumnIndex(5)
-                                        if not NavSet.doNav then
-                                            if ImGui.Button(Module.Icons.FA_TRASH .. "##_" .. i) then
-                                                deleteWP = true
-                                                deleteWPStep = tmpTable[i].step
-                                            end
-                                            if ImGui.IsItemHovered() then
-                                                ImGui.SetTooltip("Delete WP")
-                                            end
-                                            -- if not doReverse then
-                                            ImGui.SameLine(0, 0)
-                                            if ImGui.Button(Module.Icons.MD_UPDATE .. '##Update_' .. i) then
-                                                tmpTable[i].loc = MySelf.LocYXZ()
-                                                -- Update Paths table
-                                                for k, v in pairs(Paths[currZone][NavSet.SelectedPath]) do
-                                                    if v.step == tmpTable[i].step then
-                                                        Paths[currZone][NavSet.SelectedPath][k] = tmpTable[i]
-                                                    end
-                                                end
-                                                -- Paths[currZone][selectedPath][tmpTable[i].step].loc = MySelf.LocYXZ()
-                                                UpdatePath(currZone, NavSet.SelectedPath)
-                                            end
-                                            if ImGui.IsItemHovered() then
-                                                ImGui.SetTooltip("Update Loc")
-                                            end
-                                            -- end
-                                            ImGui.SameLine(0, 0)
-                                            if i > 1 and ImGui.Button(Module.Icons.FA_CHEVRON_UP .. "##up_" .. i) then
-                                                -- Swap items in tmpTable
-                                                local tmp = tmpTable[i]
-                                                tmpTable[i] = tmpTable[i - 1]
-                                                tmpTable[i - 1] = tmp
-
-                                                -- Update step values
-                                                tmpTable[i].step, tmpTable[i - 1].step = tmpTable[i - 1].step, tmpTable[i].step
-
-                                                -- Update Paths table
-                                                for k, v in pairs(Paths[currZone][NavSet.SelectedPath]) do
-                                                    if v.step == tmpTable[i].step then
-                                                        Paths[currZone][NavSet.SelectedPath][k] = tmpTable[i]
-                                                    elseif v.step == tmpTable[i - 1].step then
-                                                        Paths[currZone][NavSet.SelectedPath][k] = tmpTable[i - 1]
-                                                    end
-                                                end
-                                                UpdatePath(currZone, NavSet.SelectedPath)
-                                            end
-                                            ImGui.SameLine(0, 0)
-                                            if i < #tmpTable and ImGui.Button(Module.Icons.FA_CHEVRON_DOWN .. "##down_" .. i) then
-                                                -- Swap items in tmpTable
-                                                local tmp = tmpTable[i]
-                                                tmpTable[i] = tmpTable[i + 1]
-                                                tmpTable[i + 1] = tmp
-
-                                                -- Update step values
-                                                tmpTable[i].step, tmpTable[i + 1].step = tmpTable[i + 1].step, tmpTable[i].step
-
-                                                -- Update Paths table
-                                                for k, v in pairs(Paths[currZone][NavSet.SelectedPath]) do
-                                                    if v.step == tmpTable[i].step then
-                                                        Paths[currZone][NavSet.SelectedPath][k] = tmpTable[i]
-                                                    elseif v.step == tmpTable[i + 1].step then
-                                                        Paths[currZone][NavSet.SelectedPath][k] = tmpTable[i + 1]
-                                                    end
-                                                end
-                                                UpdatePath(currZone, NavSet.SelectedPath)
-                                            end
-                                        end
-                                        ImGui.PopID()
-                                    end
-                                    ImGui.EndTable()
-                                end
-                            else
-                                ImGui.Text("No Path Selected")
-                            end
-                        end
+                        ImGui.EndChild()
+                        ImGui.EndTabItem()
                     end
-                    ImGui.EndChild()
-                    ImGui.EndTabItem()
                 end
                 if showDebugTab and DEBUG then
                     if not Module.TempSettings.PopDebug then
@@ -2405,17 +2428,6 @@ function Module.RenderGUI()
 
                 ImGui.EndTabBar()
             end
-            if Module.TempSettings.PopDebug then
-                ImGui.SetNextWindowSize(ImVec2(400, 300), ImGuiCond.FirstUseEver)
-                local openDebug, showDebug = ImGui.Begin('MyPaths Debug Popout##' .. Module.Name, true, bit32.bor(ImGuiWindowFlags.None))
-                if not openDebug then
-                    Module.TempSettings.PopDebug = false
-                end
-                if showDebug then
-                    RenderDebugMessages(scale)
-                end
-                ImGui.End()
-            end
             -- ImGui.EndChild()
         end
         -- Reset Font Scale
@@ -2423,10 +2435,52 @@ function Module.RenderGUI()
         -- Unload Theme
         Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
         ImGui.End()
+
+        if Module.TempSettings.ControlsPopped then
+            ImGui.SetNextWindowSize(ImVec2(400, 300), ImGuiCond.FirstUseEver)
+            local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
+            local openControls, showControls = ImGui.Begin('MyPaths Controls Popout##' .. Module.Name, true, bit32.bor(ImGuiWindowFlags.None))
+            if not openControls then
+                Module.TempSettings.ControlsPopped = false
+                showControls = false
+            end
+            if showControls then
+                Module.RenderControls(scale, tmpTable)
+            end
+            ImGui.End()
+            Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
+        end
+
+        if Module.TempSettings.PathDataPopped then
+            ImGui.SetNextWindowSize(ImVec2(400, 300), ImGuiCond.FirstUseEver)
+            local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
+            local openPathData, showPathData = ImGui.Begin('MyPaths Path Data Popout##' .. Module.Name, true, bit32.bor(ImGuiWindowFlags.None))
+            if not openPathData then
+                Module.TempSettings.PathDataPopped = false
+                showPathData = false
+            end
+            if showPathData then
+                Module.RenderPathData(scale, tmpTable)
+            end
+            ImGui.End()
+            Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
+        end
     end
 
     -- Config Window
-
+    if Module.TempSettings.PopDebug and DEBUG then
+        ImGui.SetNextWindowSize(ImVec2(400, 300), ImGuiCond.FirstUseEver)
+        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
+        local openDebug, showDebug = ImGui.Begin('MyPaths Debug Popout##' .. Module.Name, true, bit32.bor(ImGuiWindowFlags.None))
+        if not openDebug then
+            Module.TempSettings.PopDebug = false
+        end
+        if showDebug then
+            RenderDebugMessages(scale)
+        end
+        ImGui.End()
+        Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
+    end
 
     if showConfigGUI then
         if currZone ~= lastZone then return end
@@ -2913,47 +2967,47 @@ local function handleArguments()
                 NavSet.doReverse = false
                 NavSet.doNav = true
                 NavSet.doLoop = true
-                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.clock()
             end
             if action == 'rloop' then
                 NavSet.SelectedPath = path
                 NavSet.doReverse = true
                 NavSet.doNav = true
                 NavSet.doLoop = true
-                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.clock()
             end
             if action == 'start' then
                 NavSet.SelectedPath = path
                 NavSet.doReverse = false
                 NavSet.doNav = true
                 NavSet.doLoop = false
-                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.clock()
             end
             if action == 'reverse' then
                 NavSet.SelectedPath = path
                 NavSet.doReverse = true
                 NavSet.doNav = true
-                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.clock()
             end
             if action == 'pingpong' then
                 NavSet.SelectedPath = path
                 NavSet.doPingPong = true
                 NavSet.doNav = true
-                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.clock()
             end
             if action == 'closest' then
                 NavSet.SelectedPath = path
                 NavSet.doNav = true
                 NavSet.doReverse = false
                 NavSet.CurrentStepIndex = FindIndexClosestWaypoint(Paths[zone][path])
-                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.clock()
             end
             if action == 'rclosest' then
                 NavSet.SelectedPath = path
                 NavSet.doNav = true
                 NavSet.doReverse = true
                 NavSet.CurrentStepIndex = FindIndexClosestWaypoint(Paths[zone][path])
-                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.clock()
             end
         end
         if key == 'chainadd' then
@@ -3055,7 +3109,7 @@ local function Init()
     lastZone = currZone
     displayHelp()
     processArgs()
-
+    Module.cycleTime = os.clock()
     Module.IsRunning = true
     if not loadedExeternally then
         mq.imgui.init(Module.Name, Module.RenderGUI)
@@ -3070,7 +3124,6 @@ function Module.MainLoop()
     end
 
     local justZoned = false
-    local cTime = os.time()
     currZone = mq.TLO.Zone.ShortName()
 
     if (InterruptSet.stopForDist and InterruptSet.stopForCharm and InterruptSet.stopForCombat and InterruptSet.stopForFear and InterruptSet.stopForGM and
@@ -3092,13 +3145,13 @@ function Module.MainLoop()
         NavSet.doPingPong = false
         NavSet.doPause = false
 
-        intPauseTime = 0
+        Module.intPauseTime = 0
         InterruptSet.PauseStart = 0
         NavSet.PauseStart = 0
         NavSet.PreviousDoNav = false
         -- Reset navigation state for new zone
         NavSet.CurrentStepIndex = 1
-        status = 'Idle'
+        Module.Status = 'Idle'
         NavSet.CurChain = NavSet.CurChain + 1
         if NavSet.ChainStart then
             InterruptSet.interruptFound = false
@@ -3124,8 +3177,8 @@ function Module.MainLoop()
                     end
                     NavSet.doChainPause = false
                     NavSet.doNav = true
-                    PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
-                    status = 'Navigating'
+                    PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.clock()
+                    Module.Status = 'Navigating'
                     Module.Utils.PrintOutput('MyUI', nil, '\ay[\at%s\ax] \agStarting navigation for path: \ay%s \agin zone: \ay%s', Module.Name, NavSet.SelectedPath, currZone)
                 end
             else
@@ -3144,6 +3197,14 @@ function Module.MainLoop()
     end
 
     if justZoned then return end
+
+    if NavSet.doPause then
+        goto paused
+    end
+
+    if NavSet.doNav then
+        InterruptSet.interruptFound = CheckInterrupts()
+    end
 
     if NavSet.doNav and NavSet.ChainStart and not NavSet.doChainPause then
         NavSet.ChainPath = NavSet.SelectedPath
@@ -3187,7 +3248,7 @@ function Module.MainLoop()
     end
 
     if not MySelf.Sitting() then
-        lastHP, lastMP = 0, 0
+        Module.lastHP, Module.lastMP = 0, 0
     end
 
     if NavSet.SelectedPath == 'None' then
@@ -3197,7 +3258,7 @@ function Module.MainLoop()
         NavSet.doPause = false
         NavSet.LoopCount = 0
         NavSet.CurrentStepIndex = 1
-        status = 'Idle'
+        Module.Status = 'Idle'
         PathStartClock, PathStartTime = nil, nil
     elseif NavSet.LastPath == nil then
         NavSet.LastPath = NavSet.SelectedPath
@@ -3208,20 +3269,18 @@ function Module.MainLoop()
         NavSet.LastPath = NavSet.SelectedPath
         NavSet.LoopCount = 0
         NavSet.CurrentStepIndex = 1
-        status = 'Idle'
+        Module.Status = 'Idle'
         PathStartClock, PathStartTime = nil, nil
     end
 
     -- check interrupts
-    InterruptSet.interruptFound = CheckInterrupts()
     if NavSet.doNav and not NavSet.doPause and not justZoned then
         -- mq.delay(1)
-        cTime = os.time()
         local checkTime = InterruptSet.interruptCheck
         -- Module.Utils.PrintOutput('MyUI',nil,"interrupt Checked: %s", checkTime)
         -- if cTime - checkTime >= 1 then
         InterruptSet.interruptFound = CheckInterrupts()
-        InterruptSet.interruptCheck = os.time()
+        InterruptSet.interruptCheck = os.clock()
         if mq.TLO.SpawnCount('gm')() > 0 and InterruptSet.stopForGM and not NavSet.PausedActiveGN then
             Module.Utils.PrintOutput('MyUI', nil, "\ay[\at%s\ax] \arGM Detected, \ayPausing Navigation...", Module.Name)
             NavSet.doNav = false
@@ -3229,10 +3288,10 @@ function Module.MainLoop()
             NavSet.ChainStart = false
             mq.cmd("/multiline ; /squelch /beep; /timed  3, /beep ; /timed 2, /beep ; /timed 1, /beep")
             mq.delay(1)
-            status = 'Paused: GM Detected'
+            Module.Status = 'Paused: GM Detected'
             NavSet.PausedActiveGN = true
         end
-        if status == 'Paused for Invis.' or status == 'Paused for Double Invis.' then
+        if Module.Status == 'Paused for Invis.' or Module.Status == 'Paused for Double Invis.' then
             if settings[Module.Name].InvisAction ~= '' then
                 mq.cmd(settings[Module.Name].InvisAction)
                 -- local iDelay = settings[script].InvisDelay * 1000
@@ -3247,20 +3306,20 @@ function Module.MainLoop()
             -- Reset the coroutine since doNav changed from false to true
             co = coroutine.create(NavigatePath)
         end
-        curTime = os.time()
+        curTime = os.clock()
 
         -- If the coroutine is not dead, resume it
         if coroutine.status(co) ~= "dead" then
             -- Check if we need to pause
             if InterruptSet.PauseStart > 0 and NavSet.PauseStart == 0 then
-                curTime = os.time()
+                curTime = os.clock()
 
                 local diff = curTime - InterruptSet.PauseStart
-                if diff > intPauseTime then
+                if diff > Module.intPauseTime then
                     -- Time is up, resume the coroutine and reset the timer values
 
                     -- Module.Utils.PrintOutput('MyUI',nil,"Pause time: %s Start Time %s Current Time: %s Difference: %s", pauseTime, InterruptSet.PauseStart, curTime, diff)
-                    intPauseTime = 0
+                    Module.intPauseTime = 0
                     InterruptSet.PauseStart = 0
                     local success, message = coroutine.resume(co, NavSet.SelectedPath)
                     if not success then
@@ -3270,23 +3329,23 @@ function Module.MainLoop()
                     end
                 end
             elseif InterruptSet.PauseStart > 0 and NavSet.PauseStart > 0 then
-                curTime = os.time()
+                curTime = os.clock()
                 local diff = curTime - InterruptSet.PauseStart
-                if diff > intPauseTime then
+                if diff > Module.intPauseTime then
                     -- Interrupt is over, reset the values
-                    intPauseTime = 0
+                    Module.intPauseTime = 0
                     InterruptSet.PauseStart = 0
                     --reset wp pause timer
-                    NavSet.PauseStart = os.time()
-                    status = string.format('Paused: Interrupt over Restarting WP %s delay', curWpPauseTime)
+                    NavSet.PauseStart = os.clock()
+                    Module.Status = string.format('Paused: Interrupt over Restarting WP %s delay', Module.curWpPauseTime)
                 end
             elseif InterruptSet.PauseStart == 0 and NavSet.PauseStart > 0 then
-                curTime = os.time()
+                curTime = os.clock()
                 local diff = curTime - NavSet.PauseStart
-                if diff > curWpPauseTime then
+                if diff > Module.curWpPauseTime then
                     -- Time is up, resume the coroutine and reset the timer values
                     -- Module.Utils.PrintOutput('MyUI',nil,"Pause time: %s Start Time %s Current Time: %s Difference: %s", pauseTime, InterruptSet.PauseStart, curTime, diff)
-                    curWpPauseTime = 0
+                    Module.curWpPauseTime = 0
                     NavSet.PauseStart = 0
                     local success, message = coroutine.resume(co, NavSet.SelectedPath)
                     if not success then
@@ -3313,7 +3372,7 @@ function Module.MainLoop()
         NavSet.LoopCount = 0
         if not NavSet.ChainStart then
             NavSet.doPause = false
-            status = 'Idle'
+            Module.Status = 'Idle'
         end
         NavSet.CurrentStepIndex = 1
 
@@ -3327,7 +3386,7 @@ function Module.MainLoop()
         -- for i = 1, #Chain do
         if ChainedPaths[NavSet.CurChain].Path == NavSet.ChainPath and NavSet.CurChain < #ChainedPaths then
             if ChainedPaths[NavSet.CurChain + 1].Zone ~= currZone then
-                status = 'Next Path Waiting to Zone: ' .. ChainedPaths[NavSet.CurChain + 1].Zone
+                Module.Status = 'Next Path Waiting to Zone: ' .. ChainedPaths[NavSet.CurChain + 1].Zone
                 NavSet.doPause = true
             else
                 NavSet.SelectedPath = ChainedPaths[NavSet.CurChain + 1].Path
@@ -3351,7 +3410,7 @@ function Module.MainLoop()
                 end
                 NavSet.CurChain = NavSet.CurChain + 1
                 NavSet.doNav = true
-                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.time()
+                PathStartClock, PathStartTime = os.date("%I:%M:%S %p"), os.clock()
             end
         elseif ChainedPaths[NavSet.CurChain].Path == NavSet.ChainPath and NavSet.CurChain == #ChainedPaths then
             if not NavSet.ChainLoop then
@@ -3394,15 +3453,17 @@ function Module.MainLoop()
         deleteWP = false
     end
 
+    ::paused::
+
     if DEBUG then
-        if lastStatus ~= status then
-            local statTxt = status
-            if status:find("Distance") then
+        if lastStatus ~= Module.Status then
+            local statTxt = Module.Status
+            if Module.Status:find("Distance") then
                 statTxt = statTxt:gsub("Distance:", "Dist:")
             end
             table.insert(debugMessages,
                 { Time = os.date("%H:%M:%S"), WP = NavSet.CurrentStepIndex, Status = statTxt, Path = NavSet.SelectedPath, Zone = mq.TLO.Zone.ShortName(), })
-            lastStatus = status
+            lastStatus = Module.Status
         end
         while #debugMessages > 100 do
             table.remove(debugMessages, 1)
@@ -3418,6 +3479,10 @@ function Module.MainLoop()
         oneshot = false
         Module.IsRunning = false
     end
+    if DEBUG and Module.Status ~= 'Idle' then
+        Module.TempSettings.Cycle = (os.clock() - Module.cycleTime)
+    end
+    Module.cycleTime = os.clock()
 end
 
 function Module.LocalLoop()

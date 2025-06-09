@@ -97,11 +97,30 @@ local function CommandHandler(...)
 	if args[1] ~= nil then
 		if args[1] == 'exit' or args[1] == 'quit' then
 			Module.IsRunning = false
-			Module.Utils.PrintOutput('MyUI', true, "\ay%s \awis \arExiting\aw...", Module.Name)
+			Module.Utils.PrintOutput('MyAA', true, "\ay%s \awis \arExiting\aw...", Module.Name)
 		elseif args[1] == 'show' or args[1] == 'ui' then
 			Module.ShowGui = not Module.ShowGui
 		end
 	end
+end
+
+function Module.UpdateAA(which)
+	if which == nil then which = "all" end
+	if which == "general" or which == "all" then
+		genAA = Module.GetAALists("general")
+	end
+	if which == "arch" or which == "all" then
+		archAA = Module.GetAALists("arch")
+	end
+	if which == "class" or which == "all" then
+		classAA = Module.GetAALists("class")
+	end
+	if which == "special" or which == "all" then
+		specAA = Module.GetAALists("special")
+	end
+	availAA = MySelf.AAPoints() or 0
+	spentAA = MySelf.AAPointsSpent() or 0
+	totalAA = MySelf.AAPointsTotal() or 0
 end
 
 local function Init()
@@ -109,11 +128,8 @@ local function Init()
 	LoadSettings() -- Load the settings from the config file
 	mq.bind('/myaa', CommandHandler)
 	Module.IsRunning = true
-	Module.Utils.PrintOutput('MyUI', false, "\a-w[\at%s\a-w] \agLoaded\aw!", Module.Name)
-	genAA = Module.GetAALists("general")
-	classAA = Module.GetAALists("class")
-	archAA = Module.GetAALists("arch")
-	specAA = Module.GetAALists("special")
+	Module.Utils.PrintOutput('MyAA', false, "\a-w[\at%s\a-w] \agLoaded\aw!", Module.Name)
+	Module.UpdateAA("all") -- Update the AA lists
 
 	if not loadedExeternally then
 		mq.imgui.init(Module.Name, Module.RenderGUI)
@@ -206,8 +222,8 @@ local function DrawAATable(which_Table, label)
 				if availAA >= cost and cur < max then
 					if ImGui.SmallButton("train##" .. data.Name) then
 						selectedAA = data.Name
-						local rowNum = ListName.List(data.Name, 1)() or 0 -- Select the AA in the AA window
-						toTrain[data.Name] = { row = rowNum, list = ListName, } -- Store the row number and list for later use
+						local rowNum = ListName.List(data.Name, 1)() or 0                             -- Select the AA in the AA window
+						toTrain[data.Name] = { row = rowNum, list = ListName, cost = data.Cost or 0, section = label, } -- Store the row number and list for later use
 						doTrain = true
 					end
 				end
@@ -349,21 +365,30 @@ end
 function Module.MainLoop()
 	if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
 
-	if mq.gettime() - drawTimerMS < 500 then
-		return
-	else
-		drawTimerMS = mq.gettime()
-		genAA = Module.GetAALists("general")
-		classAA = Module.GetAALists("class")
-		archAA = Module.GetAALists("arch")
-		specAA = Module.GetAALists("special")
-	end
+	-- if not Module.ShowGui or (Module.ShowGui and mq.gettime() - drawTimerMS < 500) then
+	-- 	return
+	-- else
+	-- 	drawTimerMS = mq.gettime()
+	-- 	genAA = Module.GetAALists("general")
+	-- 	classAA = Module.GetAALists("class")
+	-- 	archAA = Module.GetAALists("arch")
+	-- 	specAA = Module.GetAALists("special")
+	-- end
 	if doTrain then
 		for name, data in pairs(toTrain) do
+			local aaStart = availAA
 			if data.row and data.list then
-				data.list.Select(data.row)                  -- Select the AA in the AA window
+				data.list.Select(data.row)                                         -- Select the AA in the AA window
 				mq.delay(30)
-				mq.TLO.Window("AAWindow/AAW_TrainButton").LeftMouseUp() -- Click the Train button
+				mq.TLO.Window("AAWindow/AAW_TrainButton").LeftMouseUp()            -- Click the Train button
+				mq.delay(2000, function() return MySelf.AAPoints() == aaStart - data.cost end) -- Wait until AA points are updated
+
+				Module.UpdateAA(data.section)                                      -- Update the AA lists after training
+				if availAA == aaStart - data.cost then
+					Module.Utils.PrintOutput('MyAA', false, "\aw[\at%s\ax] \agTrained \ay%s\ag for \ay%s\ag AA points.", Module.Name, name, data.cost)
+				else
+					Module.Utils.PrintOutput('MyAA', false, "\aw[\at%s\ax] \arFailed to train \ay%s\ar for \ay%s\ar AA points.", Module.Name, name, data.cost)
+				end
 			end
 		end
 

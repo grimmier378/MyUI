@@ -69,7 +69,10 @@ local default_list               = {
 	"MyStats",
 	"iTrack",
 	"MyAA",
-	--"MyDots",
+	"RaidWatch",
+	"MyAA",
+	"Clock",
+	"MapButton",
 }
 
 MyUI_DefaultConfig               = {

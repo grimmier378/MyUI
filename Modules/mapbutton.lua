@@ -102,10 +102,11 @@ local function RenderBtn()
 		ImGui.Text(Module.Name)
 		ImGui.Text("Toggle NearBy Map")
 		ImGui.Separator()
-		ImGui.TextColored(ImVec4(1, 1, 0, 1), "Ctrl + M to toggle")
+		ImGui.TextColored(ImVec4(1, 1, 0, 1), "(Ctrl + M) or\n(Shift + MiddleMouseBtn)\nto toggle")
 		ImGui.EndTooltip()
 	end
-	if ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsKeyPressed(ImGuiKey.M) then
+	if (ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsKeyPressed(ImGuiKey.M)) or
+		(ImGui.IsMouseReleased(ImGuiMouseButton['Middle']) and ImGui.IsKeyDown(ImGuiMod.Shift)) then
 		mq.cmd("/nearby toggle")
 	end
 	ImGui.End()

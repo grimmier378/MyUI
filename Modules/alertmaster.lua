@@ -135,7 +135,7 @@ local playing                                                                   
 local currZone, lastZone
 local newSMFile                                                                                                                        = mq.configDir .. '/MyUI/MQ2SpawnMaster.ini'
 local execCommands                                                                                                                     = false
-
+local displayTablePlayers                                                                                                              = {}
 local DistColorRanges                                                                                                                  = {
 	orange = 600, -- distance the color changes from green to orange
 	red = 1200, -- distance the color changes from orange to red
@@ -556,6 +556,7 @@ local function SpawnToEntry(spawn, id, table)
 		pAggro = spawn.PctAggro() or 0
 	end
 	if spawn.ID() then
+		if spawn.Surname() and spawn.Surname():find("'s ") then return end
 		local entry = {
 			ID = id or 0,
 			MobName = spawn.DisplayName() or ' ',
@@ -679,9 +680,9 @@ local function AlertTableSortSpecs(a, b)
 			end
 		elseif spec.ColumnUserID == Module.GUI_Alert.Table.Column_ID.MobDist then
 			if a.MobDist and b.MobDist then
-				if math.floor(spawnA.Distance()) < math.floor(spawnB.Distance()) then
+				if math.floor(spawnA.Distance() or 0) < math.floor(spawnB.Distance() or 0) then
 					delta = -1
-				elseif math.floor(spawnA.Distance()) > math.floor(spawnB.Distance()) then
+				elseif math.floor(spawnA.Distance() or 0) > math.floor(spawnB.Distance() or 0) then
 					delta = 1
 				end
 			else
@@ -743,12 +744,16 @@ local function RefreshZone()
 	local npcs = mq.getFilteredSpawns(function(spawn) return spawn.Type() == 'NPC' end)
 	for i = 1, #npcs do
 		local spawn = npcs[i]
-		if #npcs > 0 then InsertTableSpawn(newTable, spawn, tonumber(spawn.ID())) end
+		if spawn() then
+			if #npcs > 0 then InsertTableSpawn(newTable, spawn, tonumber(spawn.ID())) end
+		end
 	end
 	for i = 1, mq.TLO.Me.XTargetSlots() do
 		if mq.TLO.Me.XTarget(i)() ~= nil and mq.TLO.Me.XTarget(i)() ~= 0 then
 			local spawn = mq.TLO.Me.XTarget(i)
-			if spawn.ID() > 0 then InsertTableSpawn(xTarTable, spawn, tonumber(spawn.ID())) end
+			if spawn() then
+				if spawn.ID() > 0 then InsertTableSpawn(xTarTable, spawn, tonumber(spawn.ID())) end
+			end
 		end
 	end
 	if showAggro then
@@ -812,14 +817,34 @@ local function spawn_search_players(search)
 				if should_include_player(pc) then
 					tmp[name] = {
 						name = (pc.GM() and '\ag*GM*\ax ' or '') .. '\ar' .. name .. '\ax',
+						tblName = name,
+						level = pc.Level() or 0,
 						guild = '<\ay' .. guild .. '\ax>',
+						tblGuild = guild,
 						distance = math.floor(pc.Distance() or 0),
 						time = os.time(),
+						isGM = pc.GM() or false,
 					}
 				end
 			end
 		end
 	end
+	for name, v in pairs(tmp) do
+		if displayTablePlayers[name] == nil then
+			displayTablePlayers[name] = v
+		else
+			displayTablePlayers[name].distance = v.distance
+			displayTablePlayers[name].time = v.time
+		end
+	end
+	if search ~= 'gm' then
+		for k, v in pairs(displayTablePlayers) do
+			if tmp[k] == nil then
+				displayTablePlayers[k] = nil
+			end
+		end
+	end
+
 	return tmp
 end
 
@@ -846,8 +871,8 @@ local function spawn_search_npcs()
 end
 
 local function check_for_gms()
-	if active and gms then
-		local tmp = spawn_search_players('gm')
+	local tmp = spawn_search_players('gm')
+	if active and gms and not check_safe_zone() then
 		if tmp ~= nil then
 			for name, v in pairs(tmp) do
 				if tGMs[name] == nil then
@@ -879,8 +904,8 @@ local function check_for_gms()
 end
 
 local function check_for_pcs()
-	if active and pcs then
-		local tmp = spawn_search_players('pc radius ' .. radius .. ' zradius ' .. zradius .. ' notid ' .. mq.TLO.Me.ID())
+	local tmp = spawn_search_players('pc radius ' .. radius .. ' zradius ' .. zradius .. ' notid ' .. mq.TLO.Me.ID())
+	if active and pcs and not check_safe_zone() then
 		local charZone = '\aw[\a-o' .. Module.CharLoaded .. '\aw|\at' .. Zone.ShortName() .. '\aw] '
 		if tmp ~= nil then
 			for name, v in pairs(tmp) do
@@ -916,9 +941,8 @@ local function check_for_pcs()
 end
 
 local function check_for_spawns()
-	if active and spawns then
+	if active then
 		local spawnAlertsUpdated, tableUpdate = false, false
-		local charZone = '\aw[\a-o' .. Module.CharLoaded .. '\aw|\at' .. Zone.ShortName() .. '\aw] '
 		if haveSM and (importZone or forceImport) then
 			local counter = 0
 			local tmpSpawnMaster = {}
@@ -950,7 +974,7 @@ local function check_for_spawns()
 			end
 		end
 		local tmp = spawn_search_npcs()
-		if tmp ~= nil then
+		if tmp ~= nil and spawns then
 			for id, v in pairs(tmp) do
 				if tSpawns[id] == nil then
 					if check_safe_zone() ~= true then
@@ -1011,7 +1035,7 @@ local function check_for_spawns()
 end
 
 local function check_for_announce()
-	if active and announce then
+	if active and announce and not check_safe_zone() then
 		local tmp = spawn_search_players('pc notid ' .. mq.TLO.Me.ID())
 		local charZone = '\aw[\a-o' .. Module.CharLoaded .. '\aw|\at' .. Zone.ShortName() .. '\aw] '
 		if tmp ~= nil then
@@ -1049,6 +1073,7 @@ local function check_for_zone_change()
 		zone_id = Zone.ID()
 		alertTime = os.time()
 		doOnce = true
+		displayTablePlayers = {}
 		if haveSM then importZone = true end
 	end
 end
@@ -1283,10 +1308,11 @@ local function DrawToggles()
 end
 
 local function addSpawnToList(name)
+	if name == nil then return end
+
 	local sCount = 0
 	local zone = Zone.ShortName()
 	if settings[zone] == nil then settings[zone] = {} end
-
 	-- if the zone does exist in the ini, spin over entries and make sure we aren't duplicating
 	for k, v in pairs(settings[zone]) do
 		if settings[zone][k] == name then
@@ -1313,8 +1339,16 @@ local function DrawRuleRow(entry)
 		ImGui.EndTooltip()
 	end
 	ImGui.TableNextColumn()
+
 	-- Mob Name
+	if spawnAlerts[entry.MobID] == nil then
+		ImGui.PushStyleColor(ImGuiCol.Text, Module.Colors.color('white'))
+	else
+		ImGui.PushStyleColor(ImGuiCol.Text, Module.Colors.color('green'))
+	end
 	ImGui.Text('%s', entry.MobName)
+	ImGui.PopStyleColor()
+
 	-- Right-click interaction uses the original spawnName
 	if ImGui.IsItemHovered() then
 		if showTooltips then
@@ -1463,60 +1497,98 @@ local function DrawSearchWindow()
 			end
 
 			if currentTab == "zone" then
-				local searchText, selected = ImGui.InputText("Search##RulesSearch", Module.GUI_Main.Search)
-				-- ImGui.PopItemWidth()
-				if selected and Module.GUI_Main.Search ~= searchText then
-					Module.GUI_Main.Search = searchText
-					Module.GUI_Main.Refresh.Sort.Rules = true
-					Module.GUI_Main.Refresh.Table.Unhandled = true
-				end
-				ImGui.SameLine()
-				if ImGui.Button("Clear##ClearRulesSearch") then
-					Module.GUI_Main.Search = ''
-					Module.GUI_Main.Refresh.Sort.Rules = false
-					Module.GUI_Main.Refresh.Table.Unhandled = true
-				end
-				ImGui.Separator()
-				local sizeX = ImGui.GetContentRegionAvail() - 4
-				ImGui.SetWindowFontScale(ZoomLvl)
-				if ImGui.BeginTable('##RulesTable', 8, Module.GUI_Main.Table.Flags) then
-					ImGui.TableSetupScrollFreeze(0, 1)
-					ImGui.TableSetupColumn(Module.Icons.FA_USER_PLUS, bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.NoSort), 15, Module.GUI_Main.Table.Column_ID
-						.Remove)
-					ImGui.TableSetupColumn("Name", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.DefaultSort), 120, Module.GUI_Main.Table.Column_ID.MobName)
-					ImGui.TableSetupColumn("Lvl", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.DefaultSort), 30, Module.GUI_Main.Table.Column_ID.MobLvl)
-					ImGui.TableSetupColumn("Dist", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.DefaultSort), 40, Module.GUI_Main.Table.Column_ID.MobDist)
-					ImGui.TableSetupColumn("Aggro", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.DefaultSort), 30, Module.GUI_Main.Table.Column_ID.MobAggro)
-					ImGui.TableSetupColumn("ID", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.DefaultSort), 30, Module.GUI_Main.Table.Column_ID.MobID)
-					ImGui.TableSetupColumn("Loc", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.NoSort), 90, Module.GUI_Main.Table.Column_ID.MobLoc)
-					ImGui.TableSetupColumn(Module.Icons.FA_COMPASS, bit32.bor(ImGuiTableColumnFlags.NoResize, ImGuiTableColumnFlags.NoSort, ImGuiTableColumnFlags.WidthFixed), 15,
-						Module.GUI_Main.Table.Column_ID.MobDirection)
-					ImGui.TableHeadersRow()
-					local sortSpecs = ImGui.TableGetSortSpecs()
-
-					if sortSpecs and (sortSpecs.SpecsDirty or Module.GUI_Main.Refresh.Sort.Rules) then
-						if #Table_Cache.Unhandled > 0 then
-							Module.GUI_Main.Table.SortSpecs = sortSpecs
-							table.sort(Table_Cache.Unhandled, TableSortSpecs)
-							Module.GUI_Main.Table.SortSpecs = nil
+				if ImGui.BeginTabBar("Spawns##Tabs") then
+					if ImGui.BeginTabItem("NPC's") then
+						local searchText, selected = ImGui.InputText("Search##RulesSearch", Module.GUI_Main.Search)
+						-- ImGui.PopItemWidth()
+						if selected and Module.GUI_Main.Search ~= searchText then
+							Module.GUI_Main.Search = searchText
+							Module.GUI_Main.Refresh.Sort.Rules = true
+							Module.GUI_Main.Refresh.Table.Unhandled = true
 						end
-						sortSpecs.SpecsDirty = false
-						Module.GUI_Main.Refresh.Sort.Rules = false
-					end
-					local clipper = ImGuiListClipper.new()
-					clipper:Begin(#Table_Cache.Unhandled)
-					while clipper:Step() do
-						for i = clipper.DisplayStart, clipper.DisplayEnd - 1, 1 do
-							local entry = Table_Cache.Unhandled[i + 1]
-							ImGui.PushID(entry.ID)
-							ImGui.TableNextRow()
-							DrawRuleRow(entry)
-							ImGui.PopID()
+						ImGui.SameLine()
+						if ImGui.Button("Clear##ClearRulesSearch") then
+							Module.GUI_Main.Search = ''
+							Module.GUI_Main.Refresh.Sort.Rules = false
+							Module.GUI_Main.Refresh.Table.Unhandled = true
 						end
-					end
-					clipper:End()
+						ImGui.Separator()
+						local sizeX = ImGui.GetContentRegionAvail() - 4
+						ImGui.SetWindowFontScale(ZoomLvl)
+						if ImGui.BeginTable('##RulesTable', 8, Module.GUI_Main.Table.Flags) then
+							ImGui.TableSetupScrollFreeze(0, 1)
+							ImGui.TableSetupColumn(Module.Icons.FA_USER_PLUS, bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.NoSort), 15,
+								Module.GUI_Main.Table.Column_ID
+								.Remove)
+							ImGui.TableSetupColumn("Name", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.DefaultSort), 120,
+								Module.GUI_Main.Table.Column_ID.MobName)
+							ImGui.TableSetupColumn("Lvl", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.DefaultSort), 30, Module.GUI_Main.Table.Column_ID.MobLvl)
+							ImGui.TableSetupColumn("Dist", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.DefaultSort), 40,
+								Module.GUI_Main.Table.Column_ID.MobDist)
+							ImGui.TableSetupColumn("Aggro", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.DefaultSort), 30,
+								Module.GUI_Main.Table.Column_ID.MobAggro)
+							ImGui.TableSetupColumn("ID", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.DefaultSort), 30, Module.GUI_Main.Table.Column_ID.MobID)
+							ImGui.TableSetupColumn("Loc", bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.NoSort), 90, Module.GUI_Main.Table.Column_ID.MobLoc)
+							ImGui.TableSetupColumn(Module.Icons.FA_COMPASS, bit32.bor(ImGuiTableColumnFlags.NoResize, ImGuiTableColumnFlags.NoSort, ImGuiTableColumnFlags.WidthFixed),
+								15,
+								Module.GUI_Main.Table.Column_ID.MobDirection)
+							ImGui.TableHeadersRow()
+							local sortSpecs = ImGui.TableGetSortSpecs()
 
-					ImGui.EndTable()
+							if sortSpecs and (sortSpecs.SpecsDirty or Module.GUI_Main.Refresh.Sort.Rules) then
+								if #Table_Cache.Unhandled > 0 then
+									Module.GUI_Main.Table.SortSpecs = sortSpecs
+									table.sort(Table_Cache.Unhandled, TableSortSpecs)
+									Module.GUI_Main.Table.SortSpecs = nil
+								end
+								sortSpecs.SpecsDirty = false
+								Module.GUI_Main.Refresh.Sort.Rules = false
+							end
+							local clipper = ImGuiListClipper.new()
+							clipper:Begin(#Table_Cache.Unhandled)
+							while clipper:Step() do
+								for i = clipper.DisplayStart, clipper.DisplayEnd - 1, 1 do
+									local entry = Table_Cache.Unhandled[i + 1]
+									ImGui.PushID(entry.ID)
+									ImGui.TableNextRow()
+									DrawRuleRow(entry)
+									ImGui.PopID()
+								end
+							end
+							clipper:End()
+
+							ImGui.EndTable()
+						end
+
+						ImGui.EndTabItem()
+					end
+
+					-- Players
+					if ImGui.BeginTabItem("Players") then
+						if ImGui.BeginTable("PlayersInZone", 4, Module.GUI_Main.Table.Flags) then
+							ImGui.TableSetupScrollFreeze(0, 1)
+							ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthFixed, 120)
+							ImGui.TableSetupColumn("Guild", ImGuiTableColumnFlags.WidthFixed, 100)
+							ImGui.TableSetupColumn("Level", ImGuiTableColumnFlags.WidthFixed, 50)
+							ImGui.TableSetupColumn("Distance", ImGuiTableColumnFlags.WidthFixed, 70)
+							ImGui.TableHeadersRow()
+							for _, player in pairs(displayTablePlayers or {}) do
+								ImGui.TableNextRow()
+								ImGui.TableNextColumn()
+								ImGui.TextColored(ImVec4(0, 1, 1, 1), player.tblName or "N/A")
+								ImGui.TableNextColumn()
+								ImGui.TextColored(ImVec4(1, 1, 0, 1), player.tblGuild or "N/A")
+								ImGui.TableNextColumn()
+								ImGui.Text("%s", player.level or "N/A")
+								ImGui.TableNextColumn()
+								ImGui.Text("%0.1f", player.distance or 9999)
+							end
+
+							ImGui.EndTable()
+						end
+						ImGui.EndTabItem()
+					end
+					ImGui.EndTabBar()
 				end
 			elseif currentTab == "npcList" then
 				-- Tab for NPC List
@@ -2204,30 +2276,15 @@ local function load_binds()
 		local sCount = #tSpawns or 0
 		-- adding/removing/listing spawn alerts for current zone
 		if cmd == 'spawnadd' then
-			if val_str ~= nil and val_str ~= 'nil' then
-				val_str = mq.TLO.Target.DisplayName()
-			elseif mq.TLO.Target() ~= nil and mq.TLO.Target.Type() == 'NPC' then
-				val_str = mq.TLO.Target.DisplayName()
-			else
-				Module.Utils.PrintOutput('AlertMaster', true, "\arNO \aoSpawn supplied\aw or \agTarget")
-				return
+			if (val_str == nil or val_str == 'nil') then
+				if mq.TLO.Target() ~= nil and mq.TLO.Target.Type() == 'NPC' then
+					val_str = mq.TLO.Target.DisplayName()
+				else
+					Module.Utils.PrintOutput('AlertMaster', true, "\arNO \aoSpawn supplied\aw or \agTarget")
+					return
+				end
 			end
 			addSpawnToList(val_str)
-			-- -- if the zone doesn't exist in ini yet, create a new table
-			-- if settings[zone] == nil then settings[zone] = {} end
-
-			-- -- if the zone does exist in the ini, spin over entries and make sure we aren't duplicating
-			-- for k, v in pairs(settings[zone]) do
-			-- 	if settings[zone][k] == val_str then
-			-- 		Module.Utils.PrintOutput('AlertMaster',nil,"\aySpawn alert \""..val_str.."\" already exists.")
-			-- 		return
-			-- 	end
-			-- 	sCount = sCount + 1
-			-- end
-			-- -- if we made it this far, the spawn isn't tracked -- add it to the table and store to ini
-			-- settings[zone]['Spawn'..sCount+1] = val_str
-			-- save_settings()
-			-- Module.Utils.PrintOutput('AlertMaster',nil,'\ayAdded spawn alert for '..val_str..' in '..zone)
 		elseif cmd == 'spawndel' and val_str:len() > 0 then
 			-- Identify and remove the spawn from the ini
 			local found = false
@@ -2464,6 +2521,10 @@ local function setup()
 	print_status()
 	RefreshZone()
 	Module.IsRunning = true
+	check_for_pcs()
+	check_for_gms()
+	check_for_announce()
+	check_for_spawns()
 	if not loadedExeternally then
 		mq.imgui.init(Module.Name, Module.RenderGUI)
 		Module.LocalLoop()
@@ -2490,12 +2551,11 @@ function Module.MainLoop()
 		Module.Guild = mq.TLO.Me.Guild() or 'NoGuild'
 
 		check_for_zone_change()
-		check_for_spawns() -- always refresh spawn list and only alert if not a safe zone.(checked later in the function)
-		if check_safe_zone() ~= true then
-			check_for_gms()
-			check_for_announce()
-			check_for_pcs()
-
+		check_for_pcs()
+		check_for_gms()
+		check_for_announce()
+		check_for_spawns()                                                -- always refresh spawn list and only alert if not a safe zone.(checked later in the function)
+		if not check_safe_zone() then
 			if ((os.time() - alertTime) > (remindNPC * 60) and numAlerts > 0) then -- if we're past the alert remindnpc time and we have alerts to give
 				-- do text alerts
 				for _, v in pairs(tSpawns) do

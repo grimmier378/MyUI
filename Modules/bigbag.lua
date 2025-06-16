@@ -1268,7 +1268,7 @@ local function renderBtn()
 		end
 
 		if toggleMouse ~= 'None' then
-			if ImGui.IsMouseReleased(ImGuiMouseButton[toggleMouse]) and not ImGui.IsKeyDown(ImGuiMod.Ctrl) then
+			if ImGui.IsMouseReleased(ImGuiMouseButton[toggleMouse]) and not ImGui.IsKeyDown(ImGuiMod.Ctrl) and not ImGui.IsKeyDown(ImGuiMod.Shift) then
 				Module.ShowGUI = not Module.ShowGUI
 			end
 		end

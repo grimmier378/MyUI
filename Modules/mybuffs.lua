@@ -670,14 +670,12 @@ local function loadSettings()
         loadSettings()
     else
         -- Load settings from the Lua config file
-        Module.timerColor = {}
         Module.settings = dofile(configFile)
         if Module.settings[Module.Name] == nil then
             Module.settings[Module.Name] = {}
             Module.settings[Module.Name] = Module.defaults
             newSetting = true
         end
-        Module.timerColor = Module.settings[Module.Name]
     end
     if Module.settings[Module.Name].Favorites == nil then
         Module.settings[Module.Name].Favorites = {}
@@ -1576,13 +1574,19 @@ function Module.RenderGUI()
                     songTimer = tmpSongTimer
                 end
                 if BuffMe then
-                    Module.settings[Module.Name].BuffBeg = Module.Utils.DrawToggle('Buff Begging##config', Module.settings[Module.Name].BuffBeg, settingsToggleFlags, ImVec2(46, 20),
+                    local clicked = false
+                    Module.settings[Module.Name].BuffBeg, clicked = Module.Utils.DrawToggle('Buff Begging##config', Module.settings[Module.Name].BuffBeg, settingsToggleFlags,
+                        ImVec2(46, 20),
                         nil, nil, ImVec4(1, 1, 0.2, 0.8))
-                    if Module.settings[Module.Name].BuffBeg then
+                    if clicked then
                         local changed = false
                         ImGui.SetNextItemWidth(150)
                         Module.settings[Module.Name].BuffBegTimer, changed = ImGui.DragInt("Buff Beg Timer (Seconds)##MyBuffs", Module.settings[Module.Name].BuffBegTimer, 10, 10,
                             600)
+                        if changed then
+                            mq.pickle(configFile, Module.settings)
+                        end
+                        mq.pickle(configFile, Module.settings)
                     end
                 end
             end
@@ -1787,14 +1791,16 @@ function Module.RenderGUI()
         if showFavs then
             if BuffMe then
                 local changedInt = false
-
-                Module.settings[Module.Name].BuffBeg = Module.Utils.DrawToggle('Buff Begging', Module.settings[Module.Name].BuffBeg,
+                local clicked = false
+                Module.settings[Module.Name].BuffBeg, clicked = Module.Utils.DrawToggle('Buff Begging', Module.settings[Module.Name].BuffBeg,
                     bit32.bor(ToggleFlags, Utils.ImGuiToggleFlags.PulseOnHover),
                     ImVec2(46, 20),
                     ImVec4(0.026, 0.519, 0.791, 1.000),
                     ImVec4(1, 0.2, 0.2, 0.8),
                     ImVec4(1.000, 0.785, 0.000, 1.000))
-
+                if clicked then
+                    Module.NeedSave = true
+                end
                 if Module.settings[Module.Name].BuffBeg then
                     ImGui.SetNextItemWidth(150)
                     Module.settings[Module.Name].BuffBegTimer, changedInt = ImGui.DragInt("Buff Beg Delay (Seconds)##MyBuffs", Module.settings[Module.Name].BuffBegTimer, 10, 10,

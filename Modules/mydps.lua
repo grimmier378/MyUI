@@ -831,6 +831,9 @@ local function DrawHistory(tbl, isHistory)
 					dataWinData['labelName'] = (isHistory and seq ~= "Current") and string.format("%s_%s", labelName, seq) or labelName
 					showDataWin = true
 				end
+				if ImGui.IsItemHovered() then
+					ImGui.SetTooltip("Click to view %s details.", labelName)
+				end
 				ImGui.PopStyleColor()
 				ImGui.TableNextColumn()
 				textColor = seq == "Current" and color.yellow or color.orange

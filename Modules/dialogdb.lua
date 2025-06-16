@@ -825,9 +825,9 @@ local function DrawMainWin()
 							cmdZone = cmdZone .. " "
 						end
 						if not DEBUG then
-							mq.cmdf("/multiline ; %s/target id %s; /timed 5, %s%s", cmdZone, CurrTarID, cmdZone, Module.CommandString)
+							mq.cmdf("/multiline ; %s/target id %s; /timed 10, %s%s", cmdZone, CurrTarID, cmdZone, Module.CommandString)
 						else
-							Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s/target id %s; /timed 5, %s%s", cmdZone, CurrTarID, cmdZone, Module.CommandString)
+							Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s/target id %s; /timed 10, %s%s", cmdZone, CurrTarID, cmdZone, Module.CommandString)
 						end
 						searchString = ""
 					end
@@ -848,9 +848,9 @@ local function DrawMainWin()
 								cmdGroup = cmdGroup .. " "
 							end
 							if not DEBUG then
-								mq.cmdf("/multiline ; %s/target id %s; /timed 5, %s%s", cmdGroup, CurrTarID, cmdGroup, Module.CommandString)
+								mq.cmdf("/multiline ; %s/target id %s; /timed 10, %s%s", cmdGroup, CurrTarID, cmdGroup, Module.CommandString)
 							else
-								Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s/target %s; /timed 5, %s%s", cmdGroup, CurrTarget, cmdGroup, Module.CommandString)
+								Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s/target %s; /timed 10, %s%s", cmdGroup, CurrTarget, cmdGroup, Module.CommandString)
 							end
 							searchString = ""
 						end
@@ -899,9 +899,9 @@ local function DrawMainWin()
 								cmdRaid = cmdRaid .. " "
 							end
 							if not DEBUG then
-								mq.cmdf("/multiline ; %s/target id %s; /timed 5, %s%s", cmdRaid, CurrTarID, cmdRaid, Module.CommandString)
+								mq.cmdf("/multiline ; %s/target id %s; /timed 10, %s%s", cmdRaid, CurrTarID, cmdRaid, Module.CommandString)
 							else
-								Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s/target %s; /timed 5, %s%s", cmdRaid, CurrTarget, cmdRaid, Module.CommandString)
+								Module.Utils.PrintOutput('MyUI', nil, "/multiline ; %s/target %s; /timed 10, %s%s", cmdRaid, CurrTarget, cmdRaid, Module.CommandString)
 							end
 							searchString = ""
 						end
@@ -945,9 +945,9 @@ local function DrawMainWin()
 					if gSize > 1 then
 						if ImGui.Button("Group Hail") then
 							if not DEBUG then
-								mq.cmdf("%s /multiline ; /target id %s; /timed 5, /say hail", cmdGroup, CurrTarID)
+								mq.cmdf("%s /multiline ; /target id %s; /timed 10, /say hail", cmdGroup, CurrTarID)
 							else
-								Module.Utils.PrintOutput('MyUI', nil, "%s /multiline ; /target id %s; /timed 5, /say hail", cmdGroup, CurrTar)
+								Module.Utils.PrintOutput('MyUI', nil, "%s /multiline ; /target id %s; /timed 10, /say hail", cmdGroup, CurrTar)
 							end
 							searchString = ""
 						end
@@ -959,9 +959,9 @@ local function DrawMainWin()
 					if rSize > 0 then
 						if ImGui.Button("Raid Hail") then
 							if not DEBUG then
-								mq.cmdf("%s /multiline ; /target id %s; /timed 5, /say hail", cmdRaid, CurrTarID)
+								mq.cmdf("%s /multiline ; /target id %s; /timed 10, /say hail", cmdRaid, CurrTarID)
 							else
-								Module.Utils.PrintOutput('MyUI', nil, "%s /multiline ; /target id %s; /timed 5, /say hail", cmdRaid, CurrTar)
+								Module.Utils.PrintOutput('MyUI', nil, "%s /multiline ; /target id %s; /timed 10, /say hail", cmdRaid, CurrTar)
 							end
 							searchString = ""
 						end

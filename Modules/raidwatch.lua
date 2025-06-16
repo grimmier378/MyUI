@@ -1,41 +1,8 @@
---[[ Template for Module Creatio/Conversion
-
-GLOBAL MyUI_ variables and functions.
-	MyUI_Utils           = require('lib.common') -- some common functions on other scripts
-	MyUI_Actor           = require('actors') -- Load Actors globally for use in modules
-
-	MyUI_Icons           = require('mq.ICONS') -- text icons for GUI
-	MyUI_Base64          = require('lib.base64') -- for encoding/decoding data to share between clients
-	MyUI_PackageMan      = require('mq.PackageMan') -- Globally load the Package Manager
-	MyUI_LoadModules     = require('lib.modules') -- Functions to load and unload modules.
-	MyUI_SQLite3         = MyUI_PackageMan.Require('lsqlite3') -- globally load sqlite3 package
-	MyUI_Colors          = require('lib.colors')  -- color table for GUI returns ImVec4
-	MyUI_ThemeLoader     = require('lib.theme_loader')
-	MyUI_AbilityPicker   = require('lib.AbilityPicker')
-
-	-- General MQ Build, Char Name, Server Name
-	MyUI_CharLoaded      = mq.TLO.Me.DisplayName()
-	MyUI_Server          = mq.TLO.EverQuest.Server()
-	MyUI_Build           = mq.TLO.MacroQuest.BuildName()
-	MyUI_Guild           = mq.TLO.Me.Guild()
-
-	MyUI_Modules         = {} -- table to hold all loaded modules you can interact with any of their exposed functions here.
-	MyUI_Mode            = 'driver' -- set to 'driver' or 'client' depending on the mode you are running in. can be checked when loading your module if you need to run different code for each mode.
-	MyUI_SettingsFile    = mq.configDir .. '/MyUI/' .. MyUI_Server:gsub(" ", "_") .. '/' .. MyUI_CharLoaded .. '.lua'
-	MyUI_MyChatLoaded    = false -- set to true if MyChat is loaded Check this before trying to use the MyChatHandler
-	MyUI_MyChatHandler = nil -- function to take in messages and output them to a specific tab in MyChat
-							this will create the tab if it does not exist and output the message to it.
-						Usage: MyUI_MyChatHandler('TabName', 'Message')
-							you can use 'main' for the main tab.
-
-	To output to MyChat without directly accessing the handler you can use MyUI_Utils.PrintOutput()
-	MyUI_Utils.PrintOutput will process the output and send it to the correct console(s) based on the parameters and status of MyChaat
-
-	usage: MyUI_Utils.PrintOutput('TabName', outputMainAlso, 'Message %s', 'with formatting')
-		-- This will output to the specified tab and the main console if outputMainAlso is true.
-		-- Leaving the TabName nil will output to the main console only.
-
-
+--[[ RaidWatch Module for MyUI
+This module is designed to monitor raid members in EverQuest, displaying their status, distance, and
+corpse information in a GUI.
+Ctrl clicking a member will bring them to the foreground.
+Right clicking a member will give you options to target, switch to, or navigate to them or their corpse.
 ]]
 
 local mq = require('mq')
@@ -44,8 +11,8 @@ local drawTimerMS = mq.gettime() -- get the current time in milliseconds
 local drawTimerS = os.time()     -- get the current time in seconds
 local Module = {}
 
-Module.Name = "Template" -- Name of the module used when loading and unloaing the modules.
-Module.IsRunning = false -- Keep track of running state. if not running we can unload it.
+Module.Name = "RaidWatch" -- Name of the module used when loading and unloaing the modules.
+Module.IsRunning = false  -- Keep track of running state. if not running we can unload it.
 Module.ShowGui = true
 Module.TempSettings = {
 	CorpseFound = false,
@@ -149,7 +116,6 @@ end
 
 local function Init()
 	-- your Init code here
-	mq.bind('/template', CommandHandler)
 	Module.IsRunning = true
 	Module.Utils.PrintOutput('main', true, "\ayModule \a-w[\at%s\a-w] \agLoaded\aw!", Module.Name)
 	raidMembers = getMembers()
@@ -187,7 +153,7 @@ function Module.RenderGUI()
 			--GUI
 			-- your code here
 			local colCount = Module.TempSettings.CorpseFound and 4 or 3
-			if ImGui.BeginTable("Raid Watch", colCount) then
+			if ImGui.BeginTable("Raid Watch##" .. Module.CharLoaded, colCount) then
 				if colCount == 4 then ImGui.TableSetupColumn("Corpse", ImGuiTableColumnFlags.WidthFixed, 70) end
 				ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch, 5)
 				ImGui.TableSetupColumn("Class", ImGuiTableColumnFlags.WidthFixed, ImGui.CalcTextSize('* LD *'))
@@ -293,7 +259,6 @@ end
 function Module.Unload()
 	-- undo any binds and events before unloading
 	-- leave empty if you don't have any binds or events
-	mq.unbind('/template')
 end
 
 function Module.MainLoop()

@@ -8,12 +8,15 @@ local genAA             = {}
 local classAA           = {}
 local archAA            = {}
 local specAA            = {}
+local currentRanks      = {}
 local doTrain           = false
+local doHotkey          = false
 local selectedAA        = "none"
 local availAA           = MySelf.AAPoints() or 0
 local spentAA           = MySelf.AAPointsSpent() or 0
 local totalAA           = MySelf.AAPointsTotal() or 0
 local toTrain           = {}
+local toHotkey          = {}
 local EQ_ICON_OFFSET    = 500
 local animMini          = mq.FindTextureAnimation("A_DragItem")
 
@@ -109,7 +112,7 @@ function Module.UpdateAA(which)
 	if which == "general" or which == "all" then
 		genAA = Module.GetAALists("general")
 	end
-	if which == "arch" or which == "all" then
+	if which == "arch" or which == "archtype" or which == "all" then
 		archAA = Module.GetAALists("arch")
 	end
 	if which == "class" or which == "all" then
@@ -135,6 +138,40 @@ local function Init()
 		mq.imgui.init(Module.Name, Module.RenderGUI)
 		Module.LocalLoop()
 	end
+end
+
+function Module.TrainAA()
+	for name, data in pairs(toTrain) do
+		local aaStart = availAA
+		if data.row and data.list then
+			data.list.Select(data.row)                                            -- Select the AA in the AA window
+			mq.delay(30)
+			mq.TLO.Window("AAWindow/AAW_TrainButton").LeftMouseUp()               -- Click the Train button
+			mq.delay(2000, function() return MySelf.AAPoints() <= aaStart - data.cost end) -- Wait until AA points are updated
+			availAA = MySelf.AAPoints() or 0                                      -- Update the available AA points
+			Module.UpdateAA(data.section)                                         -- Update the AA lists after training
+			if availAA == aaStart - data.cost then
+				Module.Utils.PrintOutput('MyAA', false, "\aw[\at%s\ax] \agTrained \ay%s\ag for \ay%s\ag AA points.", Module.Name, name, data.cost)
+			else
+				Module.Utils.PrintOutput('MyAA', false, "\aw[\at%s\ax] \arFailed to train \ay%s\ar for \ay%s\ar AA points.", Module.Name, name, data.cost)
+			end
+		end
+	end
+	toTrain = {} -- Clear the toTrain table after training
+	doTrain = false -- Reset the doTrain flag
+end
+
+function Module.SetHotkey()
+	for name, data in pairs(toHotkey) do
+		if data.row and data.list then
+			data.list.Select(data.row)
+			mq.delay(30)
+			mq.TLO.Window("AAWindow/AAW_HotButton").LeftMouseUp()
+		end
+	end
+
+	toHotkey = {} -- Clear the toHotkey table after setting hotkeys
+	doHotkey = false -- Reset the doHotkey flag
 end
 
 function Module.GetAALists(which)
@@ -165,9 +202,41 @@ function Module.GetAALists(which)
 		local aaCurMax = list.List(i, 2)() -- value in "cur/max"
 		local aaCost = list.List(i, 3)()
 		local aaType = list.List(i, 4)()
+		local passive = mq.TLO.AltAbility(aaName).Passive() or false
+		local minLvl = mq.TLO.AltAbility(aaName).MinLevel() or 0
+		local canTrain = mq.TLO.AltAbility(aaName).CanTrain() or false -- gets buggy after training something but works ok for the initial checks
 		local aaCurrent, aaMax = string.match(aaCurMax, "(%d+)/(%d+)")
+		local reqAbility = mq.TLO.AltAbility(aaName).RequiresAbility.Name() or nil
+		local reqAbilityPoints = mq.TLO.AltAbility(aaName).RequiresAbilityPoints() or 0
+		aaCurrent = tonumber(aaCurrent) or 0
+		aaMax = tonumber(aaMax) or 0
+		aaCost = tonumber(aaCost) or 0
+		currentRanks[aaName] = aaCurrent
+
+		if not canTrain then
+			if availAA >= aaCost and aaCurrent < aaMax and MySelf.Level() >= minLvl then
+				if reqAbility == nil then
+					canTrain = true
+				elseif currentRanks[reqAbility] ~= nil and
+					currentRanks[reqAbility] >= reqAbilityPoints then
+					canTrain = true
+				else
+					canTrain = false
+				end
+			end
+		end
+
 		if aaName and aaCurrent and aaMax then
-			table.insert(tmp, { ['Name'] = aaName, ['Current'] = tonumber(aaCurrent), ['Max'] = tonumber(aaMax), ['Cost'] = aaCost, ['Type'] = aaType, })
+			table.insert(tmp, {
+				['Name'] = aaName,
+				['MinLvl'] = minLvl,
+				['CanTrain'] = canTrain,
+				['Passive'] = passive,
+				['Current'] = aaCurrent,
+				['Max'] = aaMax,
+				['Cost'] = aaCost,
+				['Type'] = aaType,
+			})
 		end
 	end
 	return tmp
@@ -190,12 +259,13 @@ local function DrawAATable(which_Table, label)
 	if ImGui.BeginChild("Child##" .. label, ImVec2(sizeX, sizeY * 0.7), childFlags) then
 		ImGui.SetWindowFontScale(Module.Settings.scale)
 
-		if ImGui.BeginTable(label .. "##_table", 5, tableFlags) then
+		if ImGui.BeginTable(label .. "##TableData3", 6, tableFlags) then
 			ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch)
-			ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 100)
-			ImGui.TableSetupColumn("Cost", ImGuiTableColumnFlags.WidthFixed, 40)
+			ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 50)
+			ImGui.TableSetupColumn("Cost", ImGuiTableColumnFlags.WidthFixed, 30)
 			ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 100)
-			ImGui.TableSetupColumn("Train", ImGuiTableColumnFlags.WidthFixed, 100)
+			ImGui.TableSetupColumn("Train", ImGuiTableColumnFlags.WidthFixed, 40)
+			ImGui.TableSetupColumn("HotKey", ImGuiTableColumnFlags.WidthFixed, 50)
 			ImGui.TableSetupScrollFreeze(0, 1) -- Make the first row always visible
 			ImGui.TableHeadersRow()
 			ImGui.TableNextRow()
@@ -209,22 +279,34 @@ local function DrawAATable(which_Table, label)
 					selectedAA = data.Name
 				end
 				ImGui.TableNextColumn()
+				ImGui.Indent(3)
 				ImGui.Text(string.format("%s / %s", data.Current or 0, data.Max or 0))
+				ImGui.Unindent(3)
 				ImGui.TableNextColumn()
+				ImGui.Indent(10)
 				ImGui.Text(data.Cost or "N/A")
+				ImGui.Unindent(10)
 				ImGui.TableNextColumn()
 				ImGui.Text(data.Type or "N/A")
 				ImGui.TableNextColumn()
 				local cost = tonumber(data.Cost) or 0
 				local cur = tonumber(data.Current) or 0
 				local max = tonumber(data.Max) or 0
-				mq.TLO.AltAbility(data.Name).ID()
-				if availAA >= cost and cur < max then
-					if ImGui.SmallButton("train##" .. data.Name) then
+				if data.CanTrain then
+					if ImGui.SmallButton("Train##" .. data.Name) then
 						selectedAA = data.Name
-						local rowNum = ListName.List(data.Name, 1)() or 0                             -- Select the AA in the AA window
-						toTrain[data.Name] = { row = rowNum, list = ListName, cost = data.Cost or 0, section = label, } -- Store the row number and list for later use
+						local rowNum = ListName.List(data.Name, 1)() or 0                                -- Select the AA in the AA window
+						toTrain[data.Name] = { row = rowNum, list = ListName, cost = cost or 0, section = label:lower(), } -- Store the row number and list for later use
 						doTrain = true
+					end
+				end
+				ImGui.TableNextColumn()
+				if not data.Passive then
+					if ImGui.SmallButton("HotKey##" .. data.Name) then
+						selectedAA = data.Name
+						local rowNum = ListName.List(data.Name, 1)() or 0               -- Select the AA in the AA window
+						toHotkey[data.Name] = { row = rowNum, list = ListName, section = label:lower(), } -- Store the row number and list for later use
+						doHotkey = true
 					end
 				end
 				ImGui.PopID()
@@ -374,26 +456,18 @@ function Module.MainLoop()
 	-- 	archAA = Module.GetAALists("arch")
 	-- 	specAA = Module.GetAALists("special")
 	-- end
+	if Module.LastCheck == nil then
+		Module.LastCheck = mq.gettime()
+	end
+	if mq.gettime() - Module.LastCheck > 3000 then
+		Module.UpdateAA("all") -- Update the AA lists
+		Module.LastCheck = mq.gettime()
+	end
 	if doTrain then
-		for name, data in pairs(toTrain) do
-			local aaStart = availAA
-			if data.row and data.list then
-				data.list.Select(data.row)                                         -- Select the AA in the AA window
-				mq.delay(30)
-				mq.TLO.Window("AAWindow/AAW_TrainButton").LeftMouseUp()            -- Click the Train button
-				mq.delay(2000, function() return MySelf.AAPoints() == aaStart - data.cost end) -- Wait until AA points are updated
-
-				Module.UpdateAA(data.section)                                      -- Update the AA lists after training
-				if availAA == aaStart - data.cost then
-					Module.Utils.PrintOutput('MyAA', false, "\aw[\at%s\ax] \agTrained \ay%s\ag for \ay%s\ag AA points.", Module.Name, name, data.cost)
-				else
-					Module.Utils.PrintOutput('MyAA', false, "\aw[\at%s\ax] \arFailed to train \ay%s\ar for \ay%s\ar AA points.", Module.Name, name, data.cost)
-				end
-			end
-		end
-
-		toTrain = {} -- Clear the toTrain table after training
-		doTrain = false -- Reset the doTrain flag
+		Module.TrainAA()
+	end
+	if doHotkey then
+		Module.SetHotkey()
 	end
 end
 

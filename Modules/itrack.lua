@@ -292,8 +292,7 @@ local function renderMain()
 						local colBank = (data.bank or 0) > 0 and colGreen or colWhite
 						ImGui.TableNextRow()
 						ImGui.TableSetColumnIndex(0)
-						ImGui.Text(char)
-						if ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) then
+						if ImGui.Selectable(char, false, ImGuiSelectableFlags.SpanAllColumns) then
 							actor:send({ mailbox = mailboxName, }, { Sender = myName, Switch = char, })
 						end
 						ImGui.TableSetColumnIndex(1)

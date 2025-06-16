@@ -106,6 +106,7 @@ defaults                                                                        
 		TimerColor = { 1, 1, 1, 1, },
 		maxRow = 1,
 		AutoSize = false,
+		ShowGemNames = false,
 	},
 }
 
@@ -543,6 +544,11 @@ local function DrawConfigWin()
 		ImGui.SameLine()
 		ImGui.HelpMarker("This will change the color of the cast bar text based on the spell type.")
 	end
+
+	settings[Module.Name].ShowGemNames = Module.Utils.DrawToggle("Show Gem Names##MySpells", settings[Module.Name].ShowGemNames, ToggleFlags)
+	ImGui.SameLine()
+	ImGui.HelpMarker("This will show the spell name on the spell gem.\nThis is useful for identifying spells in the spell bar.")
+
 	-- end
 	timerColor, _ = ImGui.ColorEdit4("Timer Color##MySpells", timerColor, ImGuiColorEditFlags.AlphaBar)
 	ImGui.SameLine()
@@ -559,6 +565,64 @@ local function DrawConfigWin()
 	end
 	Module.ThemeLoader.EndTheme(ColorCountTheme, StyleCountTheme)
 	ImGui.End()
+end
+
+function Module.RenderToolTipAndContext(i)
+	if ImGui.IsItemHovered() then
+		ImGui.BeginTooltip()
+		ImGui.Indent(4)
+		local colorName = Module.Colors.color('white')
+		local manaCost = mq.TLO.Spell(spellBar[i].sID).Mana() or 0
+		local curMana = mq.TLO.Me.CurrentMana() or 0
+		if curMana < manaCost * 1.1 then
+			colorName = Module.Colors.color('pink2')
+		end
+		ImGui.TextColored(colorName, "%s", spellBar[i].sName)
+		ImGui.Separator()
+		ImGui.TextColored(colorName, "Mana: %d", manaCost)
+		ImGui.SameLine(0.0, 2)
+		ImGui.TextColored(Module.Colors.color('white'), "/")
+		ImGui.SameLine(0.0, 2)
+		ImGui.TextColored(Module.Colors.color('teal'), "%d", curMana)
+		ImGui.TextColored(Module.Colors.color('white'), "Recast: %d", spellBar[i].sRecast)
+		ImGui.TextColored(Module.Colors.color('tangerine'), "Cast Time: %d", spellBar[i].sCastTime)
+		ImGui.Separator()
+		ImGui.PushTextWrapPos(150)
+		ImGui.Text(spellBar[i].Description or 'No description available')
+		ImGui.PopTextWrapPos()
+		ImGui.Separator()
+
+		ImGui.Unindent(4)
+
+		ImGui.EndTooltip()
+
+		if ImGui.IsMouseReleased(0) then
+			mq.cmdf("/cast %s", i)
+			casting = true
+			spellBar[i].sClicked = os.time()
+		elseif ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsMouseReleased(1) then
+			mq.cmdf("/nomodkey /altkey /notify CastSpellWnd CSPW_Spell%s rightmouseup", i - 1)
+		end
+	end
+	if ImGui.BeginPopupContextItem("##SpellGem" .. i) then
+		if ImGui.IsKeyDown(ImGuiMod.Ctrl) then ImGui.CloseCurrentPopup() end
+		if ImGui.MenuItem("Memorize") then
+			if pickerOpen == true then
+				memSpell = -1
+				picker:SetClose()
+				pickerOpen = false
+				picker:ClearSelection()
+			end
+			memSpell = i
+		end
+		if ImGui.MenuItem("Inspect") then
+			mq.cmdf("/altkey /notify CastSpellWnd CSPW_Spell%s leftmouseup", i - 1)
+		end
+		if ImGui.MenuItem("Clear") then
+			mq.cmdf("/nomodkey /altkey /notify CastSpellWnd CSPW_Spell%s rightmouseup", i - 1)
+		end
+		ImGui.EndPopup()
+	end
 end
 
 function Module.RenderGUI()
@@ -610,97 +674,77 @@ function Module.RenderGUI()
 				end
 				ImGui.EndPopup()
 			end
-			ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 0, 0)
-			for i = 1, numGems do
-				ImGui.BeginChild("##SpellGem" .. i, ImVec2(scale * 40, scale * 33), bit32.bor(ImGuiChildFlags.AlwaysUseWindowPadding),
-					bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
-				if spellBar[i] ~= nil then
-					if spellBar[i].sID > -1 then
-						DrawInspectableSpellIcon(spellBar[i].sIcon, spellBar[i], i)
-						if ImGui.BeginPopupContextItem("##SpellGem" .. i) then
-							if ImGui.IsKeyDown(ImGuiMod.Ctrl) then ImGui.CloseCurrentPopup() end
-							if ImGui.MenuItem("Memorize") then
-								if pickerOpen == true then
-									memSpell = -1
-									picker:SetClose()
-									pickerOpen = false
-									picker:ClearSelection()
-								end
-								memSpell = i
-							end
-							if ImGui.MenuItem("Inspect") then
-								mq.cmdf("/altkey /notify CastSpellWnd CSPW_Spell%s leftmouseup", i - 1)
-							end
-							if ImGui.MenuItem("Clear") then
-								mq.cmdf("/nomodkey /altkey /notify CastSpellWnd CSPW_Spell%s rightmouseup", i - 1)
-							end
-							ImGui.EndPopup()
-						end
-						if ImGui.IsItemHovered() then
-							ImGui.BeginTooltip()
-							ImGui.Indent(4)
-							local colorName = Module.Colors.color('white')
-							local manaCost = mq.TLO.Spell(spellBar[i].sID).Mana() or 0
-							local curMana = mq.TLO.Me.CurrentMana() or 0
-							if curMana < manaCost * 1.1 then
-								colorName = Module.Colors.color('pink2')
-							end
-							ImGui.TextColored(colorName, "%s", spellBar[i].sName)
-							ImGui.Separator()
-							ImGui.TextColored(colorName, "Mana: %d", manaCost)
-							ImGui.SameLine(0.0, 2)
-							ImGui.TextColored(Module.Colors.color('white'), "/")
-							ImGui.SameLine(0.0, 2)
-							ImGui.TextColored(Module.Colors.color('teal'), "%d", curMana)
-							ImGui.TextColored(Module.Colors.color('white'), "Recast: %d", spellBar[i].sRecast)
-							ImGui.TextColored(Module.Colors.color('tangerine'), "Cast Time: %d", spellBar[i].sCastTime)
-							ImGui.Separator()
-							ImGui.PushTextWrapPos(150)
-							ImGui.Text(spellBar[i].Description or 'No description available')
-							ImGui.PopTextWrapPos()
-							ImGui.Separator()
+			local colCount = 2
+			if not settings[Module.Name].ShowGemNames then
+				colCount = maxRow
+			end
 
-							ImGui.Unindent(4)
-
-							ImGui.EndTooltip()
-							if ImGui.IsMouseReleased(0) then
-								mq.cmdf("/cast %s", i)
-								casting = true
-								spellBar[i].sClicked = os.time()
-							elseif ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsMouseReleased(1) then
-								mq.cmdf("/nomodkey /altkey /notify CastSpellWnd CSPW_Spell%s rightmouseup", i - 1)
-							end
-						end
-						if not casting and interrupted then
-							spellBar[i].sClicked = -1
-							interrupted = false
-						end
-					else
-						DrawInspectableSpellIcon(-1, spellBar[i], i)
-						if ImGui.IsItemHovered() then
-							ImGui.SetTooltip("Empty")
-							if ImGui.IsMouseReleased(1) then
-								if pickerOpen == true then
-									memSpell = -1
-									picker:SetClose()
-									pickerOpen = false
-									picker:ClearSelection()
-								end
-								memSpell = i
-							end
-						end
+			if ImGui.BeginTable("##SpellGems", colCount) then
+				if colCount == 2 and settings[Module.Name].ShowGemNames then
+					ImGui.TableSetupColumn("##Gem", ImGuiTableColumnFlags.WidthFixed, (settings[Module.Name].IconSize * scale) + 5)
+					ImGui.TableSetupColumn("##Name", ImGuiTableColumnFlags.WidthStretch, 100)
+				else
+					for i = 1, colCount do
+						ImGui.TableSetupColumn("##Gem" .. i, ImGuiTableColumnFlags.WidthFixed, (settings[Module.Name].IconSize * scale) + 5)
 					end
 				end
-				ImGui.EndChild()
-				rowCount = rowCount + 1
+				ImGui.TableNextRow()
+				ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 0, 0)
+				for i = 1, numGems do
+					ImGui.TableNextColumn()
+					if spellBar[i] ~= nil then
+						ImGui.PushID(tostring(spellBar[i].sID) .. "_spell")
 
-				if rowCount < maxRow then
-					ImGui.SameLine()
-				else
-					rowCount = 0
+						ImGui.BeginChild("##SpellGem" .. i, ImVec2(scale * 40, scale * 33), bit32.bor(ImGuiChildFlags.AlwaysUseWindowPadding),
+							bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
+
+
+						if spellBar[i].sID > -1 then
+							DrawInspectableSpellIcon(spellBar[i].sIcon, spellBar[i], i)
+
+							if not casting and interrupted then
+								spellBar[i].sClicked = -1
+								interrupted = false
+							end
+						else
+							DrawInspectableSpellIcon(-1, spellBar[i], i)
+							if ImGui.IsItemHovered() then
+								ImGui.SetTooltip("Empty")
+								if ImGui.IsMouseReleased(1) then
+									if pickerOpen == true then
+										memSpell = -1
+										picker:SetClose()
+										pickerOpen = false
+										picker:ClearSelection()
+									end
+									memSpell = i
+								end
+							end
+						end
+						ImGui.EndChild()
+						Module.RenderToolTipAndContext(i)
+						ImGui.PopID()
+						if settings[Module.Name].ShowGemNames then
+							ImGui.TableNextColumn()
+							ImGui.Indent(3)
+							ImGui.Selectable(string.format("%s\nCost (%s)", spellBar[i].sName, mq.TLO.Spell(spellBar[i].sID).Mana() or 0),
+								false, ImGuiSelectableFlags.SpanAllColumns)
+							Module.RenderToolTipAndContext(i)
+							ImGui.Unindent(3)
+						end
+					end
+
+					-- rowCount = rowCount + 1
+
+					-- if rowCount < maxRow then
+					-- 	ImGui.SameLine()
+					-- else
+					-- 	rowCount = 0
+					-- end
 				end
+				ImGui.PopStyleVar()
+				ImGui.EndTable()
 			end
-			ImGui.PopStyleVar()
 			if memSpell ~= -1 and not picker.Draw then -- and not pickerOpen then
 				-- ImGui.SetNextWindowPos(ImGui.GetMousePosOnOpeningCurrentPopupVec(), ImGuiCond.Appearing)
 				picker:SetOpen()

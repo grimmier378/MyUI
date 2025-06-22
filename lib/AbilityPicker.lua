@@ -125,8 +125,7 @@ local function AddSpellToMap(picker, spell)
             AERange = spell.AERange(),
             PushBack = spell.PushBack(),
             Description = spell.Description() or 'none',
-            TargetType =
-                spell.TargetType(),
+            TargetType = spell.TargetType(),
             Icon = spell.SpellIcon(),
         })
 end

@@ -556,7 +556,7 @@ local function SpawnToEntry(spawn, id, table)
 		pAggro = spawn.PctAggro() or 0
 	end
 	if spawn.ID() then
-		if spawn.Surname() and spawn.Surname():find("'s ") then return end
+		if spawn.Surname():find("'s ") then return end
 		local entry = {
 			ID = id or 0,
 			MobName = spawn.DisplayName() or ' ',
@@ -744,16 +744,12 @@ local function RefreshZone()
 	local npcs = mq.getFilteredSpawns(function(spawn) return spawn.Type() == 'NPC' end)
 	for i = 1, #npcs do
 		local spawn = npcs[i]
-		if spawn() then
-			if #npcs > 0 then InsertTableSpawn(newTable, spawn, tonumber(spawn.ID())) end
-		end
+		if #npcs > 0 then InsertTableSpawn(newTable, spawn, tonumber(spawn.ID())) end
 	end
 	for i = 1, mq.TLO.Me.XTargetSlots() do
 		if mq.TLO.Me.XTarget(i)() ~= nil and mq.TLO.Me.XTarget(i)() ~= 0 then
 			local spawn = mq.TLO.Me.XTarget(i)
-			if spawn() then
-				if spawn.ID() > 0 then InsertTableSpawn(xTarTable, spawn, tonumber(spawn.ID())) end
-			end
+			if spawn.ID() > 0 then InsertTableSpawn(xTarTable, spawn, tonumber(spawn.ID())) end
 		end
 	end
 	if showAggro then
@@ -949,7 +945,7 @@ local function check_for_spawns()
 
 			if not importedZones[Zone.ShortName()] or forceImport then
 				-- Check for Long Name
-				local tmpFixName = Zone.Name():gsub("the ", ""):lower()
+				local tmpFixName = Zone.Name():gsub("The ", ""):lower()
 				if spawnsSpawnMaster[Zone.Name():lower()] ~= nil or spawnsSpawnMaster[tmpFixName] ~= nil then
 					tmpSpawnMaster = spawnsSpawnMaster[Zone.Name():lower()] ~= nil and spawnsSpawnMaster[Zone.Name():lower()] or spawnsSpawnMaster[tmpFixName]
 					for k, v in pairs(tmpSpawnMaster) do

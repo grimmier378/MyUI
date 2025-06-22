@@ -202,12 +202,14 @@ function Module.GetAALists(which)
 		local aaCurMax = list.List(i, 2)() -- value in "cur/max"
 		local aaCost = list.List(i, 3)()
 		local aaType = list.List(i, 4)()
-		local passive = mq.TLO.AltAbility(aaName).Passive() or false
-		local minLvl = mq.TLO.AltAbility(aaName).MinLevel() or 0
-		local canTrain = mq.TLO.AltAbility(aaName).CanTrain() or false -- gets buggy after training something but works ok for the initial checks
+		local ability = mq.TLO.AltAbility(aaName)
+		local passive = ability.Passive() or false
+		local minLvl = ability.MinLevel() or 0
+		local canTrain = ability.CanTrain() or false -- gets buggy after training something but works ok for the initial checks
 		local aaCurrent, aaMax = string.match(aaCurMax, "(%d+)/(%d+)")
-		local reqAbility = mq.TLO.AltAbility(aaName).RequiresAbility.Name() or nil
-		local reqAbilityPoints = mq.TLO.AltAbility(aaName).RequiresAbilityPoints() or 0
+		local reqAbility = ability.RequiresAbility.Name() or nil
+		local reqAbilityPoints = ability.RequiresAbilityPoints() or 0
+		local aaTimer = ability.MyReuseTime() or 0
 		aaCurrent = tonumber(aaCurrent) or 0
 		aaMax = tonumber(aaMax) or 0
 		aaCost = tonumber(aaCost) or 0
@@ -236,6 +238,7 @@ function Module.GetAALists(which)
 				['Max'] = aaMax,
 				['Cost'] = aaCost,
 				['Type'] = aaType,
+				['Timer'] = aaTimer,
 			})
 		end
 	end
@@ -301,7 +304,7 @@ local function DrawAATable(which_Table, label)
 					end
 				end
 				ImGui.TableNextColumn()
-				if not data.Passive then
+				if not data.Passive and (tonumber(data.Current) or 0) > 0 then
 					if ImGui.SmallButton("HotKey##" .. data.Name) then
 						selectedAA = data.Name
 						local rowNum = ListName.List(data.Name, 1)() or 0               -- Select the AA in the AA window

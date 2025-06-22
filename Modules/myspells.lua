@@ -93,21 +93,30 @@ local castTransparency                                                          
 local startedCast, startCastTime, castBarShow                                                        = false, 0, false
 
 defaults                                                                                             = {
-	[Module.Name] = {
-		Scale = 1.0,
-		LoadTheme = 'Default',
-		locked = false,
-		CastLocked = false,
-		CastTransperancy = 1.0,
-		ShowTitleCasting = false,
-		ShowTitleBar = true,
-		enableCastBar = false,
-		CastTextColorByType = false,
-		IconSize = 30,
-		TimerColor = { 1, 1, 1, 1, },
-		maxRow = 1,
-		AutoSize = false,
-		ShowGemNames = false,
+	['MySpells'] = {
+		['ShowTitleBar'] = true,
+		['enableCastBar'] = true,
+		['ShowGemNames'] = true,
+		['maxRow'] = 1,
+		['locked'] = false,
+		['CastLocked'] = false,
+		['CastTransperancy'] = 1,
+		['ShowTitleCasting'] = false,
+		['IconSize'] = 30,
+		['CastTextColorByType'] = false,
+		['TimerColor'] = {
+			[1] = 0.2503088712692261,
+			[2] = 0.8347724080085754,
+			[3] = 0.9431279897689819,
+			[4] = 1,
+		},
+		['LoadTheme'] = 'Default',
+		['AutoSize'] = true,
+		[Module.CharLoaded] = {
+			['Sets'] = {},
+		},
+		['EnableCastBar'] = true,
+		['Scale'] = 1,
 	},
 }
 
@@ -156,15 +165,24 @@ local function loadSettings()
 	if not Module.Utils.File.Exists(configFile) then
 		settings = defaults
 		mq.pickle(configFile, settings)
-		loadSettings()
 	else
 		settings = dofile(configFile)
 	end
 
 	-- check for new settings and add them to the settings file
-	newSetting = Module.Utils.CheckDefaultSettings(defaults[Module.Name], settings[Module.Name])
+	for key, val in pairs(defaults[Module.Name]) do
+		if type(val) ~= 'table' then
+			if settings[Module.Name][key] == nil then
+				settings[Module.Name][key] = val
+				newSetting = true
+			end
+		end
+	end
 	-- newSetting = Module.Utils.CheckRemovedSettings(defaults[Module.Name], settings[Module.Name]) or newSetting
-
+	if settings[Module.Name] == nil then
+		settings[Module.Name] = defaults[Module.Name]
+		newSetting = true
+	end
 	if settings[Module.Name][Module.CharLoaded] == nil then
 		settings[Module.Name][Module.CharLoaded] = {}
 		settings[Module.Name][Module.CharLoaded].Sets = {}

@@ -190,6 +190,8 @@ local function sortTable(tbl, sortType)
 				else
 					return a.sequence > b.sequence
 				end
+			else
+				return a.name < b.name
 			end
 		else
 			if settings.Options.sortHistory then
@@ -1770,6 +1772,7 @@ function Module.MainLoop()
 
 	local currentTime = os.time()
 	if currentTime - dpsStartTime >= settings.Options.dpsTimeSpanReportTimer then
+		mq.doevents()
 		local dur = currentTime - dpsStartTime
 		if settings.Options.dpsTimeSpanReport then
 			pDPS(dur, 'ALL')
@@ -1780,6 +1783,7 @@ function Module.MainLoop()
 		if leftCombatTime == 0 then
 			leftCombatTime = os.time()
 		end
+		mq.doevents()
 
 		local endOfCombat = os.time() - leftCombatTime
 		if endOfCombat > settings.Options.battleDuration then
@@ -1797,6 +1801,7 @@ function Module.MainLoop()
 	end
 	-- Clean up the table
 	if battleStartTime > 0 then
+		mq.doevents()
 		parseCurrentBattle(currentTime - battleStartTime)
 	end
 	cleanTable()

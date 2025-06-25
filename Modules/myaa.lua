@@ -19,6 +19,20 @@ local toTrain           = {}
 local toHotkey          = {}
 local EQ_ICON_OFFSET    = 500
 local animMini          = mq.FindTextureAnimation("A_DragItem")
+local TotalMaxAA        = {
+	general = 0,
+	arch = 0,
+	class = 0,
+	special = 0,
+	all = 0,
+}
+local CurSectionAA      = {
+	general = 0,
+	arch = 0,
+	class = 0,
+	special = 0,
+	all = 0,
+}
 
 Module.Name             = "MyAA" -- Name of the module used when loading and unloaing the modules.
 Module.IsRunning        = false  -- Keep track of running state. if not running we can unload it.
@@ -124,6 +138,8 @@ function Module.UpdateAA(which)
 	availAA = MySelf.AAPoints() or 0
 	spentAA = MySelf.AAPointsSpent() or 0
 	totalAA = MySelf.AAPointsTotal() or 0
+	TotalMaxAA.all = TotalMaxAA.general + TotalMaxAA.arch + TotalMaxAA.class + TotalMaxAA.special
+	CurSectionAA.all = CurSectionAA.general + CurSectionAA.arch + CurSectionAA.class + CurSectionAA.special
 end
 
 local function Init()
@@ -196,6 +212,8 @@ function Module.GetAALists(which)
 	else
 		return tmp
 	end
+	local tmpCounterMax = 0
+	local tmpCounterCur = 0
 
 	for i = 1, maxList do
 		local aaName = list.List(i, 1)()
@@ -214,7 +232,8 @@ function Module.GetAALists(which)
 		aaMax = tonumber(aaMax) or 0
 		aaCost = tonumber(aaCost) or 0
 		currentRanks[aaName] = aaCurrent
-
+		tmpCounterMax = tmpCounterMax + aaMax
+		tmpCounterCur = tmpCounterCur + aaCurrent
 		if not canTrain then
 			if availAA >= aaCost and aaCurrent < aaMax and MySelf.Level() >= minLvl then
 				if reqAbility == nil then
@@ -242,6 +261,8 @@ function Module.GetAALists(which)
 			})
 		end
 	end
+	CurSectionAA[which] = tmpCounterCur
+	TotalMaxAA[which] = tmpCounterMax
 	return tmp
 end
 
@@ -393,33 +414,60 @@ function Module.RenderGUI()
 			ImGui.SameLine()
 			ImGui.TextColored(Module.Colors.color("yellow"), "%s", availAA)
 			ImGui.SameLine()
+
 			ImGui.Text("Spent:")
 			ImGui.SameLine()
 			ImGui.TextColored(Module.Colors.color("teal"), "%s", spentAA)
 			ImGui.SameLine()
+
 			ImGui.Text("Total AA:")
 			ImGui.SameLine()
 			ImGui.TextColored(Module.Colors.color('tangarine'), "%s", totalAA)
+
+			ImGui.SeparatorText("Current Ranks:")
+
+			ImGui.Text('Gen:')
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('yellow'), "%s/%s", CurSectionAA.general, TotalMaxAA.general)
+			ImGui.SameLine()
+
+			ImGui.Text('Arch:')
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('green2'), "%s/%s", CurSectionAA.arch, TotalMaxAA.arch)
+			ImGui.SameLine()
+
+			ImGui.Text('Class:')
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('teal'), "%s/%s", CurSectionAA.class, TotalMaxAA.class)
+			ImGui.SameLine()
+
+			ImGui.Text('Spec:')
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('tangarine'), "%s/%s", CurSectionAA.special, TotalMaxAA.special)
+
+			ImGui.Text("Cur / Max Ranks:")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('green'), "%s/%s", CurSectionAA.all, TotalMaxAA.all)
 			if _ then
 				mq.pickle(configFile, Module.Settings)
 			end
 			if ImGui.BeginTabBar("MyAA") then
-				if ImGui.BeginTabItem("General") then
+				if ImGui.BeginTabItem(string.format("General (%s/%s)###GeneralMyAA", CurSectionAA.general, TotalMaxAA.general)) then
 					tabPage.SetCurrentTab(1)
 					DrawAATable(genAA, "General")
 					ImGui.EndTabItem()
 				end
-				if ImGui.BeginTabItem("Archtype") then
+				if ImGui.BeginTabItem(string.format("Archtype (%s/%s)###ArchtypeMyAA", CurSectionAA.arch, TotalMaxAA.arch)) then
 					tabPage.SetCurrentTab(2)
 					DrawAATable(archAA, "Archtype")
 					ImGui.EndTabItem()
 				end
-				if ImGui.BeginTabItem("Class") then
+				if ImGui.BeginTabItem(string.format("Class (%s/%s)###ClassMyAA", CurSectionAA.class, TotalMaxAA.class)) then
 					tabPage.SetCurrentTab(3)
 					DrawAATable(classAA, "Class")
 					ImGui.EndTabItem()
 				end
-				if ImGui.BeginTabItem("Special") then
+				if ImGui.BeginTabItem(string.format("Special (%s/%s)###SpecialMyAA", CurSectionAA.special, TotalMaxAA.special)) then
 					tabPage.SetCurrentTab(4)
 					DrawAATable(specAA, "Special")
 					ImGui.EndTabItem()

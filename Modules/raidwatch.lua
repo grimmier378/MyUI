@@ -180,7 +180,7 @@ function Module.RenderGUI()
 
 				if data.present then
 					if not data.visable then
-						ImGui.PushStyleColor(ImGuiCol.Text, Module.Colors.color("grey"))
+						ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(0.734, 0.734, 0.734, 1.000))
 					else
 						ImGui.PushStyleColor(ImGuiCol.Text, Module.Colors.color("softblue"))
 					end

@@ -686,16 +686,21 @@ end
 ---@param default_settings table  the default settings table
 ---@param loaded_settings table  the loaded settings table
 ---@return boolean  returns true if a new setting was found
+---@return table  returns the new loaded settings table with any new settings added
 function CommonUtils.CheckDefaultSettings(default_settings, loaded_settings)
 	local newSetting = false
+	local newTable = {}
 	for setting, value in pairs(default_settings or {}) do
 		if loaded_settings[setting] == nil then
 			CommonUtils.PrintOutput('MyUI', nil, "\ayNew Default Setting: \ao%s \ayAdding it to the Settings File.", setting)
 			loaded_settings[setting] = value
+			newTable[setting] = value -- Add the new setting to the loaded settings table
 			newSetting = true
+		else
+			newTable[setting] = loaded_settings[setting] -- Keep the existing setting
 		end
 	end
-	return newSetting
+	return newSetting, newTable
 end
 
 -- Function to append colored text segments

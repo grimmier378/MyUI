@@ -31,6 +31,7 @@ Module.ShowText,
 Module.ShowScroll,
 Module.DoPulse          = false, true, true, true, true, true
 Module.iconSize         = 24
+Module.NumBuffs         = 0
 Module.MyGroupLeader    = mq.TLO.Group.Leader() or 'NoGroup'
 ---@diagnostic disable-next-line:undefined-global
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
@@ -925,6 +926,16 @@ local function BoxBuffs(id, sorted, view)
     end
 
     ImGui.EndChild()
+end
+
+function Module.CountBuffs()
+    local count = 0
+    for i = 1, mq.TLO.Me.MaxBuffSlots() do
+        if mq.TLO.Me.Buff(i)() ~= nil then
+            count = count + 1
+        end
+    end
+    return count
 end
 
 local function BoxSongs(id, sorted, view)
@@ -2047,7 +2058,6 @@ end
 
 local arguments = { ..., }
 local buffmecheck = os.time()
-
 local function init()
     if loadedExeternally then
         Module.CheckMode()
@@ -2061,6 +2071,7 @@ local function init()
     if not solo then
         MessageHandler()
     end
+
 
     GetBuffs()
     firstRun = false
@@ -2091,8 +2102,9 @@ function Module.MainLoop()
 
     local now = mq.gettime()
     local nowTime = os.time()
+    local buffCount = mq.TLO.Me.BuffCount() or 0
 
-    if now - clockTimer > 500 then
+    if (now - clockTimer >= 3000) or Module.NumBuffs ~= buffCount then
         currZone = mq.TLO.Zone.ID()
         if currZone ~= lastZone then
             lastZone = currZone
@@ -2100,6 +2112,7 @@ function Module.MainLoop()
         if not solo then CheckStale() end
         GetBuffs()
         clockTimer = mq.gettime()
+        Module.NumBuffs = buffCount
     end
 
     if Module.TempSettings.PositionTimer == nil then

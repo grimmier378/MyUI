@@ -136,6 +136,7 @@ local currZone, lastZone
 local newSMFile                                                                                                                        = mq.configDir .. '/MyUI/MQ2SpawnMaster.ini'
 local execCommands                                                                                                                     = false
 local displayTablePlayers                                                                                                              = {}
+local numDisplayPlayers                                                                                                                = 0
 local DistColorRanges                                                                                                                  = {
 	orange = 600, -- distance the color changes from green to orange
 	red = 1200, -- distance the color changes from orange to red
@@ -551,12 +552,14 @@ end
 
 ---@param spawn MQSpawn
 local function SpawnToEntry(spawn, id, table)
+	if not spawn then return end
 	local pAggro = 0
 	if table == xTarTable then
 		pAggro = spawn.PctAggro() or 0
 	end
 	if spawn.ID() then
-		if spawn.Surname():find("'s ") then return end
+		local surName = spawn.Surname() or ''
+		if surName:find("'s ") then return end
 		local entry = {
 			ID = id or 0,
 			MobName = spawn.DisplayName() or ' ',
@@ -744,12 +747,16 @@ local function RefreshZone()
 	local npcs = mq.getFilteredSpawns(function(spawn) return spawn.Type() == 'NPC' end)
 	for i = 1, #npcs do
 		local spawn = npcs[i]
-		if #npcs > 0 then InsertTableSpawn(newTable, spawn, tonumber(spawn.ID())) end
+		if spawn() then
+			if #npcs > 0 then InsertTableSpawn(newTable, spawn, tonumber(spawn.ID())) end
+		end
 	end
 	for i = 1, mq.TLO.Me.XTargetSlots() do
 		if mq.TLO.Me.XTarget(i)() ~= nil and mq.TLO.Me.XTarget(i)() ~= 0 then
 			local spawn = mq.TLO.Me.XTarget(i)
-			if spawn.ID() > 0 then InsertTableSpawn(xTarTable, spawn, tonumber(spawn.ID())) end
+			if spawn() then
+				if spawn.ID() > 0 then InsertTableSpawn(xTarTable, spawn, tonumber(spawn.ID())) end
+			end
 		end
 	end
 	if showAggro then
@@ -828,6 +835,7 @@ local function spawn_search_players(search)
 	for name, v in pairs(tmp) do
 		if displayTablePlayers[name] == nil then
 			displayTablePlayers[name] = v
+			numDisplayPlayers = numDisplayPlayers + 1
 		else
 			displayTablePlayers[name].distance = v.distance
 			displayTablePlayers[name].time = v.time
@@ -837,6 +845,7 @@ local function spawn_search_players(search)
 		for k, v in pairs(displayTablePlayers) do
 			if tmp[k] == nil then
 				displayTablePlayers[k] = nil
+				numDisplayPlayers = numDisplayPlayers - 1
 			end
 		end
 	end
@@ -945,7 +954,7 @@ local function check_for_spawns()
 
 			if not importedZones[Zone.ShortName()] or forceImport then
 				-- Check for Long Name
-				local tmpFixName = Zone.Name():gsub("The ", ""):lower()
+				local tmpFixName = Zone.Name():gsub("the ", ""):lower()
 				if spawnsSpawnMaster[Zone.Name():lower()] ~= nil or spawnsSpawnMaster[tmpFixName] ~= nil then
 					tmpSpawnMaster = spawnsSpawnMaster[Zone.Name():lower()] ~= nil and spawnsSpawnMaster[Zone.Name():lower()] or spawnsSpawnMaster[tmpFixName]
 					for k, v in pairs(tmpSpawnMaster) do
@@ -1031,8 +1040,9 @@ local function check_for_spawns()
 end
 
 local function check_for_announce()
+	local tmp = spawn_search_players('pc notid ' .. mq.TLO.Me.ID())
+
 	if active and announce and not check_safe_zone() then
-		local tmp = spawn_search_players('pc notid ' .. mq.TLO.Me.ID())
 		local charZone = '\aw[\a-o' .. Module.CharLoaded .. '\aw|\at' .. Zone.ShortName() .. '\aw] '
 		if tmp ~= nil then
 			for name, v in pairs(tmp) do
@@ -1070,6 +1080,7 @@ local function check_for_zone_change()
 		alertTime = os.time()
 		doOnce = true
 		displayTablePlayers = {}
+		numDisplayPlayers = 0
 		if haveSM then importZone = true end
 	end
 end
@@ -1493,8 +1504,8 @@ local function DrawSearchWindow()
 			end
 
 			if currentTab == "zone" then
-				if ImGui.BeginTabBar("Spawns##Tabs") then
-					if ImGui.BeginTabItem("NPC's") then
+				if ImGui.BeginTabBar(string.format("Spawns##Tabs")) then
+					if ImGui.BeginTabItem(string.format("NPC's (%s)###NpcTabLabel", (#Table_Cache.Unhandled or 0))) then
 						local searchText, selected = ImGui.InputText("Search##RulesSearch", Module.GUI_Main.Search)
 						-- ImGui.PopItemWidth()
 						if selected and Module.GUI_Main.Search ~= searchText then
@@ -1560,8 +1571,8 @@ local function DrawSearchWindow()
 					end
 
 					-- Players
-					if ImGui.BeginTabItem("Players") then
-						if ImGui.BeginTable("PlayersInZone", 4, Module.GUI_Main.Table.Flags) then
+					if ImGui.BeginTabItem(string.format("Players (%s)###PCTabLabel", numDisplayPlayers)) then
+						if ImGui.BeginTable("PlayersInZone###PCTable", 4, Module.GUI_Main.Table.Flags) then
 							ImGui.TableSetupScrollFreeze(0, 1)
 							ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthFixed, 120)
 							ImGui.TableSetupColumn("Guild", ImGuiTableColumnFlags.WidthFixed, 100)
@@ -1584,6 +1595,8 @@ local function DrawSearchWindow()
 						end
 						ImGui.EndTabItem()
 					end
+
+
 					ImGui.EndTabBar()
 				end
 			elseif currentTab == "npcList" then

@@ -440,9 +440,11 @@ local function MyUI_Render()
 		RenderLoader()
 	else
 		if MyUI_Settings.ShowMain then
+			local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
+
 			Minimized = false
 			ImGui.SetNextWindowSize(400, 200, ImGuiCond.FirstUseEver)
-			local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
+			-- local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
 			local open_gui, show_gui = ImGui.Begin(MyUI_ScriptName .. "##" .. MyUI_CharLoaded, true, ImGuiWindowFlags.None)
 
 			if not open_gui then
@@ -575,6 +577,7 @@ local function MyUI_Render()
 			end
 			MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
 			ImGui.End()
+			-- MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
 		end
 
 		RenderModules()

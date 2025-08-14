@@ -1048,6 +1048,16 @@ local function DrawConsole(channelID)
         else
             ImGui.Text("No Command History")
         end
+        ImGui.Separator()
+        if ImGui.Selectable('Clear Console##ClearConsole' .. channelID) then
+            -- Clear the console output
+            Module.Consoles[channelID].console:Clear()
+            Module.Consoles[channelID].txtBuffer = {}
+            Module.Consoles[channelID].CommandHistory = {}
+            settings.commandBuffer = ""
+            cmdBuffer = ""
+            historyUpdated = true
+        end
         ImGui.EndPopup()
     end
 
@@ -1494,6 +1504,8 @@ function Module.RenderGUI()
                         ImGui.Text("Lock Window")
                         ImGui.EndTooltip()
                     end
+
+
                     if PopOut ~= Module.Settings.Channels[channelID].PopOut then
                         Module.Settings.Channels[channelID].PopOut = PopOut
                         Module.tempSettings.Channels[channelID].PopOut = PopOut

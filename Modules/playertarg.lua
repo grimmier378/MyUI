@@ -994,9 +994,9 @@ function Module.RenderGUI()
             if settings[Module.Name].DynamicHP then
                 ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorHpMin, colorHpMax, mq.TLO.Me.PctHPs())))
             else
-                if mq.TLO.Me.PctHPs() <= 0 then
+                if (mq.TLO.Me.PctHPs() or 0) <= 0 then
                     ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
-                elseif mq.TLO.Me.PctHPs() < 15 then
+                elseif (mq.TLO.Me.PctHPs() or 0) < 15 then
                     if pulse then
                         ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('orange')))
                         if not mq.TLO.Me.CombatState() == 'COMBAT' then pulse = false end

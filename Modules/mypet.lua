@@ -52,7 +52,7 @@ local defaults, settings, btnInfo                                               
 local showMainGUI, showConfigGUI                                                  = true, false
 local scale                                                                       = 1
 local locked, hasThemeZ                                                           = false, false
-local petHP, petTarg, petDist, petBuffs, petName, petTargHP, petLvl, petBuffCount = 0, nil, 0, {}, 'No Pet', 0, -1, 0
+local petHP, petTarg, petDist, petBuffs, petName, petTargHP, petLvl, petBuffCount = 0, nil, 0, {}, 'NO PET', 0, -1, 0
 local lastCheck                                                                   = 0
 local myPet                                                                       = mq.TLO.Pet
 local btnKeys                                                                     = {
@@ -245,8 +245,12 @@ local function DrawInspectableSpellIcon(iconID, bene, name, i)
 	local beniColor = IM_COL32(0, 20, 180, 190) -- blue benificial default color
 	if iconID == 0 then
 		ImGui.SetWindowFontScale(settings[Module.Name].Scale)
-		ImGui.Dummy(iconSize, iconSize)
-		ImGui.SetWindowFontScale(1)
+		ImGui.Text("%s", i)
+		ImGui.PushID(tostring(iconID) .. i .. "_invis_btn")
+		ImGui.SetCursorPos(cursor_x, cursor_y)
+		ImGui.InvisibleButton("slot" .. tostring(i), ImVec2(iconSize, iconSize), bit32.bor(ImGuiButtonFlags.MouseButtonRight))
+		ImGui.PopID()
+
 		return
 	end
 	animSpell:SetTextureCell(iconID or 0)
@@ -295,7 +299,7 @@ function Module.RenderGUI()
 	if showMainGUI then
 		-- Sort the buttons before displaying them
 		sortButtons()
-		if (autoHide and petName ~= 'No Pet') or not autoHide then
+		if (autoHide and petName ~= 'NO PET') or not autoHide then
 			ImGui.SetNextWindowSize(ImVec2(275, 255), ImGuiCond.FirstUseEver)
 			-- Set Window Name
 			local winName = string.format('%s##Main_%s', Module.Name, Module.CharLoaded)
@@ -335,8 +339,8 @@ function Module.RenderGUI()
 					end
 					ImGui.EndPopup()
 				end
-				if petName == 'No Pet' then
-					ImGui.Text("No Pet")
+				if petName == 'NO PET' then
+					ImGui.Text("NO PET")
 				else
 					petHP = mq.TLO.Me.Pet.PctHPs() or 0
 					petTarg = myPet.Target.DisplayName() or nil
@@ -431,24 +435,18 @@ function Module.RenderGUI()
 						local idx = 1
 						while petDrawBuffCount ~= petBuffCount do
 							if petBuffs[idx] == nil then break end
+							DrawInspectableSpellIcon(petBuffs[idx].Icon, petBuffs[idx].Beneficial, petBuffs[idx].Name, idx)
+
 							if petBuffs[idx].Name ~= 'None' then
-								DrawInspectableSpellIcon(petBuffs[idx].Icon, petBuffs[idx].Beneficial, petBuffs[idx].Name, idx)
 								petDrawBuffCount = petDrawBuffCount + 1
-								if rowCnt < maxPerRow and petDrawBuffCount < petBuffCount then
-									ImGui.SameLine()
-									rowCnt = rowCnt + 1
-								else
-									rowCnt = 0
-								end
-							else
-								ImGui.Dummy(20, 20)
-								if rowCnt < maxPerRow and petDrawBuffCount < petBuffCount then
-									ImGui.SameLine()
-									rowCnt = rowCnt + 1
-								else
-									rowCnt = 0
-								end
 							end
+							if rowCnt < maxPerRow and petDrawBuffCount < petBuffCount then
+								ImGui.SameLine()
+								rowCnt = rowCnt + 1
+							else
+								rowCnt = 0
+							end
+
 							idx = idx + 1
 						end
 						ImGui.PopStyleVar()
@@ -672,20 +670,16 @@ function Module.MainLoop()
 	end
 
 	local timeDiff = mq.gettime() - clockTimer
-	if timeDiff > 10 then
-		petName = myPet.DisplayName() or 'No Pet'
-		local curTime = os.clock()
+	if timeDiff > 100 then
+		petName = myPet.DisplayName() or 'NO PET'
 		-- Process ImGui Window Flag Changes
 		winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoFocusOnAppearing)
 		winFlags = locked and bit32.bor(ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoResize, winFlags) or winFlags
 		-- winFlags = aSize and bit32.bor(winFlags, ImGuiWindowFlags.AlwaysAutoResize) or winFlags
 		winFlags = not showTitleBar and bit32.bor(winFlags, ImGuiWindowFlags.NoTitleBar) or winFlags
-		if petName ~= 'No Pet' then
+		if petName ~= 'NO PET' then
 			GetButtonStates()
-			if curTime - lastCheck > 1 then
-				getPetData()
-				lastCheck = curTime
-			end
+			getPetData()
 		else
 			petBuffCount = 0
 			petBuffs = {}

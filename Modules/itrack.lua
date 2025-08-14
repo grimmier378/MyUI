@@ -10,6 +10,7 @@ local itemData               = {}
 local saveFileName           = mq.configDir .. "/itemtracker.lua"
 local mainWindowFlags        = bit32.bor(ImGuiWindowFlags.None)
 local buttonWinFlags         = bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoCollapse)
+local MySelf                 = mq.TLO.Me
 
 local removedItems           = {}
 local myName                 = mq.TLO.Me.CleanName()
@@ -25,13 +26,36 @@ Module.Settings              = {}
 Module.Server                = mq.TLO.EverQuest.Server()
 Module.TempSettings          = {}
 Module.TempSettings.Counters = {}
+
+---@diagnostic disable-next-line:undefined-global
+local loadedExeternally      = MyUI_ScriptName ~= nil and true or false
+if not loadedExeternally then
+	Module.Utils       = require('lib.common')    -- common functions for use in other scripts
+	Module.Icons       = require('mq.ICONS')      -- FAWESOME ICONS
+	Module.Colors      = require('lib.colors')    -- color table for GUI returns ImVec4
+	Module.ThemeLoader = require('lib.theme_loader') -- Load the theme loader
+	Module.CharLoaded  = MySelf.CleanName()
+	-- Module.Server      = mq.TLO.MacroQuest.Server() or "Unknown" -- Get the server name
+	Module.ThemeName   = 'Default'
+	Module.Theme       = require('defaults.themes') -- Get the theme table
+else
+	Module.Utils       = MyUI_Utils
+	Module.Icons       = MyUI_Icons
+	Module.Colors      = MyUI_Colors
+	Module.ThemeLoader = MyUI_ThemeLoader
+	Module.CharLoaded  = MyUI_CharLoaded
+	-- Module.Server      = MyUI_Server or "Unknown" -- Get the server name
+	Module.ThemeName   = MyUI_ThemeName or 'Default'
+	Module.Theme       = MyUI_Theme or {}
+end
+
 -- local animItems         = mq.FindTextureAnimation("A_DragItem")
 -- local animBox           = mq.FindTextureAnimation("A_RecessedBox")
-local animMini               = mq.FindTextureAnimation("A_DragItem")
-local EQ_ICON_OFFSET         = 500
-local configFile             = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, Module.Name, Module.Server, myName)
+local animMini       = mq.FindTextureAnimation("A_DragItem")
+local EQ_ICON_OFFSET = 500
+local configFile     = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, Module.Name, Module.Server, myName)
 
-local defaults               = {
+local defaults       = {
 	showUI = true,
 	lockWindow = false,
 }
@@ -320,11 +344,13 @@ local function renderMain()
 end
 
 function Module.RenderGUI()
+	local styleCount, colorCount = Module.ThemeLoader.StartTheme(MyUI_ThemeName or Module.ThemeName, Module.Theme)
 	renderBtn()
 
 	if Module.Settings.showUI then
 		renderMain()
 	end
+	Module.ThemeLoader.EndTheme(styleCount, colorCount)
 end
 
 -- Helper function to check if a table contains a value

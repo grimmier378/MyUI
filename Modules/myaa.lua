@@ -1,32 +1,35 @@
-local mq                = require('mq')
-local ImGui             = require 'ImGui'
-local drawTimerMS       = mq.gettime() -- get the current time in milliseconds
-local drawTimerS        = os.time()    -- get the current time in seconds
-local Module            = {}
-local MySelf            = mq.TLO.Me
-local genAA             = {}
-local classAA           = {}
-local archAA            = {}
-local specAA            = {}
-local currentRanks      = {}
-local doTrain           = false
-local doHotkey          = false
-local selectedAA        = "none"
-local availAA           = MySelf.AAPoints() or 0
-local spentAA           = MySelf.AAPointsSpent() or 0
-local totalAA           = MySelf.AAPointsTotal() or 0
-local toTrain           = {}
-local toHotkey          = {}
-local EQ_ICON_OFFSET    = 500
-local animMini          = mq.FindTextureAnimation("A_DragItem")
-local TotalMaxAA        = {
+local mq                      = require('mq')
+local ImGui                   = require 'ImGui'
+local drawTimerMS             = mq.gettime() -- get the current time in milliseconds
+local drawTimerS              = os.time()    -- get the current time in seconds
+local lastCheck               = os.time()
+local Module                  = {}
+local MySelf                  = mq.TLO.Me
+local genAA                   = {}
+local classAA                 = {}
+local archAA                  = {}
+local specAA                  = {}
+local currentRanks            = {}
+local doTrain                 = false
+local doHotkey                = false
+local selectedAA              = "none"
+local selectedTimeLeft        = 0
+local selectedTimeLeftSeconds = 0
+local availAA                 = MySelf.AAPoints() or 0
+local spentAA                 = MySelf.AAPointsSpent() or 0
+local totalAA                 = MySelf.AAPointsTotal() or 0
+local toTrain                 = {}
+local toHotkey                = {}
+local EQ_ICON_OFFSET          = 500
+local animMini                = mq.FindTextureAnimation("A_DragItem")
+local TotalMaxAA              = {
 	general = 0,
 	arch = 0,
 	class = 0,
 	special = 0,
 	all = 0,
 }
-local CurSectionAA      = {
+local CurSectionAA            = {
 	general = 0,
 	arch = 0,
 	class = 0,
@@ -34,12 +37,12 @@ local CurSectionAA      = {
 	all = 0,
 }
 
-Module.Name             = "MyAA" -- Name of the module used when loading and unloaing the modules.
-Module.IsRunning        = false  -- Keep track of running state. if not running we can unload it.
-Module.ShowGui          = false
+Module.Name                   = "MyAA" -- Name of the module used when loading and unloaing the modules.
+Module.IsRunning              = false  -- Keep track of running state. if not running we can unload it.
+Module.ShowGui                = false
 -- check if the script is being loaded as a Module (externally) or as a Standalone script.
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+local loadedExeternally       = MyUI_ScriptName ~= nil and true or false
 if not loadedExeternally then
 	Module.Utils       = require('lib.common')                -- common functions for use in other scripts
 	Module.Icons       = require('mq.ICONS')                  -- FAWESOME ICONS
@@ -47,6 +50,8 @@ if not loadedExeternally then
 	Module.ThemeLoader = require('lib.theme_loader')          -- Load the theme loader
 	Module.CharLoaded  = MySelf.CleanName()
 	Module.Server      = mq.TLO.MacroQuest.Server() or "Unknown" -- Get the server name
+	Module.ThemeName   = 'Default'
+	Module.Theme       = require('defaults.themes')           -- Get the theme table
 else
 	Module.Utils       = MyUI_Utils
 	Module.Icons       = MyUI_Icons
@@ -54,6 +59,8 @@ else
 	Module.ThemeLoader = MyUI_ThemeLoader
 	Module.CharLoaded  = MyUI_CharLoaded
 	Module.Server      = MyUI_Server or "Unknown" -- Get the server name
+	Module.ThemeName   = MyUI_ThemeName or 'Default'
+	Module.Theme       = MyUI_Theme or {}
 end
 
 local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, Module.Name, Module.Server, Module.CharLoaded)
@@ -140,6 +147,7 @@ function Module.UpdateAA(which)
 	totalAA = MySelf.AAPointsTotal() or 0
 	TotalMaxAA.all = TotalMaxAA.general + TotalMaxAA.arch + TotalMaxAA.class + TotalMaxAA.special
 	CurSectionAA.all = CurSectionAA.general + CurSectionAA.arch + CurSectionAA.class + CurSectionAA.special
+	lastCheck = os.time() -- Update the last check time
 end
 
 local function Init()
@@ -190,6 +198,16 @@ function Module.SetHotkey()
 	doHotkey = false -- Reset the doHotkey flag
 end
 
+function Module.FormatTime(seconds)
+	if seconds < 0 then
+		return "N/A"
+	end
+	local hours = math.floor(seconds / 3600)
+	local minutes = math.floor((seconds % 3600) / 60)
+	local secs = seconds % 60
+	return string.format("%02d:%02d:%02d", hours, minutes, secs)
+end
+
 function Module.GetAALists(which)
 	availAA       = MySelf.AAPoints() or 0
 	spentAA       = MySelf.AAPointsSpent() or 0
@@ -228,6 +246,7 @@ function Module.GetAALists(which)
 		local reqAbility = ability.RequiresAbility.Name() or nil
 		local reqAbilityPoints = ability.RequiresAbilityPoints() or 0
 		local aaTimer = ability.MyReuseTime() or 0
+		local aaTimeLeftSeconds = not passive and (mq.TLO.Me.AltAbilityTimer(ability.ID()).TotalSeconds() or 0) or -1
 		aaCurrent = tonumber(aaCurrent) or 0
 		aaMax = tonumber(aaMax) or 0
 		aaCost = tonumber(aaCost) or 0
@@ -258,6 +277,7 @@ function Module.GetAALists(which)
 				['Cost'] = aaCost,
 				['Type'] = aaType,
 				['Timer'] = aaTimer,
+				['TimeLeftSeconds'] = aaTimeLeftSeconds,
 			})
 		end
 	end
@@ -301,6 +321,7 @@ local function DrawAATable(which_Table, label)
 					local rowNum = ListName.List(data.Name, 1)() or 0 -- Select the AA in the AA window
 					ListName.Select(rowNum)            -- Select the AA in the AA window
 					selectedAA = data.Name
+					selectedTimeLeft = data.TimeLeftSeconds or -1
 				end
 				ImGui.TableNextColumn()
 				ImGui.Indent(3)
@@ -392,6 +413,7 @@ local tabPage = mq.TLO.Window("AAWindow/AAW_Subwindows")
 
 -- Exposed Functions
 function Module.RenderGUI()
+	local styleCount, colorCount = Module.ThemeLoader.StartTheme(MyUI_ThemeName or Module.ThemeName, MyUI_Theme or Module.Theme)
 	if Module.ShowGui then
 		ImGui.SetNextWindowSize(ImVec2(600, 400), ImGuiCond.FirstUseEver)
 		ImGui.SetNextWindowPos(ImVec2(100, 100), ImGuiCond.FirstUseEver)
@@ -477,6 +499,15 @@ function Module.RenderGUI()
 			ImGui.Separator()
 			if ImGui.BeginChild("AA Description", ImVec2(sizeX, sizeY * 0.2), childFlags) then
 				ImGui.PushTextWrapPos(sizeX - 20)
+				if selectedTimeLeft > 0 then
+					ImGui.Text('Time Left:')
+					ImGui.SameLine()
+					ImGui.TextColored(Module.Colors.color('yellow'), "%s", Module.FormatTime(selectedTimeLeft - (os.time() - lastCheck)))
+				elseif selectedTimeLeft == 0 then
+					ImGui.TextColored(Module.Colors.color('green'), 'Ready')
+				elseif selectedTimeLeft == -1 then
+					ImGui.Text('Passive')
+				end
 				ImGui.Text(mq.TLO.Window("AAWindow/AAW_Description").Text():gsub("<BR>", "\n"):gsub("%%", " "))
 				ImGui.PopTextWrapPos()
 			end
@@ -489,6 +520,7 @@ function Module.RenderGUI()
 	if Module.Settings.showBtn then
 		RenderBtn()
 	end
+	MyUI_ThemeLoader.EndTheme(styleCount, colorCount)
 end
 
 function Module.Unload()

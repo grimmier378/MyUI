@@ -550,6 +550,8 @@ local function DrawConfigWin()
 end
 
 function Module.RenderToolTipAndContext(i)
+	if mq.TLO.EverQuest.GameState() ~= "INGAME" then mq.exit() end
+
 	if ImGui.IsItemHovered() then
 		ImGui.BeginTooltip()
 		ImGui.Indent(4)

@@ -734,8 +734,10 @@ local function DrawInspectableSpellIcon(iconID, spell, slotNum, view)
     local cursor_x, cursor_y = ImGui.GetCursorPos()
     local beniColor = IM_COL32(0, 20, 180, 190) -- blue benificial default color
     if iconID == 0 and view ~= 'table' then
-        ImGui.SetWindowFontScale(1)
         ImGui.TextDisabled("%d", slotNum)
+        ImGui.SetCursorPos(cursor_x + 3, cursor_y + 3)
+        animSpell:SetTextureCell(217)
+        ImGui.DrawTextureAnimation(animSpell, Module.iconSize - 5, Module.iconSize - 5)
         ImGui.PushID(tostring(iconID) .. slotNum .. "_invis_btn")
         ImGui.SetCursorPos(cursor_x, cursor_y)
         ImGui.InvisibleButton("slot" .. tostring(slotNum), ImVec2(Module.iconSize, Module.iconSize), bit32.bor(ImGuiButtonFlags.MouseButtonRight))
@@ -842,15 +844,19 @@ local function BoxBuffs(id, sorted, view)
             ImGui.EndGroup()
         else
             ImGui.BeginGroup()
-
+            local icon = 0
+            local sInfo = { Name = 'none', TotalSeconds = 0, }
             if boxBuffs[i] ~= nil then
-                bName = boxBuffs[i].Name:sub(1, -1)
+                bName = boxBuffs[i].Name:sub(1, -1) or 'none'
                 sDurT = boxBuffs[i].DurationDisplay or ' '
-
-                DrawInspectableSpellIcon(boxBuffs[i].Icon, boxBuffs[i], slot)
-                rowCount = rowCount + 1
-                drawn = true
+                icon = boxBuffs[i].Icon or 0
+                sInfo = boxBuffs[i]
             end
+            DrawInspectableSpellIcon(icon, sInfo, slot)
+
+            rowCount = rowCount + 1
+            drawn = true
+
             ImGui.EndGroup()
         end
 
@@ -916,7 +922,7 @@ local function BoxBuffs(id, sorted, view)
             end
             ImGui.EndTooltip()
         end
-        if view == 'table' and drawn and boxBuffs[i] ~= nil then
+        if view == 'table' and drawn then
             if rowCount < rowMax then
                 ImGui.SameLine(0, 0.5)
             else

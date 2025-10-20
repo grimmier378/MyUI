@@ -4,6 +4,7 @@ local Module            = {}
 Module.Name             = "BigBag"
 Module.IsRunning        = false
 Module.ShowGUI          = false
+Module.TempSettings     = {}
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 
 if not loadedExeternally then
@@ -175,6 +176,54 @@ local function help_marker(desc)
 	end
 end
 
+local function retrieveClassList(item)
+	local classList = ""
+	local numClasses = item.Classes()
+	if numClasses == 0 then return 'None' end
+	if numClasses < 16 then
+		for i = 1, numClasses do
+			classList = string.format("%s %s", classList, item.Class(i).ShortName())
+		end
+	elseif numClasses == 16 then
+		classList = "All"
+	else
+		classList = "None"
+	end
+	return classList
+end
+
+local function retrieveRaceList(item)
+	local racesShort = {
+		['Human'] = 'HUM',
+		['Barbarian'] = 'BAR',
+		['Erudite'] = 'ERU',
+		['Wood Elf'] = 'ELF',
+		['High Elf'] = 'HIE',
+		['Dark Elf'] = 'DEF',
+		['Half Elf'] = 'HEF',
+		['Dwarf'] = 'DWF',
+		['Troll'] = 'TRL',
+		['Ogre'] = 'OGR',
+		['Halfling'] = 'HFL',
+		['Gnome'] = 'GNM',
+		['Iksar'] = 'IKS',
+		['Vah Shir'] = 'VAH',
+		['Froglok'] = 'FRG',
+		['Drakkin'] = 'DRK',
+	}
+	local raceList = ""
+	local numRaces = item.Races() or 16
+	if numRaces < 16 then
+		for i = 1, numRaces do
+			local raceName = racesShort[item.Race(i).Name()] or ''
+			raceList = string.format("%s %s", raceList, raceName)
+		end
+	else
+		raceList = "All"
+	end
+	return raceList
+end
+
 -- Sort routines
 local function sort_inventory()
 	-- Various Sorting
@@ -252,39 +301,59 @@ local function process_coin()
 	coin_qty = ''
 end
 
+
 local function draw_qty_win()
 	local label = ''
-	if show_qty_win then
+	local maxQty = 0
+	if not show_qty_win then
+		Module.TempSettings.FocusedInput = false
+	else
 		local labelHint = "Available: "
 		if coin_type == 0 then
 			labelHint = labelHint .. myPlat
+			maxQty = myPlat
 			label = 'Plat'
 		elseif coin_type == 1 then
 			labelHint = labelHint .. myGold
+			maxQty = myGold
 			label = 'Gold'
 		elseif coin_type == 2 then
 			labelHint = labelHint .. mySilver
+			maxQty = mySilver
 			label = 'Silver'
 		elseif coin_type == 3 then
 			labelHint = labelHint .. myCopper
+			maxQty = myCopper
 			label = 'Copper'
 		end
 		ImGui.SetNextWindowPos(ImGui.GetMousePosOnOpeningCurrentPopupVec(), ImGuiCond.Appearing)
 		local open, show = ImGui.Begin("Quantity##" .. coin_type, true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.NoDocking, ImGuiWindowFlags.AlwaysAutoResize))
 		if not open then
 			show_qty_win = false
+			Module.TempSettings.FocusedInput = false
 		end
 		if show then
 			ImGui.Text("Enter %s Qty", label)
 			ImGui.Separator()
-			coin_qty = ImGui.InputTextWithHint("##Qty", labelHint, coin_qty)
-			if ImGui.Button("OK##qty") then
+			local changed = false
+			coin_qty, changed = ImGui.InputTextWithHint("##Qty", labelHint, coin_qty, ImGuiInputTextFlags.EnterReturnsTrue)
+			if not Module.TempSettings.FocusedInput then
+				ImGui.SetKeyboardFocusHere(-1)
+				Module.TempSettings.FocusedInput = true
+			end
+			if ImGui.Button('Max##maxqty') then
+				coin_qty = string.format("%s", maxQty)
+			end
+			ImGui.SameLine()
+			if ImGui.Button("OK##qty") or changed then
 				show_qty_win = false
 				do_process_coin = true
+				Module.TempSettings.FocusedInput = false
 			end
 			ImGui.SameLine()
 			if ImGui.Button("Cancel##qty") then
 				show_qty_win = false
+				Module.TempSettings.FocusedInput = false
 			end
 		end
 		ImGui.End()
@@ -365,6 +434,37 @@ local function draw_currency()
 			coin_type = 3
 		end
 	end
+end
+
+local function draw_value(value)
+	local val_plat = math.floor(value / 1000)
+	local val_gold = math.floor((value - (val_plat * 1000)) / 100)
+	local val_silver = math.floor((value - (val_plat * 1000) - (val_gold * 100)) / 10)
+	local val_copper = value - (val_plat * 1000) - (val_gold * 100) - (val_silver * 10)
+
+	animItems:SetTextureCell(644 - EQ_ICON_OFFSET)
+	ImGui.DrawTextureAnimation(animItems, 10, 10)
+	ImGui.SameLine()
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), " %s ", comma_value(val_plat))
+	ImGui.SameLine()
+
+	animItems:SetTextureCell(645 - EQ_ICON_OFFSET)
+	ImGui.DrawTextureAnimation(animItems, 10, 10)
+	ImGui.SameLine()
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), " %s ", comma_value(val_gold))
+	ImGui.SameLine()
+
+	animItems:SetTextureCell(646 - EQ_ICON_OFFSET)
+	ImGui.DrawTextureAnimation(animItems, 10, 10)
+	ImGui.SameLine()
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), " %s ", comma_value(val_silver))
+	ImGui.SameLine()
+
+	animItems:SetTextureCell(647 - EQ_ICON_OFFSET)
+	ImGui.DrawTextureAnimation(animItems, 10, 10)
+	ImGui.SameLine()
+
+	ImGui.TextColored(ImVec4(0, 1, 1, 1), " %s ", comma_value(val_copper))
 end
 
 local function draw_bank_coin()
@@ -765,6 +865,621 @@ local function btn_label(item)
 	end
 end
 
+---comment
+---@param item item
+local function draw_item_tooltip(item)
+	local hasStats = false
+	local hasResists = false
+	local hasBase = false
+
+	if not item() then return end
+	local itemData = {
+		Name = item.Name(),
+		Type = item.Type(),
+		ID = item.ID(),
+		ReqLvl = item.RequiredLevel() or 0,
+		RecLvl = item.RecommendedLevel() or 0,
+		AC = item.AC() or 0,
+		BaseDMG = item.Damage() or 0,
+		Delay = item.ItemDelay() or 0,
+		Value = item.Value() or 0,
+		Weight = item.Weight() or 0,
+		Stack = item.Stack() or 0,
+		Clicky = item.Clicky(),
+		Charges = (item.Charges() or 0) ~= -1 and (item.Charges() or 0) or 'Infinite',
+		Classes = item.Classes() or 0,
+		RaceList = retrieveRaceList(item),
+
+		--base stats
+		HP = item.HP() or 0,
+		Mana = item.Mana() or 0,
+		Endurance = item.Endurance() or 0,
+
+		-- stats
+		STR = item.STR() or 0,
+		AGI = item.AGI() or 0,
+		STA = item.STA() or 0,
+		INT = item.INT() or 0,
+		WIS = item.WIS() or 0,
+		DEX = item.DEX() or 0,
+		CHA = item.CHA() or 0,
+		-- resists
+		MR = item.svMagic() or 0,
+		FR = item.svFire() or 0,
+		DR = item.svDisease() or 0,
+		PR = item.svPoison() or 0,
+		CR = item.svCold() or 0,
+		svCor = item.svCorruption() or 0,
+
+		--heroic stats
+		hStr = item.HeroicSTR() or 0,
+		hAgi = item.HeroicAGI() or 0,
+		hSta = item.HeroicSTA() or 0,
+		hInt = item.HeroicINT() or 0,
+		hDex = item.HeroicDEX() or 0,
+		hCha = item.HeroicCHA() or 0,
+		hWis = item.HeroicWIS() or 0,
+
+		--heroic resists
+		hMr = item.HeroicSvMagic() or 0,
+		hFr = item.HeroicSvFire() or 0,
+		hDr = item.HeroicSvDisease() or 0,
+		hPr = item.HeroicSvPoison() or 0,
+		hCr = item.HeroicSvCold() or 0,
+		hCor = item.HeroicSvCorruption() or 0,
+
+		--augments
+		AugSlots = item.Augs() or 0,
+		AugSlot1 = item.AugSlot(1).Name() or 'none',
+		AugSlot2 = item.AugSlot(2).Name() or 'none',
+		AugSlot3 = item.AugSlot(3).Name() or 'none',
+		AugSlot4 = item.AugSlot(4).Name() or 'none',
+		AugSlot5 = item.AugSlot(5).Name() or 'none',
+		AugSlot6 = item.AugSlot(6).Name() or 'none',
+
+		AugType1 = item.AugSlot1() or 'none',
+		AugType2 = item.AugSlot2() or 'none',
+		AugType3 = item.AugSlot3() or 'none',
+		AugType4 = item.AugSlot4() or 'none',
+		AugType5 = item.AugSlot5() or 'none',
+		AugType6 = item.AugSlot6() or 'none',
+
+		-- bonus efx
+		Spelleffect = item.Spell.Name() or "",
+		Worn = item.Worn.Spell() and (item.Worn.Spell.Name() or '') or 'none',
+		Focus1 = item.Focus() and (item.Focus.Spell.Name() or '') or 'none',
+		Focus2 = item.Focus2() and (item.Focus2.Spell.Name() or '') or 'none',
+		-- ElementalDamage = item.ElementalDamage() or 0,
+		Haste = item.Haste() or 0,
+		DmgShield = item.DamShield() or 0,
+		DmgShieldMit = item.DamageShieldMitigation() or 0,
+		Avoidance = item.Avoidance() or 0,
+		DotShield = item.DoTShielding() or 0,
+		InstrumentMod = item.InstrumentMod() or 0,
+		HPRegen = item.HPRegen() or 0,
+		ManaRegen = item.ManaRegen() or 0,
+		EnduranceRegen = item.EnduranceRegen() or 0,
+		Accuracy = item.Accuracy() or 0,
+
+		--restrictions
+		isNoDrop = item.NoDrop() or false,
+		isNoRent = item.NoRent() or false,
+		isNoTrade = item.NoTrade() or false,
+		isAttuneable = item.Attuneable() or false,
+		isLore = item.Lore() or false,
+		isEvolving = (item.Evolving.ExpPct() > 0 and item.Evolving.ExpOn()) or false,
+		isMagic = item.Magic() or false,
+
+		-- evolution
+		EvolvingLevel = item.Evolving.Level() or 0,
+		EvolvingExpPct = item.Evolving.ExpPct() or 0,
+		EvolvingMaxLevel = item.Evolving.MaxLevel() or 0,
+	}
+	local numCombatEfx = item.CombatEffects() or 0
+	local hasCombatEffects = numCombatEfx and numCombatEfx > 0
+
+	-- if hasCombatEffects then
+	-- 	Module.TempSettings.CombatEffects = {}
+	-- 	for i = 1, numCombatEfx do
+	-- 		table.insert(Module.TempSettings.CombatEffects,  or 'unknown')
+	-- 	end
+	-- end
+
+	local listStats = { 'STR', 'AGI', 'STA', 'INT', 'WIS', 'DEX', 'CHA', }
+	for _, stat in pairs(listStats) do
+		if itemData[stat] and itemData[stat] > 0 then
+			hasStats = true
+			break
+		end
+	end
+	local listResists = { 'MR', 'FR', 'DR', 'PR', 'CR', }
+	for _, resist in pairs(listResists) do
+		if itemData[resist] and itemData[resist] > 0 then
+			hasResists = true
+			break
+		end
+	end
+	local listBase = { 'HP', 'Mana', 'Endurance', }
+	for _, base in pairs(listBase) do
+		if itemData[base] and itemData[base] > 0 then
+			hasBase = true
+			break
+		end
+	end
+
+	ImGui.BeginTooltip()
+	ImGui.Text("Item: ")
+	ImGui.SameLine()
+	ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.Name)
+	ImGui.Text("Item ID: ")
+	ImGui.SameLine()
+	ImGui.TextColored(Module.Colors.color('yellow'), "%s", itemData.ID)
+
+	ImGui.Dummy(10, 10)
+	ImGui.Separator()
+	ImGui.Dummy(10, 10)
+
+	ImGui.Text("Type: ")
+	ImGui.SameLine()
+	ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Type)
+
+	local needSameLine = false
+	local restrictionString = ''
+	--restrictions
+	if itemData.isMagic then
+		needSameLine = true
+		restrictionString = restrictionString .. 'Magic '
+	end
+	if itemData.isNoDrop then
+		if needSameLine then restrictionString = restrictionString .. ',' end
+		restrictionString = restrictionString .. 'No Drop '
+		needSameLine = true
+	end
+	if itemData.isNoRent then
+		if needSameLine then restrictionString = restrictionString .. ',' end
+		restrictionString = restrictionString .. 'No Rent '
+		needSameLine = true
+	end
+	if itemData.isNoTrade then
+		if needSameLine then restrictionString = restrictionString .. ',' end
+		restrictionString = restrictionString .. 'No Trade '
+		needSameLine = true
+	end
+	if itemData.isLore then
+		if needSameLine then restrictionString = restrictionString .. ',' end
+		restrictionString = restrictionString .. 'Lore '
+		needSameLine = true
+	end
+	if itemData.isAttuneable then
+		if needSameLine then restrictionString = restrictionString .. ',' end
+		restrictionString = restrictionString .. 'Attuneable '
+		needSameLine = true
+	end
+	if itemData.isEvolving then
+		if needSameLine then restrictionString = restrictionString .. ',' end
+		restrictionString = restrictionString .. 'Evolving '
+	end
+
+	if restrictionString ~= '' then
+		ImGui.TextColored(Module.Colors.color('grey'), "%s", restrictionString)
+	end
+
+
+	if itemData.ReqLvl > 0 then
+		ImGui.Dummy(10, 10)
+		ImGui.Separator()
+		ImGui.Dummy(10, 10)
+
+		ImGui.Text('Req Lvl: ')
+		ImGui.SameLine()
+		local reqColorLabel = itemData.ReqLvl <= MySelf.Level() and 'green' or 'tangarine'
+		ImGui.TextColored(Module.Colors.color(reqColorLabel), "\t%s", itemData.ReqLvl)
+	end
+	if itemData.RecLvl and itemData.RecLvl > 0 then
+		ImGui.Text('Rec Lvl: ')
+		ImGui.SameLine()
+		ImGui.TextColored(Module.Colors.color('softblue'), "\t%s", itemData.RecLvl)
+	end
+
+
+
+	ImGui.SeparatorText("Classes: ")
+	local classList = retrieveClassList(item)
+	ImGui.PushTextWrapPos(250)
+	ImGui.TextColored(Module.Colors.color('grey'), "%s", classList)
+	ImGui.PopTextWrapPos()
+
+	ImGui.SeparatorText("Races: ")
+	ImGui.PushTextWrapPos(250)
+	ImGui.TextColored(Module.Colors.color('grey'), "%s", itemData.RaceList)
+	ImGui.PopTextWrapPos()
+
+	if hasBase then
+		ImGui.SeparatorText('Stats')
+		-- base
+		if ImGui.BeginTable("BaseStats##itemBaseStats", 2, ImGuiTableFlags.None) then
+			ImGui.TableSetupColumn("Stat", ImGuiTableColumnFlags.WidthFixed, 110)
+			ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 110)
+			ImGui.TableNextRow()
+			if itemData.AC > 0 then
+				ImGui.TableNextColumn()
+				ImGui.Text(" AC: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('teal'), " %s", itemData.AC)
+			end
+
+			if itemData.HP and itemData.HP > 0 then
+				ImGui.TableNextColumn()
+
+				ImGui.Text("HPs: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('pink2'), "%s", itemData.HP)
+			end
+			if itemData.Mana and itemData.Mana > 0 then
+				ImGui.TableNextColumn()
+				ImGui.Text("Mana: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Mana)
+			end
+			if itemData.Endurance and itemData.Endurance > 0 then
+				ImGui.TableNextColumn()
+				ImGui.Text("End: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('yellow'), "%s", itemData['Endurance'])
+			end
+			if itemData.HPRegen > 0 then
+				ImGui.TableNextColumn()
+				ImGui.Text("HP Regen: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('pink2'), "%s", itemData.HPRegen)
+			end
+			if itemData.ManaRegen > 0 then
+				ImGui.TableNextColumn()
+				ImGui.Text("Mana Regen: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.ManaRegen)
+			end
+			if itemData.EnduranceRegen > 0 then
+				ImGui.TableNextColumn()
+				ImGui.Text("Endurance Regen: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('yellow'), "%s", itemData.EnduranceRegen)
+			end
+
+			ImGui.EndTable()
+		end
+	end
+	-- stats
+	if hasStats then
+		ImGui.SeparatorText('Stats')
+		if ImGui.BeginTable("Stats##itemStats", 2, ImGuiTableFlags.None) then
+			ImGui.TableSetupColumn("Stat##stats", ImGuiTableColumnFlags.WidthFixed, 110)
+			ImGui.TableSetupColumn("Value##stats", ImGuiTableColumnFlags.WidthFixed, 110)
+
+			ImGui.TableNextRow()
+			ImGui.TableNextColumn()
+			if itemData['STR'] > 0 then
+				ImGui.Text("STR: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.STR)
+				if itemData.hStr > 0 then
+					ImGui.SameLine()
+					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hStr)
+				end
+				ImGui.TableNextColumn()
+			end
+			if itemData.AGI and itemData.AGI > 0 then
+				ImGui.Text("AGI: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.AGI)
+				if itemData.hAgi > 0 then
+					ImGui.SameLine()
+					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hAgi)
+				end
+				ImGui.TableNextColumn()
+			end
+			if itemData.STA and itemData.STA > 0 then
+				ImGui.Text("STA: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.STA)
+				if itemData.hSta > 0 then
+					ImGui.SameLine()
+					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hSta)
+				end
+				ImGui.TableNextColumn()
+			end
+			if itemData.INT and itemData.INT > 0 then
+				ImGui.Text("INT: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.INT)
+				if itemData.hInt > 0 then
+					ImGui.SameLine()
+					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hInt)
+				end
+				ImGui.TableNextColumn()
+			end
+			if itemData.WIS and itemData.WIS > 0 then
+				ImGui.Text("WIS: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.WIS)
+				if itemData.hWis > 0 then
+					ImGui.SameLine()
+					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hWis)
+				end
+				ImGui.TableNextColumn()
+			end
+			if itemData.DEX and itemData.DEX > 0 then
+				ImGui.Text("DEX: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.DEX)
+				if itemData.hDex > 0 then
+					ImGui.SameLine()
+					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hDex)
+				end
+				ImGui.TableNextColumn()
+			end
+			if itemData.CHA and itemData.CHA > 0 then
+				ImGui.Text("CHA: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.CHA)
+				if itemData.hCha > 0 then
+					ImGui.SameLine()
+					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hCha)
+				end
+				ImGui.TableNextColumn()
+			end
+			ImGui.EndTable()
+		end
+	end
+	-- resists
+	if hasResists then
+		ImGui.SeparatorText('Resists')
+		if ImGui.BeginTable("Resists##itemResists", 2, ImGuiTableFlags.None) then
+			ImGui.TableSetupColumn("Stat##res", ImGuiTableColumnFlags.WidthFixed, 110)
+			ImGui.TableSetupColumn("Value##res", ImGuiTableColumnFlags.WidthFixed, 110)
+
+			ImGui.TableNextRow()
+			ImGui.TableNextColumn()
+			if itemData['MR'] > 0 then
+				ImGui.Text("MR:  ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['MR'])
+				if itemData.hMr > 0 then
+					ImGui.SameLine()
+					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hMr)
+				end
+				ImGui.TableNextColumn()
+			end
+			if itemData['FR'] > 0 then
+				ImGui.Text("FR:  ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['FR'])
+				if itemData.hFr > 0 then
+					ImGui.SameLine()
+					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hFr)
+				end
+				ImGui.TableNextColumn()
+			end
+			if itemData['DR'] > 0 then
+				ImGui.Text("DR:  ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['DR'])
+				if itemData.hDr > 0 then
+					ImGui.SameLine()
+					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hDr)
+				end
+				ImGui.TableNextColumn()
+			end
+			if itemData['PR'] > 0 then
+				ImGui.Text("PR:  ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['PR'])
+				if itemData.hPr > 0 then
+					ImGui.SameLine()
+					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hPr)
+				end
+				ImGui.TableNextColumn()
+			end
+			if itemData['CR'] > 0 then
+				ImGui.Text("CR:  ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['CR'])
+				if itemData.hCr > 0 then
+					ImGui.SameLine()
+					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hCr)
+				end
+			end
+			if itemData['svCor'] > 0 then
+				ImGui.Text("COR: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['svCor'])
+				if itemData.hCor > 0 then
+					ImGui.SameLine()
+					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hCor)
+				end
+			end
+			ImGui.EndTable()
+		end
+	end
+
+
+	if itemData.BaseDMG > 0 then
+		ImGui.SeparatorText('Damage')
+		if ImGui.BeginTable("DamageStats", 2, ImGuiTableFlags.None) then
+			ImGui.TableSetupColumn("Stat##dmg", ImGuiTableColumnFlags.WidthFixed, 110)
+			ImGui.TableSetupColumn("Value##dmg", ImGuiTableColumnFlags.WidthFixed, 110)
+			ImGui.TableNextRow()
+			ImGui.TableNextColumn()
+			ImGui.Text("Dmg: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('pink2'), "%s", itemData.BaseDMG or 'NA')
+
+			ImGui.TableNextColumn()
+
+			ImGui.Text(" Dly: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('yellow'), "%s", itemData.Delay or 'NA')
+
+			ImGui.TableNextColumn()
+
+			if item.DMGBonusType() ~= 'None' then
+				ImGui.Text("Bonus %s Dmg ", item.DMGBonusType())
+				-- ImGui.SameLine()
+				-- ImGui.TextColored(Module.Colors.color('pink2'), "%s", itemData.ElementalDamage or 'NA')
+				ImGui.TableNextColumn()
+			end
+
+			ImGui.TableNextColumn()
+
+			ImGui.Text("Ratio: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('teal'), "%0.3f", (itemData.Delay / (itemData.BaseDMG or 1)) or 0)
+
+			if itemData.Haste > 0 then
+				ImGui.TableNextColumn()
+				ImGui.Text("Haste: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('green'), "%s%%", itemData.Haste)
+			end
+			if itemData.DmgShield > 0 then
+				ImGui.TableNextColumn()
+				ImGui.Text("Dmg Shield: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('yellow'), "%s", itemData.DmgShield)
+			end
+
+			if itemData.DmgShieldMit > 0 then
+				ImGui.TableNextColumn()
+				ImGui.Text("DS Mit: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('teal'), "%s%%", itemData.DmgShieldMit)
+			end
+			if itemData.Avoidance > 0 then
+				ImGui.TableNextColumn()
+				ImGui.Text("Avoidance: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('green'), "%s%%", itemData.Avoidance)
+			end
+			if itemData.DotShield > 0 then
+				ImGui.TableNextColumn()
+				ImGui.Text("DoT Shielding: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('yellow'), "%s%%", itemData.DotShield)
+			end
+			if itemData.Accuracy > 0 then
+				ImGui.TableNextColumn()
+				ImGui.Text("Accuracy: ")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData.Accuracy)
+			end
+			ImGui.EndTable()
+		end
+	end
+
+	-- Augments
+	if itemData.AugSlots > 0 then
+		-- ImGui.Dummy(10, 10)
+		ImGui.SeparatorText('Augments')
+		for i = 1, itemData.AugSlots do
+			local augSlotName = itemData['AugSlot' .. i] or 'none'
+			local augTypeName = itemData['AugType' .. i] or 'none'
+			if augSlotName ~= 'none' or augTypeName ~= 21 then
+				ImGui.Text("Slot %s: ", i)
+				ImGui.SameLine()
+				ImGui.PushTextWrapPos(250)
+				ImGui.TextColored(Module.Colors.color('teal'), "%s Type (%s)", (augSlotName ~= 'none' and augSlotName or 'Empty'), augTypeName)
+				ImGui.PopTextWrapPos()
+			end
+		end
+	end
+
+	if hasCombatEffects or itemData.Clicky or itemData.Spelleffect ~= '' or itemData.Worn ~= 'none' or
+		itemData.Focus1 ~= 'none' or itemData.Focus2 ~= 'none' then
+		-- ImGui.Dummy(10, 10)
+
+		ImGui.SeparatorText('Efx')
+		if itemData.Clicky then
+			ImGui.Dummy(10, 10)
+			ImGui.Text("Charges: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('yellow'), "%s", itemData.Charges)
+			ImGui.Text("Clicky Spell: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Clicky)
+		end
+
+		if (itemData.Spelleffect ~= "" and
+				not ((itemData.Spelleffect == itemData.Clicky) or (itemData.Spelleffect == itemData.Worn) or
+					(itemData.Focus1 == itemData.Spelleffect) or (itemData.Focus2 == itemData.Spelleffect))) then
+			ImGui.Dummy(10, 10)
+			local effectTypeLabel = item.EffectType() ~= 'None' and item.EffectType() or "Spell"
+			ImGui.Text("%s Effect: ", effectTypeLabel)
+			ImGui.SameLine()
+			ImGui.PushTextWrapPos(250)
+			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Spelleffect)
+			ImGui.PopTextWrapPos()
+		end
+
+		if itemData.Worn ~= 'none' then
+			ImGui.Dummy(10, 10)
+			ImGui.Text("Worn Effect: ")
+			ImGui.SameLine()
+			ImGui.PushTextWrapPos(250)
+			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Worn)
+			ImGui.PopTextWrapPos()
+		end
+
+		if itemData.Focus1 ~= 'none' then
+			ImGui.Dummy(10, 10)
+			ImGui.Text("Focus Effect: ")
+			ImGui.SameLine()
+			ImGui.PushTextWrapPos(250)
+			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Focus1)
+			ImGui.PopTextWrapPos()
+		end
+
+		if itemData.Focus2 ~= 'none' then
+			ImGui.Dummy(10, 10)
+			ImGui.Text("Focus2 Effect: ")
+			ImGui.SameLine()
+			ImGui.PushTextWrapPos(250)
+			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Focus2)
+			ImGui.PopTextWrapPos()
+		end
+	end
+
+	if itemData.isEvolving then
+		ImGui.SeparatorText('Evolving Info')
+		ImGui.Text("Evolving Level: ")
+		ImGui.SameLine()
+		ImGui.TextColored(Module.Colors.color("tangarine"), "%d", itemData.EvolvingLevel)
+
+		ImGui.Text("Evolving Max Level: ")
+		ImGui.SameLine()
+		ImGui.TextColored(Module.Colors.color("teal"), "%d", itemData.EvolvingMaxLevel)
+
+		ImGui.Text("Evolving Exp: ")
+		ImGui.SameLine()
+		ImGui.TextColored(Module.Colors.color("yellow"), "%0.2f%%", itemData.EvolvingExpPct)
+	end
+
+	ImGui.Dummy(10, 10)
+	ImGui.Text("Weight: ")
+	ImGui.SameLine()
+	ImGui.TextColored(Module.Colors.color('pink2'), "%s", itemData.Weight)
+	if itemData.Stack > 0 then
+		ImGui.Text("Stack Size: ")
+		ImGui.SameLine()
+		ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Stack)
+	end
+	ImGui.Dummy(10, 10)
+	ImGui.Text("Value: ")
+	ImGui.SameLine()
+	draw_value(itemData.Value or 0)
+
+	ImGui.EndTooltip()
+end
+
 ---Draws the individual item icon in the bag.
 ---@param item item The item object
 local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
@@ -869,36 +1584,62 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 	if ImGui.IsItemHovered() then
 		local charges = item.Charges() or 0
 		local clicky = item.Clicky() or 'none'
-		ImGui.BeginTooltip()
-		ImGui.Text("Item: ")
-		ImGui.SameLine()
-		ImGui.TextColored(Module.Colors.color('tangarine'), "%s", item.Name())
-		if toolTipSpell ~= '' then
-			ImGui.Text("Scroll: ")
-			ImGui.SameLine()
-			ImGui.TextColored(Module.Colors.color('green'), "(%s)", toolTipSpell)
-		end
-		ImGui.Text("Type: ")
-		ImGui.SameLine()
-		ImGui.TextColored(Module.Colors.color('pink2'), "%s", item.Type())
-		ImGui.Text("Qty: ")
-		ImGui.SameLine()
-		ImGui.TextColored(Module.Colors.color('green'), "%s", item.Stack() or 1)
-		ImGui.TextColored(Module.Colors.color('teal'), "Value: %0.1f Plat ", (item.Value() or 0) / 1000) -- 1000 copper - 1 plat
-		ImGui.SameLine()
-		ImGui.TextColored(Module.Colors.color('yellow'), 'Trib: %s', (item.Tribute() or 0))
-		if clicky ~= 'none' then
-			ImGui.SeparatorText("Clicky Info")
-			ImGui.TextColored(Module.Colors.color('green'), "Clicky: %s", clicky)
-			ImGui.TextColored(Module.Colors.color('teal'), "Charges: %s", charges >= 0 and charges or 'Infinite')
-		end
-		ImGui.SeparatorText("Click Actions")
-		if clickable then
-			ImGui.Text("Right Click to use item")
-			ImGui.Text("Left Click Pick Up item")
-		end
-		ImGui.Text("Ctrl + Right Click to Inspect Item")
-		ImGui.EndTooltip()
+		draw_item_tooltip(item)
+		-- ImGui.BeginTooltip()
+		-- ImGui.Text("Item: ")
+		-- ImGui.SameLine()
+		-- ImGui.TextColored(Module.Colors.color('tangarine'), "%s", item.Name())
+		-- if toolTipSpell ~= '' then
+		-- 	ImGui.Text("Scroll: ")
+		-- 	ImGui.SameLine()
+		-- 	ImGui.TextColored(Module.Colors.color('green'), "(%s)", toolTipSpell)
+		-- end
+		-- ImGui.Text("Type: ")
+		-- ImGui.SameLine()
+		-- ImGui.TextColored(Module.Colors.color('pink2'), "%s", item.Type())
+		-- if item.Type() == 'Armor' then
+		-- 	ImGui.SameLine()
+		-- 	ImGui.Text(" AC: ")
+		-- 	ImGui.SameLine()
+		-- 	ImGui.TextColored(Module.Colors.color('teal'), "%s", item.AC() or 'NA')
+		-- end
+		-- if item.Damage() ~= nil and item.Damage() > 0 then
+		-- 	ImGui.Text("Dmg: ")
+		-- 	ImGui.SameLine()
+		-- 	ImGui.TextColored(Module.Colors.color('pink2'), "%s", item.Damage() or 'NA')
+		-- 	ImGui.SameLine()
+		-- 	ImGui.Text(" Delay: ")
+		-- 	ImGui.SameLine()
+		-- 	ImGui.TextColored(Module.Colors.color('yellow'), "%s", item.ItemDelay() or 'NA')
+		-- end
+		-- ImGui.Text('Classes: ')
+		-- ImGui.SameLine()
+		-- ImGui.PushTextWrapPos(200)
+		-- ImGui.TextColored(Module.Colors.color('green'), "%s", retrieveClassList(item))
+		-- ImGui.PopTextWrapPos()
+		-- if item.RequiredLevel() and item.RequiredLevel() > 0 then
+		-- 	ImGui.Text('Required Lvl: ')
+		-- 	ImGui.SameLine()
+		-- 	ImGui.TextColored(Module.Colors.color('tangarine'), "%s", item.RequiredLevel() or 0)
+		-- end
+		-- ImGui.Text("Qty: ")
+		-- ImGui.SameLine()
+		-- ImGui.TextColored(Module.Colors.color('green'), "%s", item.Stack() or 1)
+		-- ImGui.TextColored(Module.Colors.color('teal'), "Value: %0.1f Plat ", (item.Value() or 0) / 1000) -- 1000 copper - 1 plat
+		-- ImGui.SameLine()
+		-- ImGui.TextColored(Module.Colors.color('yellow'), 'Trib: %s', (item.Tribute() or 0))
+		-- if clicky ~= 'none' then
+		-- 	ImGui.SeparatorText("Clicky Info")
+		-- 	ImGui.TextColored(Module.Colors.color('green'), "Clicky: %s", clicky)
+		-- 	ImGui.TextColored(Module.Colors.color('teal'), "Charges: %s", charges >= 0 and charges or 'Infinite')
+		-- end
+		-- ImGui.SeparatorText("Click Actions")
+		-- if clickable then
+		-- 	ImGui.Text("Right Click to use item")
+		-- 	ImGui.Text("Left Click Pick Up item")
+		-- end
+		-- ImGui.Text("Ctrl + Right Click to Inspect Item")
+		-- ImGui.EndTooltip()
 	end
 	if clickable then
 		if ImGui.IsItemClicked(ImGuiMouseButton.Left) then

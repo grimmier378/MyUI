@@ -133,7 +133,7 @@ local originalVolume                                                            
 local playTime                                                                                                                         = 0
 local playing                                                                                                                          = false
 local currZone, lastZone
-local newSMFile                                                                                                                        = mq.configDir .. '/MyUI/MQ2SpawnMaster.ini'
+-- local newSMFile                                                                                                                        = mq.configDir .. '/MyUI/MQ2SpawnMaster.ini'
 local execCommands                                                                                                                     = false
 local displayTablePlayers                                                                                                              = {}
 local numDisplayPlayers                                                                                                                = 0
@@ -486,11 +486,12 @@ local function load_settings()
 		end
 	end
 
-	if Module.Utils.File.Exists(newSMFile) then
-		spawnsSpawnMaster = LIP.loadSM(newSMFile)
-		haveSM = true
-		importZone = true
-	elseif Module.Utils.File.Exists(smSettings) then
+	-- if Module.Utils.File.Exists(newSMFile) then
+	-- 	spawnsSpawnMaster = LIP.loadSM(newSMFile)
+	-- 	haveSM = true
+	-- 	importZone = true
+	-- else
+	if Module.Utils.File.Exists(smSettings) then
 		spawnsSpawnMaster = LIP.loadSM(smSettings)
 		haveSM = true
 		importZone = true
@@ -501,7 +502,7 @@ local function load_settings()
 				spawnsSpawnMaster[section] = nil
 			end
 		end
-		LIP.save(newSMFile, spawnsSpawnMaster)
+		-- LIP.save(newSMFile, spawnsSpawnMaster)
 	end
 	local exportFile = string.format("%s/MyUI/ExportSM.lua", mq.configDir)
 	mq.pickle(exportFile, spawnsSpawnMaster)
@@ -815,7 +816,7 @@ local function spawn_search_players(search)
 		for i = 1, cnt do
 			local pc = NearestSpawn(i, search)
 			if pc ~= nil and pc.DisplayName() ~= nil then
-				local name = pc.DisplayName()
+				local name = pc.DisplayName() or 'unknown'
 				local guild = pc.Guild() or 'No Guild'
 				if should_include_player(pc) then
 					tmp[name] = {

@@ -444,6 +444,7 @@ local function MyUI_Render()
 
 			Minimized = false
 			ImGui.SetNextWindowSize(400, 200, ImGuiCond.FirstUseEver)
+			ImGui.SetNextWindowSizeConstraints(ImVec2(200, 200), ImVec2(4000, 4000))
 			-- local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
 			local open_gui, show_gui = ImGui.Begin(MyUI_ScriptName .. "##" .. MyUI_CharLoaded, true, ImGuiWindowFlags.None)
 
@@ -501,7 +502,8 @@ local function MyUI_Render()
 				end
 				ImGui.SeparatorText('Modules')
 				local sizeX, sizeY = ImGui.GetContentRegionAvail()
-				local col = math.floor(sizeX / 125) or 1
+				if (sizeX or 125) < 125 then sizeX = 125 end
+				local col = math.floor((sizeX or 125) / 125) or 1
 				if ImGui.BeginTable("Modules", col, ImGuiWindowFlags.None) then
 					local tempSort = GetSortedModuleNames()
 					local sorted_names = MyUI_Utils.SortTableColumns(nil, tempSort, col)

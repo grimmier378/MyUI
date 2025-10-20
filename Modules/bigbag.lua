@@ -1,11 +1,13 @@
-local mq                = require("mq")
-local ImGui             = require("ImGui")
-local Module            = {}
-Module.Name             = "BigBag"
-Module.IsRunning        = false
-Module.ShowGUI          = false
-Module.TempSettings     = {}
-local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+local mq                   = require("mq")
+local ImGui                = require("ImGui")
+local Module               = {}
+Module.Name                = "BigBag"
+Module.IsRunning           = false
+Module.ShowGUI             = false
+Module.TempSettings        = {}
+Module.TempSettings.Popped = {}
+
+local loadedExeternally    = MyUI_ScriptName ~= nil and true or false
 
 if not loadedExeternally then
 	Module.Path        = string.format("%s/%s/", mq.luaDir, Module.Name)
@@ -864,16 +866,12 @@ local function btn_label(item)
 		return string.format("##bag_%s_slot_%s", item.ItemSlot(), item.ItemSlot2())
 	end
 end
+local itemData = {}
 
----comment
----@param item item
-local function draw_item_tooltip(item)
-	local hasStats = false
-	local hasResists = false
-	local hasBase = false
+local function get_item_data(item)
+	if not item() then return nil end
 
-	if not item() then return end
-	local itemData = {
+	local tmpItemData = {
 		Name = item.Name(),
 		Type = item.Type(),
 		ID = item.ID(),
@@ -885,9 +883,10 @@ local function draw_item_tooltip(item)
 		Value = item.Value() or 0,
 		Weight = item.Weight() or 0,
 		Stack = item.Stack() or 0,
+		MaxStack = item.StackSize() or 0,
 		Clicky = item.Clicky(),
 		Charges = (item.Charges() or 0) ~= -1 and (item.Charges() or 0) or 'Infinite',
-		Classes = item.Classes() or 0,
+		ClassList = retrieveClassList(item),
 		RaceList = retrieveRaceList(item),
 
 		--base stats
@@ -960,6 +959,12 @@ local function draw_item_tooltip(item)
 		ManaRegen = item.ManaRegen() or 0,
 		EnduranceRegen = item.EnduranceRegen() or 0,
 		Accuracy = item.Accuracy() or 0,
+		BonusDmgType = item.DMGBonusType() or 'None',
+		SpellShield = item.SpellShield() or 0,
+		Clairvoyance = item.Clairvoyance() or 0,
+		HealAmount = item.HealAmount() or 0,
+		SpellDamage = item.SpellDamage() or 0,
+		StunResist = item.StunResist() or 0,
 
 		--restrictions
 		isNoDrop = item.NoDrop() or false,
@@ -975,6 +980,23 @@ local function draw_item_tooltip(item)
 		EvolvingExpPct = item.Evolving.ExpPct() or 0,
 		EvolvingMaxLevel = item.Evolving.MaxLevel() or 0,
 	}
+	return tmpItemData
+end
+
+---comment
+---@param item item
+local function draw_item_tooltip(item)
+	if not item() then return end
+	if item.ID() ~= itemData.ID then
+		itemData = {}
+		itemData = get_item_data(item)
+	end
+
+	if not itemData then return end
+
+	local hasStats = false
+	local hasResists = false
+	local hasBase = false
 	local numCombatEfx = item.CombatEffects() or 0
 	local hasCombatEffects = numCombatEfx and numCombatEfx > 0
 
@@ -985,29 +1007,28 @@ local function draw_item_tooltip(item)
 	-- 	end
 	-- end
 
-	local listStats = { 'STR', 'AGI', 'STA', 'INT', 'WIS', 'DEX', 'CHA', }
-	for _, stat in pairs(listStats) do
+	-- local listStats = { 'STR', 'AGI', 'STA', 'INT', 'WIS', 'DEX', 'CHA', }
+	for _, stat in pairs({ 'STR', 'AGI', 'STA', 'INT', 'WIS', 'DEX', 'CHA', }) do
 		if itemData[stat] and itemData[stat] > 0 then
 			hasStats = true
 			break
 		end
 	end
-	local listResists = { 'MR', 'FR', 'DR', 'PR', 'CR', }
-	for _, resist in pairs(listResists) do
+	-- local listResists = { 'MR', 'FR', 'DR', 'PR', 'CR', }
+	for _, resist in pairs({ 'MR', 'FR', 'DR', 'PR', 'CR', }) do
 		if itemData[resist] and itemData[resist] > 0 then
 			hasResists = true
 			break
 		end
 	end
-	local listBase = { 'HP', 'Mana', 'Endurance', }
-	for _, base in pairs(listBase) do
+	-- local listBase = { 'HP', 'Mana', 'Endurance', }
+	for _, base in pairs({ 'HP', 'Mana', 'Endurance', }) do
 		if itemData[base] and itemData[base] > 0 then
 			hasBase = true
 			break
 		end
 	end
 
-	ImGui.BeginTooltip()
 	ImGui.Text("Item: ")
 	ImGui.SameLine()
 	ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.Name)
@@ -1064,33 +1085,50 @@ local function draw_item_tooltip(item)
 		ImGui.TextColored(Module.Colors.color('grey'), "%s", restrictionString)
 	end
 
+	if ImGui.BeginTable('LVlInfo##lvl', 2, ImGuiTableFlags.None) then
+		ImGui.TableSetupColumn("Level Info##lvlinfo", ImGuiTableColumnFlags.WidthFixed, 150)
+		ImGui.TableSetupColumn("Value##lvlvalue", ImGuiTableColumnFlags.WidthFixed, 150)
 
-	if itemData.ReqLvl > 0 then
-		ImGui.Dummy(10, 10)
-		ImGui.Separator()
-		ImGui.Dummy(10, 10)
+		ImGui.TableNextRow()
+		if itemData.ReqLvl > 0 then
+			ImGui.TableNextColumn()
+			ImGui.Text('Req Lvl: ')
+			ImGui.SameLine()
+			local reqColorLabel = itemData.ReqLvl <= MySelf.Level() and 'green' or 'tangarine'
+			ImGui.TextColored(Module.Colors.color(reqColorLabel), "\t%s", itemData.ReqLvl)
+		end
+		if itemData.RecLvl and itemData.RecLvl > 0 then
+			ImGui.TableNextColumn()
+			ImGui.Text('Rec Lvl: ')
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('softblue'), "\t%s", itemData.RecLvl)
+		end
 
-		ImGui.Text('Req Lvl: ')
+		ImGui.TableNextColumn()
+		ImGui.Text("Weight: ")
 		ImGui.SameLine()
-		local reqColorLabel = itemData.ReqLvl <= MySelf.Level() and 'green' or 'tangarine'
-		ImGui.TextColored(Module.Colors.color(reqColorLabel), "\t%s", itemData.ReqLvl)
-	end
-	if itemData.RecLvl and itemData.RecLvl > 0 then
-		ImGui.Text('Rec Lvl: ')
-		ImGui.SameLine()
-		ImGui.TextColored(Module.Colors.color('softblue'), "\t%s", itemData.RecLvl)
-	end
+		ImGui.TextColored(Module.Colors.color('pink2'), "%s", itemData.Weight)
 
-
+		if itemData.MaxStack > 1 then
+			ImGui.TableNextColumn()
+			ImGui.Text("Qty: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('yellow'), "%s", itemData.Stack)
+			ImGui.SameLine()
+			ImGui.Text(" / ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.MaxStack)
+		end
+		ImGui.EndTable()
+	end
 
 	ImGui.SeparatorText("Classes: ")
-	local classList = retrieveClassList(item)
-	ImGui.PushTextWrapPos(250)
-	ImGui.TextColored(Module.Colors.color('grey'), "%s", classList)
+	ImGui.PushTextWrapPos(290)
+	ImGui.TextColored(Module.Colors.color('grey'), "%s", itemData.ClassList)
 	ImGui.PopTextWrapPos()
 
 	ImGui.SeparatorText("Races: ")
-	ImGui.PushTextWrapPos(250)
+	ImGui.PushTextWrapPos(290)
 	ImGui.TextColored(Module.Colors.color('grey'), "%s", itemData.RaceList)
 	ImGui.PopTextWrapPos()
 
@@ -1098,8 +1136,8 @@ local function draw_item_tooltip(item)
 		ImGui.SeparatorText('Stats')
 		-- base
 		if ImGui.BeginTable("BaseStats##itemBaseStats", 2, ImGuiTableFlags.None) then
-			ImGui.TableSetupColumn("Stat", ImGuiTableColumnFlags.WidthFixed, 110)
-			ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 110)
+			ImGui.TableSetupColumn("Stat", ImGuiTableColumnFlags.WidthFixed, 150)
+			ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 150)
 			ImGui.TableNextRow()
 			if itemData.AC > 0 then
 				ImGui.TableNextColumn()
@@ -1151,10 +1189,10 @@ local function draw_item_tooltip(item)
 	end
 	-- stats
 	if hasStats then
-		ImGui.SeparatorText('Stats')
+		-- ImGui.SeparatorText('Stats')
 		if ImGui.BeginTable("Stats##itemStats", 2, ImGuiTableFlags.None) then
-			ImGui.TableSetupColumn("Stat##stats", ImGuiTableColumnFlags.WidthFixed, 110)
-			ImGui.TableSetupColumn("Value##stats", ImGuiTableColumnFlags.WidthFixed, 110)
+			ImGui.TableSetupColumn("Stat##stats", ImGuiTableColumnFlags.WidthFixed, 150)
+			ImGui.TableSetupColumn("Value##stats", ImGuiTableColumnFlags.WidthFixed, 150)
 
 			ImGui.TableNextRow()
 			ImGui.TableNextColumn()
@@ -1235,13 +1273,13 @@ local function draw_item_tooltip(item)
 	if hasResists then
 		ImGui.SeparatorText('Resists')
 		if ImGui.BeginTable("Resists##itemResists", 2, ImGuiTableFlags.None) then
-			ImGui.TableSetupColumn("Stat##res", ImGuiTableColumnFlags.WidthFixed, 110)
-			ImGui.TableSetupColumn("Value##res", ImGuiTableColumnFlags.WidthFixed, 110)
+			ImGui.TableSetupColumn("Stat##res", ImGuiTableColumnFlags.WidthFixed, 150)
+			ImGui.TableSetupColumn("Value##res", ImGuiTableColumnFlags.WidthFixed, 150)
 
 			ImGui.TableNextRow()
 			ImGui.TableNextColumn()
 			if itemData['MR'] > 0 then
-				ImGui.Text("MR:  ")
+				ImGui.Text("MR:\t")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['MR'])
 				if itemData.hMr > 0 then
@@ -1251,7 +1289,7 @@ local function draw_item_tooltip(item)
 				ImGui.TableNextColumn()
 			end
 			if itemData['FR'] > 0 then
-				ImGui.Text("FR:  ")
+				ImGui.Text("FR:\t")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['FR'])
 				if itemData.hFr > 0 then
@@ -1261,7 +1299,7 @@ local function draw_item_tooltip(item)
 				ImGui.TableNextColumn()
 			end
 			if itemData['DR'] > 0 then
-				ImGui.Text("DR:  ")
+				ImGui.Text("DR:\t")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['DR'])
 				if itemData.hDr > 0 then
@@ -1271,7 +1309,7 @@ local function draw_item_tooltip(item)
 				ImGui.TableNextColumn()
 			end
 			if itemData['PR'] > 0 then
-				ImGui.Text("PR:  ")
+				ImGui.Text("PR:\t")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['PR'])
 				if itemData.hPr > 0 then
@@ -1281,7 +1319,7 @@ local function draw_item_tooltip(item)
 				ImGui.TableNextColumn()
 			end
 			if itemData['CR'] > 0 then
-				ImGui.Text("CR:  ")
+				ImGui.Text("CR:\t")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['CR'])
 				if itemData.hCr > 0 then
@@ -1290,7 +1328,7 @@ local function draw_item_tooltip(item)
 				end
 			end
 			if itemData['svCor'] > 0 then
-				ImGui.Text("COR: ")
+				ImGui.Text("COR:\t")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['svCor'])
 				if itemData.hCor > 0 then
@@ -1303,77 +1341,110 @@ local function draw_item_tooltip(item)
 	end
 
 
-	if itemData.BaseDMG > 0 then
-		ImGui.SeparatorText('Damage')
-		if ImGui.BeginTable("DamageStats", 2, ImGuiTableFlags.None) then
-			ImGui.TableSetupColumn("Stat##dmg", ImGuiTableColumnFlags.WidthFixed, 110)
-			ImGui.TableSetupColumn("Value##dmg", ImGuiTableColumnFlags.WidthFixed, 110)
-			ImGui.TableNextRow()
+	ImGui.SeparatorText('Damage')
+	if ImGui.BeginTable("DamageStats", 2, ImGuiTableFlags.None) then
+		ImGui.TableSetupColumn("Stat##dmg", ImGuiTableColumnFlags.WidthFixed, 150)
+		ImGui.TableSetupColumn("Value##dmg", ImGuiTableColumnFlags.WidthFixed, 150)
+		ImGui.TableNextRow()
+
+		if itemData.BaseDMG > 0 then
 			ImGui.TableNextColumn()
 			ImGui.Text("Dmg: ")
 			ImGui.SameLine()
 			ImGui.TextColored(Module.Colors.color('pink2'), "%s", itemData.BaseDMG or 'NA')
-
+		end
+		if itemData.Delay > 0 then
 			ImGui.TableNextColumn()
 
 			ImGui.Text(" Dly: ")
 			ImGui.SameLine()
 			ImGui.TextColored(Module.Colors.color('yellow'), "%s", itemData.Delay or 'NA')
-
+		end
+		if itemData.BonusDmgType ~= 'None' then
 			ImGui.TableNextColumn()
-
-			if item.DMGBonusType() ~= 'None' then
-				ImGui.Text("Bonus %s Dmg ", item.DMGBonusType())
-				-- ImGui.SameLine()
-				-- ImGui.TextColored(Module.Colors.color('pink2'), "%s", itemData.ElementalDamage or 'NA')
-				ImGui.TableNextColumn()
-			end
-
+			ImGui.Text("Bonus %s Dmg ", itemData.BonusDmgType)
+			-- ImGui.SameLine()
+			-- ImGui.TextColored(Module.Colors.color('pink2'), "%s", itemData.ElementalDamage or 'NA')
 			ImGui.TableNextColumn()
+		end
 
+		if itemData.Haste > 0 then
+			ImGui.TableNextColumn()
+			ImGui.Text("Haste: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('green'), "%s%%", itemData.Haste)
+		end
+		if itemData.DmgShield > 0 then
+			ImGui.TableNextColumn()
+			ImGui.Text("Dmg Shield: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('yellow'), "%s", itemData.DmgShield)
+		end
+
+		if itemData.DmgShieldMit > 0 then
+			ImGui.TableNextColumn()
+			ImGui.Text("DS Mit: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.DmgShieldMit)
+		end
+		if itemData.Avoidance > 0 then
+			ImGui.TableNextColumn()
+			ImGui.Text("Avoidance: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('green'), "%s", itemData.Avoidance)
+		end
+		if itemData.DotShield > 0 then
+			ImGui.TableNextColumn()
+			ImGui.Text("DoT Shielding: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('yellow'), "%s", itemData.DotShield)
+		end
+		if itemData.Accuracy > 0 then
+			ImGui.TableNextColumn()
+			ImGui.Text("Accuracy: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('green'), "%s", itemData.Accuracy)
+		end
+		if itemData.SpellShield > 0 then
+			ImGui.TableNextColumn()
+			ImGui.Text("Spell Shield: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.SpellShield)
+		end
+
+		if itemData.HealAmount > 0 then
+			ImGui.TableNextColumn()
+			ImGui.Text("Heal Amt: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('pink2'), "%s", itemData.HealAmount)
+		end
+		if itemData.SpellDamage > 0 then
+			ImGui.TableNextColumn()
+			ImGui.Text("Spell Dmg: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.SpellDamage)
+		end
+		if itemData.StunResist > 0 then
+			ImGui.TableNextColumn()
+			ImGui.Text("Stun Res: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('green'), "%s", itemData.StunResist)
+		end
+
+		if itemData.Clairvoyance > 0 then
+			ImGui.TableNextColumn()
+			ImGui.Text("Clairvoyance: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('green'), "%s", itemData.Clairvoyance)
+		end
+		-- DPS Ratio
+		if itemData.BaseDMG > 0 and itemData.Delay > 0 then
+			ImGui.TableNextColumn()
 			ImGui.Text("Ratio: ")
 			ImGui.SameLine()
 			ImGui.TextColored(Module.Colors.color('teal'), "%0.3f", (itemData.Delay / (itemData.BaseDMG or 1)) or 0)
-
-			if itemData.Haste > 0 then
-				ImGui.TableNextColumn()
-				ImGui.Text("Haste: ")
-				ImGui.SameLine()
-				ImGui.TextColored(Module.Colors.color('green'), "%s%%", itemData.Haste)
-			end
-			if itemData.DmgShield > 0 then
-				ImGui.TableNextColumn()
-				ImGui.Text("Dmg Shield: ")
-				ImGui.SameLine()
-				ImGui.TextColored(Module.Colors.color('yellow'), "%s", itemData.DmgShield)
-			end
-
-			if itemData.DmgShieldMit > 0 then
-				ImGui.TableNextColumn()
-				ImGui.Text("DS Mit: ")
-				ImGui.SameLine()
-				ImGui.TextColored(Module.Colors.color('teal'), "%s%%", itemData.DmgShieldMit)
-			end
-			if itemData.Avoidance > 0 then
-				ImGui.TableNextColumn()
-				ImGui.Text("Avoidance: ")
-				ImGui.SameLine()
-				ImGui.TextColored(Module.Colors.color('green'), "%s%%", itemData.Avoidance)
-			end
-			if itemData.DotShield > 0 then
-				ImGui.TableNextColumn()
-				ImGui.Text("DoT Shielding: ")
-				ImGui.SameLine()
-				ImGui.TextColored(Module.Colors.color('yellow'), "%s%%", itemData.DotShield)
-			end
-			if itemData.Accuracy > 0 then
-				ImGui.TableNextColumn()
-				ImGui.Text("Accuracy: ")
-				ImGui.SameLine()
-				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData.Accuracy)
-			end
-			ImGui.EndTable()
 		end
+		ImGui.EndTable()
 	end
 
 	-- Augments
@@ -1386,7 +1457,7 @@ local function draw_item_tooltip(item)
 			if augSlotName ~= 'none' or augTypeName ~= 21 then
 				ImGui.Text("Slot %s: ", i)
 				ImGui.SameLine()
-				ImGui.PushTextWrapPos(250)
+				ImGui.PushTextWrapPos(290)
 				ImGui.TextColored(Module.Colors.color('teal'), "%s Type (%s)", (augSlotName ~= 'none' and augSlotName or 'Empty'), augTypeName)
 				ImGui.PopTextWrapPos()
 			end
@@ -1415,7 +1486,7 @@ local function draw_item_tooltip(item)
 			local effectTypeLabel = item.EffectType() ~= 'None' and item.EffectType() or "Spell"
 			ImGui.Text("%s Effect: ", effectTypeLabel)
 			ImGui.SameLine()
-			ImGui.PushTextWrapPos(250)
+			ImGui.PushTextWrapPos(290)
 			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Spelleffect)
 			ImGui.PopTextWrapPos()
 		end
@@ -1424,7 +1495,7 @@ local function draw_item_tooltip(item)
 			ImGui.Dummy(10, 10)
 			ImGui.Text("Worn Effect: ")
 			ImGui.SameLine()
-			ImGui.PushTextWrapPos(250)
+			ImGui.PushTextWrapPos(290)
 			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Worn)
 			ImGui.PopTextWrapPos()
 		end
@@ -1433,7 +1504,7 @@ local function draw_item_tooltip(item)
 			ImGui.Dummy(10, 10)
 			ImGui.Text("Focus Effect: ")
 			ImGui.SameLine()
-			ImGui.PushTextWrapPos(250)
+			ImGui.PushTextWrapPos(290)
 			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Focus1)
 			ImGui.PopTextWrapPos()
 		end
@@ -1442,7 +1513,7 @@ local function draw_item_tooltip(item)
 			ImGui.Dummy(10, 10)
 			ImGui.Text("Focus2 Effect: ")
 			ImGui.SameLine()
-			ImGui.PushTextWrapPos(250)
+			ImGui.PushTextWrapPos(290)
 			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Focus2)
 			ImGui.PopTextWrapPos()
 		end
@@ -1463,21 +1534,27 @@ local function draw_item_tooltip(item)
 		ImGui.TextColored(Module.Colors.color("yellow"), "%0.2f%%", itemData.EvolvingExpPct)
 	end
 
-	ImGui.Dummy(10, 10)
-	ImGui.Text("Weight: ")
-	ImGui.SameLine()
-	ImGui.TextColored(Module.Colors.color('pink2'), "%s", itemData.Weight)
-	if itemData.Stack > 0 then
-		ImGui.Text("Stack Size: ")
-		ImGui.SameLine()
-		ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Stack)
-	end
+	ImGui.SeparatorText('Value')
 	ImGui.Dummy(10, 10)
 	ImGui.Text("Value: ")
 	ImGui.SameLine()
 	draw_value(itemData.Value or 0)
+end
 
-	ImGui.EndTooltip()
+local function draw_item_info_window(item)
+	local itemID = item.ID()
+	local itemName = item.Name()
+
+	ImGui.SetNextWindowSize(0.0, 0.0, ImGuiCond.FirstUseEver)
+	local open, show = ImGui.Begin(string.format("%s##iteminfo_%s", itemName, itemID), true)
+	if not open then
+		show = false
+		Module.TempSettings.Popped[itemID] = nil
+	end
+	if show then
+		draw_item_tooltip(item)
+	end
+	ImGui.End()
 end
 
 ---Draws the individual item icon in the bag.
@@ -1584,62 +1661,20 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 	if ImGui.IsItemHovered() then
 		local charges = item.Charges() or 0
 		local clicky = item.Clicky() or 'none'
+		ImGui.BeginTooltip()
+
 		draw_item_tooltip(item)
-		-- ImGui.BeginTooltip()
-		-- ImGui.Text("Item: ")
-		-- ImGui.SameLine()
-		-- ImGui.TextColored(Module.Colors.color('tangarine'), "%s", item.Name())
-		-- if toolTipSpell ~= '' then
-		-- 	ImGui.Text("Scroll: ")
-		-- 	ImGui.SameLine()
-		-- 	ImGui.TextColored(Module.Colors.color('green'), "(%s)", toolTipSpell)
-		-- end
-		-- ImGui.Text("Type: ")
-		-- ImGui.SameLine()
-		-- ImGui.TextColored(Module.Colors.color('pink2'), "%s", item.Type())
-		-- if item.Type() == 'Armor' then
-		-- 	ImGui.SameLine()
-		-- 	ImGui.Text(" AC: ")
-		-- 	ImGui.SameLine()
-		-- 	ImGui.TextColored(Module.Colors.color('teal'), "%s", item.AC() or 'NA')
-		-- end
-		-- if item.Damage() ~= nil and item.Damage() > 0 then
-		-- 	ImGui.Text("Dmg: ")
-		-- 	ImGui.SameLine()
-		-- 	ImGui.TextColored(Module.Colors.color('pink2'), "%s", item.Damage() or 'NA')
-		-- 	ImGui.SameLine()
-		-- 	ImGui.Text(" Delay: ")
-		-- 	ImGui.SameLine()
-		-- 	ImGui.TextColored(Module.Colors.color('yellow'), "%s", item.ItemDelay() or 'NA')
-		-- end
-		-- ImGui.Text('Classes: ')
-		-- ImGui.SameLine()
-		-- ImGui.PushTextWrapPos(200)
-		-- ImGui.TextColored(Module.Colors.color('green'), "%s", retrieveClassList(item))
-		-- ImGui.PopTextWrapPos()
-		-- if item.RequiredLevel() and item.RequiredLevel() > 0 then
-		-- 	ImGui.Text('Required Lvl: ')
-		-- 	ImGui.SameLine()
-		-- 	ImGui.TextColored(Module.Colors.color('tangarine'), "%s", item.RequiredLevel() or 0)
-		-- end
-		-- ImGui.Text("Qty: ")
-		-- ImGui.SameLine()
-		-- ImGui.TextColored(Module.Colors.color('green'), "%s", item.Stack() or 1)
-		-- ImGui.TextColored(Module.Colors.color('teal'), "Value: %0.1f Plat ", (item.Value() or 0) / 1000) -- 1000 copper - 1 plat
-		-- ImGui.SameLine()
-		-- ImGui.TextColored(Module.Colors.color('yellow'), 'Trib: %s', (item.Tribute() or 0))
-		-- if clicky ~= 'none' then
-		-- 	ImGui.SeparatorText("Clicky Info")
-		-- 	ImGui.TextColored(Module.Colors.color('green'), "Clicky: %s", clicky)
-		-- 	ImGui.TextColored(Module.Colors.color('teal'), "Charges: %s", charges >= 0 and charges or 'Infinite')
-		-- end
-		-- ImGui.SeparatorText("Click Actions")
-		-- if clickable then
-		-- 	ImGui.Text("Right Click to use item")
-		-- 	ImGui.Text("Left Click Pick Up item")
-		-- end
-		-- ImGui.Text("Ctrl + Right Click to Inspect Item")
-		-- ImGui.EndTooltip()
+		ImGui.SeparatorText("Click Actions")
+		if clickable then
+			ImGui.Text("Right Click to use item")
+			ImGui.Text("Left Click Pick Up item")
+		end
+		ImGui.Text('Shift + Right Click to Pop Out Item Info')
+		ImGui.Text("Ctrl + Right Click to Inspect Item")
+		ImGui.EndTooltip()
+	end
+	if ImGui.IsKeyDown(ImGuiMod.Shift) and ImGui.IsItemClicked(ImGuiMouseButton.Right) then
+		Module.TempSettings.Popped[item.ID()] = item
 	end
 	if clickable then
 		if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
@@ -2145,6 +2180,14 @@ function Module.RenderGUI()
 	renderBtn()
 
 	draw_qty_win()
+
+	for k, v in pairs(Module.TempSettings.Popped) do
+		if v and v.ID() then
+			draw_item_info_window(v)
+		else
+			Module.TempSettings.Popped[k] = nil
+		end
+	end
 end
 
 local function init()

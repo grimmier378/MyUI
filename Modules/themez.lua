@@ -134,16 +134,16 @@ end
 
 local function DrawStyles()
 	local style = {}
-	tempSettings.Theme[themeID] = theme.Theme[themeID]
+	tempSettings.Theme[themeID] = theme.Theme[themeID] or nil
 	if tempSettings.Theme[themeID]['Style'] == nil then
-		tempSettings.Theme[themeID]['Style'] = defaults['Theme'][2]['Style']
+		tempSettings.Theme[themeID]['Style'] = defaults['Theme'][2]['Style'] or {}
 	end
-	style = tempSettings.Theme[themeID]['Style']
+	style = tempSettings.Theme[themeID]['Style'] or {}
 
 	ImGui.SeparatorText('Borders')
 	local tmpBorder = false
 	local borderPressed = false
-	if style[ImGuiStyleVar.WindowBorderSize].Size == 1 then
+	if (style[ImGuiStyleVar.WindowBorderSize] ~= nil and (style[ImGuiStyleVar.WindowBorderSize].Size or 0) == 1) then
 		tmpBorder = true
 	end
 	tmpBorder, borderPressed = Module.Utils.DrawToggle('WindowBorder##', tmpBorder)
@@ -157,7 +157,7 @@ local function DrawStyles()
 	ImGui.SameLine()
 	local tmpFBorder = false
 	local borderFPressed = false
-	if style[ImGuiStyleVar.FrameBorderSize].Size == 1 then
+	if (style[ImGuiStyleVar.FrameBorderSize] ~= nil and (style[ImGuiStyleVar.FrameBorderSize].Size or 0) == 1) then
 		tmpFBorder = true
 	end
 	tmpFBorder, borderFPressed = Module.Utils.DrawToggle('FrameBorder##', tmpFBorder)
@@ -171,7 +171,7 @@ local function DrawStyles()
 	ImGui.SameLine()
 	local tmpCBorder = false
 	local borderCPressed = false
-	if style[ImGuiStyleVar.ChildBorderSize].Size == 1 then
+	if (style[ImGuiStyleVar.ChildBorderSize] ~= nil and (style[ImGuiStyleVar.ChildBorderSize].Size or 0) == 1) then
 		tmpCBorder = true
 	end
 	tmpCBorder, borderCPressed = Module.Utils.DrawToggle('ChildBorder##', tmpCBorder)
@@ -185,7 +185,7 @@ local function DrawStyles()
 
 	local tmpPBorder = false
 	local borderPPressed = false
-	if style[ImGuiStyleVar.PopupBorderSize].Size == 1 then
+	if (style[ImGuiStyleVar.PopupBorderSize] ~= nil and (style[ImGuiStyleVar.PopupBorderSize].Size or 0) == 1) then
 		tmpPBorder = true
 	end
 	tmpPBorder, borderPPressed = Module.Utils.DrawToggle('PopupBorder##', tmpPBorder)

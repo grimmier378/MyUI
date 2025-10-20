@@ -553,6 +553,7 @@ function Module.RenderToolTipAndContext(i)
 	if mq.TLO.EverQuest.GameState() ~= "INGAME" then mq.exit() end
 
 	if ImGui.IsItemHovered() then
+		ImGui.PushID("Tooltip" .. i)
 		ImGui.BeginTooltip()
 		ImGui.Indent(4)
 		local colorName = Module.Colors.color('white')
@@ -579,7 +580,7 @@ function Module.RenderToolTipAndContext(i)
 		ImGui.Unindent(4)
 
 		ImGui.EndTooltip()
-
+		ImGui.PopID()
 		if ImGui.IsMouseReleased(0) then
 			mq.cmdf("/cast %s", i)
 			casting = true
@@ -676,7 +677,7 @@ function Module.RenderGUI()
 				for i = 1, numGems do
 					ImGui.TableNextColumn()
 					if spellBar[i] ~= nil then
-						ImGui.PushID(tostring(spellBar[i].sID) .. "_spell")
+						ImGui.PushID(tostring(spellBar[i].sID) .. "_spell" .. i)
 
 						ImGui.BeginChild("##SpellGem" .. i, ImVec2(scale * 40, scale * 33), bit32.bor(ImGuiChildFlags.AlwaysUseWindowPadding),
 							bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))
@@ -687,7 +688,9 @@ function Module.RenderGUI()
 						else
 							DrawInspectableSpellIcon(-1, spellBar[i], i)
 							if ImGui.IsItemHovered() then
+								ImGui.PushID("EmptyGem" .. i)
 								ImGui.SetTooltip("Empty")
+								ImGui.PopID()
 								if ImGui.IsMouseReleased(1) then
 									if pickerOpen == true then
 										memSpell = -1
@@ -704,6 +707,7 @@ function Module.RenderGUI()
 						ImGui.PopID()
 						if settings[Module.Name].ShowGemNames then
 							ImGui.TableNextColumn()
+							ImGui.PushID("Name" .. i)
 							ImGui.Indent(3)
 							picker:SetTextColor({
 								ID = spellBar[i].sID,
@@ -719,6 +723,7 @@ function Module.RenderGUI()
 							ImGui.PopStyleColor()
 							Module.RenderToolTipAndContext(i)
 							ImGui.Unindent(3)
+							ImGui.PopID()
 						end
 					end
 

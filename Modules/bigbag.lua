@@ -1028,13 +1028,26 @@ local function draw_item_tooltip(item)
 			break
 		end
 	end
+	local cursorY = ImGui.GetCursorPosY()
 
 	ImGui.Text("Item: ")
 	ImGui.SameLine()
 	ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.Name)
+
 	ImGui.Text("Item ID: ")
 	ImGui.SameLine()
 	ImGui.TextColored(Module.Colors.color('yellow'), "%s", itemData.ID)
+	local cursorX = ImGui.GetCursorPosX()
+	local cursorY2 = ImGui.GetCursorPosY()
+	ImGui.SetCursorPosY(cursorY)
+	ImGui.SetCursorPosX(ImGui.GetWindowWidth() - 50)
+
+	-- ImGui.SetCursorPosY(12)
+	Module.Draw_Item_Icon(item, 32, 32, true, false, true)
+	-- animItems:SetTextureCell(item.Icon() - EQ_ICON_OFFSET)
+	-- ImGui.DrawTextureAnimation(animItems, 32, 32)
+	ImGui.SetCursorPosX(cursorX)
+	ImGui.SetCursorPosY(cursorY2)
 
 	ImGui.Dummy(10, 10)
 	ImGui.Separator()
@@ -1559,7 +1572,7 @@ end
 
 ---Draws the individual item icon in the bag.
 ---@param item item The item object
-local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
+function Module.Draw_Item_Icon(item, iconWidth, iconHeight, drawID, clickable, iconOnly)
 	-- Capture original cursor position
 	local cursor_x, cursor_y = ImGui.GetCursorPos()
 	local offsetX, offsetY = iconWidth - 1, iconHeight / 1.5
@@ -1581,123 +1594,128 @@ local function draw_item_icon(item, iconWidth, iconHeight, drawID, clickable)
 	local canUse = (item.CanUse() and settings.HighlightUseable) or false
 	ImGui.DrawTextureAnimation(animItems, iconWidth, iconHeight)
 
-	-- Overlay the stack size text in the lower right corner
-	ImGui.SetWindowFontScale(0.68)
-	local TextSize = ImGui.CalcTextSize(tostring(item.Stack()))
-	if item.Stack() > 1 then
-		ImGui.SetCursorPos((cursor_x + offsetX) - TextSize, cursor_y + offsetY)
-		ImGui.DrawTextureAnimation(animBox, TextSize, 4)
-		ImGui.SetCursorPos((cursor_x + offsetX) - TextSize, cursor_y + offsetY)
-		ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", item.Stack())
-	end
-	local TextSize2 = ImGui.CalcTextSize(tostring(item.Charges()))
-	if item.Charges() >= 1 and item.Clicky() then
-		ImGui.SetCursorPos((cursor_x + offsetXCharges), cursor_y + offsetYCharges)
-		ImGui.DrawTextureAnimation(animBox, TextSize2, 4)
-		ImGui.SetCursorPos((cursor_x + offsetXCharges), cursor_y + offsetYCharges)
-		ImGui.TextColored(ImVec4(1, 1, 0, 1), "%s", item.Charges())
-	end
-	ImGui.SetWindowFontScale(1.0)
+	if not iconOnly then
+		-- Overlay the stack size text in the lower right corner
+		ImGui.SetWindowFontScale(0.68)
+		local TextSize = ImGui.CalcTextSize(tostring(item.Stack()))
+		if item.Stack() > 1 then
+			ImGui.SetCursorPos((cursor_x + offsetX) - TextSize, cursor_y + offsetY)
+			ImGui.DrawTextureAnimation(animBox, TextSize, 4)
+			ImGui.SetCursorPos((cursor_x + offsetX) - TextSize, cursor_y + offsetY)
+			ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", item.Stack())
+		end
+		local TextSize2 = ImGui.CalcTextSize(tostring(item.Charges()))
+		if item.Charges() >= 1 and item.Clicky() then
+			ImGui.SetCursorPos((cursor_x + offsetXCharges), cursor_y + offsetYCharges)
+			ImGui.DrawTextureAnimation(animBox, TextSize2, 4)
+			ImGui.SetCursorPos((cursor_x + offsetXCharges), cursor_y + offsetYCharges)
+			ImGui.TextColored(ImVec4(1, 1, 0, 1), "%s", item.Charges())
+		end
+		ImGui.SetWindowFontScale(1.0)
 
-	-- Reset the cursor to start position, then draw a transparent button (for drag & drop)
-	ImGui.SetCursorPos(cursor_x, cursor_y)
+		-- Reset the cursor to start position, then draw a transparent button (for drag & drop)
+		ImGui.SetCursorPos(cursor_x, cursor_y)
 
-	if item.TimerReady() > 0 then
-		ImGui.PushStyleColor(ImGuiCol.Button, 0.3, 0, 0, 0.4)
-		ImGui.PushStyleColor(ImGuiCol.ButtonHovered, 0.3, 0, 0, 0.4)
-		ImGui.PushStyleColor(ImGuiCol.ButtonActive, 0.3, 00, 0, 0.3)
-	else
-		ImGui.PushStyleColor(ImGuiCol.Button, 0, 0, 0, 0)
-		ImGui.PushStyleColor(ImGuiCol.ButtonHovered, 0, 0.3, 0, 0.2)
-		ImGui.PushStyleColor(ImGuiCol.ButtonActive, 0, 0.3, 0, 0.3)
-	end
-	local toolTipSpell = ''
-	local colorChange = false
-	local lvlHigh = false
-	if canUse then
-		local isSpell = item.Name():find("Spell:")
-		local isSong = item.Name():find("Song:")
-		local iType = item.Type() or ''
+		if item.TimerReady() > 0 then
+			ImGui.PushStyleColor(ImGuiCol.Button, 0.3, 0, 0, 0.4)
+			ImGui.PushStyleColor(ImGuiCol.ButtonHovered, 0.3, 0, 0, 0.4)
+			ImGui.PushStyleColor(ImGuiCol.ButtonActive, 0.3, 00, 0, 0.3)
+		else
+			ImGui.PushStyleColor(ImGuiCol.Button, 0, 0, 0, 0)
+			ImGui.PushStyleColor(ImGuiCol.ButtonHovered, 0, 0.3, 0, 0.2)
+			ImGui.PushStyleColor(ImGuiCol.ButtonActive, 0, 0.3, 0, 0.3)
+		end
+		local toolTipSpell = ''
+		local colorChange = false
+		local lvlHigh = false
+		if canUse then
+			local isSpell = item.Name():find("Spell:")
+			local isSong = item.Name():find("Song:")
+			local iType = item.Type() or ''
 
-		if isSpell or isSong then
-			local spellName = item.Spell.Name() --:gsub("Spell: ", ""):gsub("Song: ", "")
-			local spellLvl = mq.TLO.Spell(spellName).Level() or 0
-			if not book[spellName] then
-				if spellLvl > MySelf.Level() then
-					lvlHigh = true
+			if isSpell or isSong then
+				local spellName = item.Spell.Name() --:gsub("Spell: ", ""):gsub("Song: ", "")
+				local spellLvl = mq.TLO.Spell(spellName).Level() or 0
+				if not book[spellName] then
+					if spellLvl > MySelf.Level() then
+						lvlHigh = true
+					end
+					colorChange = true
+					toolTipSpell = spellLvl > 0 and string.format("Lvl %s", spellLvl) or ''
+				else
+					toolTipSpell = "Already Know"
 				end
-				colorChange = true
-				toolTipSpell = spellLvl > 0 and string.format("Lvl %s", spellLvl) or ''
 			else
-				toolTipSpell = "Already Know"
-			end
-		else
-			if iType == 'Combinable' or iType == 'Food' or iType == 'Drink' then
-				colorChange = false
-			else
-				colorChange = true
+				if iType == 'Combinable' or iType == 'Food' or iType == 'Drink' then
+					colorChange = false
+				else
+					colorChange = true
+				end
 			end
 		end
-	end
 
-	if colorChange then
-		if lvlHigh then
-			ImGui.PushStyleColor(ImGuiCol.Button, 0.8, 0.1, 0.2, 0.2)
-		else
-			ImGui.PushStyleColor(ImGuiCol.Button, 0, 0.8, 0.2, 0.2)
+		if colorChange then
+			if lvlHigh then
+				ImGui.PushStyleColor(ImGuiCol.Button, 0.8, 0.1, 0.2, 0.2)
+			else
+				ImGui.PushStyleColor(ImGuiCol.Button, 0, 0.8, 0.2, 0.2)
+			end
 		end
+
+		ImGui.Button(btn_label(item), iconWidth, iconHeight)
+
+		if colorChange then
+			ImGui.PopStyleColor(1)
+		end
+
+		ImGui.PopStyleColor(3)
 	end
-
-	ImGui.Button(btn_label(item), iconWidth, iconHeight)
-
-	if colorChange then
-		ImGui.PopStyleColor(1)
-	end
-
-	ImGui.PopStyleColor(3)
 	ImGui.PopID()
 
-	-- Tooltip
-	if ImGui.IsItemHovered() then
-		local charges = item.Charges() or 0
-		local clicky = item.Clicky() or 'none'
-		ImGui.BeginTooltip()
+	if not iconOnly then
+		-- Tooltip
+		if ImGui.IsItemHovered() then
+			local charges = item.Charges() or 0
+			local clicky = item.Clicky() or 'none'
+			ImGui.BeginTooltip()
 
-		draw_item_tooltip(item)
-		ImGui.SeparatorText("Click Actions")
-		if clickable then
-			ImGui.Text("Right Click to use item")
-			ImGui.Text("Left Click Pick Up item")
-		end
-		ImGui.Text('Shift + Right Click to Pop Out Item Info')
-		ImGui.Text("Ctrl + Right Click to Inspect Item")
-		ImGui.EndTooltip()
-	end
-	if ImGui.IsKeyDown(ImGuiMod.Shift) and ImGui.IsItemClicked(ImGuiMouseButton.Right) then
-		Module.TempSettings.Popped[item.ID()] = item
-	end
-	if clickable then
-		if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
-			if mq.TLO.Me.Casting() ~= nil then return end
-			if item.ItemSlot2() == -1 then
-				mq.cmd("/itemnotify " .. item.ItemSlot() .. " leftmouseup")
-			else
-				-- print(item.ItemSlot2())
-				mq.cmd("/itemnotify in " .. to_pack(item.ItemSlot()) .. " " .. to_bag_slot(item.ItemSlot2()) .. " leftmouseup")
+			draw_item_tooltip(item)
+			ImGui.SeparatorText("Click Actions")
+			if clickable then
+				ImGui.Text("Right Click to use item")
+				ImGui.Text("Left Click Pick Up item")
+			end
+			ImGui.Text('Shift + Right Click to Pop Out Item Info')
+			ImGui.Text("Ctrl + Right Click to Inspect Item")
+			ImGui.EndTooltip()
+			if ImGui.IsKeyDown(ImGuiMod.Shift) and ImGui.IsItemClicked(ImGuiMouseButton.Right) then
+				Module.TempSettings.Popped[item.ID()] = item
 			end
 		end
-		if ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsItemClicked(ImGuiMouseButton.Right) then
-			local link = item.ItemLink('CLICKABLE')()
-			mq.cmdf('/executelink %s', link)
-		elseif ImGui.IsItemClicked(ImGuiMouseButton.Right) then
-			if mq.TLO.Me.Casting() ~= nil then return end
-			mq.cmdf('/useitem "%s"', item.Name())
-			clicked = true
-		end
-	else
-		if ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsItemClicked(ImGuiMouseButton.Right) then
-			local link = item.ItemLink('CLICKABLE')()
-			mq.cmdf('/executelink %s', link)
+
+		if clickable then
+			if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
+				if mq.TLO.Me.Casting() ~= nil then return end
+				if item.ItemSlot2() == -1 then
+					mq.cmd("/itemnotify " .. item.ItemSlot() .. " leftmouseup")
+				else
+					-- print(item.ItemSlot2())
+					mq.cmd("/itemnotify in " .. to_pack(item.ItemSlot()) .. " " .. to_bag_slot(item.ItemSlot2()) .. " leftmouseup")
+				end
+			end
+			if ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsItemClicked(ImGuiMouseButton.Right) then
+				local link = item.ItemLink('CLICKABLE')()
+				mq.cmdf('/executelink %s', link)
+			elseif ImGui.IsItemClicked(ImGuiMouseButton.Right) then
+				if mq.TLO.Me.Casting() ~= nil then return end
+				mq.cmdf('/useitem "%s"', item.Name())
+				clicked = true
+			end
+		else
+			if (ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsItemClicked(ImGuiMouseButton.Right)) then
+				local link = item.ItemLink('CLICKABLE')()
+				mq.cmdf('/executelink %s', link)
+			end
 		end
 	end
 end
@@ -1737,7 +1755,7 @@ local function display_bag_content()
 
 		for index, _ in ipairs(display_tables.items or {}) do
 			if string.match(string.lower(display_tables.items[index].Name()), string.lower(filter_text)) then
-				draw_item_icon(display_tables.items[index], ICON_WIDTH, ICON_HEIGHT, 'inv' .. index, true)
+				Module.Draw_Item_Icon(display_tables.items[index], ICON_WIDTH, ICON_HEIGHT, 'inv' .. index, true)
 				if bag_cols > temp_bag_cols then
 					temp_bag_cols = temp_bag_cols + 1
 					ImGui.SameLine()
@@ -1762,7 +1780,7 @@ local function display_bank_content()
 
 		for index, _ in ipairs(display_tables.bank_items or {}) do
 			if string.match(string.lower(display_tables.bank_items[index].Name()), string.lower(filter_text)) then
-				draw_item_icon(display_tables.bank_items[index], ICON_WIDTH, ICON_HEIGHT, 'bank' .. index, false)
+				Module.Draw_Item_Icon(display_tables.bank_items[index], ICON_WIDTH, ICON_HEIGHT, 'bank' .. index, false)
 				if bag_cols > temp_bag_cols then
 					temp_bag_cols = temp_bag_cols + 1
 					ImGui.SameLine()
@@ -1786,7 +1804,7 @@ local function display_clickies()
 
 		for index, _ in ipairs(display_tables.clickies or {}) do
 			if string.match(string.lower(display_tables.clickies[index].Name()), string.lower(filter_text)) then
-				draw_item_icon(display_tables.clickies[index], ICON_WIDTH, ICON_HEIGHT, 'clicky' .. index, true)
+				Module.Draw_Item_Icon(display_tables.clickies[index], ICON_WIDTH, ICON_HEIGHT, 'clicky' .. index, true)
 				if bag_cols > temp_bag_cols then
 					temp_bag_cols = temp_bag_cols + 1
 					ImGui.SameLine()
@@ -1810,7 +1828,7 @@ local function display_augments()
 
 		for index, _ in ipairs(display_tables.augments or {}) do
 			if string.match(string.lower(display_tables.augments[index].Name()), string.lower(filter_text)) then
-				draw_item_icon(display_tables.augments[index], ICON_WIDTH, ICON_HEIGHT, 'augments' .. index, true)
+				Module.Draw_Item_Icon(display_tables.augments[index], ICON_WIDTH, ICON_HEIGHT, 'augments' .. index, true)
 				if bag_cols > temp_bag_cols then
 					temp_bag_cols = temp_bag_cols + 1
 					ImGui.SameLine()
@@ -1876,7 +1894,7 @@ local function display_details()
 					end
 				end
 				ImGui.TableNextColumn()
-				draw_item_icon(item, 20, 20, 'details' .. index, true)
+				Module.Draw_Item_Icon(item, 20, 20, 'details' .. index, true)
 				ImGui.TableNextColumn()
 				ImGui.PushID(string.format("##SelectItem_%s", index))
 				ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(0, 1, 1, 1))

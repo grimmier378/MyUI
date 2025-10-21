@@ -1040,10 +1040,10 @@ local function draw_item_tooltip(item)
 	local cursorX = ImGui.GetCursorPosX()
 	local cursorY2 = ImGui.GetCursorPosY()
 	ImGui.SetCursorPosY(cursorY)
-	ImGui.SetCursorPosX(ImGui.GetWindowWidth() - 50)
+	ImGui.SetCursorPosX(ImGui.GetWindowWidth() - 60)
 
 	-- ImGui.SetCursorPosY(12)
-	Module.Draw_Item_Icon(item, 32, 32, true, false, true)
+	Module.Draw_Item_Icon(item, 50, 50, true, false, true)
 	-- animItems:SetTextureCell(item.Icon() - EQ_ICON_OFFSET)
 	-- ImGui.DrawTextureAnimation(animItems, 32, 32)
 	ImGui.SetCursorPosX(cursorX)
@@ -1108,13 +1108,13 @@ local function draw_item_tooltip(item)
 			ImGui.Text('Req Lvl: ')
 			ImGui.SameLine()
 			local reqColorLabel = itemData.ReqLvl <= MySelf.Level() and 'green' or 'tangarine'
-			ImGui.TextColored(Module.Colors.color(reqColorLabel), "\t%s", itemData.ReqLvl)
+			ImGui.TextColored(Module.Colors.color(reqColorLabel), "%s", itemData.ReqLvl)
 		end
 		if itemData.RecLvl and itemData.RecLvl > 0 then
 			ImGui.TableNextColumn()
 			ImGui.Text('Rec Lvl: ')
 			ImGui.SameLine()
-			ImGui.TextColored(Module.Colors.color('softblue'), "\t%s", itemData.RecLvl)
+			ImGui.TextColored(Module.Colors.color('softblue'), "%s", itemData.RecLvl)
 		end
 
 		ImGui.TableNextColumn()

@@ -455,6 +455,13 @@ local function MyUI_Render()
 			end
 
 			if show_gui then
+				if ImGui.IsWindowFocused() then
+					if ImGui.IsKeyPressed(ImGuiKey.Escape) then
+						MyUI_Settings.ShowMain = false
+						Minimized = true
+						mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+					end
+				end
 				ImGui.Text(MyUI_Icons.MD_SETTINGS)
 				if ImGui.BeginPopupContextItem() then
 					DrawContextMenu()
@@ -570,13 +577,7 @@ local function MyUI_Render()
 					end
 				end
 			end
-			if ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows) then
-				if ImGui.IsKeyPressed(ImGuiKey.Escape) then
-					MyUI_Settings.ShowMain = false
-					Minimized = true
-					mq.pickle(MyUI_SettingsFile, MyUI_Settings)
-				end
-			end
+
 			MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
 			ImGui.End()
 			-- MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)

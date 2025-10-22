@@ -866,7 +866,7 @@ local function btn_label(item)
 		return string.format("##bag_%s_slot_%s", item.ItemSlot(), item.ItemSlot2())
 	end
 end
-local itemData = {}
+local items = {}
 
 local function get_item_data(item)
 	if not item() then return nil end
@@ -1001,10 +1001,10 @@ end
 ---@param item item
 local function draw_item_tooltip(item)
 	if not item() then return end
-	if item.ID() ~= itemData.ID then
-		itemData = {}
-		itemData = get_item_data(item)
+	if not items[item.ID()] then
+		items[item.ID()] = get_item_data(item)
 	end
+	local itemData = items[item.ID()]
 
 	if not itemData then return end
 

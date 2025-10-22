@@ -114,6 +114,31 @@ local mouseKeys                                           = {
 	"Middle",
 	"None",
 }
+local equipSlots                                          = {
+	[0] = 'charm',
+	[1] = 'leftear',
+	[2] = 'head',
+	[3] = 'face',
+	[4] = 'rightear',
+	[5] = 'neck',
+	[6] = 'shoulder',
+	[7] = 'arms',
+	[8] = 'back',
+	[9] = 'leftwrist',
+	[10] = 'rightwrist',
+	[11] = 'ranged',
+	[12] = 'hands',
+	[13] = 'mainhand',
+	[14] = 'offhand',
+	[15] = 'leftfinger',
+	[16] = 'rightfinger',
+	[17] = 'chest',
+	[18] = 'legs',
+	[19] = 'feet',
+	[20] = 'waist',
+	[21] = 'powersource',
+	[22] = 'ammo',
+}
 local function loadSettings()
 	if utils.File.Exists(configFile) then
 		settings = dofile(configFile)
@@ -856,6 +881,16 @@ local function display_bag_options()
 	ImGui.EndChild()
 end
 
+function get_worn_slots(item)
+	local SlotsString = ""
+	for i = 1, item.WornSlots() do
+		local slotID = item.WornSlot(i)() or '-1'
+		if (tonumber(slotID) or -1) > -1 then
+			SlotsString = SlotsString .. equipSlots[tonumber(slotID)] .. " "
+		end
+	end
+	return SlotsString
+end
 
 -- Helper to create a unique hidden label for each button.  The uniqueness is
 -- necessary for drag and drop to work correctly.
@@ -993,6 +1028,9 @@ local function get_item_data(item)
 		Focus1ID = item.Focus() and (item.Focus.Spell.ID() or 0) or 0,
 		Focus2ID = item.Focus2() and (item.Focus2.Spell.ID() or 0) or 0,
 		ClickyID = item.Clicky() and (item.Clicky.Spell.ID() or 0) or 0,
+
+		-- slots
+		WornSlots = get_worn_slots(item),
 	}
 	return tmpItemData
 end
@@ -1263,6 +1301,12 @@ local function draw_item_tooltip(item)
 	ImGui.PushTextWrapPos(290)
 	ImGui.TextColored(Module.Colors.color('grey'), "%s", itemData.RaceList)
 	ImGui.PopTextWrapPos()
+
+	if itemData.WornSlots ~= '' then
+		ImGui.SeparatorText('Worn Slots: ')
+		ImGui.TextColored(Module.Colors.color('grey'), "%s", itemData.WornSlots)
+	end
+	-- base stats
 
 	if hasBase then
 		ImGui.SeparatorText('Stats')

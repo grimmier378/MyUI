@@ -986,6 +986,13 @@ local function get_item_data(item)
 		Focus1Desc = item.Focus() and (item.Focus.Spell.Description() or '') or '',
 		Focus2Desc = item.Focus2() and (item.Focus2.Spell.Description() or '') or '',
 		ClickyDesc = item.Clicky() and (item.Clicky.Spell.Description() or '') or '',
+
+		-- links
+		SpellID = item.Spell.ID() or 0,
+		WornID = item.Worn.Spell() and (item.Worn.Spell.ID() or 0) or 0,
+		Focus1ID = item.Focus() and (item.Focus.Spell.ID() or 0) or 0,
+		Focus2ID = item.Focus2() and (item.Focus2.Spell.ID() or 0) or 0,
+		ClickyID = item.Clicky() and (item.Clicky.Spell.ID() or 0) or 0,
 	}
 	return tmpItemData
 end
@@ -1496,6 +1503,11 @@ local function draw_item_tooltip(item)
 			ImGui.SameLine()
 			ImGui.PushTextWrapPos(290)
 			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Clicky)
+			if ImGui.IsItemHovered() then
+				if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
+					mq.TLO.Spell(itemData.ClickyID).Inspect()
+				end
+			end
 			if itemData.ClickyDesc ~= '' then
 				ImGui.Indent(5)
 				ImGui.TextColored(Module.Colors.color('yellow'), itemData.ClickyDesc)
@@ -1513,6 +1525,11 @@ local function draw_item_tooltip(item)
 			ImGui.SameLine()
 			ImGui.PushTextWrapPos(290)
 			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Spelleffect)
+			if ImGui.IsItemHovered() then
+				if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
+					mq.TLO.Spell(itemData.SpellID).Inspect()
+				end
+			end
 			if itemData.SpellDesc ~= '' then
 				ImGui.Indent(5)
 				ImGui.TextColored(Module.Colors.color('yellow'), itemData.SpellDesc)
@@ -1527,6 +1544,11 @@ local function draw_item_tooltip(item)
 			ImGui.SameLine()
 			ImGui.PushTextWrapPos(290)
 			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Worn)
+			if ImGui.IsItemHovered() then
+				if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
+					mq.TLO.Spell(itemData.WornID).Inspect()
+				end
+			end
 			if itemData.WornDesc ~= '' then
 				ImGui.Indent(5)
 				ImGui.TextColored(Module.Colors.color('yellow'), itemData.WornDesc)
@@ -1541,7 +1563,11 @@ local function draw_item_tooltip(item)
 			ImGui.SameLine()
 			ImGui.PushTextWrapPos(290)
 			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Focus1)
-
+			if ImGui.IsItemHovered() then
+				if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
+					mq.TLO.Spell(itemData.Focus1ID).Inspect()
+				end
+			end
 			if itemData.Focus1Desc ~= '' then
 				ImGui.Indent(5)
 				ImGui.TextColored(Module.Colors.color('yellow'), itemData.Focus1Desc)
@@ -1556,6 +1582,11 @@ local function draw_item_tooltip(item)
 			ImGui.SameLine()
 			ImGui.PushTextWrapPos(290)
 			ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Focus2)
+			if ImGui.IsItemHovered() then
+				if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
+					mq.TLO.Spell(itemData.Focus2ID).Inspect()
+				end
+			end
 			if itemData.Focus2Desc ~= '' then
 				ImGui.Indent(5)
 				ImGui.TextColored(Module.Colors.color('yellow'), itemData.Focus2Desc)

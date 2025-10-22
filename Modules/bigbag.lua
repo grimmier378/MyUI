@@ -1098,14 +1098,32 @@ local function draw_item_tooltip(item)
 
 	-- ImGui.SetCursorPosY(12)
 	Module.Draw_Item_Icon(item, 50, 50, true, false, true)
+	if ImGui.IsItemHovered() then
+		if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
+			local numSlots = item.WornSlots() or 0
+			if numSlots > 0 then
+				for i = 1, numSlots do
+					local slotID = item.WornSlot(i)() or '-1'
+					local wornItem = mq.TLO.Me.Inventory(slotID)
+					if wornItem() and wornItem.ID() then
+						Module.TempSettings.Popped[wornItem.ID()] = wornItem
+					end
+					printf("slot: %s worn %s ID %s", slotID, wornItem.Name() or 'none',
+						wornItem.ID() or 0)
+				end
+			end
+		end
+	end
 	-- animItems:SetTextureCell(item.Icon() - EQ_ICON_OFFSET)
 	-- ImGui.DrawTextureAnimation(animItems, 32, 32)
 	ImGui.SetCursorPosX(cursorX)
 	ImGui.SetCursorPosY(cursorY2)
 
-	ImGui.Dummy(10, 10)
-	ImGui.Separator()
-	ImGui.Dummy(10, 10)
+	-- ImGui.Dummy(10, 10)
+	-- ImGui.Separator()
+	-- ImGui.Dummy(10, 10)
+
+	ImGui.Spacing()
 
 	ImGui.Text("Type: ")
 	ImGui.SameLine()
@@ -1149,7 +1167,42 @@ local function draw_item_tooltip(item)
 	end
 
 	if restrictionString ~= '' then
+		ImGui.PushTextWrapPos(ImGui.GetWindowWidth() - 60)
 		ImGui.TextColored(Module.Colors.color('grey'), "%s", restrictionString)
+		ImGui.PopTextWrapPos()
+	end
+
+	if ImGui.BeginTable('basicinfo##basicinfo', 2, ImGuiTableFlags.None) then
+		ImGui.TableSetupColumn("Info##basicinfo", ImGuiTableColumnFlags.WidthFixed, 60)
+		ImGui.TableSetupColumn("Value##basicinfo", ImGuiTableColumnFlags.WidthStretch, 240)
+		ImGui.TableNextRow()
+		if itemData.ClassList and itemData.ClassList ~= '' then
+			ImGui.TableNextColumn()
+			ImGui.Text("Classes:")
+			ImGui.TableNextColumn()
+			ImGui.PushTextWrapPos(ImGui.GetColumnWidth(-1))
+			ImGui.TextColored(Module.Colors.color('grey'), "%s", itemData.ClassList)
+			ImGui.PopTextWrapPos()
+		end
+
+		if itemData.RaceList and itemData.RaceList ~= '' then
+			ImGui.TableNextColumn()
+			ImGui.Text("Races:")
+			ImGui.TableNextColumn()
+			ImGui.PushTextWrapPos(ImGui.GetColumnWidth(-1))
+			ImGui.TextColored(Module.Colors.color('grey'), "%s", itemData.RaceList)
+			ImGui.PopTextWrapPos()
+		end
+
+		if itemData.WornSlots ~= '' then
+			ImGui.TableNextColumn()
+			ImGui.Text('Slots:')
+			ImGui.TableNextColumn()
+			ImGui.PushTextWrapPos(ImGui.GetColumnWidth(-1))
+			ImGui.TextColored(Module.Colors.color('grey'), "%s", itemData.WornSlots)
+			ImGui.PopTextWrapPos()
+		end
+		ImGui.EndTable()
 	end
 
 	if ImGui.BeginTable('LVlInfo##lvl', 2, ImGuiTableFlags.None) then
@@ -1294,24 +1347,8 @@ local function draw_item_tooltip(item)
 		ImGui.EndTable()
 	end
 
-	if itemData.ClassList and itemData.ClassList ~= '' then
-		ImGui.SeparatorText("Classes: ")
-		ImGui.PushTextWrapPos(290)
-		ImGui.TextColored(Module.Colors.color('grey'), "%s", itemData.ClassList)
-		ImGui.PopTextWrapPos()
-	end
+	ImGui.Spacing()
 
-	if itemData.RaceList and itemData.RaceList ~= '' then
-		ImGui.SeparatorText("Races: ")
-		ImGui.PushTextWrapPos(290)
-		ImGui.TextColored(Module.Colors.color('grey'), "%s", itemData.RaceList)
-		ImGui.PopTextWrapPos()
-	end
-
-	if itemData.WornSlots ~= '' then
-		ImGui.SeparatorText('Worn Slots: ')
-		ImGui.TextColored(Module.Colors.color('grey'), "%s", itemData.WornSlots)
-	end
 	-- base stats
 
 	if hasBase then
@@ -1326,6 +1363,7 @@ local function draw_item_tooltip(item)
 				ImGui.Text(" AC: ")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('teal'), " %s", itemData.AC)
+				ImGui.TableNextRow()
 			end
 
 			if itemData.HP and itemData.HP > 0 then

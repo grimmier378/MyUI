@@ -1623,12 +1623,20 @@ local function draw_item_info_window(item)
 	local itemName = item.Name()
 
 	ImGui.SetNextWindowSize(0.0, 0.0, ImGuiCond.FirstUseEver)
+	local mouseX, mouseY = ImGui.GetMousePos()
+	ImGui.SetNextWindowPos((mouseX - 30), (mouseY - 5), ImGuiCond.FirstUseEver)
 	local open, show = ImGui.Begin(string.format("%s##iteminfo_%s", itemName, itemID), true)
 	if not open then
 		show = false
 		Module.TempSettings.Popped[itemID] = nil
 	end
 	if show then
+		if ImGui.IsWindowFocused() then
+			if ImGui.IsKeyPressed(ImGuiKey.Escape) then
+				show = false
+				Module.TempSettings.Popped[itemID] = nil
+			end
+		end
 		draw_item_tooltip(item)
 	end
 	ImGui.End()
@@ -1770,7 +1778,7 @@ function Module.Draw_Item_Icon(item, iconWidth, iconHeight, drawID, clickable, i
 			if ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsItemClicked(ImGuiMouseButton.Right) then
 				local link = item.ItemLink('CLICKABLE')()
 				mq.cmdf('/executelink %s', link)
-			elseif ImGui.IsItemClicked(ImGuiMouseButton.Right) then
+			elseif ImGui.IsItemClicked(ImGuiMouseButton.Right) and not ImGui.IsKeyDown(ImGuiMod.Shift) then
 				if mq.TLO.Me.Casting() ~= nil then return end
 				mq.cmdf('/useitem "%s"', item.Name())
 				clicked = true

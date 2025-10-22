@@ -115,29 +115,29 @@ local mouseKeys                                           = {
 	"None",
 }
 local equipSlots                                          = {
-	[0] = 'charm',
-	[1] = 'leftear',
-	[2] = 'head',
-	[3] = 'face',
-	[4] = 'rightear',
-	[5] = 'neck',
-	[6] = 'shoulder',
-	[7] = 'arms',
-	[8] = 'back',
-	[9] = 'leftwrist',
-	[10] = 'rightwrist',
-	[11] = 'ranged',
-	[12] = 'hands',
-	[13] = 'mainhand',
-	[14] = 'offhand',
-	[15] = 'leftfinger',
-	[16] = 'rightfinger',
-	[17] = 'chest',
-	[18] = 'legs',
-	[19] = 'feet',
-	[20] = 'waist',
-	[21] = 'powersource',
-	[22] = 'ammo',
+	[0] = 'Charm',
+	[1] = 'Ears',
+	[2] = 'Head',
+	[3] = 'Face',
+	[4] = 'Ears',
+	[5] = 'Neck',
+	[6] = 'Shoulder',
+	[7] = 'Arms',
+	[8] = 'Back',
+	[9] = 'Wrists',
+	[10] = 'Wrists',
+	[11] = 'Ranged',
+	[12] = 'Hands',
+	[13] = 'Primary',
+	[14] = 'Secondary',
+	[15] = 'Fingers',
+	[16] = 'Fingers',
+	[17] = 'Chest',
+	[18] = 'Legs',
+	[19] = 'Feet',
+	[20] = 'Waist',
+	[21] = 'Powersource',
+	[22] = 'Ammo',
 }
 local function loadSettings()
 	if utils.File.Exists(configFile) then
@@ -206,7 +206,7 @@ end
 local function retrieveClassList(item)
 	local classList = ""
 	local numClasses = item.Classes()
-	if numClasses == 0 then return 'None' end
+	if numClasses == 0 then return '' end
 	if numClasses < 16 then
 		for i = 1, numClasses do
 			classList = string.format("%s %s", classList, item.Class(i).ShortName())
@@ -214,7 +214,7 @@ local function retrieveClassList(item)
 	elseif numClasses == 16 then
 		classList = "All"
 	else
-		classList = "None"
+		classList = ""
 	end
 	return classList
 end
@@ -239,13 +239,13 @@ local function retrieveRaceList(item)
 		['Drakkin'] = 'DRK',
 	}
 	local raceList = ""
-	local numRaces = item.Races() or 16
-	if numRaces < 16 then
+	local numRaces = item.Races() or 0
+	if numRaces < 16 and numRaces > 0 then
 		for i = 1, numRaces do
 			local raceName = racesShort[item.Race(i).Name()] or ''
 			raceList = string.format("%s %s", raceList, raceName)
 		end
-	else
+	elseif numRaces == 16 then
 		raceList = "All"
 	end
 	return raceList
@@ -883,11 +883,13 @@ end
 
 function get_worn_slots(item)
 	local SlotsString = ""
+	local tmp = {}
 	for i = 1, item.WornSlots() do
 		local slotID = item.WornSlot(i)() or '-1'
-		if (tonumber(slotID) or -1) > -1 then
-			SlotsString = SlotsString .. equipSlots[tonumber(slotID)] .. " "
-		end
+		tmp[equipSlots[tonumber(slotID)]] = true
+	end
+	for slotID, _ in pairs(tmp) do
+		SlotsString = SlotsString .. slotID .. " "
 	end
 	return SlotsString
 end
@@ -1060,21 +1062,21 @@ local function draw_item_tooltip(item)
 	-- end
 
 	-- local listStats = { 'STR', 'AGI', 'STA', 'INT', 'WIS', 'DEX', 'CHA', }
-	for _, stat in pairs({ 'STR', 'AGI', 'STA', 'INT', 'WIS', 'DEX', 'CHA', }) do
+	for _, stat in pairs({ 'STR', 'AGI', 'STA', 'INT', 'WIS', 'DEX', 'CHA', 'hStr', 'hSta', 'hAgi', 'hInt', 'hWis', 'hDex', 'hCha', }) do
 		if itemData[stat] and itemData[stat] > 0 then
 			hasStats = true
 			break
 		end
 	end
 	-- local listResists = { 'MR', 'FR', 'DR', 'PR', 'CR', }
-	for _, resist in pairs({ 'MR', 'FR', 'DR', 'PR', 'CR', }) do
+	for _, resist in pairs({ 'MR', 'FR', 'DR', 'PR', 'CR', 'svCor', 'hMr', 'hFr', 'hCr', 'hPr', 'hDr', 'hCor', }) do
 		if itemData[resist] and itemData[resist] > 0 then
 			hasResists = true
 			break
 		end
 	end
 	-- local listBase = { 'HP', 'Mana', 'Endurance', }
-	for _, base in pairs({ 'HP', 'Mana', 'Endurance', }) do
+	for _, base in pairs({ 'HP', 'Mana', 'Endurance', 'AC', 'HPRegen', 'EnduranceRegen', 'ManaRegen', }) do
 		if itemData[base] and itemData[base] > 0 then
 			hasBase = true
 			break
@@ -1292,15 +1294,19 @@ local function draw_item_tooltip(item)
 		ImGui.EndTable()
 	end
 
-	ImGui.SeparatorText("Classes: ")
-	ImGui.PushTextWrapPos(290)
-	ImGui.TextColored(Module.Colors.color('grey'), "%s", itemData.ClassList)
-	ImGui.PopTextWrapPos()
+	if itemData.ClassList and itemData.ClassList ~= '' then
+		ImGui.SeparatorText("Classes: ")
+		ImGui.PushTextWrapPos(290)
+		ImGui.TextColored(Module.Colors.color('grey'), "%s", itemData.ClassList)
+		ImGui.PopTextWrapPos()
+	end
 
-	ImGui.SeparatorText("Races: ")
-	ImGui.PushTextWrapPos(290)
-	ImGui.TextColored(Module.Colors.color('grey'), "%s", itemData.RaceList)
-	ImGui.PopTextWrapPos()
+	if itemData.RaceList and itemData.RaceList ~= '' then
+		ImGui.SeparatorText("Races: ")
+		ImGui.PushTextWrapPos(290)
+		ImGui.TextColored(Module.Colors.color('grey'), "%s", itemData.RaceList)
+		ImGui.PopTextWrapPos()
+	end
 
 	if itemData.WornSlots ~= '' then
 		ImGui.SeparatorText('Worn Slots: ')

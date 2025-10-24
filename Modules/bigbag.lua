@@ -1002,6 +1002,7 @@ local function get_item_data(item)
 		HealAmount = item.HealAmount() or 0,
 		SpellDamage = item.SpellDamage() or 0,
 		StunResist = item.StunResist() or 0,
+		CanUse = item.CanUse() or false,
 
 		--restrictions
 		isNoDrop = item.NoDrop() or false,
@@ -1054,14 +1055,6 @@ local function draw_item_tooltip(item)
 	local numCombatEfx = item.CombatEffects() or 0
 	local hasCombatEffects = numCombatEfx and numCombatEfx > 0
 
-	-- if hasCombatEffects then
-	-- 	Module.TempSettings.CombatEffects = {}
-	-- 	for i = 1, numCombatEfx do
-	-- 		table.insert(Module.TempSettings.CombatEffects,  or 'unknown')
-	-- 	end
-	-- end
-
-	-- local listStats = { 'STR', 'AGI', 'STA', 'INT', 'WIS', 'DEX', 'CHA', }
 	for _, stat in pairs({ 'STR', 'AGI', 'STA', 'INT', 'WIS', 'DEX', 'CHA', 'hStr', 'hSta', 'hAgi', 'hInt', 'hWis', 'hDex', 'hCha', }) do
 		if itemData[stat] and itemData[stat] > 0 then
 			hasStats = true
@@ -1086,11 +1079,37 @@ local function draw_item_tooltip(item)
 
 	ImGui.Text("Item: ")
 	ImGui.SameLine()
-	ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.Name)
-
+	local changeColor, isTrash = Module.ColorUseable(item)
+	if itemData.CanUse and (itemData.RecLvl <= MySelf.Level()) and changeColor and not isTrash then
+		ImGui.TextColored(Module.Colors.color('green'), "%s", itemData.Name)
+	elseif not isTrash then
+		ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.Name)
+	else
+		ImGui.TextColored(Module.Colors.color('grey'), "%s", itemData.Name)
+	end
+	if ImGui.IsItemHovered() then
+		ImGui.BeginTooltip()
+		ImGui.Text("Click to copy item Name to clipboard")
+		ImGui.EndTooltip()
+		if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
+			ImGui.LogToClipboard()
+			ImGui.LogText(itemData.Name)
+			ImGui.LogFinish()
+		end
+	end
 	ImGui.Text("Item ID: ")
 	ImGui.SameLine()
 	ImGui.TextColored(Module.Colors.color('yellow'), "%s", itemData.ID)
+	if ImGui.IsItemHovered() then
+		ImGui.BeginTooltip()
+		ImGui.Text("Click to copy item ID to clipboard")
+		ImGui.EndTooltip()
+		if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
+			ImGui.LogToClipboard()
+			ImGui.LogText(itemData.ID)
+			ImGui.LogFinish()
+		end
+	end
 	local cursorX = ImGui.GetCursorPosX()
 	local cursorY2 = ImGui.GetCursorPosY()
 	ImGui.SetCursorPosY(cursorY)
@@ -1099,6 +1118,9 @@ local function draw_item_tooltip(item)
 	-- ImGui.SetCursorPosY(12)
 	Module.Draw_Item_Icon(item, 50, 50, true, false, true)
 	if ImGui.IsItemHovered() then
+		ImGui.BeginTooltip()
+		ImGui.Text("Click to compare with items worn in allowed slots.")
+		ImGui.EndTooltip()
 		if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
 			local numSlots = item.WornSlots() or 0
 			if numSlots > 0 then
@@ -1108,20 +1130,13 @@ local function draw_item_tooltip(item)
 					if wornItem() and wornItem.ID() then
 						Module.TempSettings.Popped[wornItem.ID()] = wornItem
 					end
-					printf("slot: %s worn %s ID %s", slotID, wornItem.Name() or 'none',
-						wornItem.ID() or 0)
 				end
 			end
 		end
 	end
-	-- animItems:SetTextureCell(item.Icon() - EQ_ICON_OFFSET)
-	-- ImGui.DrawTextureAnimation(animItems, 32, 32)
+
 	ImGui.SetCursorPosX(cursorX)
 	ImGui.SetCursorPosY(cursorY2)
-
-	-- ImGui.Dummy(10, 10)
-	-- ImGui.Separator()
-	-- ImGui.Dummy(10, 10)
 
 	ImGui.Spacing()
 
@@ -1415,8 +1430,9 @@ local function draw_item_tooltip(item)
 			ImGui.TableSetupColumn("Value##stats", ImGuiTableColumnFlags.WidthFixed, 150)
 
 			ImGui.TableNextRow()
-			ImGui.TableNextColumn()
 			if itemData['STR'] > 0 then
+				ImGui.TableNextColumn()
+
 				ImGui.Text("STR: ")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.STR)
@@ -1424,9 +1440,9 @@ local function draw_item_tooltip(item)
 					ImGui.SameLine()
 					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hStr)
 				end
-				ImGui.TableNextColumn()
 			end
 			if itemData.AGI and itemData.AGI > 0 then
+				ImGui.TableNextColumn()
 				ImGui.Text("AGI: ")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.AGI)
@@ -1437,6 +1453,7 @@ local function draw_item_tooltip(item)
 				ImGui.TableNextColumn()
 			end
 			if itemData.STA and itemData.STA > 0 then
+				ImGui.TableNextColumn()
 				ImGui.Text("STA: ")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.STA)
@@ -1444,9 +1461,9 @@ local function draw_item_tooltip(item)
 					ImGui.SameLine()
 					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hSta)
 				end
-				ImGui.TableNextColumn()
 			end
 			if itemData.INT and itemData.INT > 0 then
+				ImGui.TableNextColumn()
 				ImGui.Text("INT: ")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.INT)
@@ -1454,9 +1471,9 @@ local function draw_item_tooltip(item)
 					ImGui.SameLine()
 					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hInt)
 				end
-				ImGui.TableNextColumn()
 			end
 			if itemData.WIS and itemData.WIS > 0 then
+				ImGui.TableNextColumn()
 				ImGui.Text("WIS: ")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.WIS)
@@ -1464,9 +1481,9 @@ local function draw_item_tooltip(item)
 					ImGui.SameLine()
 					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hWis)
 				end
-				ImGui.TableNextColumn()
 			end
 			if itemData.DEX and itemData.DEX > 0 then
+				ImGui.TableNextColumn()
 				ImGui.Text("DEX: ")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.DEX)
@@ -1474,9 +1491,9 @@ local function draw_item_tooltip(item)
 					ImGui.SameLine()
 					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hDex)
 				end
-				ImGui.TableNextColumn()
 			end
 			if itemData.CHA and itemData.CHA > 0 then
+				ImGui.TableNextColumn()
 				ImGui.Text("CHA: ")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.CHA)
@@ -1484,7 +1501,6 @@ local function draw_item_tooltip(item)
 					ImGui.SameLine()
 					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hCha)
 				end
-				ImGui.TableNextColumn()
 			end
 			ImGui.EndTable()
 		end
@@ -1497,8 +1513,8 @@ local function draw_item_tooltip(item)
 			ImGui.TableSetupColumn("Value##res", ImGuiTableColumnFlags.WidthFixed, 150)
 
 			ImGui.TableNextRow()
-			ImGui.TableNextColumn()
 			if itemData['MR'] > 0 then
+				ImGui.TableNextColumn()
 				ImGui.Text("MR:\t")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['MR'])
@@ -1506,9 +1522,9 @@ local function draw_item_tooltip(item)
 					ImGui.SameLine()
 					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hMr)
 				end
-				ImGui.TableNextColumn()
 			end
 			if itemData['FR'] > 0 then
+				ImGui.TableNextColumn()
 				ImGui.Text("FR:\t")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['FR'])
@@ -1516,9 +1532,9 @@ local function draw_item_tooltip(item)
 					ImGui.SameLine()
 					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hFr)
 				end
-				ImGui.TableNextColumn()
 			end
 			if itemData['DR'] > 0 then
+				ImGui.TableNextColumn()
 				ImGui.Text("DR:\t")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['DR'])
@@ -1526,9 +1542,9 @@ local function draw_item_tooltip(item)
 					ImGui.SameLine()
 					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hDr)
 				end
-				ImGui.TableNextColumn()
 			end
 			if itemData['PR'] > 0 then
+				ImGui.TableNextColumn()
 				ImGui.Text("PR:\t")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['PR'])
@@ -1536,9 +1552,9 @@ local function draw_item_tooltip(item)
 					ImGui.SameLine()
 					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hPr)
 				end
-				ImGui.TableNextColumn()
 			end
 			if itemData['CR'] > 0 then
+				ImGui.TableNextColumn()
 				ImGui.Text("CR:\t")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['CR'])
@@ -1548,6 +1564,7 @@ local function draw_item_tooltip(item)
 				end
 			end
 			if itemData['svCor'] > 0 then
+				ImGui.TableNextColumn()
 				ImGui.Text("COR:\t")
 				ImGui.SameLine()
 				ImGui.TextColored(Module.Colors.color('green'), "%s", itemData['svCor'])
@@ -1710,7 +1727,7 @@ local function draw_item_info_window(item)
 	local itemID = item.ID()
 	local itemName = item.Name()
 
-	ImGui.SetNextWindowSize(0.0, 0.0, ImGuiCond.FirstUseEver)
+	ImGui.SetNextWindowSize(320, 0.0, ImGuiCond.Always)
 	local mouseX, mouseY = ImGui.GetMousePos()
 	ImGui.SetNextWindowPos((mouseX - 30), (mouseY - 5), ImGuiCond.FirstUseEver)
 	local open, show = ImGui.Begin(string.format("%s##iteminfo_%s", itemName, itemID), true)
@@ -1728,6 +1745,44 @@ local function draw_item_info_window(item)
 		draw_item_tooltip(item)
 	end
 	ImGui.End()
+end
+
+---comment
+---@param item any
+---@return boolean colorChange #should we change color
+---@return boolean trashItem #is the item considered trash
+---@return boolean lvlHigh #is the level higher than player level
+---@return string toolTipSpell #the tooltip for the spell if spell
+function Module.ColorUseable(item)
+	local isSpell = item.Name():find("Spell:")
+	local isSong = item.Name():find("Song:")
+	local iType = item.Type() or ''
+	local toolTipSpell = ''
+	local colorChange = false
+	local lvlHigh = false
+	local trashItem = false
+
+	if isSpell or isSong then
+		local spellName = item.Spell.Name() --:gsub("Spell: ", ""):gsub("Song: ", "")
+		local spellLvl = mq.TLO.Spell(spellName).Level() or 0
+		if not book[spellName] then
+			if spellLvl > MySelf.Level() then
+				lvlHigh = true
+			end
+			colorChange = true
+			toolTipSpell = spellLvl > 0 and string.format("Lvl %s", spellLvl) or ''
+		else
+			toolTipSpell = "Already Know"
+		end
+	else
+		if iType == 'Combinable' or iType == 'Food' or iType == 'Drink' then
+			trashItem = true
+			colorChange = false
+		else
+			colorChange = true
+		end
+	end
+	return colorChange, trashItem, lvlHigh, toolTipSpell
 end
 
 ---Draws the individual item icon in the bag.
@@ -1785,33 +1840,33 @@ function Module.Draw_Item_Icon(item, iconWidth, iconHeight, drawID, clickable, i
 			ImGui.PushStyleColor(ImGuiCol.ButtonHovered, 0, 0.3, 0, 0.2)
 			ImGui.PushStyleColor(ImGuiCol.ButtonActive, 0, 0.3, 0, 0.3)
 		end
-		local toolTipSpell = ''
-		local colorChange = false
-		local lvlHigh = false
+		local colorChange, lvlHigh, toolTipSpell = false, false, ''
+		-- local colorChange = false
+		-- local lvlHigh = false
 		if canUse then
-			local isSpell = item.Name():find("Spell:")
-			local isSong = item.Name():find("Song:")
-			local iType = item.Type() or ''
-
-			if isSpell or isSong then
-				local spellName = item.Spell.Name() --:gsub("Spell: ", ""):gsub("Song: ", "")
-				local spellLvl = mq.TLO.Spell(spellName).Level() or 0
-				if not book[spellName] then
-					if spellLvl > MySelf.Level() then
-						lvlHigh = true
-					end
-					colorChange = true
-					toolTipSpell = spellLvl > 0 and string.format("Lvl %s", spellLvl) or ''
-				else
-					toolTipSpell = "Already Know"
-				end
-			else
-				if iType == 'Combinable' or iType == 'Food' or iType == 'Drink' then
-					colorChange = false
-				else
-					colorChange = true
-				end
-			end
+			-- 	local isSpell = item.Name():find("Spell:")
+			-- 	local isSong = item.Name():find("Song:")
+			-- 	local iType = item.Type() or ''
+			colorChange, _, lvlHigh, toolTipSpell = Module.ColorUseable(item)
+			-- 	if isSpell or isSong then
+			-- 		local spellName = item.Spell.Name() --:gsub("Spell: ", ""):gsub("Song: ", "")
+			-- 		local spellLvl = mq.TLO.Spell(spellName).Level() or 0
+			-- 		if not book[spellName] then
+			-- 			if spellLvl > MySelf.Level() then
+			-- 				lvlHigh = true
+			-- 			end
+			-- 			colorChange = true
+			-- 			toolTipSpell = spellLvl > 0 and string.format("Lvl %s", spellLvl) or ''
+			-- 		else
+			-- 			toolTipSpell = "Already Know"
+			-- 		end
+			-- 	else
+			-- 		if iType == 'Combinable' or iType == 'Food' or iType == 'Drink' then
+			-- 			colorChange = false
+			-- 		else
+			-- 			colorChange = true
+			-- 		end
+			-- 	end
 		end
 
 		if colorChange then

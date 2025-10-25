@@ -1079,8 +1079,8 @@ local function draw_item_tooltip(item)
 
 	ImGui.Text("Item: ")
 	ImGui.SameLine()
-	local changeColor, isTrash = Module.ColorUseable(item)
-	if itemData.CanUse and (itemData.RecLvl <= MySelf.Level()) and changeColor and not isTrash then
+	local changeColor, isTrash = Module.ColorItemInfo(item)
+	if itemData.CanUse and (itemData.ReqLvl <= MySelf.Level()) and changeColor and not isTrash then
 		ImGui.TextColored(Module.Colors.color('green'), "%s", itemData.Name)
 	elseif not isTrash then
 		ImGui.TextColored(Module.Colors.color('tangarine'), "%s", itemData.Name)
@@ -1753,7 +1753,7 @@ end
 ---@return boolean trashItem #is the item considered trash
 ---@return boolean lvlHigh #is the level higher than player level
 ---@return string toolTipSpell #the tooltip for the spell if spell
-function Module.ColorUseable(item)
+function Module.ColorItemInfo(item)
 	local isSpell = item.Name():find("Spell:")
 	local isSong = item.Name():find("Song:")
 	local iType = item.Type() or ''
@@ -1847,7 +1847,7 @@ function Module.Draw_Item_Icon(item, iconWidth, iconHeight, drawID, clickable, i
 			-- 	local isSpell = item.Name():find("Spell:")
 			-- 	local isSong = item.Name():find("Song:")
 			-- 	local iType = item.Type() or ''
-			colorChange, _, lvlHigh, toolTipSpell = Module.ColorUseable(item)
+			colorChange, _, lvlHigh, toolTipSpell = Module.ColorItemInfo(item)
 			-- 	if isSpell or isSong then
 			-- 		local spellName = item.Spell.Name() --:gsub("Spell: ", ""):gsub("Song: ", "")
 			-- 		local spellLvl = mq.TLO.Spell(spellName).Level() or 0

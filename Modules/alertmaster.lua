@@ -407,22 +407,22 @@ function Module:GetSpawns(zoneShort)
 		return {}
 	end
 
-	Module.WatchedSpawns = {}
+	local WatchedSpawns = {}
 	local stmt = db:prepare("SELECT spawn_name FROM npc_spawns WHERE zone_short = ?")
 	stmt:bind_values(zoneShort)
-	if stmt == nil then
-		db:close()
-		return {}
-	end
+	-- if stmt == nil then
+	-- 	db:close()
+	-- 	return {}
+	-- end
 	for row in stmt:nrows() do
 		if row.spawn_name and row.spawn_name ~= "" then
-			table.insert(Module.WatchedSpawns, row.spawn_name)
+			table.insert(WatchedSpawns, row.spawn_name)
 		end
 	end
 
 	stmt:finalize()
 	db:close()
-	return Module.WatchedSpawns
+	return WatchedSpawns
 end
 
 function Module:GetIgnoredPlayers()
@@ -435,10 +435,10 @@ function Module:GetIgnoredPlayers()
 	local ignoredPlayers = {}
 	local stmt = db:prepare("SELECT pc_name FROM pc_ignore")
 
-	if stmt == nil then
-		db:close()
-		return {}
-	end
+	-- if stmt == nil then
+	-- 	db:close()
+	-- 	return {}
+	-- end
 
 	for row in stmt:nrows() do
 		if row.pc_name and row.pc_name ~= "" then
@@ -461,10 +461,10 @@ function Module:GetSafeZones()
 	local safeZones = {}
 	local stmt = db:prepare("SELECT zone_short FROM safe_zones")
 
-	if stmt == nil then
-		db:close()
-		return {}
-	end
+	-- if stmt == nil then
+	-- 	db:close()
+	-- 	return {}
+	-- end
 
 	for row in stmt:nrows() do
 		if row.zone_short and row.zone_short ~= "" then

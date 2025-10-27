@@ -925,6 +925,7 @@ local function get_item_data(item)
 		Charges = (item.Charges() or 0) ~= -1 and (item.Charges() or 0) or 'Infinite',
 		ClassList = retrieveClassList(item),
 		RaceList = retrieveRaceList(item),
+		TributeValue = item.Tribute() or 0,
 
 		--base stats
 		HP = item.HP() or 0,
@@ -1450,7 +1451,6 @@ local function draw_item_tooltip(item)
 					ImGui.SameLine()
 					ImGui.TextColored(Module.Colors.color('Yellow'), " + %s", itemData.hAgi)
 				end
-				ImGui.TableNextColumn()
 			end
 			if itemData.STA and itemData.STA > 0 then
 				ImGui.TableNextColumn()
@@ -1721,6 +1721,11 @@ local function draw_item_tooltip(item)
 	ImGui.Text("Value: ")
 	ImGui.SameLine()
 	draw_value(itemData.Value or 0)
+	if itemData.TributeValue > 0 then
+		ImGui.Text("Tribute Value: ")
+		ImGui.SameLine()
+		ImGui.TextColored(Module.Colors.color('yellow'), "%s", itemData.TributeValue)
+	end
 end
 
 local function draw_item_info_window(item)

@@ -898,7 +898,7 @@ function Module.MainLoop()
         if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
     local elapsedTime = mq.gettime() - clockTimer
-    if not loadedExeternally or elapsedTime >= 50 then
+    if elapsedTime >= 500 then
         currZone = mq.TLO.Zone.ID()
         if currZone ~= lastZone then
             lastZone = currZone
@@ -909,18 +909,19 @@ function Module.MainLoop()
         else
             MessageHandler()
         end
-        if needSave then
-            settings[Module.DisplayName].Scale = TempSettings.scale
-            settings[Module.DisplayName].AlphaSort = TempSettings.alphaSort
-            settings[Module.DisplayName].LoadTheme = TempSettings.themeName
-            settings[Module.DisplayName].ShowTooltip = TempSettings.showTooltip
-            settings[Module.DisplayName].MyGroupOnly = TempSettings.MyGroupOnly
-            settings[Module.DisplayName].LockWindow = TempSettings.LockWindow
-            settings[Module.DisplayName].ShowLeader = TempSettings.ShowLeader
-            mq.pickle(configFile, settings)
-            needSave = false
-        end
+
         clockTimer = mq.gettime()
+    end
+    if needSave then
+        settings[Module.DisplayName].Scale = TempSettings.scale
+        settings[Module.DisplayName].AlphaSort = TempSettings.alphaSort
+        settings[Module.DisplayName].LoadTheme = TempSettings.themeName
+        settings[Module.DisplayName].ShowTooltip = TempSettings.showTooltip
+        settings[Module.DisplayName].MyGroupOnly = TempSettings.MyGroupOnly
+        settings[Module.DisplayName].LockWindow = TempSettings.LockWindow
+        settings[Module.DisplayName].ShowLeader = TempSettings.ShowLeader
+        mq.pickle(configFile, settings)
+        needSave = false
     end
 end
 

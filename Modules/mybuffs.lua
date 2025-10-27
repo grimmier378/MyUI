@@ -2118,7 +2118,7 @@ function Module.MainLoop()
         if not solo then CheckStale() end
         GetBuffs()
         clockTimer = mq.gettime()
-        Module.NumBuffs = buffCount
+        Module.NumBuffs = mq.TLO.Me.BuffCount() or 0
     end
 
     if Module.TempSettings.PositionTimer == nil then

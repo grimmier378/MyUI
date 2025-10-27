@@ -265,12 +265,11 @@ function Module.MainLoop()
 	-- This will unload the module gracefully if IsRunning state changes.
 	if loadedExeternally and not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
 
-	-- This will only allow the MainLoop to run every 500ms (half a secon)
+	-- This will only allow the MainLoop to run every x ms
 	if mq.gettime() - drawTimerMS < 1000 then
 		return
 	else
 		-- your code here
-		drawTimerMS = mq.gettime()
 		rSize = mq.TLO.Raid.Members() or 0
 		if rSize > 0 then raidMembers = getMembers() end
 
@@ -280,7 +279,7 @@ function Module.MainLoop()
 			Module.ShowGui = false
 			raidMembers = {}
 		end
-		-- drawTimerS = os.time()
+		drawTimerMS = mq.gettime()
 	end
 	--[[
 	your MainLoop code here without the loop.

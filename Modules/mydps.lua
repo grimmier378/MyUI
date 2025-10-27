@@ -24,8 +24,11 @@ else
 	Module.ThemeFile = MyUI_ThemeFile
 	Module.Theme = MyUI_Theme
 end
-Module.PetName                                                                                                                     = mq.TLO.Pet.DisplayName() or 'NoPet'
-Module.TempSettings                                                                                                                = {}
+Module.PetName                 = mq.TLO.Pet.DisplayName() or 'NoPet'
+Module.TempSettings            = {}
+Module.TempSettings.LastUpdate = 0
+
+
 local Utils                                                                                                                        = Module.Utils
 local ToggleFlags                                                                                                                  = bit32.bor(
 	Utils.ImGuiToggleFlags.PulseOnHover,
@@ -204,7 +207,6 @@ local function sortTable(tbl, sortType)
 	end)
 	return tbl
 end
-
 local function parseCurrentBattle(dur)
 	if not enteredCombat then return end
 	if dur > 0 then
@@ -254,8 +256,11 @@ local function parseCurrentBattle(dur)
 				CritHeals = critHealsTotal,
 				Dots = dotTotalBattle,
 			}
-			ActorDPS:send({ mailbox = 'my_dps', script = 'mydps', }, (msgSend))
-			ActorDPS:send({ mailbox = 'my_dps', script = 'myui', }, (msgSend))
+			if mq.gettime() - Module.TempSettings.LastUpdate > 500 then
+				ActorDPS:send({ mailbox = 'my_dps', script = 'mydps', }, (msgSend))
+				ActorDPS:send({ mailbox = 'my_dps', script = 'myui', }, (msgSend))
+				Module.TempSettings.LastUpdate = mq.gettime()
+			end
 			local found = false
 			for k, v in pairs(actorsTable) do
 				if v.name == Module.CharLoaded then

@@ -348,17 +348,18 @@ function Module.LoadSpawnsDB()
 				"zone_short" TEXT NOT NULL,
 				"spawn_name" TEXT NOT NULL,
 				"id" INTEGER PRIMARY KEY AUTOINCREMENT
+
 			);
 		]]
 		db:exec [[
 			CREATE TABLE IF NOT EXISTS pc_ignore (
-				"pc_name" TEXT NOT NULL,
+				"pc_name" TEXT NOT NULL UNIQUE,
 				"id" INTEGER PRIMARY KEY AUTOINCREMENT
 			);
 		]]
 		db:exec [[
 			CREATE TABLE IF NOT EXISTS safe_zones (
-				"zone_short" TEXT NOT NULL,
+				"zone_short" TEXT NOT NULL UNIQUE,
 				"id" INTEGER PRIMARY KEY AUTOINCREMENT
 			);
 		]]
@@ -483,6 +484,15 @@ function Module:AddSafeZone(zoneShort)
 		Module.Utils.PrintOutput('MyUI', nil, "Failed to open the AlertMaster Database")
 		return false
 	end
+	-- check for exiting
+	local existingStmt = db:prepare("SELECT zone_short FROM safe_zones WHERE zone_short = ?")
+	existingStmt:bind_values(zoneShort)
+	local exists = existingStmt:step() == Module.SQLite3.ROW
+	existingStmt:finalize()
+	if exists then
+		db:close()
+		return false
+	end
 
 	-- skip conflicts
 	local stmt = db:prepare("INSERT OR IGNORE INTO safe_zones (zone_short) VALUES (?)")
@@ -498,6 +508,15 @@ function Module:AddIgnorePCtoDB(pcName)
 	local db = Module.SQLite3.open(Module.DBPath)
 	if not db then
 		Module.Utils.PrintOutput('MyUI', nil, "Failed to open the AlertMaster Database")
+		return false
+	end
+	-- check for existing entry
+	local existingStmt = db:prepare("SELECT pc_name FROM pc_ignore WHERE pc_name = ?")
+	existingStmt:bind_values(pcName)
+	local exists = existingStmt:step() == Module.SQLite3.ROW
+	existingStmt:finalize()
+	if exists then
+		db:close()
 		return false
 	end
 
@@ -547,6 +566,16 @@ function Module:AddSpawnToDB(zoneShort, spawnName)
 	local db = Module.SQLite3.open(Module.DBPath)
 	if not db then
 		Module.Utils.PrintOutput('MyUI', nil, "Failed to open the AlertMaster Database")
+		return false
+	end
+
+	-- check for existing entry
+	local existingStmt = db:prepare("SELECT zone_short FROM npc_spawns WHERE zone_short = ? AND spawn_name = ?")
+	existingStmt:bind_values(zoneShort, spawnName)
+	local exists = existingStmt:step() == Module.SQLite3.ROW
+	existingStmt:finalize()
+	if exists then
+		db:close()
 		return false
 	end
 
@@ -1061,7 +1090,6 @@ local function should_include_player(spawn)
 	local name = spawn.DisplayName()
 	local guild = spawn.Guild() or 'None'
 	-- if pc exists on the ignore list, skip
-	Module:UpdateIgnoredPlayers()
 	if settings['Ignore'] ~= nil then
 		for k, v in pairs(settings['Ignore'] or {}) do
 			if v == nil or v == name then return false end
@@ -1733,7 +1761,6 @@ function Module:DrawIgnoredPlayersConfig()
 	if changed then
 		Module:AddIgnorePCtoDB(Module.TempSettings.NewIgnoredPlayer)
 		Module.TempSettings.NewIgnoredPlayer = ""
-		Module:UpdateIgnoredPlayers()
 	end
 	ImGui.Separator()
 	if ImGui.BeginTable("IgnoredPlayersTable##IgnoredPlayersTable", 2, ImGuiTableFlags.Borders) then
@@ -2778,7 +2805,6 @@ local function load_binds()
 			else
 				Module.Utils.PrintOutput('AlertMaster', nil, '\ayAlready ignoring \"' .. val_str .. '\".')
 			end
-			Module:UpdateIgnoredPlayers()
 
 			-- Module.Utils.PrintOutput('AlertMaster', nil, '\ayNow ignoring \"' .. val_str .. '\"')
 		elseif cmd == 'ignoredel' and val_str:len() > 0 then
@@ -2788,7 +2814,6 @@ local function load_binds()
 			-- end
 			-- save_settings()
 			local result = Module:RemoveIgnoredPC(val_str)
-			Module:UpdateIgnoredPlayers()
 			if result then
 				Module.Utils.PrintOutput('AlertMaster', nil, '\ayNo longer ignoring \"' .. val_str .. '\"')
 			else

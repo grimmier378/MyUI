@@ -124,6 +124,7 @@ defaults        = {
         NavDist = 10,
         ShowLevel = true,
         ShowValOnBar = false,
+        MaxRaidColumns = 4,
     },
 }
 
@@ -1220,16 +1221,25 @@ function Module.RenderGUI()
             ImGui.SetWindowFontScale(Scale)
 
             if raidSize > 0 then
-                local col = math.floor(raidSize / 6) > 0 and math.floor(raidSize / 6) or 1
+                local col = math.ceil(raidSize / 6) > 0 and math.ceil(raidSize / 6) or 1
+                if col > settings[Module.Name].MaxRaidColumns then
+                    col = settings[Module.Name].MaxRaidColumns
+                end
                 if ImGui.BeginTable("Raid", col) then
                     ImGui.TableNextRow()
                     ImGui.TableNextColumn()
                     local cnt = 1
+                    local childNum = 1
+                    ImGui.BeginChild("RaidGroup##" .. childNum, 0, 0, bit32.bor(ImGuiChildFlags.AutoResizeY), ImGuiWindowFlags.NoScrollbar)
+
                     for k, v in ipairs(raidKeys) do
                         local member = mq.TLO.Raid.Member(v.slot)
                         if cnt == 7 then
+                            ImGui.EndChild()
+                            childNum = childNum + 1
                             ImGui.TableNextColumn()
                             cnt = 1
+                            ImGui.BeginChild("RaidGroup##" .. childNum, 0, 0, bit32.bor(ImGuiChildFlags.AutoResizeY), ImGuiWindowFlags.NoScrollbar)
                         end
                         if member ~= 'NULL' then
                             ImGui.BeginGroup()
@@ -1238,6 +1248,7 @@ function Module.RenderGUI()
                         end
                         cnt = cnt + 1
                     end
+                    ImGui.EndChild()
                     ImGui.EndTable()
                 end
             end
@@ -1447,6 +1458,10 @@ function Module.RenderGUI()
                 settings[Module.Name].ShowValOnBar = Module.Utils.DrawToggle('Show Value on Bar##' .. Module.Name, settings[Module.Name].ShowValOnBar, ToggleFlags)
                 ImGui.EndTable()
             end
+
+            settings[Module.Name].MaxRaidColumns = ImGui.SliderInt('Max Raid Columns##' .. Module.Name, settings[Module.Name].MaxRaidColumns, 1, 10)
+            ImGui.SeparatorText("Navigation##" .. Module.Name)
+
             local tmpDist
             if tmpDist == nil then tmpDist = navDist end
             ImGui.SetNextItemWidth(100)
@@ -1751,7 +1766,11 @@ function Module.MainLoop()
         mq.cmdf("/dgge /target id %s", lastTar)
     end
 
-    getMyInfo()
+    local now = mq.gettime()
+    if now - clockTimer >= 500 then
+        getMyInfo()
+        clockTimer = now
+    end
 
     if raidSize > 0 then
         sortRaidByGroup()

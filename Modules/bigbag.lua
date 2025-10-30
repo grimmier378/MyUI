@@ -1011,7 +1011,7 @@ local function get_item_data(item)
 		isNoTrade = item.NoTrade() or false,
 		isAttuneable = item.Attuneable() or false,
 		isLore = item.Lore() or false,
-		isEvolving = (item.Evolving.ExpPct() > 0 and item.Evolving.ExpOn()) or false,
+		-- isEvolving = ((item.Evolving.ExpPct() or 0) > 0 and item.Evolving.ExpOn()) or false,
 		isMagic = item.Magic() or false,
 
 		-- evolution
@@ -1177,10 +1177,10 @@ local function draw_item_tooltip(item)
 		restrictionString = restrictionString .. 'Attuneable '
 		needSameLine = true
 	end
-	if itemData.isEvolving then
-		if needSameLine then restrictionString = restrictionString .. ',' end
-		restrictionString = restrictionString .. 'Evolving '
-	end
+	-- if itemData.isEvolving then
+	-- 	if needSameLine then restrictionString = restrictionString .. ',' end
+	-- 	restrictionString = restrictionString .. 'Evolving '
+	-- end
 
 	if restrictionString ~= '' then
 		ImGui.PushTextWrapPos(ImGui.GetWindowWidth() - 60)

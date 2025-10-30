@@ -43,7 +43,8 @@ Module.tempChanColors    = {}
 Module.tempFiltColors    = {}
 Module.hString           = {}
 Module.TLOConsoles       = {}
-Module.LogFile           = string.format('%s/MyUI/MyChat/%s/%s.log', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
+Module.Logtouch          = string.format('%s/MyUI/MyChat/%s/Logs/touch.lua', mq.configDir, Module.Server:gsub(' ', '_'))
+Module.LogFile           = string.format('%s/MyUI/MyChat/%s/Logs/%s.log', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
 Module.SHOW              = true
 Module.openGUI           = true
 Module.openConfigGUI     = false
@@ -51,6 +52,7 @@ Module.refreshLinkDB     = 10
 Module.mainEcho          = '/say'
 -- Module.doRefresh         = false
 Module.SettingsFile      = string.format('%s/MyUI/MyChat/%s/%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
+
 Module.KeyFocus          = false
 Module.KeyName           = 'RightShift'
 Module.Settings          = {
@@ -324,9 +326,6 @@ local function loadSettings()
         -- Load settings from the Lua config file
         Module.Settings = dofile(Module.SettingsFile)
         if firstPass then
-            local date = os.date("%m_%d_%Y_%H_%M")
-            local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded, date)
-            if not Module.Utils.File.Exists(backup) then mq.pickle(backup, Module.Settings) end
             reIndexSettings(Module.SettingsFile, Module.Settings)
             firstPass = false
         end
@@ -354,13 +353,6 @@ local function loadSettings()
         Module.Settings.Channels[9100] = Module.defaults['Channels'][9100]
     end
     Module.Settings.Channels[9000].enabled = enableSpam
-    -- if Module.Settings.refreshLinkDB == nil then
-    --     Module.Settings.refreshLinkDB = Module.defaults.refreshLinkDB
-    -- end
-    -- doRefresh = Module.Settings.refreshLinkDB >= 5 or false
-    -- if Module.Settings.doRefresh == nil then
-    --     Module.Settings.doRefresh = doRefresh
-    -- end
     local i = 1
     for channelID, channelData in pairs(Module.Settings.Channels) do
         -- setup default Echo command channels.
@@ -399,20 +391,6 @@ local function loadSettings()
         if forceIndex then
             Module.Consoles[channelID].console = nil
         end
-
-        -- if Module.Settings.Channels[channelID].Scale ~= nil then
-        --     if Module.Settings.Channels[channelID].Scale <= 8 then
-        --         Module.Settings.Channels[channelID].FontSize = 16
-        --     else
-        --         Module.Settings.Channels[channelID].FontSize = Module.Settings.Channels[channelID].Scale
-        --     end
-        --     Module.Settings.Channels[channelID].Scale = nil
-        -- end
-        -- if not Module.Settings.Channels[channelID].FontSize then
-        --     Module.Settings.Channels[channelID].FontSize = 16
-        -- elseif Module.Settings.Channels[channelID].FontSize < 8 then
-        --     Module.Settings.Channels[channelID].FontSize = 16
-        -- end
 
         SetUpConsoles(channelID)
 
@@ -506,7 +484,7 @@ local function loadSettings()
     forceIndex = false
     Module.KeyFocus = Module.Settings.keyFocus ~= nil or false
     Module.KeyName = Module.Settings.keyName ~= nil and Module.Settings.keyName or 'RightShift'
-    writeSettings(Module.SettingsFile, Module.Settings)
+    -- writeSettings(Module.SettingsFile, Module.Settings)
     Module.tempSettings = Module.Settings
 end
 
@@ -664,6 +642,11 @@ local function CheckNPC(line)
     return false, name
 end
 
+function Module.BackupSettings()
+    local date = os.date("%m_%d_%Y_%H_%M")
+    local backup = string.format('%s/MyUI/MyChat/%s/Backups/%s_BAK_%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded, date)
+    mq.pickle(backup, Module.Settings)
+end
 
 --[[ Reads in the line, channelID and eventName of the triggered events. Parses the line against the Events and Filters for that channel.
     adjusts coloring for the line based on settings for the matching event / filter and writes to the corresponding console.
@@ -688,7 +671,8 @@ function Module.EventChat(channelID, eventName, line, spam)
         local matchCount = 0
         local negMatch = false
         local conColorStr = 'white'
-        local gSize = mq.TLO.Me.GroupSize() -- size of the group including yourself
+        local gSize = mq.TLO.Me.GroupSize()      -- size of the group including yourself
+        local rSize = mq.TLO.Raid.Members() or 0 -- size of the raid including yourself
         gSize = gSize - 1
         if txtBuffer then
             local haveFilters = false
@@ -721,6 +705,17 @@ function Module.EventChat(channelID, eventName, line, spam)
                                         fString = string.gsub(fString, 'PT3', npcName)
                                         -- print(npcName)
                                         tagged = true
+                                        break
+                                    end
+                                end
+                            end
+                            if rSize > 0 and not tagged then
+                                for r = 1, rSize do
+                                    if mq.TLO.Spawn(string.format("%s", npcName)).Master.Name() == mq.TLO.Raid.Member(r).Name() then
+                                        fString = string.gsub(fString, 'PT3', npcName)
+                                        -- print(npcName)
+                                        tagged = true
+                                        break
                                     end
                                 end
                             end
@@ -1061,20 +1056,6 @@ local function DrawConsole(channelID)
         ImGui.EndPopup()
     end
 
-    -- if ImGui.IsItemHovered() then
-    --     -- Navigate command history
-    --     if ImGui.IsKeyPressed(ImGuiKey.UpArrow) and ImGui.IsKeyDown(ImGuiMod.Ctrl) then
-    --         settings.commandBuffer = Module.NavigateCommandHistory(channelID, "up")
-    --         cmdBuffer = settings.commandBuffer
-    --         historyUpdated = true
-    --     end
-    --     if ImGui.IsKeyPressed(ImGuiKey.DownArrow) and ImGui.IsKeyDown(ImGuiMod.Ctrl) then
-    --         settings.commandBuffer = Module.NavigateCommandHistory(channelID, "down")
-    --         cmdBuffer = settings.commandBuffer
-    --         historyUpdated = true
-    --     end
-    -- end
-
     if focusKeyboard then
         local textSizeX, _ = ImGui.CalcTextSize(cmdBuffer)
         ImGui.SetCursorPos(posX + textSizeX * ImGui.GetIO().FontGlobalScale, posY)
@@ -1200,25 +1181,7 @@ local function DrawChatWindow()
             end
             ImGui.EndMenu()
         end
-        -- if ImGui.BeginMenu('Zoom##' .. windowNum) then
-        --     ImGui.SetWindowFontScale(Module.Settings.Scale)
-        --     if ImGui.MenuItem('Main##MyChat', '', zoomMain) then
-        --         zoomMain = not zoomMain
-        --     end
-        --     for _, Data in ipairs(sortedChannels) do
-        --         -- for channelID, settings in pairs(ChatWin.Settings.Channels) do
-        --         local channelID = Data[1]
-        --         if channelID ~= 9000 or enableSpam then
-        --             local zoom = Module.Consoles[channelID].zoom
-        --             local name = Module.Settings.Channels[channelID].Name
-        --             if ImGui.MenuItem(name, '', zoom) then
-        --                 Module.Consoles[channelID].zoom = not zoom
-        --             end
-        --         end
-        --     end
 
-        --     ImGui.EndMenu()
-        -- end
         if ImGui.BeginMenu('Links##' .. windowNum) then
             ImGui.SetWindowFontScale(Module.Settings.Scale)
             for _, Data in ipairs(sortedChannels) do
@@ -1284,16 +1247,10 @@ local function DrawChatWindow()
                     Module.console:Clear()
                     mainBuffer = {}
                 end
-                -- ImGui.Separator()
-                -- if ImGui.Selectable('Zoom##Main' .. windowNum) then
-                --     zoomMain = not zoomMain
-                -- end
-
                 ImGui.EndPopup()
             end
 
             Module.console:Render(ImVec2(0, contentSizeY))
-            -- Module.console.fontSize = Module.Settings.MainFontSize or 16
             --Command Line
             ImGui.Separator()
             local textFlags = bit32.bor(0,
@@ -1388,10 +1345,6 @@ local function DrawChatWindow()
                             end
 
                             ImGui.Separator()
-                            -- if ImGui.Selectable(tNameZ .. '##' .. windowNum) then
-                            --     zoom = not zoom
-                            --     Module.Consoles[channelID].zoom = zoom
-                            -- end
                             if ImGui.Selectable(tNameP .. '##' .. windowNum) then
                                 PopOut = not PopOut
                                 Module.Settings.Channels[channelID].PopOut = PopOut
@@ -1435,9 +1388,6 @@ local function DrawChatWindow()
 
                         ImGui.EndTabItem()
                     end
-                    -- if ImGui.IsItemHovered() then
-                    --     tabToolTip()
-                    -- end
                 end
             end
         end
@@ -1665,38 +1615,12 @@ function Module.AddChannel(editChanID, isNewChannel)
     else
         ImGui.Text('')
     end
-    -- Slider for adjusting zoom level
-    if Module.Consoles[editChanID].console ~= nil then
-        local changed = false
-        -- if ImGui.BeginCombo("Font Size##" .. editChanID, tostring(Module.Consoles[editChanID].console.fontSize)) then
-        --     for k, data in pairs(fontSizes) do
-        --         local isSelected = data == Module.Consoles[editChanID].console.fontSize
-        --         if ImGui.Selectable(tostring(data), isSelected) then
-        --             if Module.Consoles[editChanID].console.fontSize ~= data then
-        --                 -- Module.Consoles[editChanID].console.fontSize = data
-        --                 Module.Settings.Channels[editChanID].FontSize = Module.Consoles[editChanID].console.fontSize
-        --                 Module.tempSettings.Channels[editChanID].FontSize = Module.Consoles[editChanID].console.fontSize
-        --                 changed = true
-        --             end
-        --         end
-        --     end
-        --     ImGui.EndCombo()
-        -- end
-        -- Module.Consoles[editChanID].console.fontSize, changed = ImGui.SliderInt("Font Size", Module.Consoles[editChanID].console.fontSize, 8, 300)
-        -- Module.tempSettings.Channels[editChanID].Scale = Module.Consoles[editChanID].console.fontSize
-        -- Module.Settings.Channels[editChanID].Scale = Module.Consoles[editChanID].console.fontSize
-        if changed then
-            mq.pickle(Module.SettingsFile, Module.Settings)
-        end
-    end
     if ImGui.Button('Add New Event') then
         newEvent = true
     end
     ImGui.SameLine()
     if ImGui.Button('Save Settings') then
-        local date = os.date("%m_%d_%Y_%H_%M")
-        local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded, date)
-        mq.pickle(backup, Module.Settings)
+        Module.BackupSettings()
         Module.tempSettings.Channels[editChanID] = Module.tempSettings.Channels[editChanID] or { Events = {}, Name = "New Channel", enabled = true, }
         Module.tempSettings.Channels[editChanID].Name = Module.tempEventStrings[editChanID].Name or "New Channel"
         Module.tempSettings.Channels[editChanID].enabled = true
@@ -1715,10 +1639,6 @@ function Module.AddChannel(editChanID, isNewChannel)
                     channelEvents[eventId].Filters = {}
                     for filterID, filterData in pairs(Module.tempFilterStrings[editChanID][eventId] or {}) do
                         local tempFString = filterData or 'New'
-                        -- local tmpEnable = Module.tempFilterEnabled[editChanID][eventId][filterID] ~= nil and Module.tempFilterEnabled[editChanID][eventId][filterID] or true
-
-                        --print(filterData.." : "..tempFString)
-                        -- printf("Filter Enabled: %s", Module.tempFilterEnabled[editChanID][eventId][filterID])
                         if tempFString == '' or tempFString == nil then tempFString = 'New' end
                         channelEvents[eventId].Filters[filterID] = {
                             filterString = tempFString,
@@ -1742,10 +1662,7 @@ function Module.AddChannel(editChanID, isNewChannel)
     ImGui.SameLine()
     if ImGui.Button("DELETE Channel##" .. editChanID) then
         -- Delete the event
-        local date = os.date("%m_%d_%Y_%H_%M")
-
-        local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded, date)
-        mq.pickle(backup, Module.Settings)
+        Module.BackupSettings()
         Module.tempSettings.Channels[editChanID] = nil
         Module.tempEventStrings[editChanID] = nil
         Module.tempChanColors[editChanID] = nil
@@ -2079,12 +1996,8 @@ function Module.Config_GUI(open)
             if not Module.Utils.File.Exists(tmp) then
                 mq.cmd("/msgbox 'No File Found!")
             else
+                Module.BackupSettings()
                 -- Load settings from the Lua config file
-                local date = os.date("%m_%d_%Y_%H_%M")
-
-                -- print(date)
-                local backup = string.format('%s/MyChat/Backups/%s/%s_BAK_%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded, date)
-                mq.pickle(backup, Module.Settings)
                 local newSettings = {}
                 local newID = getNextID(Module.tempSettings.Channels)
 
@@ -2134,48 +2047,11 @@ function Module.Config_GUI(open)
             tmpZoom = ImGui.SliderFloat("Gui Font Scale Level##MyBuffs", tmpZoom, 0.5, 2.0)
         end
 
-        if Module.console ~= nil then
-            local changed = false
-            -- if ImGui.BeginCombo("Main Tab Font Size##" .. editChanID, tostring(Module.console.fontSize)) then
-            --     for k, data in pairs(fontSizes) do
-            --         local isSelected = data == Module.console.fontSize
-            --         if ImGui.Selectable(tostring(data), isSelected) then
-            --             if Module.console.fontSize ~= data then
-            --                 Module.console.fontSize = data
-            --                 Module.Settings.MainFontSize = Module.console.fontSize
-
-            --                 changed = true
-            --             end
-            --         end
-            --     end
-            --     ImGui.EndCombo()
-            -- end
-            if changed then
-                writeSettings(Module.SettingsFile, Module.Settings)
-            end
-
-
-            -- Module.console.fontSize = ImGui.SliderInt("Main Tab Font Size", Module.console.fontSize, 8, 300)
-            -- Module.Settings.MainFontSize = Module.console.fontSize
-            -- writeSettings(Module.SettingsFile, Module.Settings)
-        end
-
         if Module.Settings.Scale ~= tmpZoom then
             Module.Settings.Scale = tmpZoom
             Module.tempSettings.Scale = tmpZoom
         end
 
-        -- local tmpRefLink = (doRefresh and Module.Settings.refreshLinkDB >= 5) and Module.Settings.refreshLinkDB or 0
-        -- tmpRefLink = ImGui.InputInt("Refresh Delay##LinkRefresh", tmpRefLink, 5, 5)
-        -- if tmpRefLink < 0 then tmpRefLink = 0 end
-        -- if tmpRefLink ~= Module.Settings.refreshLinkDB then
-        --     -- ChatWin.Settings.refreshLinkDB = tmpRefLink
-        --     Module.tempSettings.refreshLinkDB = tmpRefLink
-        --     doRefresh = tmpRefLink >= 5 or false
-        -- end
-        -- ImGui.SameLine()
-        -- local txtOnOff = doRefresh and 'ON' or 'OFF'
-        -- ImGui.Text(txtOnOff)
         eChan = ImGui.InputText("Main Channel Echo##Echo", eChan, 256)
         if eChan ~= Module.Settings.mainEcho then
             Module.Settings.mainEcho = eChan
@@ -2445,6 +2321,9 @@ function Module.Unload()
 end
 
 local function init()
+    if not Module.Utils.File.Exists(Module.Logtouch) then
+        mq.pickle(Module.Logtouch, { touched = true, })
+    end
     loadSettings()
     BuildEvents()
 

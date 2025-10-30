@@ -645,16 +645,10 @@ local function save_settings()
 	mq.pickle(newConfigFile, Module.Settings)
 end
 
+---comment
+---@return boolean
 local function check_safe_zone()
-	return tSafeZones[Zone.ShortName()]
-end
-
-function Module:UpdateSafeZones()
-	tSafeZones = {}
-	settings.SafeZones = Module:GetSafeZones()
-	for k, v in ipairs(settings.SafeZones) do
-		tSafeZones[v] = true
-	end
+	return settings.SafeZones[Zone.ShortName()] ~= nil
 end
 
 function Module:UpdateIgnoredPlayers()
@@ -1408,7 +1402,9 @@ local function check_for_zone_change()
 		displayTablePlayers = {}
 		numDisplayPlayers = 0
 		if haveSM then importZone = true end
+		return true
 	end
+	return false
 end
 -------- GUI STUFF ------------
 
@@ -1648,7 +1644,7 @@ function Module:AddSpawnToList(name)
 	local sCount = 0
 	local zone = Zone.ShortName()
 	local db = Module:OpenDB()
-	local result = Module:AddSpawnToDB(zone, name, db)
+	local result = Module:AddSpawnToDB(zone, name)
 	if result == false then
 		Module.Utils.PrintOutput('AlertMaster', nil, "\aySpawn alert \"" .. name .. "\" already exists.")
 		return
@@ -2704,7 +2700,7 @@ local function load_binds()
 			Module:AddSpawnToList(val_str)
 		elseif cmd == 'spawndel' and val_str:len() > 0 then
 			local db = Module:OpenDB()
-			Module:DeleteSpawnFromDB(zone, val_str, db)
+			Module:DeleteSpawnFromDB(zone, val_str)
 			Module.TempSettings.NpcList = Module:GetSpawns(Zone.ShortName(), db)
 			if db then db:close() end
 			-- Identify and remove the spawn from the ini
@@ -2943,7 +2939,7 @@ local function setup()
 	radius = arg[1] or 200
 	zradius = arg[2] or 100
 	currZone = mq.TLO.Zone.ID()
-	lastZone = currZone
+	lastZone = mq.TLO.Zone.ID()
 	if mq.TLO.Plugin('mq2eqbc').IsLoaded() then groupCmd = '/bcaa /' end
 	load_settings()
 	load_binds()
@@ -2972,10 +2968,13 @@ local cTime = os.time()
 local firstRun = true
 function Module.MainLoop()
 	-- while true do
+	local needUpdate = false
+	currZone = mq.TLO.Zone.ID()
 	if currZone ~= lastZone then
 		numAlerts = 0
 		RefreshZone()
-		lastZone = currZone
+		lastZone = mq.TLO.Zone.ID()
+		needUpdate = check_for_zone_change()
 	end
 
 	if loadedExeternally then
@@ -2983,11 +2982,11 @@ function Module.MainLoop()
 		if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
 	end
 
-	if not loadedExeternally or os.time() - cTime > delay or firstRun then
+
+	if not loadedExeternally or os.time() - cTime > delay or firstRun or needUpdate then
 		if mq.TLO.Window('CharacterListWnd').Open() then return false end
 		currZone = mq.TLO.Zone.ID()
 		Module.Guild = mq.TLO.Me.Guild() or 'NoGuild'
-		check_for_zone_change()
 		check_for_pcs()
 		check_for_gms()
 		check_for_announce()
@@ -3030,6 +3029,7 @@ function Module.MainLoop()
 		end
 		cTime = os.time()
 		firstRun = false
+		needUpdate = false
 	end
 
 	if playing and playTime > 0 then

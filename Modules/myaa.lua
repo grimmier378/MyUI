@@ -73,7 +73,7 @@ local defaults       = {
 }
 
 Module.Settings      = {}
-
+Module.TempSettings  = {}
 local tableFlags     = bit32.bor(
 	ImGuiTableFlags.ScrollY,
 	ImGuiTableFlags.BordersOuter,
@@ -148,6 +148,7 @@ function Module.UpdateAA(which)
 	TotalMaxAA.all = TotalMaxAA.general + TotalMaxAA.arch + TotalMaxAA.class + TotalMaxAA.special
 	CurSectionAA.all = CurSectionAA.general + CurSectionAA.arch + CurSectionAA.class + CurSectionAA.special
 	lastCheck = os.time() -- Update the last check time
+	Module.TempSettings.LastAvailAA = MySelf.AAPoints() or 0
 end
 
 local function Init()
@@ -157,7 +158,8 @@ local function Init()
 	Module.IsRunning = true
 	Module.Utils.PrintOutput('MyAA', false, "\a-w[\at%s\a-w] \agLoaded\aw!", Module.Name)
 	Module.UpdateAA("all") -- Update the AA lists
-
+	availAA = MySelf.AAPoints() or 0
+	Module.TempSettings.LastAvailAA = MySelf.AAPoints() or 0
 	if not loadedExeternally then
 		mq.imgui.init(Module.Name, Module.RenderGUI)
 		Module.LocalLoop()
@@ -322,6 +324,9 @@ local function DrawAATable(which_Table, label)
 					ListName.Select(rowNum)            -- Select the AA in the AA window
 					selectedAA = data.Name
 					selectedTimeLeft = data.TimeLeftSeconds or -1
+					if ImGui.IsMouseClicked(ImGuiMouseButton.Right) then
+						mq.TLO.AltAbility(data.Name).Spell.Inspect() -- Open the inspect window for the selected AA
+					end
 				end
 				ImGui.TableNextColumn()
 				ImGui.Indent(3)
@@ -508,7 +513,15 @@ function Module.RenderGUI()
 				elseif selectedTimeLeft == -1 then
 					ImGui.Text('Passive')
 				end
-				ImGui.Text(mq.TLO.Window("AAWindow/AAW_Description").Text():gsub("<BR>", "\n"):gsub("%%", " "))
+				if mq.TLO.AltAbility(selectedAA) then
+					-- reading the aa window gives more detail and properly adjusts values
+					ImGui.Text(mq.TLO.Window("AAWindow/AAW_Description").Text():gsub("<BR>", "\n"):gsub("%%", " "))
+					-- ImGui.Text(mq.TLO.AltAbility(selectedAA).Description() or 'unknown')
+					if mq.TLO.AltAbility(selectedAA).Spell then
+						-- get the spell description as well as the AA description incase they differ
+						ImGui.Text(mq.TLO.Spell(mq.TLO.AltAbility(selectedAA).Spell.Name()).Description() or '')
+					end
+				end
 				ImGui.PopTextWrapPos()
 			end
 			ImGui.EndChild()
@@ -539,11 +552,14 @@ function Module.MainLoop()
 	-- 	archAA = Module.GetAALists("arch")
 	-- 	specAA = Module.GetAALists("special")
 	-- end
+
 	if Module.LastCheck == nil then
 		Module.LastCheck = mq.gettime()
 	end
 	if mq.gettime() - Module.LastCheck > 3000 then
-		Module.UpdateAA("all") -- Update the AA lists
+		if (MySelf.AAPoints() or 0) > Module.TempSettings.LastAvailAA then
+			Module.UpdateAA("all") -- Update the AA lists
+		end
 		Module.LastCheck = mq.gettime()
 	end
 	if doTrain then

@@ -139,6 +139,15 @@ local equipSlots                                          = {
 	[21] = 'Powersource',
 	[22] = 'Ammo',
 }
+
+local Sizes                                               = {
+	[0] = "Tiny",
+	[1] = 'Small',
+	[2] = 'Medium',
+	[3] = 'Large',
+	[4] = 'Giant',
+}
+
 local function loadSettings()
 	if utils.File.Exists(configFile) then
 		settings = dofile(configFile)
@@ -881,7 +890,7 @@ local function display_bag_options()
 	ImGui.EndChild()
 end
 
-function get_worn_slots(item)
+function Module.Get_worn_slots(item)
 	local SlotsString = ""
 	local tmp = {}
 	for i = 1, item.WornSlots() do
@@ -1020,21 +1029,24 @@ local function get_item_data(item)
 		EvolvingMaxLevel = item.Evolving.MaxLevel() or 0,
 
 		--descriptions
-		SpellDesc = item.Spell.Description() or "",
-		WornDesc = item.Worn.Spell() and (item.Worn.Spell.Description() or '') or '',
-		Focus1Desc = item.Focus() and (item.Focus.Spell.Description() or '') or '',
-		Focus2Desc = item.Focus2() and (item.Focus2.Spell.Description() or '') or '',
-		ClickyDesc = item.Clicky() and (item.Clicky.Spell.Description() or '') or '',
-
+		SpellDesc = item.Spell and (item.Spell.Description() or '') or '',
+		WornDesc = item.Worn.Spell and (item.Worn.Spell.Description() or '') or '',
+		Focus1Desc = item.Focus and (item.Focus.Spell.Description() or '') or '',
+		Focus2Desc = item.Focus2 and (item.Focus2.Spell.Description() or '') or '',
+		ClickyDesc = item.Clicky and (item.Clicky.Spell.Description() or '') or '',
 		-- links
-		SpellID = item.Spell.ID() or 0,
-		WornID = item.Worn.Spell() and (item.Worn.Spell.ID() or 0) or 0,
-		Focus1ID = item.Focus() and (item.Focus.Spell.ID() or 0) or 0,
-		Focus2ID = item.Focus2() and (item.Focus2.Spell.ID() or 0) or 0,
-		ClickyID = item.Clicky() and (item.Clicky.Spell.ID() or 0) or 0,
+		SpellID = item.Spell and (item.Spell.ID() or 0) or 0,
+		WornID = item.Worn.Spell and (item.Worn.Spell.ID() or 0) or 0,
+		Focus1ID = item.Focus and (item.Focus.Spell.ID() or 0) or 0,
+		Focus2ID = item.Focus2 and (item.Focus2.Spell.ID() or 0) or 0,
+		ClickyID = item.Clicky and (item.Clicky.Spell.ID() or 0) or 0,
 
 		-- slots
-		WornSlots = get_worn_slots(item),
+		WornSlots = Module.Get_worn_slots(item),
+		NumSlots = item.Container() or 0,
+		Size = item.Size() or 0,
+		SizeCapacity = item.SizeCapacity() or 0,
+
 	}
 	return tmpItemData
 end
@@ -1057,21 +1069,21 @@ local function draw_item_tooltip(item)
 	local hasCombatEffects = numCombatEfx and numCombatEfx > 0
 
 	for _, stat in pairs({ 'STR', 'AGI', 'STA', 'INT', 'WIS', 'DEX', 'CHA', 'hStr', 'hSta', 'hAgi', 'hInt', 'hWis', 'hDex', 'hCha', }) do
-		if itemData[stat] and itemData[stat] > 0 then
+		if itemData[stat] and (itemData[stat] > 0 or itemData[stat] < 0) then
 			hasStats = true
 			break
 		end
 	end
 	-- local listResists = { 'MR', 'FR', 'DR', 'PR', 'CR', }
 	for _, resist in pairs({ 'MR', 'FR', 'DR', 'PR', 'CR', 'svCor', 'hMr', 'hFr', 'hCr', 'hPr', 'hDr', 'hCor', }) do
-		if itemData[resist] and itemData[resist] > 0 then
+		if itemData[resist] and (itemData[resist] > 0 or itemData[resist] < 0) then
 			hasResists = true
 			break
 		end
 	end
 	-- local listBase = { 'HP', 'Mana', 'Endurance', }
 	for _, base in pairs({ 'HP', 'Mana', 'Endurance', 'AC', 'HPRegen', 'EnduranceRegen', 'ManaRegen', }) do
-		if itemData[base] and itemData[base] > 0 then
+		if itemData[base] and (itemData[base] > 0 or itemData[base] < 0) then
 			hasBase = true
 			break
 		end
@@ -1144,6 +1156,11 @@ local function draw_item_tooltip(item)
 	ImGui.Text("Type: ")
 	ImGui.SameLine()
 	ImGui.TextColored(Module.Colors.color('teal'), "%s", itemData.Type)
+
+	ImGui.Text("Size: ")
+	ImGui.SameLine()
+	ImGui.TextColored(Module.Colors.color('yellow'), "%s", Sizes[itemData.Size] or 'Unknown')
+
 
 	local needSameLine = false
 	local restrictionString = ''
@@ -1244,6 +1261,21 @@ local function draw_item_tooltip(item)
 		ImGui.Text("Weight: ")
 		ImGui.SameLine()
 		ImGui.TextColored(Module.Colors.color('pink2'), "%s", itemData.Weight)
+
+		if itemData.NumSlots and itemData.NumSlots > 0 then
+			ImGui.TableNextColumn()
+			ImGui.Text("Slots: ")
+			ImGui.SameLine()
+			ImGui.TextColored(Module.Colors.color('yellow'), "%s", itemData.NumSlots)
+
+			-- Size Capacity
+			if itemData.SizeCapacity and itemData.SizeCapacity > 0 then
+				ImGui.TableNextColumn()
+				ImGui.Text("Bag Size:")
+				ImGui.SameLine()
+				ImGui.TextColored(Module.Colors.color('teal'), "%s", Sizes[itemData.SizeCapacity] or 'Unknown')
+			end
+		end
 
 		if itemData.MaxStack > 1 then
 			ImGui.TableNextColumn()

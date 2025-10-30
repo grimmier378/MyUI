@@ -212,61 +212,62 @@ local function DrawStyles()
 	-- end
 
 	ImGui.SeparatorText('Main Sizing')
-	ImGui.BeginTable('##StylesMain', 3, tFlags)
-	ImGui.TableSetupColumn('##min', ImGuiTableColumnFlags.None)
-	ImGui.TableSetupColumn('##max', ImGuiTableColumnFlags.None)
-	ImGui.TableSetupColumn('##name', ImGuiTableColumnFlags.None)
-	ImGui.TableNextRow()
-	ImGui.TableNextColumn()
-	ImGui.SetNextItemWidth(100)
-	style[ImGuiStyleVar.WindowPadding].X = ImGui.InputInt('##WindowPadding_X', style[ImGuiStyleVar.WindowPadding].X, 1, 2)
-	ImGui.TableNextColumn()
-	ImGui.SetNextItemWidth(100)
-	style[ImGuiStyleVar.WindowPadding].Y = ImGui.InputInt(' ##WindowPadding_Y', style[ImGuiStyleVar.WindowPadding].Y, 1, 2)
-	ImGui.TableNextColumn()
-	ImGui.Text(style[ImGuiStyleVar.WindowPadding].PropertyName)
+	if ImGui.BeginTable('##StylesMain', 3, tFlags) then
+		ImGui.TableSetupColumn('##min', ImGuiTableColumnFlags.None)
+		ImGui.TableSetupColumn('##max', ImGuiTableColumnFlags.None)
+		ImGui.TableSetupColumn('##name', ImGuiTableColumnFlags.None)
+		ImGui.TableNextRow()
+		ImGui.TableNextColumn()
+		ImGui.SetNextItemWidth(100)
+		style[ImGuiStyleVar.WindowPadding].X = ImGui.InputInt('##WindowPadding_X', style[ImGuiStyleVar.WindowPadding].X, 1, 2)
+		ImGui.TableNextColumn()
+		ImGui.SetNextItemWidth(100)
+		style[ImGuiStyleVar.WindowPadding].Y = ImGui.InputInt(' ##WindowPadding_Y', style[ImGuiStyleVar.WindowPadding].Y, 1, 2)
+		ImGui.TableNextColumn()
+		ImGui.Text(style[ImGuiStyleVar.WindowPadding].PropertyName)
 
-	ImGui.TableNextRow()
-	ImGui.TableNextColumn()
-	ImGui.SetNextItemWidth(100)
-	style[ImGuiStyleVar.CellPadding].X = ImGui.InputInt('##CellPadding_X', style[ImGuiStyleVar.CellPadding].X, 1, 2)
-	ImGui.TableNextColumn()
-	ImGui.SetNextItemWidth(100)
-	style[ImGuiStyleVar.CellPadding].Y = ImGui.InputInt(' ##CellPadding_Y', style[ImGuiStyleVar.CellPadding].Y, 1, 2)
-	ImGui.TableNextColumn()
-	ImGui.Text(style[ImGuiStyleVar.CellPadding].PropertyName)
+		ImGui.TableNextRow()
+		ImGui.TableNextColumn()
+		ImGui.SetNextItemWidth(100)
+		style[ImGuiStyleVar.CellPadding].X = ImGui.InputInt('##CellPadding_X', style[ImGuiStyleVar.CellPadding].X, 1, 2)
+		ImGui.TableNextColumn()
+		ImGui.SetNextItemWidth(100)
+		style[ImGuiStyleVar.CellPadding].Y = ImGui.InputInt(' ##CellPadding_Y', style[ImGuiStyleVar.CellPadding].Y, 1, 2)
+		ImGui.TableNextColumn()
+		ImGui.Text(style[ImGuiStyleVar.CellPadding].PropertyName)
 
-	ImGui.TableNextRow()
-	ImGui.TableNextColumn()
-	ImGui.SetNextItemWidth(100)
-	style[ImGuiStyleVar.FramePadding].X = ImGui.InputInt('##FramePadding_X', style[ImGuiStyleVar.FramePadding].X, 1, 2)
-	ImGui.TableNextColumn()
-	ImGui.SetNextItemWidth(100)
-	style[ImGuiStyleVar.FramePadding].Y = ImGui.InputInt(' ##FramePadding_Y', style[ImGuiStyleVar.FramePadding].Y, 1, 2)
-	ImGui.TableNextColumn()
-	ImGui.Text(style[ImGuiStyleVar.FramePadding].PropertyName)
+		ImGui.TableNextRow()
+		ImGui.TableNextColumn()
+		ImGui.SetNextItemWidth(100)
+		style[ImGuiStyleVar.FramePadding].X = ImGui.InputInt('##FramePadding_X', style[ImGuiStyleVar.FramePadding].X, 1, 2)
+		ImGui.TableNextColumn()
+		ImGui.SetNextItemWidth(100)
+		style[ImGuiStyleVar.FramePadding].Y = ImGui.InputInt(' ##FramePadding_Y', style[ImGuiStyleVar.FramePadding].Y, 1, 2)
+		ImGui.TableNextColumn()
+		ImGui.Text(style[ImGuiStyleVar.FramePadding].PropertyName)
 
-	ImGui.TableNextRow()
-	ImGui.TableNextColumn()
-	ImGui.SetNextItemWidth(100)
-	style[ImGuiStyleVar.ItemSpacing].X = ImGui.InputInt('##ItemSpacing_X', style[ImGuiStyleVar.ItemSpacing].X, 1, 2)
-	ImGui.TableNextColumn()
-	ImGui.SetNextItemWidth(100)
-	style[ImGuiStyleVar.ItemSpacing].Y = ImGui.InputInt(' ##ItemSpacing_Y', style[ImGuiStyleVar.ItemSpacing].Y, 1, 2)
-	ImGui.TableNextColumn()
-	ImGui.Text(style[ImGuiStyleVar.ItemSpacing].PropertyName)
+		ImGui.TableNextRow()
+		ImGui.TableNextColumn()
+		ImGui.SetNextItemWidth(100)
+		style[ImGuiStyleVar.ItemSpacing].X = ImGui.InputInt('##ItemSpacing_X', style[ImGuiStyleVar.ItemSpacing].X, 1, 2)
+		ImGui.TableNextColumn()
+		ImGui.SetNextItemWidth(100)
+		style[ImGuiStyleVar.ItemSpacing].Y = ImGui.InputInt(' ##ItemSpacing_Y', style[ImGuiStyleVar.ItemSpacing].Y, 1, 2)
+		ImGui.TableNextColumn()
+		ImGui.Text(style[ImGuiStyleVar.ItemSpacing].PropertyName)
 
-	ImGui.TableNextRow()
-	ImGui.TableNextColumn()
-	ImGui.SetNextItemWidth(100)
-	style[ImGuiStyleVar.ItemInnerSpacing].X = ImGui.InputInt('##ItemInnerSpacing_X', style[ImGuiStyleVar.ItemInnerSpacing].X, 1, 2)
-	ImGui.TableNextColumn()
-	ImGui.SetNextItemWidth(100)
-	style[ImGuiStyleVar.ItemInnerSpacing].Y = ImGui.InputInt(' ##ItemInnerSpacing_Y', style[ImGuiStyleVar.ItemInnerSpacing].Y, 1, 2)
-	ImGui.TableNextColumn()
-	ImGui.Text(style[ImGuiStyleVar.ItemInnerSpacing].PropertyName)
+		ImGui.TableNextRow()
+		ImGui.TableNextColumn()
+		ImGui.SetNextItemWidth(100)
+		style[ImGuiStyleVar.ItemInnerSpacing].X = ImGui.InputInt('##ItemInnerSpacing_X', style[ImGuiStyleVar.ItemInnerSpacing].X, 1, 2)
+		ImGui.TableNextColumn()
+		ImGui.SetNextItemWidth(100)
+		style[ImGuiStyleVar.ItemInnerSpacing].Y = ImGui.InputInt(' ##ItemInnerSpacing_Y', style[ImGuiStyleVar.ItemInnerSpacing].Y, 1, 2)
+		ImGui.TableNextColumn()
+		ImGui.Text(style[ImGuiStyleVar.ItemInnerSpacing].PropertyName)
 
-	ImGui.EndTable()
+		ImGui.EndTable()
+	end
 
 	style[ImGuiStyleVar.IndentSpacing].Size = ImGui.SliderInt('IndentSpacing##', style[ImGuiStyleVar.IndentSpacing].Size, 0, 30)
 	style[ImGuiStyleVar.ScrollbarSize].Size = ImGui.SliderInt('ScrollbarSize##', style[ImGuiStyleVar.ScrollbarSize].Size, 0, 20)
@@ -284,6 +285,7 @@ end
 
 -- GUI
 local cFlag = false
+local sFlag = false
 local sorteedKeys = {}
 local function SortColors()
 	local keys = {}
@@ -307,6 +309,7 @@ function Module.RenderGUI()
 		if not open then
 			show = false
 			Module.ShowGui = false
+			Module.IsRunning = false
 		end
 		if show then
 			tempSettings.Theme[loadedID] = theme.Theme[loadedID]
@@ -402,21 +405,18 @@ function Module.RenderGUI()
 				ImGui.EndCombo()
 			end
 			ImGui.Separator()
-
 			local cWidth, xHeight = ImGui.GetContentRegionAvail()
-			ImGui.BeginChild("ThemeZ##", cWidth - 5, xHeight - 15)
-			local collapsed, _ = ImGui.CollapsingHeader("Colors##")
+			ImGui.BeginChild("ThemeZ##", cWidth - 5, xHeight - 20)
+			cWidth, xHeight = ImGui.GetContentRegionAvail()
+			local headerHeight = xHeight - 60 >= 15 and xHeight - 60 or 15
 
-			if collapsed then
+			if ImGui.CollapsingHeader("Colors##") then
+				cFlag = true
 				if ImGui.Button('Defaults##Color') then
 					tempSettings.Theme[loadedID]['Color'] = defaults.Theme[1].Color
 				end
-				cWidth, xHeight = ImGui.GetContentRegionAvail()
-				if cFlag then
-					ImGui.BeginChild('Colors', cWidth, xHeight * 0.5, ImGuiChildFlags.Border)
-				else
-					ImGui.BeginChild('Colors', cWidth, xHeight, ImGuiChildFlags.Border)
-				end
+				ImGui.BeginChild('Colors', cWidth, (sFlag and headerHeight * 0.5 or headerHeight) - 20, ImGuiChildFlags.Border)
+
 				for i = 1, #sorteedKeys do
 					local pID = sorteedKeys[i].id
 					local pData = tempSettings.Theme[loadedID]['Color'][pID]
@@ -429,23 +429,21 @@ function Module.RenderGUI()
 				end
 
 				ImGui.EndChild()
+			else
+				cFlag = false
 			end
 			cWidth, xHeight = ImGui.GetContentRegionAvail()
-			local collapsed2, _ = ImGui.CollapsingHeader("Styles##")
-			if collapsed2 then
-				cFlag = true
-				if not collapsed then
-					ImGui.BeginChild('Styles', cWidth, xHeight, ImGuiChildFlags.Border)
-				else
-					ImGui.BeginChild('Styles', cWidth, xHeight * 0.5, ImGuiChildFlags.Border)
-				end
+
+			if ImGui.CollapsingHeader("Styles##") then
+				sFlag = true
+				ImGui.BeginChild('Styles', cWidth, (cFlag and headerHeight * 0.5 or headerHeight) - 20, ImGuiChildFlags.Border)
 				if ImGui.Button('Defaults##Style') then
 					tempSettings.Theme[loadedID]['Style'] = defaults.Theme[1].Style
 				end
 				DrawStyles()
 				ImGui.EndChild()
 			else
-				cFlag = false
+				sFlag = false
 			end
 
 			ImGui.EndChild()

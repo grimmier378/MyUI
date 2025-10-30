@@ -172,7 +172,7 @@ local function GenerateContent(who, sub, what)
         Pts         = PtsAA,
         PtsTotal    = PtsTotal,
         PtsSpent    = PtsSpent,
-        Check       = checkIn,
+        Check       = os.time(),
         State       = cState,
         PctAir      = myself.PctAirSupply(),
     }
@@ -898,7 +898,7 @@ function Module.MainLoop()
         if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
     local elapsedTime = mq.gettime() - clockTimer
-    if elapsedTime >= 500 then
+    if elapsedTime >= 2000 then
         currZone = mq.TLO.Zone.ID()
         if currZone ~= lastZone then
             lastZone = currZone

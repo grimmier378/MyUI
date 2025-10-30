@@ -281,6 +281,7 @@ Module.Settings[CharCommands]                                                   
 Module.DBPath                                                                                                                          = string.format(
 	"%s/MyUI/AlertMaster/%s/AlertMasterSpawns.db", mq.configDir, Module.Server)
 Module.WatchedSpawns                                                                                                                   = {}
+Module.ZoneList                                                                                                                        = require('lib.zone-list')
 
 ------- Sounds ----------
 local ffi                                                                                                                              = require("ffi")
@@ -424,7 +425,6 @@ function Module:GetSpawns(zoneShort, db)
 	local stmt, err = db:prepare(qry)
 	if not stmt then
 		Module.Utils.PrintOutput('MyUI', nil, "Failed to prepare SQL statement: " .. err)
-		db:close()
 		return {}
 	end
 	for row in stmt:nrows() do
@@ -447,7 +447,6 @@ function Module:GetIgnoredPlayers(db)
 	local stmt, err = db:prepare("SELECT pc_name FROM pc_ignore")
 	if not stmt then
 		Module.Utils.PrintOutput('MyUI', nil, "Failed to prepare SQL statement: " .. err)
-		db:close()
 		return {}
 	end
 
@@ -472,7 +471,6 @@ function Module:GetSafeZones(db)
 
 	if not stmt then
 		Module.Utils.PrintOutput('MyUI', nil, "Failed to prepare SQL statement: " .. err)
-		db:close()
 		return {}
 	end
 
@@ -487,7 +485,7 @@ function Module:GetSafeZones(db)
 end
 
 function Module:AddSafeZone(zoneShort)
-	local db = Module:OpenDB()
+	local db = self:OpenDB()
 	if not db then
 		Module.Utils.PrintOutput('MyUI', nil, "Failed to open the AlertMaster Database")
 		return false
@@ -522,7 +520,7 @@ function Module:AddSafeZone(zoneShort)
 end
 
 function Module:AddIgnorePCtoDB(pcName)
-	local db = Module:OpenDB()
+	local db = self:OpenDB()
 	if not db then
 		Module.Utils.PrintOutput('MyUI', nil, "Failed to open the AlertMaster Database")
 		return false
@@ -547,7 +545,7 @@ function Module:AddIgnorePCtoDB(pcName)
 end
 
 function Module:RemoveSafeZone(zoneShort)
-	local db = Module:OpenDB()
+	local db = self:OpenDB()
 	if not db then
 		Module.Utils.PrintOutput('MyUI', nil, "Failed to open the AlertMaster Database")
 		return false
@@ -562,7 +560,7 @@ function Module:RemoveSafeZone(zoneShort)
 end
 
 function Module:RemoveIgnoredPC(pcName)
-	local db = Module:OpenDB()
+	local db = self:OpenDB()
 	if not db then
 		Module.Utils.PrintOutput('MyUI', nil, "Failed to open the AlertMaster Database")
 		return false
@@ -577,7 +575,7 @@ function Module:RemoveIgnoredPC(pcName)
 end
 
 function Module:AddSpawnToDB(zoneShort, spawnName)
-	local db = Module:OpenDB()
+	local db = self:OpenDB()
 	if not db then
 		Module.Utils.PrintOutput('MyUI', nil, "Failed to open the AlertMaster Database")
 		return false
@@ -605,7 +603,7 @@ function Module:AddSpawnToDB(zoneShort, spawnName)
 end
 
 function Module:DeleteSpawnFromDB(zoneShort, spawnName)
-	local db = Module:OpenDB()
+	local db = self:OpenDB()
 	if not db then
 		Module.Utils.PrintOutput('MyUI', nil, "Failed to open the AlertMaster Database")
 		return false
@@ -1276,19 +1274,24 @@ local function check_for_spawns()
 			local tmpSpawnMaster = {}
 
 			if not importedZones[Zone.ShortName()] or forceImport then
+				local zoneShort = Zone.ShortName()
 				-- Check for Long Name
 				local tmpFixName = Zone.Name():gsub("the ", ""):lower()
-				if spawnsSpawnMaster[Zone.Name():lower()] ~= nil or spawnsSpawnMaster[tmpFixName] ~= nil then
-					tmpSpawnMaster = spawnsSpawnMaster[Zone.Name():lower()] ~= nil and spawnsSpawnMaster[Zone.Name():lower()] or spawnsSpawnMaster[tmpFixName]
-					for k, v in pairs(tmpSpawnMaster) do
-						if import_spawnmaster(v) then
-							counter = counter + 1
-						end
+				if spawnsSpawnMaster[Zone.Name():lower()] ~= nil then
+					tmpSpawnMaster = spawnsSpawnMaster[Zone.Name():lower()]
+				elseif spawnsSpawnMaster[Module.ZoneList[zoneShort]] ~= nil then
+					tmpSpawnMaster = spawnsSpawnMaster[Module.ZoneList[zoneShort]]
+				elseif spawnsSpawnMaster[tmpFixName] ~= nil then
+					tmpSpawnMaster = spawnsSpawnMaster[tmpFixName]
+				end
+				for k, v in pairs(tmpSpawnMaster) do
+					if import_spawnmaster(v) then
+						counter = counter + 1
 					end
 				end
 				-- Check for Short Name
-				if spawnsSpawnMaster[Zone.ShortName()] ~= nil then
-					tmpSpawnMaster = spawnsSpawnMaster[Zone.ShortName()]
+				if spawnsSpawnMaster[zoneShort] ~= nil then
+					tmpSpawnMaster = spawnsSpawnMaster[zoneShort]
 					for k, v in pairs(tmpSpawnMaster) do
 						if import_spawnmaster(v) then
 							counter = counter + 1

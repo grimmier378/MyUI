@@ -34,8 +34,10 @@ local delayTime = 1
 local currZone, lastZone
 local winFlags = bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoFocusOnAppearing)
 local locked, showAdv, forcedOpen, refreshStats = false, false, false, false
+local desc = ''
+
 --Helpers
-local function checkAdv(draw)
+function Module:CheckAdv(draw)
 	-- check for active adventure timers.Either time to enter dungeon or time to complete.
 	if AdvWIN.Child('AdvRqst_EnterTimeLeftLabel').Text() ~= '' then
 		adv = true
@@ -61,7 +63,7 @@ local function checkAdv(draw)
 	return adv
 end
 
-local function checkExp()
+function Module:CheckExp()
 	local checkText = ExpWIN.Child('DZ_CurrentDZValue').Text() or ''
 	if checkText ~= '' then
 		exp = true
@@ -71,15 +73,17 @@ local function checkExp()
 		return 'No Expedition Started'
 	end
 end
-local desc = ''
+
 --GUI
 function Module.RenderGUI()
 	if currZone ~= lastZone then return end
 	if guiOpen or forcedOpen then
 		if locked then
-			winFlags = bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoMove)
+			winFlags = bit32.bor(ImGuiWindowFlags.NoCollapse,
+				ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoMove)
 		else
-			winFlags = bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.AlwaysAutoResize)
+			winFlags = bit32.bor(ImGuiWindowFlags.NoCollapse,
+				ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.AlwaysAutoResize)
 		end
 		local open, show = ImGui.Begin("SAST##" .. mq.TLO.Me.DisplayName(), true, winFlags)
 		if not open then show = false end
@@ -139,7 +143,7 @@ function Module.RenderGUI()
 					end
 				end
 				ImGui.Separator()
-				checkAdv(true)
+				Module:CheckAdv(true)
 				ImGui.PopStyleColor(2)
 			end
 			if exp and adv then ImGui.Separator() end
@@ -179,7 +183,7 @@ function Module.RenderGUI()
 					end
 				end
 				ImGui.Separator()
-				ImGui.Text(checkExp())
+				ImGui.Text(Module:CheckExp())
 				ImGui.PopStyleColor(2)
 			end
 			if showAdv then
@@ -217,27 +221,6 @@ function Module.RenderGUI()
 						ImGui.TableNextColumn()
 						ImGui.TextColored(ImVec4(0.7, 0.75, 0, 1), points)
 					end
-					-- if not needRefresh then
-					-- 	local totalSuc = mq.TLO.Window("AdventureStatsWnd/AdvStats_ThemeList").List(7, 3)() or 'Refresh Me'
-					-- 	local totalFail = mq.TLO.Window("AdventureStatsWnd/AdvStats_ThemeList").List(7, 4)() or 'Refresh Me'
-					-- 	local totalPoints = mq.TLO.Window("AdventureStatsWnd/AdvStats_ThemeList").List(7, 7)() or 'Refresh Me'
-					-- 	ImGui.TableNextColumn()
-					-- 	ImGui.Separator()
-					-- 	ImGui.TableNextColumn()
-					-- 	ImGui.Separator()
-					-- 	ImGui.TableNextColumn()
-					-- 	ImGui.Separator()
-					-- 	ImGui.TableNextColumn()
-					-- 	ImGui.Separator()
-					-- 	ImGui.TableNextColumn()
-					-- 	ImGui.Text("Totals:")
-					-- 	ImGui.TableNextColumn()
-					-- 	ImGui.Text(totalSuc)
-					-- 	ImGui.TableNextColumn()
-					-- 	ImGui.Text(totalFail)
-					-- 	ImGui.TableNextColumn()
-					-- 	ImGui.Text(totalPoints)
-					-- end
 					ImGui.EndTable()
 				end
 				ImGui.SetCursorPosX((ImGui.GetWindowWidth() - ImGui.CalcTextSize('Points Available: ' .. ptsAvail) - 10) * 0.5)
@@ -273,7 +256,7 @@ function Module.RenderGUI()
 	end
 end
 
-local function doBind(...)
+function Module.CmdHandler(...)
 	local args = { ..., }
 	if args[1] == 'stats' then
 		forcedOpen = not forcedOpen
@@ -313,7 +296,8 @@ local function doBind(...)
 end
 
 local arguments = { ..., }
-local function processArgs(arg)
+
+function Module:ProcessArgs(arg)
 	if #arg == 0 then
 		doDelay = true
 		mode = 'Solo'
@@ -331,56 +315,56 @@ local function processArgs(arg)
 					delayTime = tonumber(arg[3])
 					delayTime = delayTime
 				else
-					Module.Utils.PrintOutput('MyUI', nil, 'Invalid Delay Time')
+					self.Utils.PrintOutput('MyUI', nil, 'Invalid Delay Time')
 				end
 			else
-				Module.Utils.PrintOutput('MyUI', nil, 'Invalid Command')
+				self.Utils.PrintOutput('MyUI', nil, 'Invalid Command')
 			end
 		end
 	end
-	Module.Utils.PrintOutput('MyUI', nil, 'Simple Adventure Status Tracking')
-	Module.Utils.PrintOutput('MyUI', nil, 'Usage: /lua run sast [mode]')
-	Module.Utils.PrintOutput('MyUI', nil, 'Usage: /lua run sast [mode] delay [time] to add a delay to closing the window.')
-	Module.Utils.PrintOutput('MyUI', nil, 'Modes: solo, dannet, eqbc')
+	self.Utils.PrintOutput('MyUI', nil, 'Simple Adventure Status Tracking')
+	self.Utils.PrintOutput('MyUI', nil, 'Usage: /lua run sast [mode]')
+	self.Utils.PrintOutput('MyUI', nil, 'Usage: /lua run sast [mode] delay [time] to add a delay to closing the window.')
+	self.Utils.PrintOutput('MyUI', nil, 'Modes: solo, dannet, eqbc')
 end
 
 function Module.Unload()
 	mq.unbind("/sast")
 end
 
-local function startup()
-	processArgs(arguments)
+function Module:Init()
+	self:ProcessArgs(arguments)
 	--check for MQ2EQBC plugin
 	if mode == 'EQBC' then
 		if not mq.TLO.Plugin('mq2eqbc').IsLoaded() then
-			Module.Utils.PrintOutput('MyUI', nil, 'EQBC Not Loaded... Loading EQBC...')
+			self.Utils.PrintOutput('MyUI', nil, 'EQBC Not Loaded... Loading EQBC...')
 			mq.cmd('/plugin eqbc')
 		end
 		groupCmd = '/bcaa /'
 	elseif mode == 'DanNet' then
 		if not mq.TLO.Plugin('mq2dannet').IsLoaded() then
-			Module.Utils.PrintOutput('MyUI', nil, 'DanNet Not Loaded... Loading DanNet...')
+			self.Utils.PrintOutput('MyUI', nil, 'DanNet Not Loaded... Loading DanNet...')
 			mq.cmd('/plugin dannet')
 		end
 		groupCmd = '/dgae '
 	end
-	mq.bind("/sast", doBind)
+	mq.bind("/sast", self.CmdHandler)
 	local dTime = delayTime ~= nil and delayTime or 'None'
-	Module.Utils.PrintOutput('MyUI', nil, 'Starting SAST \aoMode: \at%s \aodoDelay: \at%s \aoDelayTime: \at%ss', mode, doDelay, dTime)
-	Module.Utils.PrintOutput('MyUI', nil, '\agSimple Adventure Status Tracking\ax\ay Loaded...\ax')
-	Module.Utils.PrintOutput('MyUI', nil, 'Use: \ay/sast stats\ax to toggle Adventure Stats')
-	Module.Utils.PrintOutput('MyUI', nil, 'Use: \ay/sast adv\ax to toggle Adventure Window')
-	Module.Utils.PrintOutput('MyUI', nil, 'Use: \ay/sast exped\ax to toggle Expedition Window')
+	self.Utils.PrintOutput('MyUI', nil, 'Starting SAST \aoMode: \at%s \aodoDelay: \at%s \aoDelayTime: \at%ss', mode, doDelay, dTime)
+	self.Utils.PrintOutput('MyUI', nil, '\agSimple Adventure Status Tracking\ax\ay Loaded...\ax')
+	self.Utils.PrintOutput('MyUI', nil, 'Use: \ay/sast stats\ax to toggle Adventure Stats')
+	self.Utils.PrintOutput('MyUI', nil, 'Use: \ay/sast adv\ax to toggle Adventure Window')
+	self.Utils.PrintOutput('MyUI', nil, 'Use: \ay/sast exped\ax to toggle Expedition Window')
 	currZone = mq.TLO.Zone.ID()
 	lastZone = currZone
-	Module.IsRunning = true
+	self.IsRunning = true
 	if not loadedExeternally then
-		mq.imgui.init('Adventure Status', Module.RenderGUI)
-		Module.LocalLoop()
+		mq.imgui.init('Adventure Status', self.RenderGUI)
+		self:LocalLoop()
 	end
 end
 
-local function CloseWindow(win)
+function Module:CloseWindow(win)
 	if win == 'adv' then
 		AdvWIN.DoClose()
 	elseif win == 'exp' then
@@ -424,8 +408,8 @@ function Module.MainLoop()
 	end
 	local curTime = os.time()
 	if mq.gettime() - clockTimer > 1000 then
-		local advActive = checkAdv()
-		local expActive = checkExp() ~= 'No Expedition Started'
+		local advActive = Module:CheckAdv()
+		local expActive = Module:CheckExp() ~= 'No Expedition Started'
 		if advActive or expActive then
 			guiOpen = true
 			-- if ingame window is open and we didn't set the flag close it on all characters. we most likely zoned or just accepted the quest.
@@ -433,23 +417,23 @@ function Module.MainLoop()
 			if not eqWinAdvOpen and AdvWIN.Open() and advActive then
 				if doDelay then
 					if curTime - delTimerAdv >= delayTime then
-						CloseWindow('adv')
+						Module:CloseWindow('adv')
 
 						delTimerAdv = os.time()
 					end
 				else
-					CloseWindow('adv')
+					Module:CloseWindow('adv')
 				end
 			end
 			if not eqWinExpOpen and ExpWIN.Open() and expActive then
 				if doDelay then
 					if curTime - delTimerExp >= delayTime then
-						CloseWindow('exp')
+						Module:CloseWindow('exp')
 
 						delTimerExp = os.time()
 					end
 				else
-					CloseWindow('exp')
+					Module:CloseWindow('exp')
 				end
 			end
 		else
@@ -459,9 +443,9 @@ function Module.MainLoop()
 	end
 end
 
-function Module.LocalLoop()
-	while Module.IsRunning do
-		Module.MainLoop()
+function Module:LocalLoop()
+	while self.IsRunning do
+		self.MainLoop()
 		mq.delay(1)
 	end
 end
@@ -471,5 +455,5 @@ if mq.TLO.EverQuest.GameState() ~= "INGAME" then
 	mq.exit()
 end
 
-startup()
+Module:Init()
 return Module

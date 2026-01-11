@@ -7,6 +7,8 @@ Module.ActorMailBox     = 'aa_party'
 Module.IsRunning        = false
 Module.Name             = 'AAParty'
 Module.DisplayName      = 'AA Party'
+Module.TempSettings     = {}
+Module.Settings         = {}
 
 local loadedExeternally = MyUI_ScriptName ~= nil and true or false
 if not loadedExeternally then
@@ -30,13 +32,11 @@ else
     Module.Colors      = MyUI_Colors
     Module.Server      = MyUI_Server
 end
-local Utils                                                             = Module.Utils
-local ToggleFlags                                                       = bit32.bor(Utils.ImGuiToggleFlags.StarKnob,
-    Utils.ImGuiToggleFlags.PulseOnHover,
-    Utils.ImGuiToggleFlags.RightLabel)
+local ToggleFlags                                                       = bit32.bor(Module.Utils.ImGuiToggleFlags.StarKnob,
+    Module.Utils.ImGuiToggleFlags.PulseOnHover,
+    Module.Utils.ImGuiToggleFlags.RightLabel)
 local myself                                                            = mq.TLO.Me
 local MyGroupLeader                                                     = mq.TLO.Group.Leader() or "NoGroup"
-local themeID                                                           = 1
 local expand, compact                                                   = {}, {}
 local configFileOld                                                     = mq.configDir .. '/myui/AA_Party_Configs.lua'
 local configFile                                                        = string.format('%s/myui/AAParty/%s/%s.lua', mq.configDir, Module.Server, Module.CharLoaded)
@@ -50,8 +50,6 @@ local lastAirValue                                                      = 100
 local PctAA, SettingAA, PtsAA, PtsSpent, PtsTotal, PtsAALast, LastState = 0, '0', 0, 0, 0, 0, ""
 local firstRun                                                          = true
 local hasThemeZ                                                         = Module.Utils.File.Exists(themezDir)
-local settings                                                          = {}
-local TempSettings                                                      = {}
 local groupData                                                         = {}
 local mailBox                                                           = {}
 local aaActor                                                           = nil
@@ -73,56 +71,56 @@ local defaults                                                          = {
     ShowLeader = false,
 }
 
-local function loadTheme()
-    if Module.Utils.File.Exists(Module.ThemeFile) then
-        Module.Theme = dofile(Module.ThemeFile)
+function Module:LoadTheme()
+    if self.Utils.File.Exists(self.ThemeFile) then
+        self.Theme = dofile(self.ThemeFile)
     else
-        Module.Theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
+        self.Theme = require('defaults.themes') -- your local themes file incase the user doesn't have one in config folder
     end
-    TempSettings.themeName = settings[Module.DisplayName].LoadTheme or 'Default'
+    self.TempSettings.themeName = self.Settings[self.DisplayName].LoadTheme or 'Default'
 end
 
-local function loadSettings()
+function Module:LoadSettings()
     -- Check if the dialog data file exists
     local newSetting = false
-    if not Module.Utils.File.Exists(configFile) then
-        if Module.Utils.File.Exists(configFileOld) then
-            settings = dofile(configFileOld)
-            mq.pickle(configFile, settings)
+    if not self.Utils.File.Exists(configFile) then
+        if self.Utils.File.Exists(configFileOld) then
+            self.Settings = dofile(configFileOld)
+            mq.pickle(configFile, self.Settings)
         else
-            settings[Module.DisplayName] = defaults
-            mq.pickle(configFile, settings)
+            self.Settings[self.DisplayName] = defaults
+            mq.pickle(configFile, self.Settings)
         end
     else
         -- Load settings from the Lua config file
-        settings = dofile(configFile)
+        self.Settings = dofile(configFile)
     end
-    if settings[Module.DisplayName] == nil then
-        settings[Module.DisplayName] = {}
-        settings[Module.DisplayName] = defaults
+    if self.Settings[self.DisplayName] == nil then
+        self.Settings[self.DisplayName] = {}
+        self.Settings[self.DisplayName] = defaults
         newSetting = true
     end
 
-    newSetting = Module.Utils.CheckDefaultSettings(defaults, settings[Module.DisplayName])
-    newSetting = Module.Utils.CheckRemovedSettings(defaults, settings[Module.DisplayName]) or newSetting
+    newSetting = self.Utils.CheckDefaultSettings(defaults, self.Settings[self.DisplayName])
+    newSetting = self.Utils.CheckRemovedSettings(defaults, self.Settings[self.DisplayName]) or newSetting
 
     if not loadedExeternally then
-        loadTheme()
+        self:LoadTheme()
     end
 
     -- Set the settings to the variables
-    TempSettings.alphaSort   = settings[Module.DisplayName].AlphaSort
-    TempSettings.aSize       = settings[Module.DisplayName].AutoSize
-    TempSettings.scale       = settings[Module.DisplayName].Scale
-    TempSettings.showTooltip = settings[Module.DisplayName].ShowTooltip
-    TempSettings.themeName   = settings[Module.DisplayName].LoadTheme
-    TempSettings.MyGroupOnly = settings[Module.DisplayName].MyGroupOnly
-    TempSettings.LockWindow  = settings[Module.DisplayName].LockWindow
-    TempSettings.ShowLeader  = settings[Module.DisplayName].ShowLeader
-    if newSetting then mq.pickle(configFile, settings) end
+    self.TempSettings.alphaSort   = self.Settings[self.DisplayName].AlphaSort
+    self.TempSettings.aSize       = self.Settings[self.DisplayName].AutoSize
+    self.TempSettings.scale       = self.Settings[self.DisplayName].Scale
+    self.TempSettings.showTooltip = self.Settings[self.DisplayName].ShowTooltip
+    self.TempSettings.themeName   = self.Settings[self.DisplayName].LoadTheme
+    self.TempSettings.MyGroupOnly = self.Settings[self.DisplayName].MyGroupOnly
+    self.TempSettings.LockWindow  = self.Settings[self.DisplayName].LockWindow
+    self.TempSettings.ShowLeader  = self.Settings[self.DisplayName].ShowLeader
+    if newSetting then mq.pickle(configFile, self.Settings) end
 end
 
-local function CheckIn()
+function Module:CheckIn()
     local now = os.time()
     if now - checkIn >= 270 or firstRun then
         return true
@@ -130,7 +128,7 @@ local function CheckIn()
     return false
 end
 
-local function CheckStale()
+function Module:CheckStale()
     local now = os.time()
     local found = false
     for i = 1, #groupData do
@@ -146,10 +144,10 @@ local function CheckStale()
             end
         end
     end
-    if found then CheckStale() end
+    if found then self:CheckStale() end
 end
 
-local function GenerateContent(who, sub, what)
+function Module:GenerateContent(who, sub, what)
     local doWhat = what or nil
     local doWho = who or nil
     local Subject = sub or 'Update'
@@ -178,8 +176,8 @@ local function GenerateContent(who, sub, what)
     }
 end
 
-local function sortedBoxes(boxes)
-    if TempSettings.alphaSort then
+function Module:SortBoxes(boxes)
+    if self.TempSettings.alphaSort then
         table.sort(boxes, function(a, b)
             if a == nil or b == nil then return false end
             if a.GroupLeader == b.GroupLeader then return a.Name < b.Name end
@@ -195,8 +193,8 @@ local function sortedBoxes(boxes)
 end
 
 --create mailbox for actors to send messages to
-local function MessageHandler()
-    aaActor = Module.Actor.register(Module.ActorMailBox, function(message)
+function Module:MessageHandler()
+    aaActor = self.Actor.register(self.ActorMailBox, function(message)
         local MemberEntry = message()
         local subject     = MemberEntry.Subject or 'Update'
         local aaXP        = MemberEntry.PctExpAA or 0
@@ -214,7 +212,14 @@ local function MessageHandler()
         local groupLeader = MemberEntry.GroupLeader or 'N/A'
         local found       = false
         if MailBoxShow then
-            table.insert(mailBox, { Name = who, Subject = subject, Check = check, DoWho = dowho, DoWhat = dowhat, When = os.date("%H:%M:%S"), })
+            table.insert(mailBox, {
+                Name = who,
+                Subject = subject,
+                Check = check,
+                DoWho = dowho,
+                DoWhat = dowhat,
+                When = os.date("%H:%M:%S"),
+            })
             table.sort(mailBox, function(a, b)
                 if a.Check == b.Check then
                     return a.Name < b.Name
@@ -224,7 +229,7 @@ local function MessageHandler()
             end)
         end
         if subject == 'switch' then
-            if who == Module.CharLoaded then
+            if who == self.CharLoaded then
                 mq.cmd("/foreground")
                 return
             else
@@ -235,15 +240,15 @@ local function MessageHandler()
         if subject == 'Hello' then
             -- if who ~= Module.CharLoaded then
             if aaActor ~= nil then
-                aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(nil, 'Welcome'))
-                aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(nil, 'Welcome'))
+                aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, self:GenerateContent(nil, 'Welcome'))
+                aaActor:send({ mailbox = 'aa_party', script = 'myui', }, self:GenerateContent(nil, 'Welcome'))
             end
             -- end
             return
             -- checkIn = os.time()
         elseif subject == 'Action' then
             if dowho ~= 'N/A' then
-                if MemberEntry.DoWho == Module.CharLoaded then
+                if MemberEntry.DoWho == self.CharLoaded then
                     if dowhat == 'Less' then
                         mq.TLO.Window("AAWindow/AAW_LessExpButton").LeftMouseUp()
                         return
@@ -263,7 +268,7 @@ local function MessageHandler()
         end
         if subject == 'Set' then
             if dowho ~= 'N/A' then
-                if MemberEntry.DoWho == Module.CharLoaded then
+                if MemberEntry.DoWho == self.CharLoaded then
                     if dowhat == 'min' then
                         mq.cmd('/alt on 0')
                         return
@@ -294,8 +299,9 @@ local function MessageHandler()
                         groupData[i].PctAir = pctAir
                         groupData[i].GroupLeader = groupLeader
                         if groupData[i].LastPts ~= pts then
-                            if who ~= Module.CharLoaded and AAPartyMode == 'driver' and groupData[i].LastPts < pts then
-                                Module.Utils.PrintOutput('MyUI', true, "%s gained an AA, now has %d unspent", who, pts)
+                            if who ~= self.CharLoaded and AAPartyMode == 'driver' and groupData[i].LastPts < pts then
+                                self.Utils.PrintOutput('MyUI', true,
+                                    "%s gained an AA, now has %d unspent", who, pts)
                             end
                             groupData[i].LastPts = pts
                         end
@@ -344,12 +350,12 @@ local function MessageHandler()
                     })
             end
         end
-        groupData = sortedBoxes(groupData)
-        if check == 0 then CheckStale() end
+        groupData = self:SortBoxes(groupData)
+        if check == 0 then self:CheckStale() end
     end)
 end
 
-local function getMyAA()
+function Module:GetMyAA()
     local changed      = false
     local tmpExpAA     = myself.PctAAExp() or 0
     local tmpSettingAA = mq.TLO.Window("AAWindow/AAW_PercentCount").Text() or '0'
@@ -362,7 +368,8 @@ local function getMyAA()
     local tmpAirSupply = myself.PctAirSupply()
     MyGroupLeader      = mq.TLO.Group.Leader() or "NoGroup"
     if firstRun or (PctAA ~= tmpExpAA or SettingAA ~= tmpSettingAA or PtsAA ~= tmpPts or
-            PtsSpent ~= tmpPtsSpent or PtsTotal ~= tmpPtsTotal or tmpLvl ~= MeLevel or tmpPctXP ~= PctExp or cState ~= LastState or tmpAirSupply ~= lastAirValue) then
+            PtsSpent ~= tmpPtsSpent or PtsTotal ~= tmpPtsTotal or tmpLvl ~= MeLevel or tmpPctXP ~= PctExp or
+            cState ~= LastState or tmpAirSupply ~= lastAirValue) then
         PctAA = tmpExpAA
         SettingAA = tmpSettingAA
         PtsAA = tmpPts
@@ -376,28 +383,28 @@ local function getMyAA()
         end
         changed = true
     end
-    if not changed and CheckIn() then
+    if not changed and self:CheckIn() then
         if aaActor ~= nil then
-            aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(nil, 'CheckIn'))
-            aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(nil, 'CheckIn'))
+            aaActor:send({ mailbox = 'aa_party', script = 'myui', }, self:GenerateContent(nil, 'CheckIn'))
+            aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, self:GenerateContent(nil, 'CheckIn'))
 
             checkIn = os.time()
         end
     end
     if changed then
         if aaActor ~= nil then
-            aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent())
-            aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent())
+            aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, self:GenerateContent())
+            aaActor:send({ mailbox = 'aa_party', script = 'myui', }, self:GenerateContent())
             checkIn = os.time()
             changed = false
         end
     end
 end
 
-local function SayGoodBye()
+function Module:SayGoodBye()
     local message = {
         Subject = 'Goodbye',
-        Name = Module.CharLoaded,
+        Name = self.CharLoaded,
         Check = 0,
     }
     if aaActor ~= nil then
@@ -409,19 +416,19 @@ end
 function Module.RenderGUI()
     if AAPartyShow then
         imgui.SetNextWindowSize(185, 480, ImGuiCond.FirstUseEver)
-        if TempSettings.aSize then
+        if Module.TempSettings.aSize then
             winFlags = bit32.bor(ImGuiWindowFlags.AlwaysAutoResize)
         else
             winFlags = bit32.bor(ImGuiWindowFlags.None)
         end
 
-        if TempSettings.LockWindow then
+        if Module.TempSettings.LockWindow then
             winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoMove)
         else
             winFlags = bit32.bor(winFlags)
         end
 
-        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(settings[Module.DisplayName].LoadTheme or 'Default', Module.Theme)
+        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(Module.Settings[Module.DisplayName].LoadTheme or 'Default', Module.Theme)
         local openGUI, showGUI = imgui.Begin("AA Party##_" .. Module.CharLoaded, true, winFlags)
 
         if not openGUI then
@@ -440,9 +447,9 @@ function Module.RenderGUI()
                     if groupData[i] ~= nil then
                         if not tmpLeader then
                             tmpLeader = groupData[i].GroupLeader
-                            if TempSettings.ShowLeader then imgui.SeparatorText("Leader: %s", tmpLeader) end
+                            if Module.TempSettings.ShowLeader then imgui.SeparatorText("Leader: %s", tmpLeader) end
                         end
-                        if (groupData[i].GroupLeader == MyGroupLeader and TempSettings.MyGroupOnly) or not TempSettings.MyGroupOnly then
+                        if (groupData[i].GroupLeader == MyGroupLeader and Module.TempSettings.MyGroupOnly) or not Module.TempSettings.MyGroupOnly then
                             if expand[groupData[i].Name] == nil then expand[groupData[i].Name] = false end
                             if compact[groupData[i].Name] == nil then compact[groupData[i].Name] = false end
 
@@ -454,7 +461,7 @@ function Module.RenderGUI()
                                 ImGui.SetCursorPosY(currentY - 20)
                                 if tmpLeader ~= groupData[i].GroupLeader then
                                     tmpLeader = groupData[i].GroupLeader
-                                    if TempSettings.ShowLeader then imgui.SeparatorText("Leader: %s", tmpLeader) end
+                                    if Module.TempSettings.ShowLeader then imgui.SeparatorText("Leader: %s", tmpLeader) end
                                 end
                             else
                                 if drawn > 0 then
@@ -531,7 +538,7 @@ function Module.RenderGUI()
                             imgui.PopID()
                             ImGui.EndGroup()
                             -- end of subgrouped Elements for tooltip begin tooltip
-                            if ImGui.IsItemHovered() and TempSettings.showTooltip then
+                            if ImGui.IsItemHovered() and Module.TempSettings.showTooltip then
                                 imgui.BeginTooltip()
                                 -- local tTipTxt = "\t\t" .. groupData[i].Name
                                 imgui.TextColored(ImVec4(1, 1, 1, 1), "\t\t%s", groupData[i].Name)
@@ -574,8 +581,8 @@ function Module.RenderGUI()
                                             aaActor:send({ mailbox = 'aa_party', script = 'myui', },
                                                 { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'min', })
                                         else
-                                            aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
-                                            aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(groupData[i].Name, 'Action', 'Less'))
+                                            aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, Module:GenerateContent(groupData[i].Name, 'Action', 'Less'))
+                                            aaActor:send({ mailbox = 'aa_party', script = 'myui', }, Module:GenerateContent(groupData[i].Name, 'Action', 'Less'))
                                         end
                                     end
                                 end
@@ -614,8 +621,8 @@ function Module.RenderGUI()
                                             aaActor:send({ mailbox = 'aa_party', script = 'myui', },
                                                 { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'max', })
                                         else
-                                            aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(groupData[i].Name, 'Action', 'More'))
-                                            aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(groupData[i].Name, 'Action', 'More'))
+                                            aaActor:send({ mailbox = 'aa_party', script = 'myui', }, Module:GenerateContent(groupData[i].Name, 'Action', 'More'))
+                                            aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, Module:GenerateContent(groupData[i].Name, 'Action', 'More'))
                                         end
                                     end
                                 end
@@ -636,25 +643,25 @@ function Module.RenderGUI()
                     AAPartyConfigShow = not AAPartyConfigShow
                 end
                 if ImGui.MenuItem("Toggle Auto Size##Size_" .. Module.CharLoaded) then
-                    TempSettings.aSize = not TempSettings.aSize
+                    Module.TempSettings.aSize = not Module.TempSettings.aSize
                     needSave = true
                 end
                 if ImGui.MenuItem("Toggle Tooltip##Tooltip_" .. Module.CharLoaded) then
-                    TempSettings.showTooltip = not TempSettings.showTooltip
+                    Module.TempSettings.showTooltip = not Module.TempSettings.showTooltip
                     needSave = true
                 end
                 if ImGui.MenuItem("Toggle My Group Only##MyGroup_" .. Module.CharLoaded) then
-                    TempSettings.MyGroupOnly = not TempSettings.MyGroupOnly
+                    Module.TempSettings.MyGroupOnly = not Module.TempSettings.MyGroupOnly
                     needSave = true
                 end
-                local lblLeader = TempSettings.ShowLeader and "Hide Leader##HideLeader_" or "Show Leader##ShowLeader_"
+                local lblLeader = Module.TempSettings.ShowLeader and "Hide Leader##HideLeader_" or "Show Leader##ShowLeader_"
                 if ImGui.MenuItem(lblLeader) then
-                    TempSettings.ShowLeader = not TempSettings.ShowLeader
+                    Module.TempSettings.ShowLeader = not Module.TempSettings.ShowLeader
                     needSave = true
                 end
-                local lblLock = TempSettings.LockWindow and "Unlock Window##" or "Lock Window##"
+                local lblLock = Module.TempSettings.LockWindow and "Unlock Window##" or "Lock Window##"
                 if ImGui.MenuItem(lblLock) then
-                    TempSettings.LockWindow = not TempSettings.LockWindow
+                    Module.TempSettings.LockWindow = not Module.TempSettings.LockWindow
                     needSave = true
                 end
                 ImGui.EndPopup()
@@ -665,7 +672,7 @@ function Module.RenderGUI()
     end
 
     if MailBoxShow then
-        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(settings[Module.DisplayName].LoadTheme or 'Default', Module.Theme)
+        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(Module.Settings[Module.DisplayName].LoadTheme or 'Default', Module.Theme)
         local openMail, showMail = imgui.Begin("AA Party MailBox##MailBox_" .. Module.CharLoaded, true, ImGuiWindowFlags.None)
         if not openMail then
             MailBoxShow = false
@@ -705,31 +712,31 @@ function Module.RenderGUI()
     end
 
     if AAPartyConfigShow then
-        local ColorCountTheme, StyleCountTheme = Module.ThemeLoader.StartTheme(settings[Module.DisplayName].LoadTheme or 'Default', Module.Theme)
+        local ColorCountTheme, StyleCountTheme = Module.ThemeLoader.StartTheme(Module.Settings[Module.DisplayName].LoadTheme or 'Default', Module.Theme)
         local openTheme, showConfig = ImGui.Begin('Config##_', true, bit32.bor(ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
         if not openTheme then
             AAPartyConfigShow = false
         end
         if showConfig then
             ImGui.SeparatorText("Theme##")
-            ImGui.Text("Cur Theme: %s", TempSettings.themeName)
+            ImGui.Text("Cur Theme: %s", Module.TempSettings.themeName)
             -- Combo Box Load Theme
-            if ImGui.BeginCombo("Load Theme##", TempSettings.themeName) then
+            if ImGui.BeginCombo("Load Theme##", Module.TempSettings.themeName) then
                 for k, data in pairs(Module.Theme.Theme) do
-                    local isSelected = data.Name == TempSettings.themeName
+                    local isSelected = data.Name == Module.TempSettings.themeName
                     if ImGui.Selectable(data.Name, isSelected) then
-                        settings[Module.DisplayName].LoadTheme = data.Name
-                        TempSettings.themeName = settings[Module.DisplayName].LoadTheme
-                        mq.pickle(configFile, settings)
+                        Module.Settings[Module.DisplayName].LoadTheme = data.Name
+                        Module.TempSettings.themeName = Module.Settings[Module.DisplayName].LoadTheme
+                        mq.pickle(configFile, Module.Settings)
                     end
                 end
                 ImGui.EndCombo()
             end
 
-            TempSettings.scale = ImGui.SliderFloat("Scale##DialogDB", TempSettings.scale, 0.5, 2)
-            if TempSettings.scale ~= settings[Module.DisplayName].Scale then
-                if TempSettings.scale < 0.5 then TempSettings.scale = 0.5 end
-                if TempSettings.scale > 2 then TempSettings.scale = 2 end
+            Module.TempSettings.scale = ImGui.SliderFloat("Scale##DialogDB", Module.TempSettings.scale, 0.5, 2)
+            if Module.TempSettings.scale ~= Module.Settings[Module.DisplayName].Scale then
+                if Module.TempSettings.scale < 0.5 then Module.TempSettings.scale = 0.5 end
+                if Module.TempSettings.scale > 2 then Module.TempSettings.scale = 2 end
             end
 
             if hasThemeZ or loadedExeternally then
@@ -756,26 +763,26 @@ function Module.RenderGUI()
             end
 
             if ImGui.Button('Reload Theme File') then
-                loadTheme()
+                Module:LoadTheme()
             end
 
             MailBoxShow = Module.Utils.DrawToggle("Show MailBox##", MailBoxShow)
             ImGui.SameLine()
-            TempSettings.alphaSort = Module.Utils.DrawToggle("Alpha Sort##", TempSettings.alphaSort, ToggleFlags)
-            TempSettings.showTooltip = Module.Utils.DrawToggle("Show Tooltip##", TempSettings.showTooltip, ToggleFlags)
-            TempSettings.MyGroupOnly = Module.Utils.DrawToggle("My Group Only##", TempSettings.MyGroupOnly, ToggleFlags)
-            TempSettings.LockWindow = Module.Utils.DrawToggle("Lock Window##", TempSettings.LockWindow, ToggleFlags)
-            TempSettings.ShowLeader = Module.Utils.DrawToggle("Show Leader##", TempSettings.ShowLeader, ToggleFlags)
+            Module.TempSettings.alphaSort = Module.Utils.DrawToggle("Alpha Sort##", Module.TempSettings.alphaSort, ToggleFlags)
+            Module.TempSettings.showTooltip = Module.Utils.DrawToggle("Show Tooltip##", Module.TempSettings.showTooltip, ToggleFlags)
+            Module.TempSettings.MyGroupOnly = Module.Utils.DrawToggle("My Group Only##", Module.TempSettings.MyGroupOnly, ToggleFlags)
+            Module.TempSettings.LockWindow = Module.Utils.DrawToggle("Lock Window##", Module.TempSettings.LockWindow, ToggleFlags)
+            Module.TempSettings.ShowLeader = Module.Utils.DrawToggle("Show Leader##", Module.TempSettings.ShowLeader, ToggleFlags)
             if ImGui.Button("Save & Close") then
-                settings = dofile(configFile)
-                settings[Module.DisplayName].Scale = TempSettings.scale
-                settings[Module.DisplayName].AlphaSort = TempSettings.alphaSort
-                settings[Module.DisplayName].LoadTheme = TempSettings.themeName
-                settings[Module.DisplayName].ShowTooltip = TempSettings.showTooltip
-                settings[Module.DisplayName].MyGroupOnly = TempSettings.MyGroupOnly
-                settings[Module.DisplayName].LockWindow = TempSettings.LockWindow
-                settings[Module.DisplayName].ShowLeader = TempSettings.ShowLeader
-                mq.pickle(configFile, settings)
+                Module.Settings = dofile(configFile)
+                Module.Settings[Module.DisplayName].Scale = Module.TempSettings.scale
+                Module.Settings[Module.DisplayName].AlphaSort = Module.TempSettings.alphaSort
+                Module.Settings[Module.DisplayName].LoadTheme = Module.TempSettings.themeName
+                Module.Settings[Module.DisplayName].ShowTooltip = Module.TempSettings.showTooltip
+                Module.Settings[Module.DisplayName].MyGroupOnly = Module.TempSettings.MyGroupOnly
+                Module.Settings[Module.DisplayName].LockWindow = Module.TempSettings.LockWindow
+                Module.Settings[Module.DisplayName].ShowLeader = Module.TempSettings.ShowLeader
+                mq.pickle(configFile, Module.Settings)
                 AAPartyConfigShow = false
             end
         end
@@ -799,17 +806,17 @@ function Module.CheckMode()
 end
 
 local args = { ..., }
-function Module.CheckArgs(args)
-    if #args > 0 then
-        if args[1] == 'driver' then
+function Module.CheckArgs(arg_tbl)
+    if #arg_tbl > 0 then
+        if arg_tbl[1] == 'driver' then
             AAPartyShow = true
             AAPartyMode = 'driver'
-            if args[2] ~= nil and args[2] == 'mailbox' then
+            if arg_tbl[2] ~= nil and arg_tbl[2] == 'mailbox' then
                 MailBoxShow = true
             end
             print('\ayAA Party:\ao Setting \atDriver\ax Mode. UI will be displayed.')
             print('\ayAA Party:\ao Type \at/aaparty show\ax. to Toggle the UI')
-        elseif args[1] == 'client' then
+        elseif arg_tbl[1] == 'client' then
             AAPartyMode = 'client'
             AAPartyShow = false
             print('\ayAA Party:\ao Setting \atClient\ax Mode. UI will not be displayed.')
@@ -825,27 +832,27 @@ function Module.CheckArgs(args)
 end
 
 function Module.Unload()
-    SayGoodBye()
+    Module:SayGoodBye()
     mq.unbind("/aaparty")
     aaActor = nil
 end
 
-local function processCommand(...)
-    local args = { ..., }
-    if #args > 0 then
-        if args[1] == 'gui' or args[1] == 'show' or args[1] == 'open' then
+function Module.CmdHandler(...)
+    local cmdArg = { ..., }
+    if #cmdArg > 0 then
+        if cmdArg[1] == 'gui' or cmdArg[1] == 'show' or cmdArg[1] == 'open' then
             AAPartyShow = not AAPartyShow
             if AAPartyShow then
                 Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Toggling GUI \atOpen\ax.')
             else
                 Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Toggling GUI \atClosed\ax.')
             end
-        elseif args[1] == 'exit' or args[1] == 'quit' then
+        elseif cmdArg[1] == 'exit' or cmdArg[1] == 'quit' then
             Module.IsRunning = false
             Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Exiting.')
-            SayGoodBye()
+            Module:SayGoodBye()
             Module.IsRunning = false
-        elseif args[1] == 'mailbox' then
+        elseif cmdArg[1] == 'mailbox' then
             MailBoxShow = not MailBoxShow
             if MailBoxShow then
                 Module.Utils.PrintOutput('MyUI', nil, '\ayAA Party:\ao Toggling MailBox \atOpen\ax.')
@@ -862,7 +869,7 @@ local function processCommand(...)
     end
 end
 
-local function init()
+function Module.Init()
     currZone = mq.TLO.Zone.ID()
     lastZone = currZone
     firstRun = true
@@ -872,22 +879,22 @@ local function init()
     else
         Module.CheckMode()
     end
-    mq.bind('/aaparty', processCommand)
+    mq.bind('/aaparty', Module.CmdHandler)
     PtsAA = myself.AAPoints()
-    loadSettings()
-    getMyAA()
+    Module:LoadSettings()
+    Module:GetMyAA()
     Module.IsRunning = true
     if Module.Utils.File.Exists(themezDir) then
         hasThemeZ = true
     end
 
     if aaActor ~= nil then
-        aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, GenerateContent(nil, 'Hello'))
-        aaActor:send({ mailbox = 'aa_party', script = 'myui', }, GenerateContent(nil, 'Hello'))
+        aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, Module:GenerateContent(nil, 'Hello'))
+        aaActor:send({ mailbox = 'aa_party', script = 'myui', }, Module:GenerateContent(nil, 'Hello'))
     end
     Module.IsRunning = true
     if not loadedExeternally then
-        Module.LocalLoop()
+        Module:LocalLoop()
     end
 end
 
@@ -904,30 +911,30 @@ function Module.MainLoop()
             lastZone = currZone
         end
         if aaActor ~= nil then
-            getMyAA()
-            CheckStale()
+            Module:GetMyAA()
+            Module:CheckStale()
         else
-            MessageHandler()
+            Module:MessageHandler()
         end
 
         clockTimer = mq.gettime()
     end
     if needSave then
-        settings[Module.DisplayName].Scale = TempSettings.scale
-        settings[Module.DisplayName].AlphaSort = TempSettings.alphaSort
-        settings[Module.DisplayName].LoadTheme = TempSettings.themeName
-        settings[Module.DisplayName].ShowTooltip = TempSettings.showTooltip
-        settings[Module.DisplayName].MyGroupOnly = TempSettings.MyGroupOnly
-        settings[Module.DisplayName].LockWindow = TempSettings.LockWindow
-        settings[Module.DisplayName].ShowLeader = TempSettings.ShowLeader
-        mq.pickle(configFile, settings)
+        Module.Settings[Module.DisplayName].Scale = Module.TempSettings.scale
+        Module.Settings[Module.DisplayName].AlphaSort = Module.TempSettings.alphaSort
+        Module.Settings[Module.DisplayName].LoadTheme = Module.TempSettings.themeName
+        Module.Settings[Module.DisplayName].ShowTooltip = Module.TempSettings.showTooltip
+        Module.Settings[Module.DisplayName].MyGroupOnly = Module.TempSettings.MyGroupOnly
+        Module.Settings[Module.DisplayName].LockWindow = Module.TempSettings.LockWindow
+        Module.Settings[Module.DisplayName].ShowLeader = Module.TempSettings.ShowLeader
+        mq.pickle(configFile, Module.Settings)
         needSave = false
     end
 end
 
-function Module.LocalLoop()
-    while Module.IsRunning do
-        Module.MainLoop()
+function Module:LocalLoop()
+    while self.IsRunning do
+        self.MainLoop()
         mq.delay(50)
     end
 end
@@ -937,7 +944,7 @@ if mq.TLO.EverQuest.GameState() ~= "INGAME" then
     mq.exit()
 end
 
-MessageHandler()
-init()
+Module:MessageHandler()
+Module.Init()
 Module.MainLoop()
 return Module

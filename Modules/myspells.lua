@@ -922,14 +922,15 @@ function Module.RenderGUI()
 		local spellID = mq.TLO.Spell(castingName).ID() or -1
 		if timeLeft > 4000000000 then
 			castTime = 0
-			return
+			-- return
 		end
 		if castingName == nil then
 			startCastTime = 0
 			castBarShow = false
-			return
+			castingName = 'None'
+			-- return
 		end
-		if not castBarShow then return end
+		if not (castBarShow or debugShow) then return end
 		ImGui.SetNextWindowSize(ImVec2(150, 55), ImGuiCond.FirstUseEver)
 		ImGui.SetNextWindowPos(ImVec2(100, 100), ImGuiCond.FirstUseEver)
 		if resetCastBarPos then
@@ -942,7 +943,7 @@ function Module.RenderGUI()
 		if not openCast then
 			castBarShow = false
 		end
-		if showCast or debugShow then
+		if showCast then
 			if castBarShow or debugShow then
 				ImGui.BeginChild("##CastBar", ImVec2(-1, -1), bit32.bor(ImGuiChildFlags.None),
 					bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse))

@@ -91,6 +91,7 @@ local enableCastBar                                                             
 local debugShow                                                                                      = false
 local castTransparency                                                                               = 1.0
 local startedCast, startCastTime, castBarShow                                                        = false, 0, false
+local resetCastBarPos                                                                                = false
 
 defaults                                                                                             = {
 	['MySpells'] = {
@@ -525,6 +526,21 @@ local function DrawConfigWin()
 		CastTextColorByType = Module.Utils.DrawToggle("Cast Text Color By Type##MySpells", CastTextColorByType, ToggleFlags)
 		ImGui.SameLine()
 		ImGui.HelpMarker("This will change the color of the cast bar text based on the spell type.")
+
+		if resetCastBarPos and not Module.TempSettings.BtnEnabledCastBar then
+			ImGui.PushStyleColor(ImGuiCol.Button, Module.Colors.color('btn_green'))
+			Module.TempSettings.BtnEnabledCastBar = true
+		end
+
+		if ImGui.SmallButton("Reset Cast Bar Position##MySpells") then
+			resetCastBarPos = true
+		end
+		if Module.TempSettings.BtnEnabledCastBar then
+			ImGui.PopStyleColor()
+			Module.TempSettings.BtnEnabledCastBar = false
+		end
+		ImGui.SameLine()
+		ImGui.HelpMarker("This will reset the cast bar position to the default location, on the next cast.")
 	end
 
 	settings[Module.Name].ShowGemNames = Module.Utils.DrawToggle("Show Gem Names##MySpells", settings[Module.Name].ShowGemNames, ToggleFlags)
@@ -539,6 +555,7 @@ local function DrawConfigWin()
 		settings[Module.Name].CastTextColorByType = CastTextColorByType
 		settings[Module.Name].CastTransperancy = castTransparency
 		settings[Module.Name].EnableCastBar = enableCastBar
+		settings[Module.Name].enableCastBar = enableCastBar
 		settings[Module.Name].Scale = scale
 		settings[Module.Name].TimerColor = timerColor
 		settings[Module.Name].LoadTheme = themeName
@@ -914,7 +931,11 @@ function Module.RenderGUI()
 		end
 		if not castBarShow then return end
 		ImGui.SetNextWindowSize(ImVec2(150, 55), ImGuiCond.FirstUseEver)
-		ImGui.SetNextWindowPos(ImGui.GetMousePosVec(), ImGuiCond.FirstUseEver)
+		ImGui.SetNextWindowPos(ImVec2(100, 100), ImGuiCond.FirstUseEver)
+		if resetCastBarPos then
+			ImGui.SetNextWindowPos(ImVec2(100, 100), ImGuiCond.Appearing)
+			resetCastBarPos = false
+		end
 		local ColorCountCast, StyleCountCast = Module.ThemeLoader.StartTheme(themeName, Module.Theme, true, false, castTransparency or 1)
 
 		local openCast, showCast = ImGui.Begin('Casting##MyCastingWin_' .. Module.CharLoaded, true, castFlags)

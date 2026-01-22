@@ -55,6 +55,10 @@ local configFile                                    = string.format('%s/MyUI/Pla
 local themeName                                     = 'Default'
 local pulseSpeed                                    = 5
 local combatPulseSpeed                              = 10
+local colorTargetHpMax                              = { 0.992, 0.138, 0.138, 1.000, }
+local colorTargetHpMin                              = { 0.551, 0.207, 0.962, 1.000, }
+local colorToTHpMax                                 = { 0.992, 0.138, 0.138, 1.000, }
+local colorToTHpMin                                 = { 0.551, 0.207, 0.962, 1.000, }
 local colorHpMax                                    = { 0.992, 0.138, 0.138, 1.000, }
 local colorHpMin                                    = { 0.551, 0.207, 0.962, 1.000, }
 local colorMpMax                                    = { 0.231, 0.707, 0.938, 1.000, }
@@ -62,10 +66,11 @@ local colorMpMin                                    = { 0.600, 0.231, 0.938, 1.0
 local colorBreathMin                                = { 0.600, 0.231, 0.938, 1.000, }
 local colorBreathMax                                = { 0.231, 0.707, 0.938, 1.000, }
 local targetTextColor                               = { 1, 1, 1, 1, }
-local testValue, testValue2                         = 100, 100
 local splitTarget                                   = false
 local mouseHud, mouseHudTarg                        = false, false
+local ProgressSizeAggro                             = 10
 local ProgressSizeTarget                            = 30
+local ProgressSizeTargetOfTarget                    = 30
 local showTitleBreath                               = false
 local bLocked                                       = false
 local breathBarShow                                 = false
@@ -94,6 +99,12 @@ defaults                                            = {
     doPulse = true,
     SplitTarget = false,
     showXtar = false,
+    showTargetConColorIcon = true,
+    showTargetConColorHighlight = true,
+    ColorTargetHPMax = { 0.992, 0.138, 0.138, 1.000, },
+    ColorTargetHPMin = { 0.551, 0.207, 0.962, 1.000, },
+    ColorToTHPMax = { 0.992, 0.138, 0.138, 1.000, },
+    ColorToTHPMin = { 0.551, 0.207, 0.962, 1.000, },
     ColorHPMax = { 0.992, 0.138, 0.138, 1.000, },
     ColorHPMin = { 0.551, 0.207, 0.962, 1.000, },
     ColorMPMax = { 0.231, 0.707, 0.938, 1.000, },
@@ -105,16 +116,21 @@ defaults                                            = {
     EnableBreathBar = false,
     pulseSpeed = 5,
     combatPulseSpeed = 10,
+    DynamicTargetHP = false,
+    DynamicToTHP = false,
     DynamicHP = false,
     DynamicMP = false,
     FlashBorder = true,
     MouseOver = false,
     WinTransparency = 1.0,
     ProgressSize = 10,
+    ProgressSizeAggro = 10,
     ProgressSizeTarget = 30,
+    ProgressSizeTargetOfTarget = 30,
     TargetTextColor = { 1, 1, 1, 1, },
     NoAggroColor = { 0.8, 0.0, 1.0, 1.0, },
     HaveAggroColor = { 0.78, 0.20, 0.05, 0.8, },
+    ShowAggro = true,
     ShowToT = false,
 }
 
@@ -179,6 +195,10 @@ local function loadSettings()
     bLocked = settings[Module.Name].BreathLocked
     enableBreathBar = settings[Module.Name].EnableBreathBar
     splitTarget = settings[Module.Name].SplitTarget
+    colorTargetHpMax = settings[Module.Name].ColorTargetHPMax
+    colorTargetHpMin = settings[Module.Name].ColorTargetHPMin
+    colorToTHpMax = settings[Module.Name].ColorToTHPMax
+    colorToTHpMin = settings[Module.Name].ColorToTHPMin
     colorHpMax = settings[Module.Name].ColorHPMax
     colorHpMin = settings[Module.Name].ColorHPMin
     colorMpMax = settings[Module.Name].ColorMPMax
@@ -192,7 +212,9 @@ local function loadSettings()
     locked = settings[Module.Name].locked
     FontScale = settings[Module.Name].Scale
     themeName = settings[Module.Name].LoadTheme
+    ProgressSizeAggro = settings[Module.Name].ProgressSizeAggro
     ProgressSizeTarget = settings[Module.Name].ProgressSizeTarget
+    ProgressSizeTargetOfTarget = settings[Module.Name].ProgressSizeTargetOfTarget
     targetTextColor = settings[Module.Name].TargetTextColor
     noAggroColor = settings[Module.Name].NoAggroColor
     haveAggroColor = settings[Module.Name].HaveAggroColor
@@ -360,6 +382,169 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
     ImGui.PopID()
 end
 
+local function toU32(color, defaultColor)
+    if not color then
+        return defaultColor or ImGui.GetColorU32(ImGuiCol.Text)
+    end
+
+    if color.x and color.y and color.z and color.w then -- ImVec4
+        return ImGui.GetColorU32(color)
+    end
+
+    if type(color) == "table" and #color >= 4 then
+        return ImGui.GetColorU32(ImVec4(color[1], color[2], color[3], color[4]))
+    end
+
+    return defaultColor or ImGui.GetColorU32(ImGuiCol.Text)
+end
+
+local function U32withAlpha(colorU32, alpha)
+    local a = math.floor(math.max(0, math.min(1, alpha)) * 255)
+    return bit32.bor(
+        bit32.band(colorU32, 0x00FFFFFF),
+        bit32.lshift(a, 24)
+    )
+end
+
+local function drawHighlightBox(min, max, color)
+    -- min/max = ImVec2 from ImGui.GetItemRectMinVec() / MaxVec()
+
+    local fillColor = U32withAlpha(toU32(color), 0.25)
+    local borderColor = U32withAlpha(toU32(color), 0.75)
+
+    -- Slightly inflate the rect so border is visible outside progress bar
+    local padding = 6
+    local minPadded = ImVec2(min.x - padding, min.y - padding)
+    local maxPadded = ImVec2(max.x + padding, max.y + padding)
+
+    local drawList = ImGui.GetWindowDrawList()
+    drawList:AddRectFilled(minPadded, maxPadded, fillColor, 2)
+    drawList:AddRect(minPadded, maxPadded, borderColor, 2, ImDrawFlags.RoundCornersAll, 1.5)
+end
+
+local function drawBar(opts)
+    -- Required
+    local label        = opts.label
+    local percentage   = opts.percentage
+
+    -- Optional
+    local dropShadow   = opts.dropShadow
+    local tooltip      = opts.tooltip
+    local highlight    = opts.highlight
+    local width        = opts.width
+    local height       = opts.height
+    if not width or not height then
+        local availX, availY = ImGui.GetContentRegionAvail()
+        width = width or availX
+        height = height or availY
+    end
+
+    -- Optional labels
+    local leftText     = opts.leftText
+    local centerText   = opts.centerText
+    local rightText    = opts.rightText
+    local leftText2    = opts.leftText2
+    local centerText2  = opts.centerText2
+    local rightText2   = opts.rightText2
+
+    -- Optional label colors
+    local leftColor    = opts.leftColor
+    local centerColor  = opts.centerColor
+    local rightColor   = opts.rightColor
+    local leftColor2   = opts.leftColor2
+    local centerColor2 = opts.centerColor2
+    local rightColor2  = opts.rightColor2
+
+    -- Optional bar colors
+    local dynamicColor = opts.dynamicColor
+    local colorMin     = opts.colorMin
+    local colorMax     = opts.colorMax
+
+    local initialPosition = ImGui.GetCursorScreenPosVec()
+    ImGui.Dummy(ImVec2(width, height)) -- reserve the same space the bar will later occupy
+
+    local min = ImVec2(initialPosition.x, initialPosition.y)
+    local max = ImVec2(initialPosition.x + width, initialPosition.y + height)
+
+    if highlight then
+        drawHighlightBox(min, max, highlight)
+    end
+
+    if dynamicColor then
+        ImGui.PushStyleColor(
+            ImGuiCol.PlotHistogram,
+            Module.Utils.CalculateColor(colorMin, colorMax, percentage)
+        )
+    else
+        if percentage < 25 then
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, Module.Colors.color('orange'))
+        else
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, Module.Colors.color('red'))
+        end
+    end
+
+    ImGui.SetCursorScreenPos(initialPosition)
+    ImGui.ProgressBar(percentage / 100, width, height, label)
+    ImGui.PopStyleColor()
+
+    if tooltip and ImGui.IsItemHovered() then
+        ImGui.SetTooltip(tooltip)
+    end
+
+    local drawList = ImGui.GetWindowDrawList()
+    local defaultColor = ImGui.GetColorU32(ImGuiCol.Text)
+    local shadowColor = ImGui.GetColorU32(0, 0, 0, 1)
+    local padding = 4
+
+    local rowOffset = height / 4
+    local hasRow2 = leftText2 or centerText2 or rightText2
+    local centerY = min.y + (max.y - min.y) / 2
+
+    local centerY1, centerY2
+    if hasRow2 then
+        centerY1 = centerY - rowOffset
+        centerY2 = centerY + rowOffset
+    else
+        centerY1 = centerY
+        centerY2 = nil
+    end
+
+    local function drawText(position, text, color)
+        if dropShadow then
+            drawList:AddText(ImVec2(position.x + 1, position.y + 2), shadowColor, text)
+        end
+        drawList:AddText(position, color, text)
+    end
+
+    -- First row
+    if leftText then
+        local sizeL = ImGui.CalcTextSizeVec(leftText)
+        drawText(ImVec2(min.x + padding, centerY1 - sizeL.y / 2), leftText, toU32(leftColor, defaultColor))
+    end
+    if centerText then
+        local sizeC = ImGui.CalcTextSizeVec(centerText)
+        drawText(ImVec2((min.x + max.x)/2 - sizeC.x/2, centerY1 - sizeC.y/2), centerText, toU32(centerColor, defaultColor))
+    end
+    if rightText then
+        local sizeR = ImGui.CalcTextSizeVec(rightText)
+        drawText(ImVec2(max.x - sizeR.x - padding, centerY1 - sizeR.y/2), rightText, toU32(rightColor, defaultColor))
+    end
+
+    -- Second row
+    if leftText2 then
+        local sizeL2 = ImGui.CalcTextSizeVec(leftText2)
+        drawText(ImVec2(min.x + padding, centerY2 - sizeL2.y/2), leftText2, toU32(leftColor2, defaultColor))
+    end
+    if centerText2 then
+        local sizeC2 = ImGui.CalcTextSizeVec(centerText2)
+        drawText(ImVec2((min.x + max.x)/2 - sizeC2.x/2, centerY2 - sizeC2.y/2), centerText2, toU32(centerColor2, defaultColor))
+    end
+    if rightText2 then
+        local sizeR2 = ImGui.CalcTextSizeVec(rightText2)
+        drawText(ImVec2(max.x - sizeR2.x - padding, centerY2 - sizeR2.y/2), rightText2, toU32(rightColor2, defaultColor))
+    end
+end
+
 local function targetBuffs(count)
     local target = mq.TLO.Target
     local iconsDrawn = 0
@@ -411,22 +596,35 @@ function Module.RenderTargetOfTarget()
     local openTot, drawToT = ImGui.Begin("Target of Target##" .. Module.Name, true, tmpFlag)
     if drawToT then
         ImGui.SetWindowFontScale(FontScale)
-        ImGui.Text(tot.CleanName() or '?')
-        if settings[Module.Name].DynamicHP then
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorHpMin, colorHpMax, tot.PctHPs())))
-        else
-            if tot.PctHPs() < 25 then
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('orange')))
-            else
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
-            end
-        end
-        local yPos = ImGui.GetCursorPosY() - 2
-        ImGui.ProgressBar(((tonumber(tot.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), ProgressSizeTarget, '##' .. tot.PctHPs())
-        ImGui.PopStyleColor()
-        ImGui.SetCursorPosY(yPos)
-        ImGui.SetCursorPosX((ImGui.GetContentRegionAvail() - (ImGui.CalcTextSize("HP: 1000") * 0.5)) * 0.5)
-        ImGui.Text("HP: %d%%", tot.PctHPs() or 0)
+        drawBar({
+            label        = '##TargetOfTarget',
+            percentage   = tonumber(tot.PctHPs() or 0),
+            size         = ImGui.GetContentRegionAvail(),
+            height       = ProgressSizeTargetOfTarget,
+
+            dropShadow   = true,
+            --tooltip      = string.format("Name: %s\t Lvl: %s\nClass: %s\nRace: %s\nType: %s", targetName, tLvl, tClass, tRace, tBodyType),
+
+            leftText     = tot.CleanName() or '?',
+            leftColor    = targetTextColor,
+            --centerText   = conText,
+            --centerColor  = Module.Colors.color(tC),
+            centerText   = tostring(tot.PctHPs()) .. '%',
+            centerColor  = targetTextColor,
+            --rightText    = string.format("%dm", math.floor(tot.Distance() or 0)),
+            --rightColor   = Module.Colors.color('yellow'),
+
+            --leftText2    = tostring(tLvl) .. ' ' .. tClass .. '  ' .. tBodyType,
+            --leftColor2   = targetTextColor,
+            --centerText2  = tostring(tot.PctHPs()) .. '%',
+            --centerColor2 = targetTextColor,
+            --rightText2   = tRace,
+            --rightColor2  = targetTextColor,
+
+            dynamicColor = settings[Module.Name].DynamicToTHP,
+            colorMin     = colorToTHpMin,
+            colorMax     = colorToTHpMax,
+        })
     end
     ImGui.End()
 end
@@ -523,13 +721,14 @@ local function PlayerTargConf_GUI()
             -- Slider for adjusting Progress Bar Size
             local tmpPrgSz = progressSize
             if progressSize then
-                tmpPrgSz = ImGui.SliderInt("Progress Bar Size##" .. Module.Name, tmpPrgSz, 5, 50)
+                tmpPrgSz = ImGui.SliderInt("Progress Bar Size##" .. Module.Name, tmpPrgSz, 5, 150)
             end
             if progressSize ~= tmpPrgSz then
                 progressSize = tmpPrgSz
             end
+            ProgressSizeAggro = ImGui.SliderInt("Aggro Progress Bar Size##" .. Module.Name, ProgressSizeAggro, 5, 150)
             ProgressSizeTarget = ImGui.SliderInt("Target Progress Bar Size##" .. Module.Name, ProgressSizeTarget, 5, 150)
-            settings[Module.Name].showXtar = Module.Utils.DrawToggle('Show XTarget Number', settings[Module.Name].showXtar, ToggleFlags)
+            ProgressSizeTargetOfTarget = ImGui.SliderInt("Target Of Target Progress Bar Size##" .. Module.Name, ProgressSizeTargetOfTarget, 5, 150)
         end
         ImGui.Spacing()
 
@@ -570,8 +769,8 @@ local function PlayerTargConf_GUI()
             ImGui.SetNextItemWidth(60)
             colorHpMax = ImGui.ColorEdit4("HP Max Color##" .. Module.Name, colorHpMax, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
 
+            local testValue = 100
             testValue = ImGui.SliderInt("Test HP##" .. Module.Name, testValue, 0, 100)
-
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorHpMin, colorHpMax, testValue)))
             ImGui.ProgressBar((testValue / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test')
             ImGui.PopStyleColor()
@@ -584,9 +783,38 @@ local function PlayerTargConf_GUI()
             ImGui.SetNextItemWidth(60)
             colorMpMax = ImGui.ColorEdit4("Mana Max Color##" .. Module.Name, colorMpMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
 
+            local testValue2 = 100
             testValue2 = ImGui.SliderInt("Test MP##" .. Module.Name, testValue2, 0, 100)
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorMpMin, colorMpMax, testValue2)))
             ImGui.ProgressBar((testValue2 / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test2')
+            ImGui.PopStyleColor()
+
+            settings[Module.Name].DynamicTargetHP = Module.Utils.DrawToggle('Dynamic Target HP Bar', settings[Module.Name].DynamicTargetHP, ToggleFlags)
+            ImGui.SameLine()
+            ImGui.SetNextItemWidth(60)
+            colorTargetHpMin = ImGui.ColorEdit4("Target HP Min Color##" .. Module.Name, colorTargetHpMin, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
+            ImGui.SameLine()
+            ImGui.SetNextItemWidth(60)
+            colorTargetHpMax = ImGui.ColorEdit4("Target HP Max Color##" .. Module.Name, colorTargetHpMax, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
+
+            local testValue3 = 100
+            testValue3 = ImGui.SliderInt("Test Target HP##" .. Module.Name, testValue3, 0, 100)
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorTargetHpMin, colorTargetHpMax, testValue3)))
+            ImGui.ProgressBar((testValue3 / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test')
+            ImGui.PopStyleColor()
+
+            settings[Module.Name].DynamicToTHP = Module.Utils.DrawToggle('Dynamic Target of Target HP Bar', settings[Module.Name].DynamicToTHP, ToggleFlags)
+            ImGui.SameLine()
+            ImGui.SetNextItemWidth(60)
+            colorToTHpMin = ImGui.ColorEdit4("Target of Target HP Min Color##" .. Module.Name, colorToTHpMin, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
+            ImGui.SameLine()
+            ImGui.SetNextItemWidth(60)
+            colorToTHpMax = ImGui.ColorEdit4("Target of Target HP Max Color##" .. Module.Name, colorToTHpMax, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
+
+            local testValue4 = 100
+            testValue4 = ImGui.SliderInt("Test Target of Target HP##" .. Module.Name, testValue4, 0, 100)
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorToTHpMin, colorToTHpMax, testValue4)))
+            ImGui.ProgressBar((testValue4 / 100), ImGui.GetContentRegionAvail(), progressSize, '##Test')
             ImGui.PopStyleColor()
         end
 
@@ -600,11 +828,28 @@ local function PlayerTargConf_GUI()
 
         ImGui.Spacing()
 
-        noAggroColor = ImGui.ColorEdit4("Don't Have Aggrp Color##" .. Module.Name, noAggroColor, bit32.bor(ImGuiColorEditFlags.NoInputs))
+        noAggroColor = ImGui.ColorEdit4("Don't Have Aggro Color##" .. Module.Name, noAggroColor, bit32.bor(ImGuiColorEditFlags.NoInputs))
+
+        ImGui.Spacing()
+
+        settings[Module.Name].ShowAggro = Module.Utils.DrawToggle('Show Aggro', settings[Module.Name].ShowAggro, ToggleFlags)
 
         ImGui.Spacing()
 
         settings[Module.Name].ShowToT = Module.Utils.DrawToggle('Show Target of Target', settings[Module.Name].ShowToT, ToggleFlags)
+
+        ImGui.Spacing()
+
+        settings[Module.Name].showXtar = Module.Utils.DrawToggle('Show XTarget Number##' .. Module.Name, settings[Module.Name].showXtar, ToggleFlags)
+
+        ImGui.Spacing()
+
+        settings[Module.Name].showTargetConColorIcon = Module.Utils.DrawToggle('Show Target Con Color Icon##' .. Module.Name, settings[Module.Name].showTargetConColorIcon, ToggleFlags)
+
+        ImGui.Spacing()
+
+        settings[Module.Name].showTargetConColorHighlight = Module.Utils.DrawToggle('Show Target Con Color Highlight##' .. Module.Name, settings[Module.Name].showTargetConColorHighlight, ToggleFlags)
+
         ImGui.Spacing()
         -- breath bar settings
         if ImGui.CollapsingHeader("Breath Meter##" .. Module.Name) then
@@ -631,7 +876,13 @@ local function PlayerTargConf_GUI()
             openConfigGUI = false
             settings[Module.Name].ColorBreathMin = colorBreathMin
             settings[Module.Name].ColorBreathMax = colorBreathMax
+            settings[Module.Name].ProgressSizeAggro = ProgressSizeAggro
             settings[Module.Name].ProgressSizeTarget = ProgressSizeTarget
+            settings[Module.Name].ProgressSizeTargetOfTarget = ProgressSizeTargetOfTarget
+            settings[Module.Name].ColorTargetHPMax = colorTargetHpMax
+            settings[Module.Name].ColorTargetHPMin = colorTargetHpMin
+            settings[Module.Name].ColorToTHPMax = colorToTHpMax
+            settings[Module.Name].ColorToTHPMin = colorToTHpMin
             settings[Module.Name].ColorHPMax = colorHpMax
             settings[Module.Name].ColorHPMin = colorHpMin
             settings[Module.Name].ColorMPMax = colorMpMax
@@ -676,104 +927,100 @@ local function drawTarget()
         local tClass = target.Class.ShortName() == 'UNKNOWN CLASS' and Module.Icons.MD_HELP_OUTLINE or
             target.Class.ShortName()
         local tLvl = target.Level() or 0
+        local tRace = target.Race.Name() or '?'
         local tBodyType = target.Body.Name() or '?'
+
         --Target Health Bar
         ImGui.BeginGroup()
-        if settings[Module.Name].DynamicHP then
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorHpMin, colorHpMax, target.PctHPs())))
-        else
-            if target.PctHPs() < 25 then
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('orange')))
-            else
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
-            end
-        end
-        local yPos = ImGui.GetCursorPosY() - 2
-        ImGui.ProgressBar(((tonumber(target.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), ProgressSizeTarget, '##' .. target.PctHPs())
-        ImGui.PopStyleColor()
 
-        if ImGui.IsItemHovered() then
-            ImGui.SetTooltip("Name: %s\t Lvl: %s\nClass: %s\nType: %s", targetName, tLvl, tClass, tBodyType)
+        if xSlot > 0 and settings[Module.Name].showXtar then
+            targetName = string.format("X#%s %s", xSlot, targetName)
         end
 
-        ImGui.SetCursorPosY(yPos)
-        ImGui.SetCursorPosX(9)
-        if ImGui.BeginTable("##targetInfoOverlay", 2, tPlayerFlags) then
-            ImGui.TableSetupColumn("##col1", ImGuiTableColumnFlags.NoResize, (ImGui.GetContentRegionAvail() * .5) - 8)
-            ImGui.TableSetupColumn("##col2", ImGuiTableColumnFlags.NoResize, (ImGui.GetContentRegionAvail() * .5) + 8) -- Adjust width for distance and Aggro% text
-            -- First Row: Name, con, distance
-            ImGui.TableNextRow()
-            ImGui.TableSetColumnIndex(0)
-            -- Name and CON in the first column
+        local highlightColor
+        if settings[Module.Name].showTargetConColorHighlight then
+            highlightColor = Module.Colors.color(tC)
+        end
 
-            if xSlot > 0 and settings[Module.Name].showXtar then
-                ImGui.TextColored(ImVec4(targetTextColor[1], targetTextColor[2], targetTextColor[3], targetTextColor[4]), "X#%s %s", xSlot, targetName)
-            else
-                ImGui.TextColored(ImVec4(targetTextColor[1], targetTextColor[2], targetTextColor[3], targetTextColor[4]), "%s", targetName)
-            end
-            -- Distance in the second column
-            ImGui.TableSetColumnIndex(1)
-
-            ImGui.PushStyleColor(ImGuiCol.Text, Module.Colors.color(tC))
+        local conIconText, conIconColor
+        if settings[Module.Name].showTargetConColorIcon then
+            conIconColor = Module.Colors.color(tC)
             if tC == 'pink' then
-                ImGui.Text('   ' .. Module.Icons.MD_WARNING)
+                conIconText = Module.Icons.MD_WARNING
             else
-                ImGui.Text('   ' .. Module.Icons.MD_LENS)
+                conIconText = Module.Icons.MD_LENS
             end
-            ImGui.PopStyleColor()
-
-            ImGui.SameLine(ImGui.GetColumnWidth() - 35)
-            ImGui.PushStyleColor(ImGuiCol.Text, Module.Colors.color('yellow'))
-
-            ImGui.Text(tostring(math.floor(target.Distance() or 0)) .. 'm')
-            ImGui.PopStyleColor()
-            -- Second Row: Class, Level, and Aggro%
-            ImGui.TableNextRow()
-            ImGui.TableSetColumnIndex(0) -- Class and Level in the first column
-
-            ImGui.TextColored(ImVec4(targetTextColor[1], targetTextColor[2], targetTextColor[3], targetTextColor[4]), tostring(tLvl) .. ' ' .. tClass .. '\t' .. tBodyType)
-            -- Aggro% text in the second column
-            ImGui.TableSetColumnIndex(1)
-
-            ImGui.TextColored(ImVec4(targetTextColor[1], targetTextColor[2], targetTextColor[3], targetTextColor[4]), tostring(target.PctHPs()) .. '%')
-            ImGui.EndTable()
         end
+
+        drawBar({
+            label        = '##Target',
+            percentage   = tonumber(target.PctHPs() or 0),
+            size         = ImGui.GetContentRegionAvail(),
+            height       = ProgressSizeTarget,
+
+            dropShadow   = true,
+            tooltip      = string.format("Name: %s\t Lvl: %s\nClass: %s\nRace: %s\nType: %s", targetName, tLvl, tClass, tRace, tBodyType),
+            highlight    = highlightColor,
+
+            leftText     = targetName,
+            leftColor    = targetTextColor,
+            centerText   = conIconText,
+            centerColor  = conIconColor,
+            rightText    = string.format("%dm", math.floor(target.Distance() or 0)),
+            rightColor   = Module.Colors.color('yellow'),
+
+            leftText2    = tostring(tLvl) .. ' ' .. tClass .. '  ' .. tBodyType,
+            leftColor2   = targetTextColor,
+            centerText2  = tostring(target.PctHPs()) .. '%',
+            centerColor2 = targetTextColor,
+            rightText2   = tRace,
+            rightColor2  = targetTextColor,
+
+            dynamicColor = settings[Module.Name].DynamicTargetHP,
+            colorMin     = colorTargetHpMin,
+            colorMax     = colorTargetHpMax,
+        })
         ImGui.EndGroup()
 
-        ImGui.Separator()
+        ImGui.Spacing()
         --Aggro % Bar
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 8, 1)
-        if (target.Aggressive) then
-            yPos = ImGui.GetCursorPosY() - 2
+        if target.Aggressive and settings[Module.Name].ShowAggro then
+            local text, textSize
+            local yPosMidBar = ImGui.GetCursorPosY() + ProgressSizeAggro / 2
             ImGui.BeginGroup()
             if target.PctAggro() < 100 then
                 ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(noAggroColor[1], noAggroColor[2], noAggroColor[3], noAggroColor[4]))
             else
                 ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(haveAggroColor[1], haveAggroColor[2], haveAggroColor[3], haveAggroColor[4]))
             end
-            ImGui.ProgressBar(((tonumber(target.PctAggro() or 0)) / 100), ImGui.GetContentRegionAvail(), progressSize,
+            ImGui.ProgressBar(((tonumber(target.PctAggro() or 0)) / 100), ImGui.GetContentRegionAvail(), ProgressSizeAggro,
                 '##pctAggro')
             ImGui.PopStyleColor()
             --Secondary Aggro Person
 
             if (target.SecondaryAggroPlayer() ~= nil) then
-                ImGui.SetCursorPosY(yPos)
+                text = tostring(target.SecondaryAggroPlayer())
+                textSize = ImGui.CalcTextSizeVec(text)
+                ImGui.SetCursorPosY(yPosMidBar - textSize.y / 2)
                 ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 5)
-                ImGui.Text("%s", target.SecondaryAggroPlayer())
+                ImGui.Text(text)
             end
             --Aggro % Label middle of bar
-            ImGui.SetCursorPosY(yPos)
+            text = tostring(target.PctAggro())
+            textSize = ImGui.CalcTextSizeVec(text)
+            ImGui.SetCursorPosY(yPosMidBar - textSize.y / 2)
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + ((ImGui.GetWindowWidth() / 2) - 8))
 
-            ImGui.TextColored(ImVec4(targetTextColor[1], targetTextColor[2], targetTextColor[3], targetTextColor[4]), "%d", target.PctAggro())
+            ImGui.TextColored(ImVec4(targetTextColor[1], targetTextColor[2], targetTextColor[3], targetTextColor[4]), text)
             if (target.SecondaryAggroPlayer() ~= nil) then
-                ImGui.SetCursorPosY(yPos)
+                text = tostring(target.SecondaryPctAggro())
+                textSize = ImGui.CalcTextSizeVec(text)
+                ImGui.SetCursorPosY(yPosMidBar - textSize.y / 2)
                 ImGui.SetCursorPosX(ImGui.GetWindowWidth() - 40)
-                ImGui.Text("%d", target.SecondaryPctAggro())
+                ImGui.Text(text)
             end
             ImGui.EndGroup()
-        else
-            ImGui.Text('')
         end
         ImGui.SetWindowFontScale(1)
         ImGui.PopStyleVar()
@@ -986,10 +1233,11 @@ function Module.RenderGUI()
             ImGui.PopStyleVar()
             ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, 4, 3)
 
-            ImGui.Separator()
+            ImGui.Spacing()
             ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 8, 1)
             -- My Health Bar
             local yPos = ImGui.GetCursorPosY()
+            local yPosNext = yPos
 
             if settings[Module.Name].DynamicHP then
                 ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorHpMin, colorHpMax, mq.TLO.Me.PctHPs())))
@@ -1010,12 +1258,17 @@ function Module.RenderGUI()
             end
             ImGui.ProgressBar(((tonumber(mq.TLO.Me.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), progressSize, '##pctHps')
             ImGui.PopStyleColor()
-            ImGui.SetCursorPosY(yPos - 1)
+            yPosNext = ImGui.GetCursorPosY()
+            local text = tostring(mq.TLO.Me.PctHPs() or 0)
+            local textSize = ImGui.CalcTextSizeVec(text)
+            ImGui.SetCursorPosY(yPos + progressSize / 2 - textSize.y / 2)
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + ((ImGui.GetWindowWidth() / 2) - 8))
             ImGui.SetWindowFontScale(FontScale)
-            ImGui.Text(tostring(mq.TLO.Me.PctHPs() or 0))
+            ImGui.Text(text)
             ImGui.SetWindowFontScale(1)
-            local yPos = ImGui.GetCursorPosY()
+            ImGui.SetCursorPosY(yPosNext)
+            ImGui.Spacing()
+            yPos = ImGui.GetCursorPosY()
             --My Mana Bar
             if (tonumber(mq.TLO.Me.MaxMana()) > 0) then
                 if settings[Module.Name].DynamicMP then
@@ -1025,23 +1278,33 @@ function Module.RenderGUI()
                 end
                 ImGui.ProgressBar(((tonumber(mq.TLO.Me.PctMana() or 0)) / 100), ImGui.GetContentRegionAvail(), progressSize, '##pctMana')
                 ImGui.PopStyleColor()
-                ImGui.SetCursorPosY(yPos - 1)
+                yPosNext = ImGui.GetCursorPosY()
+                text = tostring(mq.TLO.Me.PctMana() or 0)
+                textSize = ImGui.CalcTextSizeVec(text)
+                ImGui.SetCursorPosY(yPos + progressSize / 2 - textSize.y / 2)
                 ImGui.SetCursorPosX(ImGui.GetCursorPosX() + ((ImGui.GetWindowWidth() / 2) - 8))
                 ImGui.SetWindowFontScale(FontScale)
-                ImGui.Text(tostring(mq.TLO.Me.PctMana() or 0))
+                ImGui.Text(text)
                 ImGui.SetWindowFontScale(1)
+                ImGui.SetCursorPosY(yPosNext)
+                ImGui.Spacing()
+                yPos = ImGui.GetCursorPosY()
             end
-            local yPos = ImGui.GetCursorPosY()
             --My Endurance bar
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('yellow2')))
             ImGui.ProgressBar(((tonumber(mq.TLO.Me.PctEndurance() or 0)) / 100), ImGui.GetContentRegionAvail(), progressSize, '##pctEndurance')
             ImGui.PopStyleColor()
-            ImGui.SetCursorPosY(yPos - 1)
+            yPosNext = ImGui.GetCursorPosY()
+            text = tostring(mq.TLO.Me.PctEndurance() or 0)
+            textSize = ImGui.CalcTextSizeVec(text)
+            ImGui.SetCursorPosY(yPos + progressSize / 2 - textSize.y / 2)
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + ((ImGui.GetWindowWidth() / 2) - 8))
             ImGui.SetWindowFontScale(FontScale)
-            ImGui.Text(tostring(mq.TLO.Me.PctEndurance() or 0))
+            ImGui.Text(text)
             ImGui.SetWindowFontScale(1)
-            ImGui.Separator()
+            ImGui.SetCursorPosY(yPosNext)
+            ImGui.Spacing()
+            yPos = ImGui.GetCursorPosY()
             ImGui.EndGroup()
             if ImGui.IsItemHovered() and ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
                 if mq.TLO.Cursor() then
@@ -1168,7 +1431,7 @@ end
 function Module.LocalLoop()
     while Module.IsRunning do
         Module.MainLoop()
-        mq.delay(1)
+        mq.delay(8)
     end
 end
 

@@ -244,7 +244,7 @@ local function ProcessModuleChanges()
 					for i, v in ipairs(mods) do
 						if v == module_name then
 							if MyUI_Modules[module_name] ~= nil then
-								if MyUI_Modules[module_name].Unload() ~= nil then
+								if MyUI_Modules[module_name].Unload ~= nil then
 									MyUI_Modules[module_name].Unload()
 								end
 								MyUI_LoadModules.unload(module_name)
@@ -606,7 +606,8 @@ local function MyUI_Main()
 				else
 					ModTimer = 0
 				end
-				if MyUI_Modules[data.name].MainLoop ~= nil then MyUI_Modules[data.name].MainLoop() end
+				local moduleData = MyUI_Modules[data.name]
+				if moduleData and moduleData.MainLoop ~= nil then moduleData.MainLoop() end
 				-- printf("Module: \at%s\ax took \ay%.2f ms\ax to run", data.name, (os.clock() - ModTimer) * 1000)
 				if MyUI_TempSettings.Debug then
 					if MyUI_TempSettings.ModuleProcessing[data.name] == nil then

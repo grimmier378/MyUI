@@ -406,7 +406,9 @@ function Module.RenderTargetOfTarget()
     if not settings[Module.Name].ShowToT then return end
 
     ImGui.SetNextWindowSize(250, 100, ImGuiCond.FirstUseEver)
-    local openTot, drawToT = ImGui.Begin("Target of Target##" .. Module.Name, true)
+    local tmpFlag = targFlag
+    if locked then tmpFlag = bit32.bor(targFlag, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoResize) end
+    local openTot, drawToT = ImGui.Begin("Target of Target##" .. Module.Name, true, tmpFlag)
     if drawToT then
         ImGui.SetWindowFontScale(FontScale)
         ImGui.Text(tot.CleanName() or '?')
@@ -803,7 +805,7 @@ function Module.RenderGUI()
     ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
     local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme, settings[Module.Name].MouseOver, mouseHud, settings[Module.Name].WinTransparency)
     if locked then
-        flags = bit32.bor(ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.MenuBar, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoScrollWithMouse)
+        flags = bit32.bor(ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.MenuBar, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoResize, ImGuiWindowFlags.NoScrollWithMouse)
     end
     if ShowGUI then
         local open, show = ImGui.Begin(Module.CharLoaded .. "##Target", true, flags)
@@ -1063,7 +1065,7 @@ function Module.RenderGUI()
         local colorCountTarget, styleCountTarget = Module.ThemeLoader.StartTheme(themeName, Module.Theme, settings[Module.Name].MouseOver, mouseHudTarg,
             settings[Module.Name].WinTransparency)
         local tmpFlag = targFlag
-        if locked then tmpFlag = bit32.bor(targFlag, ImGuiWindowFlags.NoMove) end
+        if locked then tmpFlag = bit32.bor(targFlag, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoResize) end
         local openT, showT = ImGui.Begin("Target##TargetPopout" .. Module.CharLoaded, true, tmpFlag)
         if showT then
             if ImGui.IsWindowHovered(ImGuiHoveredFlags.ChildWindows) then
@@ -1150,7 +1152,7 @@ function Module.MainLoop()
         if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
 
-    local timeDiff = mq.gettime() - clockTimer
+    --local timeDiff = mq.gettime() - clockTimer
     -- if timeDiff > 3 then
 
     ---@diagnostic disable-next-line: undefined-field

@@ -401,32 +401,30 @@ local function targetBuffs(count)
 end
 
 function Module.RenderTargetOfTarget()
-    if not mq.TLO.Target.AggroHolder() then return end
+    local tot = mq.TLO.Me.TargetOfTarget
+    if not tot or not tot() then return end
     if not settings[Module.Name].ShowToT then return end
 
     ImGui.SetNextWindowSize(250, 100, ImGuiCond.FirstUseEver)
     local openTot, drawToT = ImGui.Begin("Target of Target##" .. Module.Name, true)
     if drawToT then
         ImGui.SetWindowFontScale(FontScale)
-        local tot = mq.TLO.Target.AggroHolder
-        if tot() then
-            ImGui.Text(tot.CleanName() or '?')
-            if settings[Module.Name].DynamicHP then
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorHpMin, colorHpMax, tot.PctHPs())))
+        ImGui.Text(tot.CleanName() or '?')
+        if settings[Module.Name].DynamicHP then
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorHpMin, colorHpMax, tot.PctHPs())))
+        else
+            if tot.PctHPs() < 25 then
+                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('orange')))
             else
-                if tot.PctHPs() < 25 then
-                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('orange')))
-                else
-                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
-                end
+                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
             end
-            local yPos = ImGui.GetCursorPosY() - 2
-            ImGui.ProgressBar(((tonumber(tot.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), ProgressSizeTarget, '##' .. tot.PctHPs())
-            ImGui.PopStyleColor()
-            ImGui.SetCursorPosY(yPos)
-            ImGui.SetCursorPosX((ImGui.GetContentRegionAvail() - (ImGui.CalcTextSize("HP: 1000") * 0.5)) * 0.5)
-            ImGui.Text("HP: %d%%", tot.PctHPs() or 0)
         end
+        local yPos = ImGui.GetCursorPosY() - 2
+        ImGui.ProgressBar(((tonumber(tot.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), ProgressSizeTarget, '##' .. tot.PctHPs())
+        ImGui.PopStyleColor()
+        ImGui.SetCursorPosY(yPos)
+        ImGui.SetCursorPosX((ImGui.GetContentRegionAvail() - (ImGui.CalcTextSize("HP: 1000") * 0.5)) * 0.5)
+        ImGui.Text("HP: %d%%", tot.PctHPs() or 0)
     end
     ImGui.End()
 end

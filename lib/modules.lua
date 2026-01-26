@@ -1,6 +1,16 @@
 local Module = { _version = '0.1a', _author = 'Derple, Grimmier', } -- Original borrowed from the RGMercs Thanks Derple! <3 then I hacked it apart.
 local mq = require 'mq'
 
+local function loadModule(path)
+	-- Macroquest wraps lua's dofile such that on error it returns a string with a stack trace
+	local result = dofile(path)
+	if not result then return nil end
+	if type(result) == "string" and result:find("stack traceback") then
+		MyUI_Utils.PrintOutput(nil, nil, "\arError loading %s:\n%s", path, result)
+		return nil
+	end
+	return result
+end
 
 ---@param module_list table
 ---@return any
@@ -13,7 +23,7 @@ function Module.loadAll(module_list)
 			if module:lower() == 'mychat' then
 				local moduleName = mq.luaDir .. "/MyUI/modules/" .. module:lower() .. ".lua"
 				Module.checkExternal(module)
-				modules[module] = dofile(moduleName)
+				modules[module] = loadModule(moduleName)
 				count = count + 1
 				MyUI_InitPctComplete = ((count / #module_list) * 100)
 				MyUI_CurLoading = module
@@ -28,7 +38,7 @@ function Module.loadAll(module_list)
 			end
 			local moduleName = mq.luaDir .. "/MyUI/modules/" .. module:lower() .. ".lua"
 			Module.checkExternal(module)
-			modules[module] = dofile(moduleName)
+			modules[module] = loadModule(moduleName)
 			count = count + 1
 			MyUI_InitPctComplete = ((count / #module_list) * 100)
 			MyUI_CurLoading = module
@@ -60,7 +70,7 @@ end
 function Module.load(module_name)
 	Module.checkExternal(module_name)
 	local modPath = mq.luaDir .. "/MyUI/modules/" .. module_name:lower() .. ".lua"
-	local moduleName = dofile(modPath)
+	local moduleName = loadModule(modPath)
 	if moduleName then
 		return moduleName
 	end

@@ -1327,7 +1327,7 @@ function Module.RenderGUI()
             ImGui.Spacing()
 
             --My Mana Bar
-            if (tonumber(mq.TLO.Me.MaxMana()) > 0) then
+            if tonumber(mq.TLO.Me.MaxMana() or 0) > 0 then
                 local percentage = tonumber(mq.TLO.Me.PctMana() or 0)
                 local text
                 local maxValue = mq.TLO.Me.MaxMana()
@@ -1510,6 +1510,9 @@ function Module.LocalLoop()
     while Module.IsRunning do
         Module.MainLoop()
         mq.delay(8)
+        if mq.TLO.EverQuest.GameState() ~= "INGAME" then
+            Module.IsRunning = false
+        end
     end
 end
 

@@ -134,6 +134,7 @@ defaults                                            = {
     HaveAggroColor = { 0.78, 0.20, 0.05, 0.8, },
     ShowAggro = true,
     ShowToT = false,
+    ShowTargetArrow = true,
 }
 
 -- Functions
@@ -994,6 +995,10 @@ local function PlayerTargConf_GUI()
 
         ImGui.Spacing()
 
+        settings[Module.Name].ShowTargetArrow = Module.Utils.DrawToggle('Show Arrow to Target##' .. Module.Name, settings[Module.Name].ShowTargetArrow, ToggleFlags)
+
+        ImGui.Spacing()
+
         settings[Module.Name].ShowToT = Module.Utils.DrawToggle('Show Target of Target##' .. Module.Name, settings[Module.Name].ShowToT, ToggleFlags)
 
         ImGui.Spacing()
@@ -1137,7 +1142,7 @@ local function drawTarget(prependSeparator)
         local distance = math.floor(target.Distance() or 0)
 
         local decorations
-        if distance > 0 and target.HeadingTo.Degrees() ~= nil and mq.TLO.Me.Heading.Degrees() ~= nil then
+        if settings[Module.Name].ShowTargetArrow and distance > 0 and target.HeadingTo.Degrees() ~= nil and mq.TLO.Me.Heading.Degrees() ~= nil then
             local angle = target.HeadingTo.Degrees() - mq.TLO.Me.Heading.Degrees()
             decorations = {
                 {

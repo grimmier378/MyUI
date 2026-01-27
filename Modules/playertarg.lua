@@ -1562,11 +1562,20 @@ function Module.RenderGUI()
 
             if lastActiveDiscID then
                 local percentage
+                local remainingSeconds
                 if lastActiveDiscEstimatedStartTime and lastActiveDiscTotalSeconds then
-                    percentage = 100 * (lastActiveDiscTotalSeconds - os.time() + lastActiveDiscEstimatedStartTime) / lastActiveDiscTotalSeconds
+                    remainingSeconds = lastActiveDiscTotalSeconds - (os.time() - lastActiveDiscEstimatedStartTime)
+                    percentage = 100 * remainingSeconds / lastActiveDiscTotalSeconds
                     percentage = math.max(0, math.min(100, percentage))
                 else
                     percentage = 100
+                end
+
+                local text
+                if remainingSeconds then
+                    text = string.format("%s (%ds)", tostring(lastActiveDiscName), remainingSeconds)
+                else
+                    text = lastActiveDiscName
                 end
 
                 drawBar({
@@ -1578,7 +1587,7 @@ function Module.RenderGUI()
                     dropShadow   = true,
                     fontScale    = FontScale,
 
-                    centerText   = lastActiveDiscName,
+                    centerText   = text,
                     centerColor  = targetTextColor,
 
                     staticColor  = Module.Colors.color('yellow'),

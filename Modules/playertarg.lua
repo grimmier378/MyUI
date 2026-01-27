@@ -1254,6 +1254,10 @@ local function drawTarget(prependSeparator)
     end
 end
 
+local lastActiveDiscID = nil
+local lastActiveDiscEstimatedStartTime = nil
+local lastActiveDiscName = nil
+local lastActiveDiscTotalSeconds = nil
 function Module.RenderGUI()
     local flags = winFlag
     -- Default window size
@@ -1539,6 +1543,48 @@ function Module.RenderGUI()
                 staticColor  = Module.Colors.color('yellow2'),
             })
             ImGui.Spacing()
+
+            -- My Combat Ability Disc bar
+            if lastActiveDiscID ~= mq.TLO.Me.ActiveDisc.ID() then
+                lastActiveDiscID = mq.TLO.Me.ActiveDisc.ID()
+                if lastActiveDiscID then
+                    -- The buff's duration for the active disc appears to always report 0,
+                    -- so we estimate the time remaining
+                    lastActiveDiscEstimatedStartTime = os.time()
+                    lastActiveDiscName = mq.TLO.Me.ActiveDisc()
+                    lastActiveDiscTotalSeconds = mq.TLO.Me.ActiveDisc.Duration.TotalSeconds()
+                else
+                    lastActiveDiscEstimatedStartTime = nil
+                    lastActiveDiscName = nil
+                    lastActiveDiscTotalSeconds = nil
+                end
+            end
+
+            if lastActiveDiscID then
+                local percentage
+                if lastActiveDiscEstimatedStartTime and lastActiveDiscTotalSeconds then
+                    percentage = 100 * (lastActiveDiscTotalSeconds - os.time() + lastActiveDiscEstimatedStartTime) / lastActiveDiscTotalSeconds
+                    percentage = math.max(0, math.min(100, percentage))
+                else
+                    percentage = 100
+                end
+
+                drawBar({
+                    label        = '##pctDisc',
+                    percentage   = percentage,
+                    width        = ImGui.GetContentRegionAvail(),
+                    height       = progressSize,
+
+                    dropShadow   = true,
+                    fontScale    = FontScale,
+
+                    centerText   = lastActiveDiscName,
+                    centerColor  = targetTextColor,
+
+                    staticColor  = Module.Colors.color('yellow'),
+                })
+                ImGui.Spacing()
+            end
 
             ImGui.EndGroup()
             if ImGui.IsItemHovered() and ImGui.IsMouseReleased(ImGuiMouseButton.Left) then

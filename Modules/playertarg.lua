@@ -134,6 +134,7 @@ defaults                                            = {
     HaveAggroColor = { 0.78, 0.20, 0.05, 0.8, },
     ShowAggro = true,
     ShowToT = false,
+    ShowTargetArrow = true,
 }
 
 -- Functions
@@ -430,12 +431,157 @@ local function drawHighlightBox(min, max, color)
     drawList:AddRect(minPadded, maxPadded, borderColor, 1, ImDrawFlags.RoundCornersAll, 2.5)
 end
 
+-- Rotate a point around a center using precomputed cos/sin
+local function rotatePoint(p, centerX, centerY, cosine, sine)
+    local x = p.x - centerX
+    local y = p.y - centerY
+    return ImVec2(
+        x * cosine - y * sine + centerX,
+        x * sine + y * cosine + centerY
+    )
+end
+
+-- Draw an isosceles triangle arrow inside a square bounding box (roughly, points can extend beyond a bit)
+-- drawList: current ImGui draw list. ImGui.GetWindowDrawList()
+-- topLeftPosX: top-left x position of square
+-- topLeftPosY: top-left y position of square
+-- size: number, width and height of square
+-- arrowWidthPercent: number 0-1, width as % of size
+-- color: ImVec4 or compatible
+-- angle: optional rotation in degrees
+local function drawArrowTriangle(drawList, topLeftPosX, topLeftPosY, size, arrowWidthPercent, color, angle)
+    local centerX = topLeftPosX + size/2
+    local centerY = topLeftPosY + size/2
+
+    -- Define triangle relative to top-left
+    local halfWidth = size * arrowWidthPercent/2
+    local tip = ImVec2(centerX, topLeftPosY)
+    local leftBase = ImVec2(centerX - halfWidth, topLeftPosY + size)
+    local rightBase = ImVec2(centerX + halfWidth, topLeftPosY + size)
+
+    -- Rotate points around center, if angle provided
+    if angle then
+        local radians = math.rad(angle)
+        local cosine, sine = math.cos(radians), math.sin(radians)
+        tip = rotatePoint(tip, centerX, centerY, cosine, sine)
+        leftBase = rotatePoint(leftBase, centerX, centerY, cosine, sine)
+        rightBase = rotatePoint(rightBase, centerX, centerY, cosine, sine)
+    end
+
+    drawList:AddTriangleFilled(tip, leftBase, rightBase, toU32(color))
+end
+
+-- Anchor points for decorations
+local BarAnchor = {
+    -- First row text
+    TEXT_LEFT_1   = 0,
+    TEXT_CENTER_1 = 1,
+    TEXT_RIGHT_1  = 2,
+
+    -- Second row text
+    TEXT_LEFT_2   = 3,
+    TEXT_CENTER_2 = 4,
+    TEXT_RIGHT_2  = 5,
+
+    -- Bar anchors
+    BAR_LEFT      = 6,
+    BAR_CENTER    = 7,
+    BAR_RIGHT     = 8,
+}
+
+local function drawBarDecorations(drawList, anchors, decorations)
+    for _, d in ipairs(decorations) do
+        local anchor = anchors[d.anchor]
+        local size = d.size or (anchor.textSize and anchor.textSize.y) or 16 -- assuming square sizes for now
+        local alignX = d.alignX or 0 -- -1 aligns left of anchor, 0 center, and 1 right
+        local alignY = d.alignY or 0 -- -1 aligns top of anchor, 0 center, and 1 bottom
+
+        local topLeftX = anchor.x - size * (1 - alignX) * 0.5
+        local topLeftY = anchor.y - size * (1 - alignY) * 0.5
+
+        if d.offsetX then
+            topLeftX = topLeftX + d.offsetX
+        end
+        if d.offsetY then
+            topLeftY = topLeftY + d.offsetY
+        end
+
+        if d.type == "arrow" then
+            drawArrowTriangle(
+                drawList,
+                topLeftX,
+                topLeftY,
+                size,
+                d.widthPercentage or 0.6,
+                d.color,
+                d.angle
+            )
+        end
+    end
+end
+
+local function drawBarText(drawList, position, text, color, dropShadow, shadowColor)
+    if dropShadow then
+        drawList:AddText(ImVec2(position.x + 1, position.y + 2), shadowColor, text)
+    end
+    drawList:AddText(position, color, text)
+end
+
+local function drawBarRow(
+        drawList,
+        leftText, centerText, rightText,
+        leftColor, centerColor, rightColor,
+        dropShadow, shadowColor,
+        min, max, rowCenterY, padding,
+        anchors, leftAnchor, centerAnchor, rightAnchor)
+    local size, pos
+    if leftText then
+        size = ImGui.CalcTextSizeVec(leftText)
+        pos = ImVec2(min.x + padding, rowCenterY - size.y/2)
+        drawBarText(drawList, pos, leftText, toU32(leftColor), dropShadow, shadowColor)
+    end
+    if anchors then
+        if leftText then
+            anchors[leftAnchor] = { x = pos.x + size.x, y = rowCenterY, textSize = size }
+        else
+            anchors[leftAnchor] = { x = min.x + padding, y = rowCenterY }
+        end
+    end
+
+    if centerText then
+        size = ImGui.CalcTextSizeVec(centerText)
+        pos = ImVec2((min.x + max.x)/2 - size.x/2, rowCenterY - size.y/2)
+        drawBarText(drawList, pos, centerText, toU32(centerColor), dropShadow, shadowColor)
+    end
+    if anchors then
+        if centerText then
+            anchors[centerAnchor] = { x = (min.x + max.x)/2, y = rowCenterY, textSize = size }
+        else
+            anchors[centerAnchor] = { x = (min.x + max.x)/2, y = rowCenterY }
+        end
+    end
+
+    if rightText then
+        size = ImGui.CalcTextSizeVec(rightText)
+        pos = ImVec2(max.x - size.x - padding, rowCenterY - size.y/2)
+        drawBarText(drawList, pos, rightText, toU32(rightColor), dropShadow, shadowColor)
+    end
+    if anchors then
+        if rightText then
+            anchors[rightAnchor] = { x = pos.x, y = rowCenterY, textSize = size }
+        else
+            anchors[rightAnchor] = { x = max.x - padding, y = rowCenterY }
+        end
+    end
+end
+
 local function drawBar(opts)
     -- Required
     local label        = opts.label
     local percentage   = opts.percentage
 
     -- Optional
+    local decorations  = opts.decorations
     local dropShadow   = opts.dropShadow
     local fontScale    = opts.fontScale
     local tooltip      = opts.tooltip
@@ -502,7 +648,6 @@ local function drawBar(opts)
     end
 
     local drawList = ImGui.GetWindowDrawList()
-    local defaultColor = ImGui.GetColorU32(ImGuiCol.Text)
     local shadowColor = ImGui.GetColorU32(0, 0, 0, 1)
     local padding = 4
 
@@ -519,39 +664,27 @@ local function drawBar(opts)
         centerY2 = nil
     end
 
-    local function drawText(position, text, color)
-        if dropShadow then
-            drawList:AddText(ImVec2(position.x + 1, position.y + 2), shadowColor, text)
-        end
-        drawList:AddText(position, color, text)
-    end
+    local anchors = decorations and {} or nil
 
-    -- First row
-    if leftText then
-        local sizeL = ImGui.CalcTextSizeVec(leftText)
-        drawText(ImVec2(min.x + padding, centerY1 - sizeL.y / 2), leftText, toU32(leftColor, defaultColor))
-    end
-    if centerText then
-        local sizeC = ImGui.CalcTextSizeVec(centerText)
-        drawText(ImVec2((min.x + max.x)/2 - sizeC.x/2, centerY1 - sizeC.y/2), centerText, toU32(centerColor, defaultColor))
-    end
-    if rightText then
-        local sizeR = ImGui.CalcTextSizeVec(rightText)
-        drawText(ImVec2(max.x - sizeR.x - padding, centerY1 - sizeR.y/2), rightText, toU32(rightColor, defaultColor))
-    end
+    drawBarRow(drawList,
+            leftText, centerText, rightText,
+            leftColor, centerColor, rightColor,
+            dropShadow, shadowColor,
+            min, max, centerY1, padding,
+            anchors, BarAnchor.TEXT_LEFT_1, BarAnchor.TEXT_CENTER_1, BarAnchor.TEXT_RIGHT_1)
+    drawBarRow(drawList,
+            leftText2, centerText2, rightText2,
+            leftColor2, centerColor2, rightColor2,
+            dropShadow, shadowColor,
+            min, max, centerY2, padding,
+            anchors, BarAnchor.TEXT_LEFT_2, BarAnchor.TEXT_CENTER_2, BarAnchor.TEXT_RIGHT_2)
 
-    -- Second row
-    if leftText2 then
-        local sizeL2 = ImGui.CalcTextSizeVec(leftText2)
-        drawText(ImVec2(min.x + padding, centerY2 - sizeL2.y/2), leftText2, toU32(leftColor2, defaultColor))
-    end
-    if centerText2 then
-        local sizeC2 = ImGui.CalcTextSizeVec(centerText2)
-        drawText(ImVec2((min.x + max.x)/2 - sizeC2.x/2, centerY2 - sizeC2.y/2), centerText2, toU32(centerColor2, defaultColor))
-    end
-    if rightText2 then
-        local sizeR2 = ImGui.CalcTextSizeVec(rightText2)
-        drawText(ImVec2(max.x - sizeR2.x - padding, centerY2 - sizeR2.y/2), rightText2, toU32(rightColor2, defaultColor))
+    if anchors then
+        anchors[BarAnchor.BAR_LEFT] = { x = min.x, y = centerY }
+        anchors[BarAnchor.BAR_CENTER] = { x = (min.x+max.x)/2, y = centerY }
+        anchors[BarAnchor.BAR_RIGHT] = { x = max.x, y = centerY }
+
+        drawBarDecorations(drawList, anchors, decorations)
     end
 
     if fontScale then
@@ -862,6 +995,10 @@ local function PlayerTargConf_GUI()
 
         ImGui.Spacing()
 
+        settings[Module.Name].ShowTargetArrow = Module.Utils.DrawToggle('Show Arrow to Target##' .. Module.Name, settings[Module.Name].ShowTargetArrow, ToggleFlags)
+
+        ImGui.Spacing()
+
         settings[Module.Name].ShowToT = Module.Utils.DrawToggle('Show Target of Target##' .. Module.Name, settings[Module.Name].ShowToT, ToggleFlags)
 
         ImGui.Spacing()
@@ -1001,6 +1138,25 @@ local function drawTarget(prependSeparator)
             text = tostring(percentage) .. "%"
         end
 
+        local distanceColor = Module.Colors.color('yellow')
+        local distance = math.floor(target.Distance() or 0)
+
+        local decorations
+        if settings[Module.Name].ShowTargetArrow and distance > 0 and target.HeadingTo.Degrees() ~= nil and mq.TLO.Me.Heading.Degrees() ~= nil then
+            local angle = target.HeadingTo.Degrees() - mq.TLO.Me.Heading.Degrees()
+            decorations = {
+                {
+                    type = "arrow",
+                    anchor = BarAnchor.TEXT_RIGHT_1,
+                    alignX = -1,
+                    offsetX = -8,
+                    widthPercentage = 0.6,
+                    color = distanceColor,
+                    angle = angle,
+                },
+            }
+        end
+
         drawBar({
             label        = '##Target',
             percentage   = percentage,
@@ -1011,13 +1167,14 @@ local function drawTarget(prependSeparator)
             fontScale    = FontScale,
             tooltip      = string.format("Name: %s\t Lvl: %s\nClass: %s\nRace: %s\nType: %s", targetName, tLvl, tClass, tRace, tBodyType),
             highlight    = highlightColor,
+            decorations  = decorations,
 
             leftText     = targetName,
             leftColor    = targetTextColor,
             centerText   = conIconText,
             centerColor  = conIconColor,
             rightText    = string.format("%dm", math.floor(target.Distance() or 0)),
-            rightColor   = Module.Colors.color('yellow'),
+            rightColor   = distanceColor,
 
             leftText2    = tostring(tLvl) .. ' ' .. tClass .. '  ' .. tBodyType,
             leftColor2   = targetTextColor,
@@ -1097,6 +1254,10 @@ local function drawTarget(prependSeparator)
     end
 end
 
+local lastActiveDiscID = nil
+local lastActiveDiscEstimatedStartTime = nil
+local lastActiveDiscName = nil
+local lastActiveDiscTotalSeconds = nil
 function Module.RenderGUI()
     local flags = winFlag
     -- Default window size
@@ -1382,6 +1543,57 @@ function Module.RenderGUI()
                 staticColor  = Module.Colors.color('yellow2'),
             })
             ImGui.Spacing()
+
+            -- My Combat Ability Disc bar
+            if lastActiveDiscID ~= mq.TLO.Me.ActiveDisc.ID() then
+                lastActiveDiscID = mq.TLO.Me.ActiveDisc.ID()
+                if lastActiveDiscID then
+                    -- The buff's duration for the active disc appears to always report 0,
+                    -- so we estimate the time remaining
+                    lastActiveDiscEstimatedStartTime = os.time()
+                    lastActiveDiscName = mq.TLO.Me.ActiveDisc()
+                    lastActiveDiscTotalSeconds = mq.TLO.Me.ActiveDisc.Duration.TotalSeconds()
+                else
+                    lastActiveDiscEstimatedStartTime = nil
+                    lastActiveDiscName = nil
+                    lastActiveDiscTotalSeconds = nil
+                end
+            end
+
+            if lastActiveDiscID then
+                local percentage
+                local remainingSeconds
+                if lastActiveDiscEstimatedStartTime and lastActiveDiscTotalSeconds then
+                    remainingSeconds = lastActiveDiscTotalSeconds - (os.time() - lastActiveDiscEstimatedStartTime)
+                    percentage = 100 * remainingSeconds / lastActiveDiscTotalSeconds
+                    percentage = math.max(0, math.min(100, percentage))
+                else
+                    percentage = 100
+                end
+
+                local text
+                if remainingSeconds then
+                    text = string.format("%s (%ds)", tostring(lastActiveDiscName), remainingSeconds)
+                else
+                    text = lastActiveDiscName
+                end
+
+                drawBar({
+                    label        = '##pctDisc',
+                    percentage   = percentage,
+                    width        = ImGui.GetContentRegionAvail(),
+                    height       = progressSize,
+
+                    dropShadow   = true,
+                    fontScale    = FontScale,
+
+                    centerText   = text,
+                    centerColor  = targetTextColor,
+
+                    staticColor  = Module.Colors.color('yellow'),
+                })
+                ImGui.Spacing()
+            end
 
             ImGui.EndGroup()
             if ImGui.IsItemHovered() and ImGui.IsMouseReleased(ImGuiMouseButton.Left) then

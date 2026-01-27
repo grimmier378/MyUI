@@ -828,6 +828,12 @@ function CommonUtils.RotatePoint(point, center, angle)
 	)
 end
 
+---comment
+---@param topPoint ImVec2 x,y coordinates of the top point of the arrow
+---@param width number base width of the arrow
+---@param height number height of the arrow
+---@param color ImVec4 color of the arrow
+---@param angle number angle in radians to rotate the arrow
 function CommonUtils.DrawArrow(topPoint, width, height, color, angle)
 	local draw_list = ImGui.GetWindowDrawList()
 	local p1 = ImVec2(topPoint.x, topPoint.y)

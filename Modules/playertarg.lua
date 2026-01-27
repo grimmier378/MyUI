@@ -258,80 +258,6 @@ local function pulseCombat(speed)
     if speed == 0 then cAlpha = 255 end
 end
 
-
----comment
----@param tName string -- name of the Module.Theme to load form table
----@param window string -- name of the window to apply the Module.Theme to
----@return integer, integer -- returns the new counter values
-local function DrawTheme(tName, window)
-    local StyleCounter = 0
-    local ColorCounter = 0
-    for tID, tData in pairs(Module.Theme.Theme) do
-        if tData.Name == tName then
-            for pID, cData in pairs(Module.Theme.Theme[tID].Color) do
-                if window == 'main' then
-                    if cData.PropertyName == 'Border' then
-                        themeBorderBG = { cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4], }
-                    elseif cData.PropertyName == 'TableRowBg' then
-                        themeRowBG = { cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4], }
-                    elseif cData.PropertyName == 'WindowBg' then
-                        if not settings[Module.Name].MouseOver then
-                            ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[Module.Name].WinTransparency))
-                            ColorCounter = ColorCounter + 1
-                        elseif settings[Module.Name].MouseOver and mouseHud then
-                            ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], 1.0))
-                            ColorCounter = ColorCounter + 1
-                        elseif settings[Module.Name].MouseOver and not mouseHud then
-                            ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[Module.Name].WinTransparency))
-                            ColorCounter = ColorCounter + 1
-                        end
-                    else
-                        ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
-                        ColorCounter = ColorCounter + 1
-                    end
-                elseif window == 'targ' then
-                    if cData.PropertyName == 'Border' then
-                        themeBorderBG = { cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4], }
-                    elseif cData.PropertyName == 'TableRowBg' then
-                        themeRowBG = { cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4], }
-                    elseif cData.PropertyName == 'WindowBg' then
-                        if not settings[Module.Name].MouseOver then
-                            ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[Module.Name].WinTransparency))
-                            ColorCounter = ColorCounter + 1
-                        elseif settings[Module.Name].MouseOver and mouseHudTarg then
-                            ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], 1.0))
-                            ColorCounter = ColorCounter + 1
-                        elseif settings[Module.Name].MouseOver and not mouseHudTarg then
-                            ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], settings[Module.Name].WinTransparency))
-                            ColorCounter = ColorCounter + 1
-                        end
-                    else
-                        ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
-                        ColorCounter = ColorCounter + 1
-                    end
-                else
-                    ImGui.PushStyleColor(pID, ImVec4(cData.Color[1], cData.Color[2], cData.Color[3], cData.Color[4]))
-                    ColorCounter = ColorCounter + 1
-                end
-            end
-            if tData['Style'] ~= nil then
-                if next(tData['Style']) ~= nil then
-                    for sID, sData in pairs(Module.Theme.Theme[tID].Style) do
-                        if sData.Size ~= nil then
-                            ImGui.PushStyleVar(sID, sData.Size)
-                            StyleCounter = StyleCounter + 1
-                        elseif sData.X ~= nil then
-                            ImGui.PushStyleVar(sID, sData.X, sData.Y)
-                            StyleCounter = StyleCounter + 1
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return ColorCounter, StyleCounter
-end
-
 --[[
     Borrowed from rgmercs
     ~Thanks Derple
@@ -431,46 +357,6 @@ local function drawHighlightBox(min, max, color)
     drawList:AddRect(minPadded, maxPadded, borderColor, 1, ImDrawFlags.RoundCornersAll, 2.5)
 end
 
--- Rotate a point around a center using precomputed cos/sin
-local function rotatePoint(p, centerX, centerY, cosine, sine)
-    local x = p.x - centerX
-    local y = p.y - centerY
-    return ImVec2(
-        x * cosine - y * sine + centerX,
-        x * sine + y * cosine + centerY
-    )
-end
-
--- Draw an isosceles triangle arrow inside a square bounding box (roughly, points can extend beyond a bit)
--- drawList: current ImGui draw list. ImGui.GetWindowDrawList()
--- topLeftPosX: top-left x position of square
--- topLeftPosY: top-left y position of square
--- size: number, width and height of square
--- arrowWidthPercent: number 0-1, width as % of size
--- color: ImVec4 or compatible
--- angle: optional rotation in degrees
-local function drawArrowTriangle(drawList, topLeftPosX, topLeftPosY, size, arrowWidthPercent, color, angle)
-    local centerX = topLeftPosX + size/2
-    local centerY = topLeftPosY + size/2
-
-    -- Define triangle relative to top-left
-    local halfWidth = size * arrowWidthPercent/2
-    local tip = ImVec2(centerX, topLeftPosY)
-    local leftBase = ImVec2(centerX - halfWidth, topLeftPosY + size)
-    local rightBase = ImVec2(centerX + halfWidth, topLeftPosY + size)
-
-    -- Rotate points around center, if angle provided
-    if angle then
-        local radians = math.rad(angle)
-        local cosine, sine = math.cos(radians), math.sin(radians)
-        tip = rotatePoint(tip, centerX, centerY, cosine, sine)
-        leftBase = rotatePoint(leftBase, centerX, centerY, cosine, sine)
-        rightBase = rotatePoint(rightBase, centerX, centerY, cosine, sine)
-    end
-
-    drawList:AddTriangleFilled(tip, leftBase, rightBase, toU32(color))
-end
-
 -- Anchor points for decorations
 local BarAnchor = {
     -- First row text
@@ -493,8 +379,8 @@ local function drawBarDecorations(drawList, anchors, decorations)
     for _, d in ipairs(decorations) do
         local anchor = anchors[d.anchor]
         local size = d.size or (anchor.textSize and anchor.textSize.y) or 16 -- assuming square sizes for now
-        local alignX = d.alignX or 0 -- -1 aligns left of anchor, 0 center, and 1 right
-        local alignY = d.alignY or 0 -- -1 aligns top of anchor, 0 center, and 1 bottom
+        local alignX = d.alignX or 0                                         -- -1 aligns left of anchor, 0 center, and 1 right
+        local alignY = d.alignY or 0                                         -- -1 aligns top of anchor, 0 center, and 1 bottom
 
         local topLeftX = anchor.x - size * (1 - alignX) * 0.5
         local topLeftY = anchor.y - size * (1 - alignY) * 0.5
@@ -507,15 +393,17 @@ local function drawBarDecorations(drawList, anchors, decorations)
         end
 
         if d.type == "arrow" then
-            drawArrowTriangle(
-                drawList,
-                topLeftX,
-                topLeftY,
-                size,
-                d.widthPercentage or 0.6,
-                d.color,
-                d.angle
-            )
+            Module.Utils.DrawArrow(ImVec2(topLeftX, topLeftY), size * d.widthPercentage, size, d.color, d.angle)
+            -- use the function in Utils
+            -- drawArrowTriangle(
+            --     drawList,
+            --     topLeftX,
+            --     topLeftY,
+            --     size,
+            --     d.widthPercentage or 0.6,
+            --     d.color,
+            --     d.angle
+            -- )
         end
     end
 end
@@ -528,66 +416,66 @@ local function drawBarText(drawList, position, text, color, dropShadow, shadowCo
 end
 
 local function drawBarRow(
-        drawList,
-        leftText, centerText, rightText,
-        leftColor, centerColor, rightColor,
-        dropShadow, shadowColor,
-        min, max, rowCenterY, padding,
-        anchors, leftAnchor, centerAnchor, rightAnchor)
+    drawList,
+    leftText, centerText, rightText,
+    leftColor, centerColor, rightColor,
+    dropShadow, shadowColor,
+    min, max, rowCenterY, padding,
+    anchors, leftAnchor, centerAnchor, rightAnchor)
     local size, pos
     if leftText then
         size = ImGui.CalcTextSizeVec(leftText)
-        pos = ImVec2(min.x + padding, rowCenterY - size.y/2)
+        pos = ImVec2(min.x + padding, rowCenterY - size.y / 2)
         drawBarText(drawList, pos, leftText, toU32(leftColor), dropShadow, shadowColor)
     end
     if anchors then
         if leftText then
-            anchors[leftAnchor] = { x = pos.x + size.x, y = rowCenterY, textSize = size }
+            anchors[leftAnchor] = { x = pos.x + size.x, y = rowCenterY, textSize = size, }
         else
-            anchors[leftAnchor] = { x = min.x + padding, y = rowCenterY }
+            anchors[leftAnchor] = { x = min.x + padding, y = rowCenterY, }
         end
     end
 
     if centerText then
         size = ImGui.CalcTextSizeVec(centerText)
-        pos = ImVec2((min.x + max.x)/2 - size.x/2, rowCenterY - size.y/2)
+        pos = ImVec2((min.x + max.x) / 2 - size.x / 2, rowCenterY - size.y / 2)
         drawBarText(drawList, pos, centerText, toU32(centerColor), dropShadow, shadowColor)
     end
     if anchors then
         if centerText then
-            anchors[centerAnchor] = { x = (min.x + max.x)/2, y = rowCenterY, textSize = size }
+            anchors[centerAnchor] = { x = (min.x + max.x) / 2, y = rowCenterY, textSize = size, }
         else
-            anchors[centerAnchor] = { x = (min.x + max.x)/2, y = rowCenterY }
+            anchors[centerAnchor] = { x = (min.x + max.x) / 2, y = rowCenterY, }
         end
     end
 
     if rightText then
         size = ImGui.CalcTextSizeVec(rightText)
-        pos = ImVec2(max.x - size.x - padding, rowCenterY - size.y/2)
+        pos = ImVec2(max.x - size.x - padding, rowCenterY - size.y / 2)
         drawBarText(drawList, pos, rightText, toU32(rightColor), dropShadow, shadowColor)
     end
     if anchors then
         if rightText then
-            anchors[rightAnchor] = { x = pos.x, y = rowCenterY, textSize = size }
+            anchors[rightAnchor] = { x = pos.x, y = rowCenterY, textSize = size, }
         else
-            anchors[rightAnchor] = { x = max.x - padding, y = rowCenterY }
+            anchors[rightAnchor] = { x = max.x - padding, y = rowCenterY, }
         end
     end
 end
 
 local function drawBar(opts)
     -- Required
-    local label        = opts.label
-    local percentage   = opts.percentage
+    local label       = opts.label
+    local percentage  = opts.percentage
 
     -- Optional
-    local decorations  = opts.decorations
-    local dropShadow   = opts.dropShadow
-    local fontScale    = opts.fontScale
-    local tooltip      = opts.tooltip
-    local highlight    = opts.highlight
-    local width        = opts.width
-    local height       = opts.height
+    local decorations = opts.decorations
+    local dropShadow  = opts.dropShadow
+    local fontScale   = opts.fontScale
+    local tooltip     = opts.tooltip
+    local highlight   = opts.highlight
+    local width       = opts.width
+    local height      = opts.height
     if not width or not height then
         local availX, availY = ImGui.GetContentRegionAvail()
         width = width or availX
@@ -667,22 +555,22 @@ local function drawBar(opts)
     local anchors = decorations and {} or nil
 
     drawBarRow(drawList,
-            leftText, centerText, rightText,
-            leftColor, centerColor, rightColor,
-            dropShadow, shadowColor,
-            min, max, centerY1, padding,
-            anchors, BarAnchor.TEXT_LEFT_1, BarAnchor.TEXT_CENTER_1, BarAnchor.TEXT_RIGHT_1)
+        leftText, centerText, rightText,
+        leftColor, centerColor, rightColor,
+        dropShadow, shadowColor,
+        min, max, centerY1, padding,
+        anchors, BarAnchor.TEXT_LEFT_1, BarAnchor.TEXT_CENTER_1, BarAnchor.TEXT_RIGHT_1)
     drawBarRow(drawList,
-            leftText2, centerText2, rightText2,
-            leftColor2, centerColor2, rightColor2,
-            dropShadow, shadowColor,
-            min, max, centerY2, padding,
-            anchors, BarAnchor.TEXT_LEFT_2, BarAnchor.TEXT_CENTER_2, BarAnchor.TEXT_RIGHT_2)
+        leftText2, centerText2, rightText2,
+        leftColor2, centerColor2, rightColor2,
+        dropShadow, shadowColor,
+        min, max, centerY2, padding,
+        anchors, BarAnchor.TEXT_LEFT_2, BarAnchor.TEXT_CENTER_2, BarAnchor.TEXT_RIGHT_2)
 
     if anchors then
-        anchors[BarAnchor.BAR_LEFT] = { x = min.x, y = centerY }
-        anchors[BarAnchor.BAR_CENTER] = { x = (min.x+max.x)/2, y = centerY }
-        anchors[BarAnchor.BAR_RIGHT] = { x = max.x, y = centerY }
+        anchors[BarAnchor.BAR_LEFT] = { x = min.x, y = centerY, }
+        anchors[BarAnchor.BAR_CENTER] = { x = (min.x + max.x) / 2, y = centerY, }
+        anchors[BarAnchor.BAR_RIGHT] = { x = max.x, y = centerY, }
 
         drawBarDecorations(drawList, anchors, decorations)
     end
@@ -1007,11 +895,13 @@ local function PlayerTargConf_GUI()
 
         ImGui.Spacing()
 
-        settings[Module.Name].showTargetConColorIcon = Module.Utils.DrawToggle('Show Target Con Color Icon##' .. Module.Name, settings[Module.Name].showTargetConColorIcon, ToggleFlags)
+        settings[Module.Name].showTargetConColorIcon = Module.Utils.DrawToggle('Show Target Con Color Icon##' .. Module.Name, settings[Module.Name].showTargetConColorIcon,
+            ToggleFlags)
 
         ImGui.Spacing()
 
-        settings[Module.Name].showTargetConColorHighlight = Module.Utils.DrawToggle('Show Target Con Color Highlight##' .. Module.Name, settings[Module.Name].showTargetConColorHighlight, ToggleFlags)
+        settings[Module.Name].showTargetConColorHighlight = Module.Utils.DrawToggle('Show Target Con Color Highlight##' .. Module.Name,
+            settings[Module.Name].showTargetConColorHighlight, ToggleFlags)
 
         ImGui.Spacing()
         -- breath bar settings
@@ -1143,14 +1033,14 @@ local function drawTarget(prependSeparator)
 
         local decorations
         if settings[Module.Name].ShowTargetArrow and distance > 0 and target.HeadingTo.Degrees() ~= nil and mq.TLO.Me.Heading.Degrees() ~= nil then
-            local angle = target.HeadingTo.Degrees() - mq.TLO.Me.Heading.Degrees()
+            local angle = Module.Utils.getRelativeDirection(target.HeadingTo())
             decorations = {
                 {
                     type = "arrow",
                     anchor = BarAnchor.TEXT_RIGHT_1,
                     alignX = -1,
                     offsetX = -8,
-                    widthPercentage = 0.6,
+                    widthPercentage = 0.3,
                     color = distanceColor,
                     angle = angle,
                 },
@@ -1213,24 +1103,24 @@ local function drawTarget(prependSeparator)
             end
 
             drawBar({
-                label        = '##pctAggro',
-                percentage   = percentage,
-                width        = ImGui.GetContentRegionAvail(),
-                height       = progressSizeAggro,
+                label       = '##pctAggro',
+                percentage  = percentage,
+                width       = ImGui.GetContentRegionAvail(),
+                height      = progressSizeAggro,
 
-                dropShadow   = true,
-                fontScale    = FontScale,
+                dropShadow  = true,
+                fontScale   = FontScale,
 
-                leftText     = secondaryAggroPlayer,
-                leftColor    = targetTextColor,
-                centerText   = tostring(percentage) .. "%",
-                centerColor  = targetTextColor,
-                rightText    = secondaryAggroPercentage,
-                rightColor   = targetTextColor,
+                leftText    = secondaryAggroPlayer,
+                leftColor   = targetTextColor,
+                centerText  = tostring(percentage) .. "%",
+                centerColor = targetTextColor,
+                rightText   = secondaryAggroPercentage,
+                rightColor  = targetTextColor,
 
-                staticColor  = staticColor,
+                staticColor = staticColor,
             })
-            ImGui.EndGroup()
+            -- ImGui.EndGroup()
         end
         ImGui.PopStyleVar()
         ImGui.EndGroup()
@@ -1241,7 +1131,7 @@ local function drawTarget(prependSeparator)
             end
         end
         --Target Buffs
-        if tonumber(target.BuffCount()) > 0 then
+        if tonumber(target.BuffCount() or 0) > 0 then
             local windowWidth, windowHeight = ImGui.GetContentRegionAvail()
             -- Begin a scrollable child
             ImGui.BeginChild("TargetBuffsScrollRegion", ImVec2(windowWidth, windowHeight), ImGuiChildFlags.Border)
@@ -1265,7 +1155,8 @@ function Module.RenderGUI()
     ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
     local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme, settings[Module.Name].MouseOver, mouseHud, settings[Module.Name].WinTransparency)
     if locked then
-        flags = bit32.bor(ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.MenuBar, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoResize, ImGuiWindowFlags.NoScrollWithMouse)
+        flags = bit32.bor(ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.MenuBar, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoResize,
+            ImGuiWindowFlags.NoScrollWithMouse)
     end
     if ShowGUI then
         local open, show = ImGui.Begin(Module.CharLoaded .. "##Target", true, flags)
@@ -1529,18 +1420,18 @@ function Module.RenderGUI()
             end
 
             drawBar({
-                label        = '##pctEndurance',
-                percentage   = percentage,
-                width        = ImGui.GetContentRegionAvail(),
-                height       = progressSize,
+                label       = '##pctEndurance',
+                percentage  = percentage,
+                width       = ImGui.GetContentRegionAvail(),
+                height      = progressSize,
 
-                dropShadow   = true,
-                fontScale    = FontScale,
+                dropShadow  = true,
+                fontScale   = FontScale,
 
-                centerText   = text,
-                centerColor  = targetTextColor,
+                centerText  = text,
+                centerColor = targetTextColor,
 
-                staticColor  = Module.Colors.color('yellow2'),
+                staticColor = Module.Colors.color('yellow2'),
             })
             ImGui.Spacing()
 
@@ -1579,18 +1470,18 @@ function Module.RenderGUI()
                 end
 
                 drawBar({
-                    label        = '##pctDisc',
-                    percentage   = percentage,
-                    width        = ImGui.GetContentRegionAvail(),
-                    height       = progressSize,
+                    label       = '##pctDisc',
+                    percentage  = percentage,
+                    width       = ImGui.GetContentRegionAvail(),
+                    height      = progressSize,
 
-                    dropShadow   = true,
-                    fontScale    = FontScale,
+                    dropShadow  = true,
+                    fontScale   = FontScale,
 
-                    centerText   = text,
-                    centerColor  = targetTextColor,
+                    centerText  = text,
+                    centerColor = targetTextColor,
 
-                    staticColor  = Module.Colors.color('yellow'),
+                    staticColor = Module.Colors.color('yellow'),
                 })
                 ImGui.Spacing()
             end

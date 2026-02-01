@@ -1,26 +1,26 @@
 --[[
-	Created by Special.Ed
-	Shout out to the homies:
-	Lads
-	Dannuic (my on again off again thing)
-	Knightly (no, i won't take that bet)
+Created by Special.Ed
+Shout out to the homies:
+Lads
+Dannuic (my on again off again thing)
+Knightly (no, i won't take that bet)
 --]]
 --[[
-	Modified by Grimmier
-	Added a GUI and commands.
-	** Commands **
-	* /alertmaster show will toggle the search window.
-	* /alertmaster popup will toggle the alert popup window.
-	** Search Window **
-	* You can search with the search box
-	* Clicking the check box for track, and the spawn will be added to spawnlist
-	* Clicking ignore will remove the spawn from the list if it exists.
-	* you can navTo any spawn in the search window by clicking the button, rightclicking the name will target the spawn.
-	** Alert Window **
-	* The Alert Popup Window lists the spawns that you are tracking and are alive. Shown as "Name : Distance"
-	* Clicking the button on the Alert Window will NavTo the spawn.
-	* Closing the Alert Popup will keep it closed until something changes or your remind timer is up.
-	* remind setting is in minutes.
+Modified by Grimmier
+Added a GUI and commands.
+** Commands **
+* /alertmaster show will toggle the search window.
+* /alertmaster popup will toggle the alert popup window.
+** Search Window **
+* You can search with the search box
+* Clicking the check box for track, and the spawn will be added to spawnlist
+* Clicking ignore will remove the spawn from the list if it exists.
+* you can navTo any spawn in the search window by clicking the button, rightclicking the name will target the spawn.
+** Alert Window **
+* The Alert Popup Window lists the spawns that you are tracking and are alive. Shown as "Name : Distance"
+* Clicking the button on the Alert Window will NavTo the spawn.
+* Closing the Alert Popup will keep it closed until something changes or your remind timer is up.
+* remind setting is in minutes.
 ]]
 local LIP = require('lib.lip')
 local mq = require('mq')
@@ -49,7 +49,8 @@ if not loadedExeternally then
 	Module.Server      = mq.TLO.EverQuest.Server()
 	Module.Build       = mq.TLO.MacroQuest.BuildName()
 	Module.PackageMan  = require('mq.PackageMan')
-	Module.SQLite3     = MyUI_PackageMan.Require('lsqlite3')
+	Module.SQLite3     = Module.PackageMan.Require('lsqlite3')
+	Module.Actors      = require('actors')
 else
 	Module.Utils = MyUI_Utils
 	Module.CharLoaded = MyUI_CharLoaded
@@ -63,9 +64,14 @@ else
 	Module.Server = MyUI_Server
 	Module.Build = MyUI_Build
 	Module.SQLite3 = MyUI_SQLite3
+	Module.Actors = MyUI_Actor
 end
+
+
+Module.ActorMailBox                                                                                                                    = 'alertmaster'
 Module.SoundPath                                                                                                                       = string.format("%s/sounds/default/",
 	Module.Path)
+
 local Utils                                                                                                                            = Module.Utils
 local ToggleFlags                                                                                                                      = bit32.bor(
 	Utils.ImGuiToggleFlags.PulseOnHover,
@@ -281,10 +287,12 @@ Module.Settings[CharCommands]                                                   
 Module.DBPath                                                                                                                          = string.format(
 	"%s/MyUI/AlertMaster/%s/AlertMasterSpawns.db", mq.configDir, Module.Server)
 Module.WatchedSpawns                                                                                                                   = {}
-Module.ZoneList                                                                                                                        = require('lib.zone-list')
-
+local pSuccess                                                                                                                         = false
+pSuccess, Module.ZoneList                                                                                                              = pcall(require, 'lib.zone-list')
+if not pSuccess then Module.ZoneList = {} end
+Module.TempSettings = {}
 ------- Sounds ----------
-local ffi                                                                                                                              = require("ffi")
+local ffi           = require("ffi")
 -- C code definitions
 ffi.cdef [[
 int sndPlaySoundA(const char *pszSound, unsigned int fdwSound);
@@ -357,25 +365,25 @@ function Module.LoadSpawnsDB()
 		db:exec("PRAGMA journal_mode=WAL;")
 		db:exec("BEGIN TRANSACTION")
 		db:exec [[
-			CREATE TABLE IF NOT EXISTS npc_spawns (
-				"zone_short" TEXT NOT NULL,
-				"spawn_name" TEXT NOT NULL,
-				"id" INTEGER PRIMARY KEY AUTOINCREMENT
+CREATE TABLE IF NOT EXISTS npc_spawns (
+"zone_short" TEXT NOT NULL,
+"spawn_name" TEXT NOT NULL,
+"id" INTEGER PRIMARY KEY AUTOINCREMENT
 
-			);
-		]]
+);
+]]
 		db:exec [[
-			CREATE TABLE IF NOT EXISTS pc_ignore (
-				"pc_name" TEXT NOT NULL UNIQUE,
-				"id" INTEGER PRIMARY KEY AUTOINCREMENT
-			);
-		]]
+CREATE TABLE IF NOT EXISTS pc_ignore (
+"pc_name" TEXT NOT NULL UNIQUE,
+"id" INTEGER PRIMARY KEY AUTOINCREMENT
+);
+]]
 		db:exec [[
-			CREATE TABLE IF NOT EXISTS safe_zones (
-				"zone_short" TEXT NOT NULL UNIQUE,
-				"id" INTEGER PRIMARY KEY AUTOINCREMENT
-			);
-		]]
+CREATE TABLE IF NOT EXISTS safe_zones (
+"zone_short" TEXT NOT NULL UNIQUE,
+"id" INTEGER PRIMARY KEY AUTOINCREMENT
+);
+]]
 		db:exec("COMMIT")
 		db:exec("PRAGMA wal_checkpoint;")
 
@@ -757,6 +765,24 @@ local function set_settings()
 	Module.Settings[CharConfig]['doSoundPCLeft'] = doSoundPCLeft
 	doSoundPCEntered = Module.Settings[CharConfig]['doSoundPCEntered'] or false
 	Module.Settings[CharConfig]['doSoundPCEntered'] = doSoundPCEntered
+end
+
+local amActor = nil
+function Module:MessageHandler()
+	amActor = Module.Actors.register('alertmaster', function(message)
+		if not message() then return end
+		local messageData = message()
+		local subject     = messageData.Subject or 'Hello'
+		local who         = messageData.Name
+		local zone        = messageData.Zone or 'Unknown'
+		local replyTo     = messageData.ReplyTo or Module.ActorMailBox
+		if subject == 'GetNamed' and zone ~= 'Unknown' then
+			Module.TempSettings.SendNamed = true
+			Module.TempSettings.NamedZone = zone
+			Module.TempSettings.ReplyTo = replyTo
+			return
+		end
+	end)
 end
 
 local function load_settings()
@@ -1466,6 +1492,9 @@ function DrawArrow(topPoint, width, height, color)
 end
 
 ----------------------------
+---
+---
+---
 
 local function DrawToggles()
 	local lockedIcon = Module.GUI_Main.Locked and Module.Icons.FA_LOCK .. '##lockTabButton' or
@@ -1643,7 +1672,6 @@ function Module:AddSpawnToList(name)
 
 	local sCount = 0
 	local zone = Zone.ShortName()
-	local db = Module:OpenDB()
 	local result = Module:AddSpawnToDB(zone, name)
 	if result == false then
 		Module.Utils.PrintOutput('AlertMaster', nil, "\aySpawn alert \"" .. name .. "\" already exists.")
@@ -1661,6 +1689,7 @@ function Module:AddSpawnToList(name)
 	-- -- if we made it this far, the spawn isn't tracked -- add it to the table and store to ini
 	-- settings[zone]['Spawn' .. sCount + 1] = name
 	-- save_settings()
+	local db = Module:OpenDB()
 	Module.TempSettings.NpcList = Module:GetSpawns(Zone.ShortName(), db)
 	if db then db:close() end
 	Module.Utils.PrintOutput('AlertMaster', nil, '\ayAdded spawn alert for ' .. name .. ' in ' .. zone)
@@ -2930,6 +2959,8 @@ end
 
 function Module.Unload()
 	mq.unbind('/alertmaster')
+	mq.RemoveTopLevelObject('AlertMaster')
+
 	-- mq.unbind('/am')
 end
 
@@ -2943,6 +2974,7 @@ local function setup()
 	if mq.TLO.Plugin('mq2eqbc').IsLoaded() then groupCmd = '/bcaa /' end
 	load_settings()
 	load_binds()
+	Module:MessageHandler()
 	-- Kickstart the data
 	Module.GUI_Main.Refresh.Table.Rules = true
 	Module.GUI_Main.Refresh.Table.Filtered = true
@@ -2964,6 +2996,34 @@ local function setup()
 	end
 end
 
+---@class AlertMasterDataType
+---@field IsNamed boolean
+---@field IsActive boolean
+---@type DataType
+local alertMasterDataType = mq.DataType.new('AlertMaster', {
+	Members = {
+		IsNamed = function(param, self)
+			if param and param:len() > 0 then
+				return 'bool', isSpawnInAlerts(param, spawnAlerts) or false
+			end
+			return 'bool', false
+		end,
+
+		IsActive = function(param, self)
+			return 'bool', active
+		end,
+	},
+	ToString = function(self)
+		return 'AlertMaster'
+	end,
+})
+
+function AlertMasterTLOHandler(param)
+	return alertMasterDataType, active
+end
+
+mq.AddTopLevelObject('AlertMaster', AlertMasterTLOHandler)
+
 local cTime = os.time()
 local firstRun = true
 function Module.MainLoop()
@@ -2979,7 +3039,11 @@ function Module.MainLoop()
 
 	if loadedExeternally then
 		---@diagnostic disable-next-line: undefined-global
-		if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+		if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then
+			mq.RemoveTopLevelObject('AlertMaster')
+			mq.unbind('/alertmaster')
+			return
+		end
 	end
 
 
@@ -3044,6 +3108,22 @@ function Module.MainLoop()
 		originalVolume = getVolume()
 	end
 
+	if Module.TempSettings.SendNamed then
+		local db = Module:OpenDB()
+
+		if amActor ~= nil then
+			amActor:send({ mailbox = Module.TempSettings.ReplyTo, absolute_mailbox = true, }, {
+				Who = Module.CharLoaded,
+				NamedList = Module:GetSpawns(Module.TempSettings.NamedZone, db) or {},
+			})
+		end
+		Module.TempSettings.SendNamed = false
+		Module.TempSettings.ReplyTo = nil
+		Module.TempSettings.NamedZone = nil
+
+		if db then db:close() end
+	end
+
 	if Module.GUI_Main.Refresh.Table.Unhandled then RefreshUnhandled() end
 	if SearchWindow_Show == true or #Table_Cache.Mobs < 1 then RefreshZone() end
 end
@@ -3057,6 +3137,8 @@ function Module.LocalLoop()
 		Module.MainLoop()
 		mq.delay(delay .. 's')
 	end
+	mq.unbind('/alertmaster')
+	mq.RemoveTopLevelObject('AlertMaster')
 end
 
 setup()

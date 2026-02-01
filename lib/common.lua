@@ -529,6 +529,35 @@ function CommonUtils.GetBreathingColor(base_color, do_breathe)
 	return ImVec4(r, g, b, a)
 end
 
+---Draw Text with Drop Shadow effects
+---@param str any
+---@param options table|nil # options Optional parameters: Enabled, Opacity, OffsetX, OffsetY
+---@param shadCol ImVec4|nil Shadow Color
+---@param txtCol ImVec4|nil Text Color
+function CommonUtils.DropShadow(str, options, shadCol, txtCol)
+	options                 = options or {}
+	local enabled           = options.Enabled ~= false and options.Enabled or false
+	local opacity           = options.Opacity or 0.5
+	local shadowColor       = shadCol or CommonUtils.Colors.color('black')
+	local offsetX           = options.OffsetX or 2
+	local offsetY           = options.OffsetY or 2
+	local shadowWithOpacity = ImVec4(shadowColor.x, shadowColor.y, shadowColor.z, opacity)
+
+	if enabled then
+		local cursorX, cursorY = ImGui.GetCursorPos()
+		ImGui.SetCursorPosX(cursorX + offsetX)
+		ImGui.SetCursorPosY(cursorY + offsetY)
+		ImGui.TextColored(shadowWithOpacity, str)
+		ImGui.SetCursorPosX(cursorX)
+		ImGui.SetCursorPosY(cursorY)
+	end
+	if txtCol ~= nil then
+		ImGui.TextColored(txtCol, str)
+	else
+		ImGui.Text(str)
+	end
+end
+
 ---@param spawn MQSpawn
 function CommonUtils.GetConColor(spawn)
 	local conColor = string.lower(spawn.ConColor()) or 'WHITE'
@@ -692,10 +721,17 @@ function CommonUtils.CheckDefaultSettings(default_settings, loaded_settings)
 	local newTable = {}
 	for setting, value in pairs(default_settings or {}) do
 		if loaded_settings[setting] == nil then
+			if type(value) == 'table' then
+				loaded_settings[setting] = CommonUtils.Deepcopy(value)
+				newTable[setting] = CommonUtils.Deepcopy(value) -- Add the new setting to the loaded settings table
+				newSetting = true
+			else
+				loaded_settings[setting] = value
+				newTable[setting] = value -- Add the new setting to the loaded settings table
+				newSetting = true
+			end
 			CommonUtils.PrintOutput('MyUI', nil, "\ayNew Default Setting: \ao%s \ayAdding it to the Settings File.", setting)
 			loaded_settings[setting] = value
-			newTable[setting] = value -- Add the new setting to the loaded settings table
-			newSetting = true
 		else
 			newTable[setting] = loaded_settings[setting] -- Keep the existing setting
 		end

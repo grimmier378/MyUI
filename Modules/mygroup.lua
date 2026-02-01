@@ -25,6 +25,7 @@ if not loadedExeternally then
     Module.ThemeFile   = string.format('%s/MyUI/ThemeZ.lua', mq.configDir)
     Module.Theme       = {}
     Module.ThemeLoader = require('lib.theme_loader')
+    Module.ProgressBar = require('lib.progressBars')
 else
     Module.Utils = MyUI_Utils
     Module.Actor = MyUI_Actor
@@ -36,6 +37,7 @@ else
     Module.ThemeFile = MyUI_ThemeFile
     Module.Theme = MyUI_Theme
     Module.ThemeLoader = MyUI_ThemeLoader
+    Module.ProgressBar = MyUI_ProgressBar
 end
 local Utils              = Module.Utils
 local ToggleFlags        = bit32.bor(
@@ -101,6 +103,8 @@ local manaClass = {
     [12] = 'SHD',
 }
 
+local defOpts   = {}
+
 defaults        = {
     [Module.Name] = {
         Scale = 1.0,
@@ -119,14 +123,43 @@ defaults        = {
         ShowPet = true,
         DynamicHP = false,
         DynamicMP = false,
+        BorderBars = false,
+        TickPct = 0.2,
+        ShowTicks = true,
         HideTitleBar = false,
         ShowMoveStatus = true,
         NavDist = 10,
         ShowLevel = true,
         ShowValOnBar = false,
         MaxRaidColumns = 4,
+        UseGradients = true,
+        ShimmerEfx = true,
+        GlowEfx = true,
+        VertPet = true,
+        Colors = {
+            HPMax = { 0.992, 0.138, 0.138, 1.000, },
+            HPMin = { 0.551, 0.207, 0.962, 1.000, },
+            ManaMax = { 0.124, 0.592, 0.920, 1.000, },
+            ManaMin = { 0.258, 0.069, 0.502, 1.000, },
+            EndurMin = { 0.063, 0.389, 0.117, 1.000, },
+            EndurMax = { 0.825, 0.727, 0.004, 1.000, },
+            XPMin = { 0.293, 0.416, 0.791, 1.000, },
+            XPMax = { 0.782, 0.905, 0.009, 1.000, },
+            Borders = { 0.5, 0.5, 0.5, 1.0, },
+            PetMax = { 0.063, 0.389, 0.117, 1.000, },
+            PetMin = { 0.825, 0.727, 0.004, 1.000, },
+        },
     },
 }
+
+
+local function retCol(col)
+    if settings[Module.Name].Colors[col] ~= nil then
+        return ImColor(settings[Module.Name].Colors[col])
+    else
+        return ImColor(defaults[Module.Name].Colors[col])
+    end
+end
 
 local function sortRaidByGroup()
     local tmpKeys = {}
@@ -160,6 +193,28 @@ local function writeSettings(file, table)
     mq.pickle(file, table)
 end
 
+local function loadOpts()
+    defOpts = {
+        shimmer = (settings[Module.Name].ShimmerEfx == true),
+        shimmerColor = Module.Colors.color('white'),
+        shimmerWidth = 45,
+        height = 12 * Scale,
+        fillGradient = (settings[Module.Name].UseGradients == true),
+        fillGradientMode = "dynamic",
+        rounding = 0.0,
+        border = (settings[Module.Name].BorderBars == true),
+        borderSize = 1.0,
+        borderColor = settings[Module.Name].Colors.Borders or Module.Colors.color('grey'),
+        glow = (settings[Module.Name].GlowEfx == true),
+        showText = false,
+        showTicks = (settings[Module.Name].ShowTicks == true),
+        tickEvery = settings[Module.Name].TickPct ~= nil and settings[Module.Name].TickPct or 0.2,
+        tickAlpha = 100,
+        width = 0.0,
+        padEnd = 4.0,
+    }
+end
+
 local function loadSettings()
     local newSetting = false
     if not Module.Utils.File.Exists(configFile) then
@@ -177,6 +232,10 @@ local function loadSettings()
     newSetting = Module.Utils.CheckDefaultSettings(defaults[Module.Name], settings[Module.Name])
     newSetting = Module.Utils.CheckRemovedSettings(defaults[Module.Name], settings[Module.Name]) or newSetting
 
+    if settings[Module.Name].Colors == nil or next(settings[Module.Name].Colors) == nil then
+        settings[Module.Name].Colors = defaults[Module.Name].Colors
+        writeSettings(configFile, settings)
+    end
     showRaidWindow = settings[Module.Name].ShowRaidWindow
     showSelf = settings[Module.Name].ShowSelf
     hideTitle = settings[Module.Name].HideTitleBar
@@ -190,6 +249,8 @@ local function loadSettings()
     themeName = settings[Module.Name].LoadTheme
     navDist = settings[Module.Name].NavDist ~= nil and settings[Module.Name].NavDist or 20
     showMoveStatus = settings[Module.Name].ShowMoveStatus
+
+    loadOpts()
     if newSetting then writeSettings(configFile, settings) end
 end
 
@@ -274,7 +335,7 @@ end
 
 
 local function DrawGroupMember(id)
-    local barSize = settings[Module.Name].ShowValOnBar and 12 or 7
+    local barSize = settings[Module.Name].ShowValOnBar and 12 or 8
     local member = mq.TLO.Group.Member(id)
     local r, g, b, a = 1, 1, 1, 1
     if member == 'NULL' then return end
@@ -434,35 +495,51 @@ local function DrawGroupMember(id)
     end
 
     -- Module.DrawContext(member)
-
+    local hasPet = (member.Pet() ~= 'NO PET') or false
     ImGui.Separator()
 
+    local petPosX = ImGui.GetWindowWidth() - 20
+    local petPosY = ImGui.GetCursorPosY()
     -- Health Bar
+    local minHP = settings[Module.Name].DynamicHP and retCol("HPMin") or Module.Colors.color('red')
+    local maxHP = settings[Module.Name].DynamicHP and retCol("HPMax") or Module.Colors.color('red')
     if settings[Module.Name].DynamicHP then
-        r = 1
-        b = b * (100 - hpPct) / 150
-        g = 0.1
-        a = 0.9
-        if Module.MyZone == zne then
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r, g, b, a))
-        else
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
+        if Module.MyZone ~= zne then
+            minHP = Module.Colors.color('purple')
+            maxHP = Module.Colors.color('purple')
         end
     else
         if (groupData[memberName] ~= nil) then
             if hpPct == nil or hpPct <= 0 or not (Module.MyZone == groupData[memberName].Zone) then
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
+                minHP = Module.Colors.color('purple')
+                maxHP = Module.Colors.color('purple')
             elseif hpPct < 15 then
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('pink')))
+                minHP = Module.Colors.color('pink')
+                maxHP = Module.Colors.color('pink')
             else
-                ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
+                minHP = Module.Colors.color('red')
+                maxHP = Module.Colors.color('red')
             end
         else
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
+            minHP = Module.Colors.color('red')
+            maxHP = Module.Colors.color('red')
         end
     end
     local cursorX, cursorY = ImGui.GetCursorPos()
-    ImGui.ProgressBar((hpPct / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctHps' .. id)
+    -- ImGui.ProgressBar((hpPct / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctHps' .. id)
+
+    defOpts.height = barSize * Scale
+    defOpts.fillGradientMode = "dynamic"
+    if (hasPet and showPet) and settings[Module.Name].VertPet then
+        defOpts.width = 0.0
+        defOpts.padEnd = 15
+    else
+        defOpts.width = 0.0
+        defOpts.padEnd = 4.0
+    end
+    Module.ProgressBar.DrawProgress("HP##" .. memberName,
+        hpPct,
+        minHP, maxHP, settings[Module.Name].DynamicHP and defOpts or { width = 0.0, height = barSize * Scale, })
     if settings[Module.Name].ShowValOnBar then
         ImGui.SetCursorPos(cursorX + 2, cursorY)
 
@@ -474,25 +551,24 @@ local function DrawGroupMember(id)
 
         ImGui.Text(txtLabel)
     end
-    ImGui.PopStyleColor()
+    -- ImGui.PopStyleColor()
 
 
     --My Mana Bar
     if showMana then
         for i, v in pairs(manaClass) do
             if string.find(cls, v) then
-                if settings[Module.Name].DynamicMP then
-                    b = 0.9
-                    r = 1 * (100 - mpPct) / 200
-                    g = 0.9 * mpPct / 100 > 0.1 and 0.9 * mpPct / 100 or 0.1
-                    a = 0.5
-                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r, g, b, a))
-                else
-                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('light blue2')))
-                end
+                local manaMin = settings[Module.Name].DynamicMP and retCol("ManaMin") or Module.Colors.color('light blue2')
+                local manaMax = settings[Module.Name].DynamicMP and retCol("ManaMax") or Module.Colors.color('light blue2')
+
                 cursorX, cursorY = ImGui.GetCursorPos()
-                ImGui.ProgressBar((mpPct / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctMana' .. id)
-                ImGui.PopStyleColor()
+                -- ImGui.ProgressBar((mpPct / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctMana' .. id)
+                defOpts.height = barSize * Scale
+                defOpts.fillGradientMode = "static"
+
+                Module.ProgressBar.DrawProgress("MP##" .. memberName,
+                    mpPct,
+                    manaMin, manaMax, settings[Module.Name].DynamicMP and defOpts or { width = 0.0, height = barSize * Scale, })
                 if settings[Module.Name].ShowValOnBar then
                     ImGui.SetCursorPos(cursorX + 2, cursorY)
 
@@ -510,9 +586,18 @@ local function DrawGroupMember(id)
     if showEnd then
         --My Endurance bar
         cursorX, cursorY = ImGui.GetCursorPos()
-        ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('yellow2')))
-        ImGui.ProgressBar((enPct / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctEndurance' .. id)
-        ImGui.PopStyleColor()
+        local endurMin = settings[Module.Name].DynamicEnd and retCol("EndurMin") or Module.Colors.color('yellow2')
+        local endurMax = settings[Module.Name].DynamicEnd and retCol("EndurMax") or Module.Colors.color('yellow2')
+        -- ImGui.ProgressBar((enPct / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctEndurance' .. id)
+        -- ImGui.PopStyleColor()
+
+        defOpts.height = barSize * Scale
+        defOpts.fillGradientMode = "dynamic"
+
+        Module.ProgressBar.DrawProgress("END##" .. memberName,
+            enPct,
+            endurMin, endurMax, settings[Module.Name].DynamicHP and defOpts or { width = 0.0, height = barSize * Scale, })
+
         if settings[Module.Name].ShowValOnBar then
             local txtLabel = groupData[memberName] ~= nil and string.format("%d / %d", groupData[memberName].CurEnd, groupData[memberName].MaxEnd) or string.format("%d%%", enPct)
             ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
@@ -542,16 +627,41 @@ local function DrawGroupMember(id)
 
     if showPet and (Module.MyZone == zne) then
         ImGui.BeginGroup()
-        if member.Pet() ~= 'NO PET' then
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('green2')))
-            ImGui.ProgressBar(((tonumber(member.Pet.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), 5 * Scale, '##PetHp' .. id)
-            ImGui.PopStyleColor()
+        if hasPet then
+            -- ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('green2')))
+            -- ImGui.ProgressBar(((tonumber(member.Pet.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), 5 * Scale, '##PetHp' .. id)
+            -- ImGui.PopStyleColor()
+            local petMax = settings[Module.Name].DynamicHP and retCol("PetMax") or Module.Colors.color('green2')
+            local petMin = settings[Module.Name].DynamicHP and retCol("PetMin") or Module.Colors.color('green2')
+
+            defOpts.height = 5 * Scale
+            defOpts.fillGradientMode = "static"
+
+            if settings[Module.Name].VertPet then
+                defOpts.vertical = true
+                defOpts.width = 15
+                defOpts.height = 48
+                defOpts.padEnd = 5
+                ImGui.SetCursorPos(petPosX, petPosY)
+            else
+                defOpts.vertical = false
+                defOpts.width = 0.0
+            end
+
+            Module.ProgressBar.DrawProgress("PetHP##" .. memberName,
+                member.Pet.PctHPs() or 0,
+                petMin, petMax,
+                settings[Module.Name].DynamicHP and defOpts or { width = 0.0, height = 5 * Scale, })
+
+            loadOpts()
             if ImGui.IsItemHovered() then
                 ImGui.SetTooltip('%s\n%d%% health', member.Pet.DisplayName(), member.Pet.PctHPs())
                 if ImGui.IsMouseReleased(0) then
                     Module.Utils.GiveItem(member.Pet.ID() or 0)
                 end
             end
+            defOpts.fillGradientMode = "dynamic"
+            defOpts.height = barSize * Scale
         end
         ImGui.EndGroup()
     end
@@ -840,12 +950,19 @@ end
 local function DrawSelf()
     local mySelf = mq.TLO.Me
     local memberName = mySelf.Name()
+    local hasPet = (mySelf.Pet() ~= 'NO PET')
     local r, g, b, a = 1, 1, 1, 1
     if mySelf == 'NULL' then return end
     local barSize = settings[Module.Name].ShowValOnBar and 12 or 7
     local sizeX, sizeY = ImGui.GetContentRegionAvail()
     ImGui.BeginGroup()
     local colCount = settings[Module.Name].ShowLevel and 4 or 3
+    local hpMin = settings[Module.Name].DynamicHP and retCol("HPMin") or Module.Colors.color('red')
+    local hpMax = settings[Module.Name].DynamicHP and retCol("HPMax") or Module.Colors.color('red')
+    local manaMin = settings[Module.Name].DynamicMP and retCol("ManaMin") or Module.Colors.color('light blue2')
+    local manaMax = settings[Module.Name].DynamicMP and retCol("ManaMax") or Module.Colors.color('light blue2')
+    local endurMin = settings[Module.Name].DynamicHP and retCol("EndurMin") or Module.Colors.color('yellow2')
+    local endurMax = settings[Module.Name].DynamicHP and retCol("EndurMax") or Module.Colors.color('yellow2')
     if ImGui.BeginTable("##playerInfoSelf", colCount, tPlayerFlags) then
         ImGui.TableSetupColumn("##tName", ImGuiTableColumnFlags.NoResize, (sizeX * .5))
         ImGui.TableSetupColumn("##tVis", ImGuiTableColumnFlags.NoResize, 16)
@@ -930,25 +1047,34 @@ local function DrawSelf()
     end
     ImGui.Separator()
 
+    local petPosX, petPosY = ImGui.GetCursorPos()
+    petPosX = ImGui.GetWindowWidth() - 20
     -- Health Bar
-    if settings[Module.Name].DynamicHP then
-        r = 1
-        b = b * (100 - mySelf.PctHPs()) / 150
-        g = 0.1
-        a = 0.9
-        ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r, g, b, a))
-    else
+    if not settings[Module.Name].DynamicHP then
         if mySelf.PctHPs() <= 0 or mySelf.PctHPs() == nil then
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
+            hpMin, hpMax = Module.Colors.color('purple'), Module.Colors.color('purple')
         elseif mySelf.PctHPs() < 15 then
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('pink')))
+            hpMin, hpMax = Module.Colors.color('pink'), Module.Colors.color('pink')
         else
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('red')))
+            hpMin, hpMax = Module.Colors.color('red'), Module.Colors.color('red')
         end
     end
     local cursorX, cursorY = ImGui.GetCursorPos()
-    ImGui.ProgressBar(((tonumber(mySelf.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctHpsSelf')
-    ImGui.PopStyleColor()
+    defOpts.height = barSize * Scale
+    if (hasPet and showPet) and settings[Module.Name].VertPet then
+        defOpts.width = 0.0
+        defOpts.padEnd = 15
+    else
+        defOpts.width = 0.0
+        defOpts.padEnd = 4.0
+    end
+
+    Module.ProgressBar.DrawProgress("HP##Self",
+        mySelf.PctHPs() or 0,
+        hpMin, hpMax, settings[Module.Name].DynamicHP and defOpts or { width = 0.0, height = barSize * Scale, })
+
+    -- ImGui.ProgressBar(((tonumber(mySelf.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctHpsSelf')
+    -- ImGui.PopStyleColor()
     if ImGui.IsItemHovered() then
         ImGui.BeginTooltip()
         GetInfoToolTip(0, false)
@@ -969,18 +1095,20 @@ local function DrawSelf()
     if showMana then
         for i, v in pairs(manaClass) do
             if string.find(mySelf.Class.ShortName(), v) then
-                if settings[Module.Name].DynamicMP then
-                    b = 0.9
-                    r = 1 * (100 - mySelf.PctMana()) / 200
-                    g = 0.9 * mySelf.PctMana() / 100 > 0.1 and 0.9 * mySelf.PctMana() / 100 or 0.1
-                    a = 0.5
-                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r, g, b, a))
-                else
-                    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('light blue2')))
+                if not settings[Module.Name].DynamicMP then
+                    manaMin = Module.Colors.color('light blue2')
+                    manaMax = Module.Colors.color('light blue2')
                 end
                 cursorX, cursorY = ImGui.GetCursorPos()
-                ImGui.ProgressBar(((tonumber(mySelf.PctMana() or 0)) / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctManaSelf')
-                ImGui.PopStyleColor()
+
+                defOpts.height = barSize * Scale
+                defOpts.fillGradientMode = "static"
+                Module.ProgressBar.DrawProgress("MP##Self",
+                    mySelf.PctMana() or 0,
+                    manaMin, manaMax, settings[Module.Name].DynamicMP and defOpts or { padEnd = 15, width = 0.0, height = barSize * Scale, })
+
+                -- ImGui.ProgressBar(((tonumber(mySelf.PctMana() or 0)) / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctManaSelf')
+                -- ImGui.PopStyleColor()
                 if ImGui.IsItemHovered() then
                     ImGui.BeginTooltip()
                     GetInfoToolTip(0, false)
@@ -998,12 +1126,19 @@ local function DrawSelf()
             end
         end
     end
+
     if showEnd then
         --My Endurance bar
         cursorX, cursorY = ImGui.GetCursorPos()
-        ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('yellow2')))
-        ImGui.ProgressBar(((tonumber(mySelf.PctEndurance() or 0)) / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctEnduranceSelf')
-        ImGui.PopStyleColor()
+        -- ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('yellow2')))
+        -- ImGui.ProgressBar(((tonumber(mySelf.PctEndurance() or 0)) / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctEnduranceSelf')
+        -- ImGui.PopStyleColor()
+        defOpts.height = barSize * Scale
+        defOpts.fillGradientMode = "dynamic"
+        Module.ProgressBar.DrawProgress("END##Self",
+            mySelf.PctEndurance() or 0,
+            endurMin, endurMax, settings[Module.Name].DynamicHP and defOpts or { padEnd = 15, width = 0.0, height = barSize * Scale, })
+
         if ImGui.IsItemHovered() then
             ImGui.BeginTooltip()
             GetInfoToolTip(0, false)
@@ -1022,10 +1157,30 @@ local function DrawSelf()
 
     if showPet then
         ImGui.BeginGroup()
-        if mySelf.Pet() ~= 'NO PET' then
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('green2')))
-            ImGui.ProgressBar(((tonumber(mySelf.Pet.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), 5 * Scale, '##PetHpSelf')
-            ImGui.PopStyleColor()
+        if hasPet then
+            -- ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('green2')))
+            -- ImGui.ProgressBar(((tonumber(mySelf.Pet.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), 5 * Scale, '##PetHpSelf')
+            -- ImGui.PopStyleColor()
+            local petMax = settings[Module.Name].DynamicHP and retCol("PetMax") or Module.Colors.color('green2')
+            local petMin = settings[Module.Name].DynamicHP and retCol("PetMin") or Module.Colors.color('green2')
+            defOpts.height = 5 * Scale
+            defOpts.fillGradientMode = "static"
+            if settings[Module.Name].VertPet then
+                defOpts.vertical = true
+                defOpts.width = 15
+                defOpts.height = 48
+                defOpts.padEnd = 5
+                ImGui.SetCursorPos(petPosX, petPosY)
+            else
+                defOpts.vertical = false
+                defOpts.width = 0.0
+            end
+            Module.ProgressBar.DrawProgress("PET##Self",
+                mySelf.Pet.PctHPs() or 0,
+                petMin, petMax, defOpts)
+
+            defOpts.vertical = false
+            loadOpts()
             if ImGui.IsItemHovered() then
                 ImGui.SetTooltip('%s\n%d%% health', mySelf.Pet.DisplayName(), mySelf.Pet.PctHPs())
                 if ImGui.IsMouseReleased(0) then
@@ -1471,6 +1626,64 @@ function Module.RenderGUI()
             if tmpDist ~= navDist then
                 navDist = tmpDist
             end
+
+            if ImGui.CollapsingHeader('Bar EFX') then
+                ImGui.SeparatorText('Efx')
+                local changed = false
+                settings[Module.Name].ShimmerEfx, changed = Module.Utils.DrawToggle('Shimmer##' .. Module.Name, settings[Module.Name].ShimmerEfx, ToggleFlags)
+                if changed then
+                    loadOpts()
+                    changed = false
+                end
+                settings[Module.Name].GlowEfx, changed = Module.Utils.DrawToggle('Glow##' .. Module.Name, settings[Module.Name].GlowEfx, ToggleFlags)
+                if changed then
+                    loadOpts()
+                    changed = false
+                end
+                settings[Module.Name].UseGradients, changed = Module.Utils.DrawToggle('Use Gradients##' .. Module.Name, settings[Module.Name].UseGradients, ToggleFlags)
+                if changed then
+                    loadOpts()
+                    changed = false
+                end
+
+                settings[Module.Name].BorderBars, changed = Module.Utils.DrawToggle('Border Bars##' .. Module.Name, settings[Module.Name].BorderBars, ToggleFlags)
+                if changed then
+                    loadOpts()
+                    changed = false
+                end
+
+                settings[Module.Name].VertPet, changed = Module.Utils.DrawToggle('Vertical Pet Bar##' .. Module.Name, settings[Module.Name].VertPet, ToggleFlags)
+                if changed then
+                    loadOpts()
+                    changed = false
+                end
+
+                settings[Module.Name].ShowTicks, changed = Module.Utils.DrawToggle('Show Ticks##' .. Module.Name, settings[Module.Name].ShowTicks, ToggleFlags)
+                if changed then
+                    loadOpts()
+                    changed = false
+                end
+
+                if settings[Module.Name].ShowTicks then
+                    settings[Module.Name].TickPct, changed = ImGui.SliderFloat('Tick Pct##' .. Module.Name, settings[Module.Name].TickPct, 0.01, 1.0)
+                    if changed then
+                        loadOpts()
+                        changed = false
+                    end
+                end
+
+                ImGui.SeparatorText("Colors##" .. Module.Name)
+                for k, v in pairs(settings[Module.Name].Colors) do
+                    local color = v
+                    local newColor
+                    newColor, changed = ImGui.ColorEdit4(k .. '##' .. Module.Name, color)
+                    if changed then
+                        settings[Module.Name].Colors[k] = newColor
+                        loadOpts()
+                    end
+                end
+            end
+
             ImGui.SeparatorText("Save and Close##" .. Module.Name)
             if ImGui.Button('Save and Close##' .. Module.Name) then
                 OpenConfigGUI = false
@@ -1488,6 +1701,7 @@ function Module.RenderGUI()
                 settings[Module.Name].ShowRaidWindow = showRaidWindow
                 settings[Module.Name].NavDist = tmpDist
                 writeSettings(configFile, settings)
+                loadOpts()
             end
         end
         ImGui.SetWindowFontScale(1)

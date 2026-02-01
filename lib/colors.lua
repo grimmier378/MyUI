@@ -29,6 +29,7 @@ function ColorList.color(color_name)
         purple2 = ImVec4(0.460, 0.204, 1.000, 1.000),
         btn_red = ImVec4(1.0, 0.4, 0.4, 0.4),
         btn_green = ImVec4(0.4, 1.0, 0.4, 0.4),
+        black = ImVec4(0, 0, 0, 1),
     }
     if (ColorList[color_name]) then
         return ColorList[color_name]

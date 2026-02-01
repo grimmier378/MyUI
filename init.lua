@@ -4,7 +4,7 @@ local ImGui          = require 'ImGui'
 MyUI_PackageMan      = require('mq.PackageMan')
 MyUI_Actor           = require('actors')
 MyUI_SQLite3         = MyUI_PackageMan.Require('lsqlite3')
-
+MyUI_ProgressBar     = require('lib.progressBars')
 MyUI_Version         = '1.0.0'
 MyUI_ScriptName      = 'MyUI'
 MyUI_Path            = mq.luaDir .. '/myui/'

@@ -45,6 +45,7 @@ if not loadedExeternally then
     Module.Path        = string.format("%s/%s/", mq.luaDir, Module.Mane)
     Module.ThemeFile   = string.format('%s/MyUI/ThemeZ.lua', mq.configDir)
     Module.ThemeLoader = require('lib.theme_loader')
+    Module.ProgressBar = require('lib.ProgressBar')
 else
     Module.Utils = MyUI_Utils
     Module.Actor = MyUI_Actor
@@ -56,6 +57,7 @@ else
     Module.Theme = MyUI_Theme
     Module.ThemeLoader = MyUI_ThemeLoader
     Module.Path = MyUI_Path
+    Module.ProgressBar = MyUI_ProgressBar
 end
 local Utils                            = Module.Utils
 local ToggleFlags                      = bit32.bor(

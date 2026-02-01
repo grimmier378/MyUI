@@ -116,43 +116,12 @@ local function CommandHandler(...)
 	end
 end
 
-local function getMembers()
-	local temp = {}
-	local foundCorpse = false
-	for i = 1, rSize do
-		local member = mq.TLO.Raid.Member(i)
-		if member() then
-			local memberName = member.Name() or "Unknown_Member"
-			local present = (mq.TLO.SpawnCount(string.format("PC =%s", memberName))() or 0) > 0
-			local memberClass = member.Class.ShortName() or "Unknown"
-			local hasCorpse = mq.TLO.Spawn(string.format("%s's corpse", memberName))() ~= nil
-			local checkLD = string.format("=%s", memberName)
-			if mq.TLO.Spawn(checkLD).Linkdead() then
-				present = false
-				memberClass = "* LD *"
-			end
-			table.insert(temp, {
-				name = memberName,
-				class = memberClass,
-				present = present,
-				corpse = hasCorpse,
-				distance = member.Distance() or 99999,
-				corpseDistance = hasCorpse and mq.TLO.Spawn(string.format("%s's corpse", memberName)).Distance() or -1,
-				visable = not (member.Invis(0)() or false),
-			})
-			if hasCorpse then foundCorpse = true end
-		end
-	end
-	Module.TempSettings.CorpseFound = foundCorpse
-	return SortTable(temp)
-end
 
 local function Init()
 	-- your Init code here
 	mq.bind('/template', CommandHandler)
 	Module.IsRunning = true
 	Module.Utils.PrintOutput('main', true, "\ayModule \a-w[\at%s\a-w] \agLoaded\aw!", Module.Name)
-	raidMembers = getMembers()
 	-- for standalone mode we need to init the GUI and use a real loop
 	if not loadedExeternally then
 		mq.imgui.init(Module.Name, Module.RenderGUI)
@@ -169,15 +138,47 @@ local winFlags = bit32.bor(
 	ImGuiWindowFlags.NoScrollWithMouse
 )
 
+local opts = {}
+opts.Enabled = false
+opts.Opacity = 0.5
+opts.TextColor = Module.Colors.color('white')
+opts.ShadowColor = Module.Colors.color('black')
+opts.OffsetX = 2
+opts.OffsetY = 2
+opts.Blur = 0
+
+---comment
+---@param str any
+---@param options table|nil # options Optional parameters: Enabled, Opacity, ShadowColor, OffsetX, OffsetY, TextColor
+function Module.DropShadow(str, options)
+	options                 = options or {}
+	local enabled           = options.Enabled ~= false and options.Enabled or false
+	local opacity           = options.Opacity or 1
+	local shadowColor       = options.ShadowColor or Module.Colors.color('black')
+	local offsetX           = options.OffsetX or 2
+	local offsetY           = options.OffsetY or 2
+	local shadowWithOpacity = ImVec4(shadowColor.x, shadowColor.y, shadowColor.z, opacity)
+
+	if enabled then
+		local cursorX, cursorY = ImGui.GetCursorPos()
+		ImGui.SetCursorPosX(cursorX + offsetX)
+		ImGui.SetCursorPosY(cursorY + offsetY)
+		ImGui.PushStyleColor(ImGuiCol.Text, shadowWithOpacity)
+		ImGui.TextUnformatted(str)
+		ImGui.PopStyleColor()
+		ImGui.SetCursorPosX(cursorX)
+		ImGui.SetCursorPosY(cursorY)
+		ImGui.PushStyleColor(ImGuiCol.Text, options.TextColor or Module.Colors.color('white'))
+		ImGui.TextUnformatted(str)
+		ImGui.PopStyleColor()
+		return
+	end
+	ImGui.TextUnformatted(str)
+end
 
 -- Exposed Functions
 function Module.RenderGUI()
-	if rSize <= 0 and #raidMembers <= 0 then
-		Module.ShowGui = false
-		return
-	end
 	if Module.ShowGui then
-		ImGui.PushStyleColor(ImGuiCol.WindowBg, ImVec4(0.1, 0.1, 0.1, 0.8))
 		local open, show = ImGui.Begin(Module.Name .. "##" .. Module.CharLoaded, true, winFlags)
 		if not open then
 			show = false
@@ -186,106 +187,16 @@ function Module.RenderGUI()
 		if show then
 			--GUI
 			-- your code here
-			local colCount = Module.TempSettings.CorpseFound and 4 or 3
-			if ImGui.BeginTable("Raid Watch", colCount) then
-				if colCount == 4 then ImGui.TableSetupColumn("Corpse", ImGuiTableColumnFlags.WidthFixed, 70) end
-				ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch, 5)
-				ImGui.TableSetupColumn("Class", ImGuiTableColumnFlags.WidthFixed, ImGui.CalcTextSize('* LD *'))
-				ImGui.TableSetupColumn("Distance", ImGuiTableColumnFlags.WidthFixed, ImGui.CalcTextSize('(99999)'))
-				ImGui.TableNextRow()
-			end
+			Module.Utils.DropShadow("Template Module DropShadow Default", opts)
+			opts.Enabled = ImGui.Checkbox("Enable DropShadow", opts.Enabled)
+			opts.Opacity = ImGui.SliderFloat("DropShadow Opacity", opts.Opacity, 0.0, 1.0)
+			opts.OffsetX = ImGui.SliderInt("DropShadow OffsetX", opts.OffsetX, 0, 10)
+			opts.OffsetY = ImGui.SliderInt("DropShadow OffsetY", opts.OffsetY, 0, 10)
+			opts.ShadowColor = ImGui.ColorEdit4("DropShadow Color", opts.ShadowColor)
 
-			for _, data in ipairs(raidMembers or {}) do
-				local displayString = string.format("%s - %s", data.name, data.class)
-
-				if colCount == 4 then
-					ImGui.TableNextColumn()
-
-					if data.corpse then
-						ImGui.TextColored(Module.Colors.color("pink"), Module.Icons.MD_HEALING)
-						ImGui.SameLine()
-						ImGui.Text("(%0.1f)", data.corpseDistance)
-					end
-				end
-
-				ImGui.TableNextColumn()
-
-				ImGui.PushID(data.name .. data.class)
-
-				if data.present then
-					if not data.visable then
-						ImGui.PushStyleColor(ImGuiCol.Text, Module.Colors.color("grey"))
-					else
-						ImGui.PushStyleColor(ImGuiCol.Text, Module.Colors.color("softblue"))
-					end
-				else
-					ImGui.PushStyleColor(ImGuiCol.Text, Module.Colors.color("tangarine"))
-				end
-				ImGui.PushStyleColor(ImGuiCol.HeaderHovered, ImVec4(0.036, 0.000, 0.137, 0.800))
-
-				local label = data.visable and data.name or string.format("%s %s", Module.Icons.FA_EYE_SLASH, data.name)
-
-				if ImGui.Selectable(label, false, ImGuiSelectableFlags.SpanAllColumns) then
-					if data.corpse then
-						mq.cmdf("/target %s's", data.name)
-					else
-						mq.cmdf("/target %s", data.name)
-					end
-					if ImGui.IsKeyDown(ImGuiMod.Ctrl) then
-						mq.cmdf("/dex %s /foreground", data.name)
-					end
-				end
-
-				ImGui.PopStyleColor(2)
-
-				if ImGui.BeginPopupContextItem(data.name .. "##RaidMemberContext") then
-					if ImGui.Selectable("switch", false) then
-						mq.cmdf("/dex %s /foreground", data.name)
-					end
-					if ImGui.Selectable('Come to Me') then
-						mq.cmdf("/dex %s /nav id %s dist=15 lineofsight=on", data.name, mq.TLO.Me.ID())
-					end
-					if ImGui.Selectable('Go To ' .. data.name) then
-						local id = mq.TLO.Spawn(string.format("=%s", data.name)).ID() or 0
-						if id > 0 then
-							mq.cmdf("/nav id %s dist=15 lineofsight=on", id)
-						end
-					end
-					if data.corpse then
-						if ImGui.Selectable("Nav to Corpse") then
-							local corpse = mq.TLO.Spawn(string.format("%s's corpse", data.name))
-							if corpse() then
-								mq.cmdf("/nav id %s dist=15 lineofsight=on", corpse.ID())
-							else
-								Module.Utils.PrintOutput('main', true, "\arNo Corpse found for %s", data.name)
-							end
-						end
-					end
-					ImGui.EndPopup()
-				end
-				ImGui.PopID()
-
-				ImGui.TableNextColumn()
-
-				if data.present then
-					ImGui.TextColored(Module.Colors.color("softblue"), data.class)
-				else
-					ImGui.TextColored(Module.Colors.color("tangarine"), data.class)
-				end
-
-				ImGui.TableNextColumn()
-
-				if data.present then
-					if data.distance > 100 then
-						ImGui.TextColored(Module.Colors.color("tangarine"), "(%0.1f)", mq.TLO.Spawn(string.format("=%s", data.name)).Distance() or 99999)
-					else
-						ImGui.TextColored(Module.Colors.color("yellow"), "(%0.1f)", mq.TLO.Spawn(string.format("=%s", data.name)).Distance() or 99999)
-					end
-				end
-			end
-			ImGui.EndTable()
+			Module.Utils.DropShadow("Testing DropShadow Preview", opts)
+			Module.Utils.DropShadow("Testing DEFAULT NO OPTIONS SENT")
 		end
-		ImGui.PopStyleColor()
 		ImGui.End()
 	end
 end
@@ -306,15 +217,7 @@ function Module.MainLoop()
 	else
 		-- your code here
 		drawTimerMS = mq.gettime()
-		rSize = mq.TLO.Raid.Members() or 0
-		if rSize > 0 then raidMembers = getMembers() end
 
-		if rSize > 0 then
-			Module.ShowGui = true
-		else
-			Module.ShowGui = false
-			raidMembers = {}
-		end
 		-- drawTimerS = os.time()
 	end
 	--[[
@@ -339,6 +242,96 @@ end
 if mq.TLO.EverQuest.GameState() ~= "INGAME" then
 	printf("\aw[\at%s\ax] \arNot in game, \ayTry again later...", Module.Name)
 	mq.exit()
+end
+
+--button master button test
+function btnTest()
+-- lua
+local ScriptName = 'rgmercs'
+local myName = mq.TLO.Me.DisplayName()
+local raidSize = mq.TLO.Raid.Members() or 0
+local IsRunning = mq.TLO.Lua.Script(ScriptName).Status() == 'RUNNING'
+
+local tankList = {
+	[1] = { Name = 'Shadowfrog', Enabled = true, },
+	[2] = { Name = 'Derf', Enabled = true, },
+	[3] = { Name = 'Grobash', Enabled = true, },
+	[4] = { Name = 'Grimmier', Enabled = true, },
+	[5] = { Name = 'Shadly', Enabled = true, },
+}
+
+
+if raidSize == 0 then
+	if IsRunning then
+		mq.cmdf('/dgg /lstop %s', ScriptName)
+		mq.cmdf('/lstop %s', ScriptName)
+	else
+		local delay = 10
+		for i = 1, mq.TLO.Me.GroupSize() - 1 do
+			mq.cmdf('/timed %s /dex %s /lrun %s mini', (i * delay), mq.TLO.Group.Member(i).DisplayName(), ScriptName)
+		end
+		delay = delay * mq.TLO.Me.GroupSize()
+		mq.cmdf('/lrun %s mini', ScriptName)
+		local cmd = string.format("/timed %s /dgg /multiline ; /rgl assistclear; /timed %s /rgl assistadd %s", delay, delay + 5, myName)
+		mq.cmd(cmd)
+		delay = delay + 10
+		for _, data in ipairs(tankList or {}) do
+			if data.Enabled and mq.TLO.Group.Member(data.Name)() ~= nil then
+				mq.cmdf("/timed %d /dgg /multiline ; /rgl assistadd %s", delay, data.Name)
+				delay = delay + 5
+			end
+		end
+		for i = 1, mq.TLO.Me.GroupSize() - 1 do
+			local mName = mq.TLO.Group.Member(i).DisplayName() or ''
+			for _, data in ipairs(tankList or {}) do
+				if data.Enabled and data.Name == mName then
+					goto next
+				end
+			end
+			mq.cmdf("/timed %d /dgg /multiline ; /rgl assistadd %s", (i * 5 + delay), mName)
+			::next::
+		end
+	end
+else
+	local delay = 0
+	if IsRunning then
+		mq.cmdf('/dgr /lstop %s', ScriptName)
+		mq.cmdf('/lstop %s', ScriptName)
+	else
+		for i = 1, raidSize do
+			if mq.TLO.Raid.Member(i).CleanName() ~= mq.TLO.Me.CleanName() then
+				mq.cmdf('/timed %s /dex %s /lrun %s mini', (i * 10), mq.TLO.Raid.Member(i).CleanName(), ScriptName)
+			else
+				-- if it's me then just run the script immediately
+				mq.cmdf('/lrun %s mini', ScriptName)
+			end
+			delay = i * 15
+		end
+		-- RAID SETUP
+		local myName = mq.TLO.Me.CleanName():lower()
+		delay = delay + 15
+		-- enter tanks in order you wish them to be in first slot will always default to the caller of the script
+
+		local cmd = string.format("/timed %s /dgr /multiline ; /rgl assistclear; /timed %s /rgl setma %s", delay, 5, myName)
+		mq.cmd(cmd)
+		delay = delay + 10 -- set to at least 5 more than the last delay before the table iterations
+		for _, data in ipairs(tankList or {}) do
+			if data.Enabled then
+				mq.cmdf("/timed %d /dgr /multiline ; /rgl assistadd %s", delay, data.Name)
+				delay = delay + 15
+			end
+		end
+		for i = 1, raidSize do
+			local memberName = mq.TLO.Raid.Member(i).CleanName()
+			if not tankList[memberName] then
+				mq.cmdf("/timed %d /dgr /multiline ; /rgl assistadd %s", delay, memberName)
+				delay = delay + 15
+			end
+		end
+		mq.cmdf("/timed %s /multiline ; /timed %s /rgl chaseoff; /timed %s /rgl chaseon", delay, 5, 20)
+	end
+end
+
 end
 
 -- Init the module

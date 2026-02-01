@@ -58,17 +58,25 @@ local toggleMouse                                         = 'Middle'
 local items                                               = {}
 local clickies                                            = {}
 local augments                                            = {}
+local jewlery                                             = {}
 local bank_items                                          = {}
 local bank_augments                                       = {}
 local book                                                = {}
 local trade_list                                          = {}
+local onehand                                             = {}
+local twohand                                             = {}
+local ranged                                              = {}
 local sell_list                                           = {}
 local display_tables                                      = {
 	augments = {},
 	items = {},
+	jewlery = {},
 	clickies = {},
 	bank_items = {},
 	bank_augments = {},
+	onehand = {},
+	twohand = {},
+	ranged = {},
 }
 local needSort                                            = true
 local checkAll                                            = false
@@ -313,12 +321,20 @@ function Module:SortInv()
 	table.sort(augments, function(a, b) return a.Name() < b.Name() end)   -- Sort augments by name
 	table.sort(bank_augments, function(a, b) return a.Name() < b.Name() end) -- Sort banked augments by name TODO:: Impliment this display
 	table.sort(clickies, function(a, b) return a.Name() < b.Name() end)   -- Sort clickies by name
+	table.sort(jewlery, function(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Name() < b.Name()) end)
+	table.sort(onehand, function(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Name() < b.Name()) end)
+	table.sort(twohand, function(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Name() < b.Name()) end)
+	table.sort(ranged, function(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Name() < b.Name()) end)
 	display_tables = {
 		augments = augments,
 		items = items,
 		clickies = clickies,
 		bank_items = bank_items,
 		bank_augments = bank_augments,
+		jewlery = jewlery,
+		onehand = onehand,
+		twohand = twohand,
+		ranged = ranged,
 	}
 end
 
@@ -593,11 +609,59 @@ function Module:CreateBank()
 end
 
 function Module:CreateInventory()
+	---@param item MQItem
+	---@return boolean
+	local function CheckJewlery(item)
+		if not item() then return false end
+		for i = 1, item.WornSlots() or 0 do
+			local slotID = item.WornSlot(i)()
+			local jSlots = { ['Charm'] = true, ['Ears'] = true, ['Neck'] = true, ['Fingers'] = true, ['Face'] = true, }
+			if jSlots[equipSlots[tonumber(slotID)]] and (item.AugType() or 0) == 0 then
+				return true
+			end
+		end
+		return false
+	end
+
+	local function CheckWeapons(item)
+		local weaponSlots = { ['Primary'] = true, ['Secondary'] = true, ['Ranged'] = true, }
+		local weaponTypes = {
+			["1H Slashing"] = true,
+			["1H Blunt"] = true,
+			["Piercing"] = true,
+			["2H Slashing"] = true,
+			["2H Blunt"] = true,
+			["2H Piercing"] = true,
+			["Archery"] = true,
+			["Ammo"] = true,
+			["Martial"] = true,
+		}
+		if not item() then return end
+		for i = 1, item.WornSlots() or 0 do
+			local slotID = item.WornSlot(i)()
+			if weaponSlots[equipSlots[tonumber(slotID)]] and weaponTypes[item.Type()] then
+				if item.Type() == "Ammo" or item.Type() == "Archery" then
+					table.insert(ranged, item)
+					break
+				elseif item.Type():find("2H") then
+					table.insert(twohand, item)
+					break
+				else
+					table.insert(onehand, item)
+					break
+				end
+			end
+		end
+	end
 	if ((os.difftime(os.time(), start_time)) > INVENTORY_DELAY_SECONDS) or mq.TLO.Me.FreeInventory() ~= FreeSlots or clicked then
 		start_time = os.time()
 		items = {}
 		clickies = {}
+		jewlery = {}
 		augments = {}
+		onehand = {}
+		twohand = {}
+		ranged = {}
 		local tmpUsedSlots = 0
 		for i = 1, 22, 1 do
 			local slot = mq.TLO.Me.Inventory(i)
@@ -614,6 +678,10 @@ function Module:CreateInventory()
 					if (slot.Item(j)()) then
 						local itemName = slot.Item(j).Name() or 'unknown'
 						table.insert(items, slot.Item(j))
+						if CheckJewlery(slot.Item(j)) then
+							table.insert(jewlery, slot.Item(j))
+						end
+						CheckWeapons(slot.Item(j))
 						if trade_list[itemName] == nil and not slot.Item(j).NoDrop() and not slot.Item(j).NoTrade() then
 							trade_list[itemName] = false -- Initialize trade_list with item names
 						end
@@ -653,6 +721,11 @@ function Module:CreateInventory()
 				end
 				if slot.AugType() > 0 then
 					table.insert(augments, slot)
+				end
+
+				CheckWeapons(slot)
+				if CheckJewlery(slot) then
+					table.insert(jewlery, slot)
 				end
 			end
 		end
@@ -1969,18 +2042,21 @@ function Module:Draw_Item_Icon(item, iconWidth, iconHeight, drawID, clickable, i
 end
 
 ---Handles the bag layout of individual items
-function Module:RenderBagContents()
+function Module:RenderBagContents(contentType)
+	if contentType == nil then
+		contentType = 'items'
+	end
 	-- create_inventory()
 	ImGui.SetWindowFontScale(1.0)
-	if ImGui.BeginChild("BagContent", 0.0, 0.0) then
+	if ImGui.BeginChild("BagContent##" .. contentType, 0.0, 0.0) then
 		ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
 		local bag_window_width = ImGui.GetWindowWidth()
 		local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
 		local temp_bag_cols = 1
 
-		for index, _ in ipairs(display_tables.items or {}) do
-			if string.match(string.lower(display_tables.items[index].Name()), string.lower(filter_text)) then
-				self:Draw_Item_Icon(display_tables.items[index], ICON_WIDTH, ICON_HEIGHT, 'inv' .. index, true)
+		for index, _ in ipairs(display_tables[contentType] or {}) do
+			if string.match(string.lower(display_tables[contentType][index].Name()), string.lower(filter_text)) then
+				self:Draw_Item_Icon(display_tables[contentType][index], ICON_WIDTH, ICON_HEIGHT, 'inv' .. index, true)
 				if bag_cols > temp_bag_cols then
 					temp_bag_cols = temp_bag_cols + 1
 					ImGui.SameLine()
@@ -1994,75 +2070,84 @@ function Module:RenderBagContents()
 	ImGui.EndChild()
 end
 
-function Module:RenderBankContents()
-	-- create_inventory()
-	ImGui.SetWindowFontScale(1.0)
-	if ImGui.BeginChild("BankContent", 0.0, 0.0) then
-		ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
-		local bag_window_width = ImGui.GetWindowWidth()
-		local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
-		local temp_bag_cols = 1
+-- function Module:RenderBankContents()
+-- 	-- create_inventory()
+-- 	ImGui.SetWindowFontScale(1.0)
+-- 	if ImGui.BeginChild("BankContent", 0.0, 0.0) then
+-- 		ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
+-- 		local bag_window_width = ImGui.GetWindowWidth()
+-- 		local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
+-- 		local temp_bag_cols = 1
 
-		for index, _ in ipairs(display_tables.bank_items or {}) do
-			if string.match(string.lower(display_tables.bank_items[index].Name()), string.lower(filter_text)) then
-				self:Draw_Item_Icon(display_tables.bank_items[index], ICON_WIDTH, ICON_HEIGHT, 'bank' .. index, false)
-				if bag_cols > temp_bag_cols then
-					temp_bag_cols = temp_bag_cols + 1
-					ImGui.SameLine()
-				else
-					temp_bag_cols = 1
+-- 		for index, _ in ipairs(display_tables.bank_items or {}) do
+-- 			if string.match(string.lower(display_tables.bank_items[index].Name()), string.lower(filter_text)) then
+-- 				self:Draw_Item_Icon(display_tables.bank_items[index], ICON_WIDTH, ICON_HEIGHT, 'bank' .. index, false)
+-- 				if bag_cols > temp_bag_cols then
+-- 					temp_bag_cols = temp_bag_cols + 1
+-- 					ImGui.SameLine()
+-- 				else
+-- 					temp_bag_cols = 1
+-- 				end
+-- 			end
+-- 		end
+-- 		ImGui.PopStyleVar()
+-- 	end
+-- 	ImGui.EndChild()
+-- end
+
+-- function Module:RenderClickies()
+-- 	ImGui.SetWindowFontScale(1.0)
+-- 	if ImGui.BeginChild("BagClickies", 0.0, 0.0) then
+-- 		ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
+-- 		local bag_window_width = ImGui.GetWindowWidth()
+-- 		local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
+-- 		local temp_bag_cols = 1
+
+-- 		for index, _ in ipairs(display_tables.clickies or {}) do
+-- 			if string.match(string.lower(display_tables.clickies[index].Name()), string.lower(filter_text)) then
+-- 				self:Draw_Item_Icon(display_tables.clickies[index], ICON_WIDTH,
+-- 					ICON_HEIGHT, 'clicky' .. index, true)
+-- 				if bag_cols > temp_bag_cols then
+-- 					temp_bag_cols = temp_bag_cols + 1
+-- 					ImGui.SameLine()
+-- 				else
+-- 					temp_bag_cols = 1
+-- 				end
+-- 			end
+-- 		end
+-- 		ImGui.PopStyleVar()
+-- 	end
+-- 	ImGui.EndChild()
+-- end
+
+function Module:RenderWeapons()
+	ImGui.SetWindowFontScale(1.0)
+	if ImGui.BeginChild("BagWeapons", 0.0, 0.0) then
+		ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
+		local function drawItemsTables(tableName)
+			local bag_window_width = ImGui.GetWindowWidth()
+			local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
+			local temp_bag_cols = 1
+			for index, _ in ipairs(display_tables[tableName] or {}) do
+				if string.match(string.lower(display_tables[tableName][index].Name()), string.lower(filter_text)) then
+					self:Draw_Item_Icon(display_tables[tableName][index], ICON_WIDTH, ICON_HEIGHT, tableName .. index, true)
+					if bag_cols > temp_bag_cols then
+						temp_bag_cols = temp_bag_cols + 1
+						ImGui.SameLine()
+					else
+						temp_bag_cols = 1
+					end
 				end
 			end
+			ImGui.NewLine()
 		end
-		ImGui.PopStyleVar()
-	end
-	ImGui.EndChild()
-end
+		ImGui.SeparatorText('1 Handed Weapons')
+		drawItemsTables('onehand')
+		ImGui.SeparatorText('2 Handed Weapons')
+		drawItemsTables('twohand')
+		ImGui.SeparatorText('Ranged Weapons')
+		drawItemsTables('ranged')
 
-function Module:RenderClickies()
-	ImGui.SetWindowFontScale(1.0)
-	if ImGui.BeginChild("BagClickies", 0.0, 0.0) then
-		ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
-		local bag_window_width = ImGui.GetWindowWidth()
-		local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
-		local temp_bag_cols = 1
-
-		for index, _ in ipairs(display_tables.clickies or {}) do
-			if string.match(string.lower(display_tables.clickies[index].Name()), string.lower(filter_text)) then
-				self:Draw_Item_Icon(display_tables.clickies[index], ICON_WIDTH,
-					ICON_HEIGHT, 'clicky' .. index, true)
-				if bag_cols > temp_bag_cols then
-					temp_bag_cols = temp_bag_cols + 1
-					ImGui.SameLine()
-				else
-					temp_bag_cols = 1
-				end
-			end
-		end
-		ImGui.PopStyleVar()
-	end
-	ImGui.EndChild()
-end
-
-function Module:RenderAugs()
-	ImGui.SetWindowFontScale(1.0)
-	if ImGui.BeginChild("BagAugments", 0.0, 0.0) then
-		ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
-		local bag_window_width = ImGui.GetWindowWidth()
-		local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
-		local temp_bag_cols = 1
-
-		for index, _ in ipairs(display_tables.augments or {}) do
-			if string.match(string.lower(display_tables.augments[index].Name()), string.lower(filter_text)) then
-				self:Draw_Item_Icon(display_tables.augments[index], ICON_WIDTH, ICON_HEIGHT, 'augments' .. index, true)
-				if bag_cols > temp_bag_cols then
-					temp_bag_cols = temp_bag_cols + 1
-					ImGui.SameLine()
-				else
-					temp_bag_cols = 1
-				end
-			end
-		end
 		ImGui.PopStyleVar()
 	end
 	ImGui.EndChild()
@@ -2373,17 +2458,27 @@ function Module:RenderTabs()
 
 		ImGui.Separator()
 		if ImGui.BeginChild("BagTabs") then
-			if ImGui.BeginTabBar("##BagTabs") then
+			if ImGui.BeginTabBar("##BagTabs", bit32.bor(ImGuiTabBarFlags.Reorderable)) then
 				if ImGui.BeginTabItem("Items") then
-					self:RenderBagContents()
+					self:RenderBagContents('items')
+					ImGui.EndTabItem()
+				end
+				if ImGui.BeginTabItem("Jewlery") then
+					self:RenderBagContents('jewlery')
 					ImGui.EndTabItem()
 				end
 				if ImGui.BeginTabItem('Clickies') then
-					self:RenderClickies()
+					self:RenderBagContents('clickies')
 					ImGui.EndTabItem()
 				end
 				if ImGui.BeginTabItem('Augments') then
-					self:RenderAugs()
+					-- self:RenderAugs()
+					self:RenderBagContents('augments')
+					ImGui.EndTabItem()
+				end
+
+				if ImGui.BeginTabItem('Weapons') then
+					self:RenderWeapons()
 					ImGui.EndTabItem()
 				end
 				if ImGui.BeginTabItem('Details') then
@@ -2392,7 +2487,7 @@ function Module:RenderTabs()
 				end
 				if ImGui.BeginTabItem("Bank") then
 					self:DrawBankCurrency()
-					self:RenderBankContents()
+					self:RenderBagContents('bank_items')
 					ImGui.EndTabItem()
 				end
 				if ImGui.BeginTabItem('Settings') then

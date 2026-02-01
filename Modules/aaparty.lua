@@ -70,7 +70,15 @@ local defaults                                                          = {
     LockWindow = false,
     ShowLeader = false,
 }
+local ShadowColor                                                       = Module.Colors.color('black')
+local TextColor                                                         = Module.Colors.color('white')
 
+local txtOpts                                                           = {
+    Enabled = true,
+    Opacity = 0.6,
+    OffsetX = 2,
+    OffsetY = 2,
+}
 function Module:LoadTheme()
     if self.Utils.File.Exists(self.ThemeFile) then
         self.Theme = dofile(self.ThemeFile)
@@ -491,9 +499,13 @@ function Module.RenderGUI()
                                 ImGui.TableSetupColumn("Pts", ImGuiTableColumnFlags.WidthFixed, 55)
                                 ImGui.TableNextRow()
                                 ImGui.TableNextColumn()
-                                imgui.Text(groupData[i].Name)
+                                Module.Utils.DropShadow(groupData[i].Name, txtOpts)
+                                -- imgui.Text(groupData[i].Name)
                                 imgui.SameLine()
-                                imgui.TextColored(Module.Colors.color('tangarine'), groupData[i].Level)
+                                Module.Utils.DropShadow(groupData[i].Level, txtOpts,
+                                    ShadowColor,
+                                    Module.Colors.color('tangarine'))
+                                --imgui.TextColored(Module.Colors.color('tangarine'), groupData[i].Level)
                                 ImGui.TableNextColumn()
                                 local combatState = groupData[i].State
                                 if combatState == 'DEBUFFED' then
@@ -510,7 +522,12 @@ function Module.RenderGUI()
                                     Module.Utils.DrawStatusIcon(3996, 'item', ' ', iconSize)
                                 end
                                 ImGui.TableNextColumn()
-                                ImGui.TextColored(Module.Colors.color('green'), groupData[i].Pts)
+                                Module.Utils.DropShadow(string.format("%d", groupData[i].Pts),
+                                    txtOpts,
+                                    ShadowColor,
+                                    Module.Colors.color('green'))
+
+                                --ImGui.TextColored(Module.Colors.color('green'), groupData[i].Pts)
                                 ImGui.EndTable()
                             end
 

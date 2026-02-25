@@ -108,8 +108,8 @@ end
 -- Register Actor
 local function RegisterActors()
 	actor = Actors.register(mailboxName, function(message)
-		if not message() then return end
 		local received_message = message()
+		if received_message == nil then return end
 		local who = received_message.Sender or "Unknown"
 		local items = received_message.Items or {}
 		local tracking = received_message.Tracking or {}

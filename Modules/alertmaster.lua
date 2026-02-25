@@ -770,12 +770,12 @@ end
 local amActor = nil
 function Module:MessageHandler()
 	amActor = Module.Actors.register('alertmaster', function(message)
-		if not message() then return end
 		local messageData = message()
-		local subject     = messageData.Subject or 'Hello'
-		local who         = messageData.Name
-		local zone        = messageData.Zone or 'Unknown'
-		local replyTo     = messageData.ReplyTo or Module.ActorMailBox
+		if messageData == nil then return end
+		local subject = messageData.Subject or 'Hello'
+		local who     = messageData.Name
+		local zone    = messageData.Zone or 'Unknown'
+		local replyTo = messageData.ReplyTo or Module.ActorMailBox
 		if subject == 'GetNamed' and zone ~= 'Unknown' then
 			Module.TempSettings.SendNamed = true
 			Module.TempSettings.NamedZone = zone

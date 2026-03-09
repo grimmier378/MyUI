@@ -1,224 +1,321 @@
 local mq = require('mq')
 local ImGui = require('ImGui')
 local ImAnim = require('ImAnim')
+
+-- Gradient direction
+ImGradientDir = ImGradientDir or {
+    Horizontal             = 0,
+    Vertical               = 1,
+    DiagTopLeftBottomRight = 2,
+    DiagTopRightBottomLeft = 3,
+}
+
+local function u32ToF4(u32)
+    local r = u32 % 256
+    local g = math.floor(u32 / 256) % 256
+    local b = math.floor(u32 / 65536) % 256
+    local a = math.floor(u32 / 16777216) % 256
+    return r / 255.0, g / 255.0, b / 255.0, a / 255.0
+end
+
+local function f4ToU32(r, g, b, a)
+    return math.floor(r * 255 + 0.5)
+        + math.floor(g * 255 + 0.5) * 256
+        + math.floor(b * 255 + 0.5) * 65536
+        + math.floor(a * 255 + 0.5) * 16777216
+end
+
+local function lerpColor(c1, c2, t)
+    local r1, g1, b1, a1 = u32ToF4(c1)
+    local r2, g2, b2, a2 = u32ToF4(c2)
+    return f4ToU32(r1 + (r2 - r1) * t, g1 + (g2 - g1) * t,
+        b1 + (b2 - b1) * t, a1 + (a2 - a1) * t)
+end
+
+---@param dl        ImDrawList Window draw list
+---@param p_min     ImVec2     Top-left corner
+---@param p_max     ImVec2     Bottom-right corner
+---@param col_start integer    IM_COL32 start color (left / top)
+---@param col_end   integer    IM_COL32 end color   (right / bottom)
+---@param dir       integer    ImGradientDir constant (default: Horizontal)
+---@param rounding  number     Corner rounding radius (default: 0)
+---@param flags     integer    ImDrawFlags (default: 0)
+local function AddRectGradientFilled(dl, p_min, p_max, col_start, col_end, dir, rounding, flags)
+    dir          = dir or ImGradientDir.Horizontal
+    rounding     = rounding or 0.0
+    flags        = flags or 0
+
+    local x1, y1 = p_min.x, p_min.y
+    local x2, y2 = p_max.x, p_max.y
+    local w, h   = x2 - x1, y2 - y1
+    if w <= 0 or h <= 0 then return end
+
+    if rounding == 0.0 then
+        if dir == ImGradientDir.Horizontal then
+            dl:AddRectFilledMultiColor(p_min, p_max, col_start, col_end, col_end, col_start)
+            return
+        elseif dir == ImGradientDir.Vertical then
+            dl:AddRectFilledMultiColor(p_min, p_max, col_start, col_start, col_end, col_end)
+            return
+        end
+    end
+
+    -- Slice path: sweep 2px strips, clip each to its band, draw full rounded rect
+    local SLICE = 2.0
+    if dir == ImGradientDir.Horizontal
+        or dir == ImGradientDir.DiagTopLeftBottomRight
+        or dir == ImGradientDir.DiagTopRightBottomLeft then
+        -- Vertical slices (sweep x)
+        local n = math.ceil(w / SLICE)
+        for i = 0, n - 1 do
+            local sx1 = x1 + i * SLICE
+            local sx2 = math.min(sx1 + SLICE, x2)
+            local cx  = (sx1 + sx2) * 0.5
+            local t
+            if dir == ImGradientDir.Horizontal then
+                t = (cx - x1) / w
+            elseif dir == ImGradientDir.DiagTopLeftBottomRight then
+                t = ((cx - x1) + h * 0.5) / (w + h)
+            else -- DiagTopRightBottomLeft
+                t = ((x2 - cx) + h * 0.5) / (w + h)
+            end
+            t = math.max(0.0, math.min(1.0, t))
+            dl:PushClipRect(ImVec2(sx1, y1), ImVec2(sx2, y2), true)
+            dl:AddRectFilled(p_min, p_max, lerpColor(col_start, col_end, t), rounding, flags)
+            dl:PopClipRect()
+        end
+    else -- Vertical: horizontal slices (sweep y)
+        local n = math.ceil(h / SLICE)
+        for i = 0, n - 1 do
+            local sy1 = y1 + i * SLICE
+            local sy2 = math.min(sy1 + SLICE, y2)
+            local cy  = (sy1 + sy2) * 0.5
+            local t   = math.max(0.0, math.min(1.0, (cy - y1) / h))
+            dl:PushClipRect(ImVec2(x1, sy1), ImVec2(x2, sy2), true)
+            dl:AddRectFilled(p_min, p_max, lerpColor(col_start, col_end, t), rounding, flags)
+            dl:PopClipRect()
+        end
+    end
+end
+
 local StatusBar = {}
 StatusBar._state = StatusBar._state or {}
 
 local function clamp01(x)
-	if x < 0 then return 0 end
-	if x > 1 then return 1 end
-	return x
+    if x < 0 then return 0 end
+    if x > 1 then return 1 end
+    return x
 end
 
 local function getBarState(id, now)
-	local state = StatusBar._state[id]
-	if not state then
-		state = { lastP = 0.0, dir = 1, t0 = now, }
-		StatusBar._state[id] = state
-	end
-	return state
+    local state = StatusBar._state[id]
+    if not state then
+        state = { lastP = 0.0, dir = 1, t0 = now, }
+        StatusBar._state[id] = state
+    end
+    return state
 end
 
 local function to01(percent)
-	if percent > 1.0 then
-		return clamp01(percent / 100.0)
-	end
-	return clamp01(percent)
+    if percent > 1.0 then
+        return clamp01(percent / 100.0)
+    end
+    return clamp01(percent)
 end
 
 
 ---Draw a vertical Progress bar using ImAnim efx
 ---@param label string Label ID for the bar
----@param percent float|integer Percentage (0-100 or 0.0-1.0) to fill the bar
+---@param percent number Percentage (0-100 or 0.0-1.0) to fill the bar
 ---@param lowCol ImVec4|table|nil Color at 0% fill
 ---@param highCol ImVec4|table|nil Color at 100% fill
 ---@param opts table|nil Optional settings:
 ---@return integer
 function StatusBar.DrawProgressVert(label, percent, lowCol, highCol, opts)
-	opts = opts or {}
-	if lowCol == nil then lowCol = ImVec4(ImGui.GetStyleColor(ImGuiCol.PlotHistogram)) end
-	if highCol == nil then highCol = ImVec4(ImGui.GetStyleColor(ImGuiCol.PlotHistogram)) end
+    opts = opts or {}
+    if lowCol == nil then lowCol = ImVec4(ImGui.GetStyleColor(ImGuiCol.PlotHistogram)) end
+    if highCol == nil then highCol = ImVec4(ImGui.GetStyleColor(ImGuiCol.PlotHistogram)) end
 
-	local now       = mq.gettime()
-	local dl        = ImGui.GetWindowDrawList()
+    local now       = mq.gettime()
+    local dl        = ImGui.GetWindowDrawList()
 
-	-- shared opts (same names as horizontal)
-	local borderOn  = (opts.border == true)
-	local borderTh  = opts.borderThickness or 1.0
-	local borderCol = (opts.borderColor ~= nil) and opts.borderColor or ImVec4(0.8, 0.8, 0.8, 1.0)
+    -- shared opts (same names as horizontal)
+    local borderOn  = (opts.border == true)
+    local borderTh  = opts.borderThickness or 1.0
+    local borderCol = (opts.borderColor ~= nil) and opts.borderColor or ImVec4(0.8, 0.8, 0.8, 1.0)
 
-	local width     = (opts.width and opts.width > 3) and opts.width or 24.0 -- vertical bar width
-	local padEnd    = opts.padEnd or 6.0                                  -- spacing after bar
-	local rounding  = opts.rounding or ImGui.GetStyle().FrameRounding
-	local showText  = (opts.showText == true)
-	local textFmt   = opts.textFmt or "%.0f%%"
+    local width     = (opts.width and opts.width > 3) and opts.width or 24.0 -- vertical bar width
+    local padEnd    = opts.padEnd or 6.0                                     -- spacing after bar
+    local rounding  = opts.rounding or ImGui.GetStyle().FrameRounding
+    local showText  = (opts.showText == true)
+    local textFmt   = opts.textFmt or "%.0f%%"
 
-	local showTicks = (opts.showTicks == true)
-	local tickEvery = opts.tickEvery or 0.05
-	local tickAlpha = opts.tickAlpha or 80
-	local tickH     = opts.tickThickness or 1.0 -- thickness of horizontal tick lines
+    local showTicks = (opts.showTicks == true)
+    local tickEvery = opts.tickEvery or 0.05
+    local tickAlpha = opts.tickAlpha or 80
+    local tickH     = opts.tickThickness or 1.0 -- thickness of horizontal tick lines
 
-	local shimmerOn = (opts.shimmer == true)
-	local glowOn    = (opts.glow == true)
-	local bgU32     = opts.bgU32 or IM_COL32(30, 32, 40, 255)
-	local tweenSec  = opts.tweenSeconds or 0.35
+    local shimmerOn = (opts.shimmer == true)
+    local glowOn    = (opts.glow == true)
+    local bgU32     = opts.bgU32 or IM_COL32(30, 32, 40, 255)
+    local tweenSec  = opts.tweenSeconds or 0.35
 
-	local gradOn    = (opts.fillGradient == true)
-	local gradMode  = opts.fillGradientMode or "static" -- "static" or "dynamic"
-	local gradDir   = opts.fillGradientDir or ImGradientDir.Vertical
-	local flags     = opts.flags or 0
-	local target    = to01(percent)
-	local id        = ImGui.GetID(label)
+    local gradOn    = (opts.fillGradient == true)
+    local gradMode  = opts.fillGradientMode or "static" -- "static" or "dynamic"
+    local gradDir   = opts.fillGradientDir or ImGradientDir.Vertical
+    local flags     = opts.flags or 0
+    local target    = to01(percent)
+    local id        = ImGui.GetID(label)
 
-	local progress  = ImAnim.TweenFloat(
-		id,
-		ImHashStr(label),
-		target,
-		tweenSec,
-		ImAnim.EasePreset(IamEaseType.OutExpo),
-		IamPolicy.Crossfade,
-		0
-	)
-	progress        = clamp01(progress)
+    local progress  = ImAnim.TweenFloat(
+        id,
+        ImHashStr(label),
+        target,
+        tweenSec,
+        ImAnim.EasePreset(IamEaseType.OutExpo),
+        IamPolicy.Crossfade,
+        0
+    )
+    progress        = clamp01(progress)
 
-	-- layout
-	local bar_pos   = ImGui.GetCursorScreenPosVec()
-	local avail     = ImGui.GetContentRegionAvailVec()
-	local height    = (opts.height and opts.height > 3) and opts.height or (avail.y - padEnd)
-	if height < 10 then height = 10 end
+    -- layout
+    local bar_pos   = ImGui.GetCursorScreenPosVec()
+    local avail     = ImGui.GetContentRegionAvailVec()
+    local height    = (opts.height and opts.height > 3) and opts.height or (avail.y - padEnd)
+    if height < 10 then height = 10 end
 
-	local bar_size = ImVec2(width, height)
-	local bar_max  = ImVec2(bar_pos.x + bar_size.x, bar_pos.y + bar_size.y)
+    local bar_size = ImVec2(width, height)
+    local bar_max  = ImVec2(bar_pos.x + bar_size.x, bar_pos.y + bar_size.y)
 
-	-- Background
-	dl:AddRectFilled(bar_pos, bar_max, bgU32, rounding, flags)
+    -- Background
+    dl:AddRectFilled(bar_pos, bar_max, bgU32, rounding, flags)
 
-	local function DrawTicks()
-		local insetX = 3.0
-		local x1 = bar_pos.x + insetX
-		local x2 = bar_pos.x + bar_size.x - insetX
+    local function DrawTicks()
+        local insetX = 3.0
+        local x1 = bar_pos.x + insetX
+        local x2 = bar_pos.x + bar_size.x - insetX
 
-		local steps = math.floor(1.0 / tickEvery + 0.5)
-		for i = 1, steps - 1 do   -- skip 0% and 100%
-			local t = i * tickEvery
-			if t <= 0.0 or t >= 1.0 then break end
+        local steps = math.floor(1.0 / tickEvery + 0.5)
+        for i = 1, steps - 1 do -- skip 0% and 100%
+            local t = i * tickEvery
+            if t <= 0.0 or t >= 1.0 then break end
 
-			-- vertical fill is bottom->top; tick position is along height
-			local y = bar_pos.y + (bar_size.y * (1.0 - t))
+            -- vertical fill is bottom->top; tick position is along height
+            local y = bar_pos.y + (bar_size.y * (1.0 - t))
 
-			dl:AddRectFilled(
-				ImVec2(x1, y - tickH * 0.5),
-				ImVec2(x2, y + tickH * 0.5),
-				IM_COL32(255, 255, 255, tickAlpha),
-				0.0
-			)
-		end
-	end
+            dl:AddRectFilled(
+                ImVec2(x1, y - tickH * 0.5),
+                ImVec2(x2, y + tickH * 0.5),
+                IM_COL32(255, 255, 255, tickAlpha),
+                0.0
+            )
+        end
+    end
 
-	-- if showTicks and tickEvery > 0 then DrawTicks() end
+    -- if showTicks and tickEvery > 0 then DrawTicks() end
 
-	-- Fill bottom->top
-	local filled_h = bar_size.y * progress
-	if filled_h > 2.0 then
-		local fill_min = ImVec2(bar_pos.x, bar_pos.y + (bar_size.y - filled_h)) -- top of fill
-		local fill_max = ImVec2(bar_pos.x + bar_size.x, bar_pos.y + bar_size.y) -- bottom
+    -- Fill bottom->top
+    local filled_h = bar_size.y * progress
+    if filled_h > 2.0 then
+        local fill_min = ImVec2(bar_pos.x, bar_pos.y + (bar_size.y - filled_h)) -- top of fill
+        local fill_max = ImVec2(bar_pos.x + bar_size.x, bar_pos.y + bar_size.y) -- bottom
 
-		if gradOn then
-			local topCol, bottomCol
+        if gradOn then
+            local topCol, bottomCol
 
-			if gradMode == "dynamic" then
-				-- top color tracks current progress (max-ish at current fill)
-				topCol = ImAnim.GetBlendedColor(lowCol, highCol, progress, IamColorSpace.OKLAB)
-			else
-				topCol = highCol
-			end
-			bottomCol         = lowCol
+            if gradMode == "dynamic" then
+                -- top color tracks current progress (max-ish at current fill)
+                topCol = ImAnim.GetBlendedColor(lowCol, highCol, progress, IamColorSpace.OKLAB)
+            else
+                topCol = highCol
+            end
+            bottomCol         = lowCol
 
-			local colorTop    = ImGui.ColorConvertFloat4ToU32(topCol)
-			local colorBottom = ImGui.ColorConvertFloat4ToU32(bottomCol)
+            local colorTop    = ImGui.ColorConvertFloat4ToU32(topCol)
+            local colorBottom = ImGui.ColorConvertFloat4ToU32(bottomCol)
 
-				dl:AddRectGradientFilled(
-					fill_min, fill_max,
-					colorBottom,
-					colorTop,
-					gradDir,
-					rounding, -- rounding
-					flags
-				)
-		else
-			local fill_col = ImAnim.GetBlendedColor(lowCol, highCol, progress, IamColorSpace.OKLAB)
-			local fill_u32 = ImGui.ColorConvertFloat4ToU32(fill_col)
+            AddRectGradientFilled(dl,
+                fill_min, fill_max,
+                colorTop,
+                colorBottom,
+                gradDir,
+                rounding,
+                flags
+            )
+        else
+            local fill_col = ImAnim.GetBlendedColor(lowCol, highCol, progress, IamColorSpace.OKLAB)
+            local fill_u32 = ImGui.ColorConvertFloat4ToU32(fill_col)
 
-			-- bottom corners should be rounded (bar fills upward)
-			dl:AddRectFilled(fill_min, fill_max, fill_u32, rounding, flags)
-		end
+            -- bottom corners should be rounded (bar fills upward)
+            dl:AddRectFilled(fill_min, fill_max, fill_u32, rounding, flags)
+        end
 
-		-- glow edge (vertical) - overlay matches full fill shape; transparent until the last glowThickness
-		if glowOn then
-			local thick = opts.glowThickness or bar_size.y * 0.5
+        -- glow edge (vertical) - overlay matches full fill shape; transparent until the last glowThickness
+        if glowOn then
+            local thick = opts.glowThickness or bar_size.y * 0.5
 
-			local aMax  = opts.glowAlphaMax or 90 -- 0..255
+            local aMax  = opts.glowAlphaMax or 90 -- 0..255
 
-			if filled_h > 2.0 and thick > 0.0 then
-				-- Glow spans only the last 'thick' pixels below the cap (cap is at fill_min.y)
-				local band_max_y = math.min(fill_max.y, fill_min.y + thick)
+            if filled_h > 2.0 and thick > 0.0 then
+                -- Glow spans only the last 'thick' pixels below the cap (cap is at fill_min.y)
+                local band_max_y = math.min(fill_max.y, fill_min.y + thick)
 
-				local gmin = ImVec2(fill_min.x, fill_min.y)
-				local gmax = ImVec2(fill_max.x, band_max_y)
+                local gmin       = ImVec2(fill_min.x, fill_min.y)
+                local gmax       = ImVec2(fill_max.x, band_max_y)
 
-				local col_trans  = IM_COL32(0, 0, 0, 0)
-				local col_bright = IM_COL32(255, 255, 255, aMax)
+                local col_trans  = IM_COL32(0, 0, 0, 0)
+                local col_bright = IM_COL32(255, 255, 255, aMax)
 
-				-- Clip to the filled region so the glow follows the cap silhouette perfectly
-				dl:PushClipRect(fill_min, fill_max, true)
+                -- Clip to the filled region so the glow follows the cap silhouette perfectly
+                dl:PushClipRect(fill_min, fill_max, true)
 
-				-- Fade away from the cap: top bright -> bottom transparent
-				dl:AddRectGradientFilled(
-					gmin, gmax,
-					col_bright, col_trans,
-					ImGradientDir.Vertical,
-					rounding,
-					flags
-				)
+                -- Fade away from the cap: top bright -> bottom transparent
+                AddRectGradientFilled(dl,
+                    gmin, gmax,
+                    col_bright, col_trans,
+                    ImGradientDir.Vertical,
+                    rounding,
+                    flags
+                )
 
-				dl:PopClipRect()
-			end
-		end
+                dl:PopClipRect()
+            end
+        end
 
-		-- Shimmer
-		if shimmerOn then
-			local shimmerFollows = (opts.shimmerFollows ~= false) -- default true
-			local shimmerSpeed   = opts.shimmerSpeed or 0.5
-			local shimmerHeight  = opts.shimmerHeight or 30.0 -- vertical shimmer height
-			local deadzone       = opts.shimmerDeadzone or 0.001
-			local barState       = getBarState(id, now)
-			local phase          = (((now - (barState.t0 or now)) * 0.001) * shimmerSpeed) % 1.0
+        -- Shimmer
+        if shimmerOn then
+            local shimmerFollows = (opts.shimmerFollows ~= false) -- default true
+            local shimmerSpeed   = opts.shimmerSpeed or 0.5
+            local shimmerHeight  = opts.shimmerHeight or 30.0     -- vertical shimmer height
+            local deadzone       = opts.shimmerDeadzone or 0.001
+            local barState       = getBarState(id, now)
+            local phase          = (((now - (barState.t0 or now)) * 0.001) * shimmerSpeed) % 1.0
 
-			if shimmerFollows then
-				local delta = progress - (barState.lastP or progress)
-				local newDir = barState.dir or 1
-				if delta > deadzone then newDir = 1 end
-				if delta < -deadzone then newDir = -1 end
-				if newDir ~= (barState.dir or 1) then
-					barState.t0 = now - (phase / shimmerSpeed) * 1000.0
-					barState.dir = newDir
-				end
-			else
-				barState.dir = 1 -- always upward shimmer
-			end
+            if shimmerFollows then
+                local delta = progress - (barState.lastP or progress)
+                local newDir = barState.dir or 1
+                if delta > deadzone then newDir = 1 end
+                if delta < -deadzone then newDir = -1 end
+                if newDir ~= (barState.dir or 1) then
+                    barState.t0 = now - (phase / shimmerSpeed) * 1000.0
+                    barState.dir = newDir
+                end
+            else
+                barState.dir = 1 -- always upward shimmer
+            end
 
-			phase = (((now - (barState.t0 or now)) * 0.001) * shimmerSpeed) % 1.0
+            phase = (((now - (barState.t0 or now)) * 0.001) * shimmerSpeed) % 1.0
 
-			local pos01 = phase
-			if shimmerFollows and (barState.dir or 1) < 0 then
-				pos01 = 1.0 - phase
-			end
+            local pos01 = phase
+            if shimmerFollows and (barState.dir or 1) < 0 then
+                pos01 = 1.0 - phase
+            end
 
-			local shimmer_y = fill_max.y - (pos01 * filled_h)
+            local shimmer_y = fill_max.y - (pos01 * filled_h)
 
-			if shimmer_y >= fill_min.y then
-				local shimmer_alpha = 0.15 * math.sin(((fill_max.y - shimmer_y) / filled_h) * math.pi)
-				local a_sh = math.floor(shimmer_alpha * 255)
+            if shimmer_y >= fill_min.y then
+                local shimmer_alpha = 0.15 * math.sin(((fill_max.y - shimmer_y) / filled_h) * math.pi)
+                local a_sh = math.floor(shimmer_alpha * 255)
                 local startShimCol = IM_COL32(255, 255, 255, 0)
                 local endShimCol = IM_COL32(255, 255, 255, a_sh)
 
@@ -227,287 +324,288 @@ function StatusBar.DrawProgressVert(label, percent, lowCol, highCol, opts)
                     startShimCol = IM_COL32(255, 255, 255, a_sh)
                 end
 
-				dl:AddRectGradientFilled(
-					ImVec2(bar_pos.x, shimmer_y - shimmerHeight),
-					ImVec2(bar_pos.x + bar_size.x, shimmer_y),
-					startShimCol,
+                AddRectGradientFilled(dl,
+                    ImVec2(bar_pos.x, shimmer_y - shimmerHeight),
+                    ImVec2(bar_pos.x + bar_size.x, shimmer_y),
+                    startShimCol,
                     endShimCol,
-					ImGradientDir.Vertical,
-					rounding,
-					flags
-				)
-			end
+                    ImGradientDir.Vertical,
+                    rounding,
+                    flags
+                )
+            end
 
-			barState.lastP = progress
-		end
+            barState.lastP = progress
+        end
 
-		-- Overlay image mask (vertical)
-		if opts.overlayOn and opts.overlay ~= nil then
-			local pad           = opts.overlayPadding or 0.0
-			local uv0           = opts.overlayUv0 or ImVec2(0, 0)
-			local uv1           = opts.overlayUv1 or ImVec2(1, 1)
-			local tint          = opts.overlayTint or IM_COL32(255, 255, 255, 255)
+        -- Overlay image mask (vertical)
+        if opts.overlayOn and opts.overlay ~= nil then
+            local pad           = opts.overlayPadding or 0.0
+            local uv0           = opts.overlayUv0 or ImVec2(0, 0)
+            local uv1           = opts.overlayUv1 or ImVec2(1, 1)
+            local tint          = opts.overlayTint or IM_COL32(255, 255, 255, 255)
 
-			local texID         = opts.overlay.GetTextureID and opts.overlay:GetTextureID() or opts.overlay
-			local overlayStatic = (opts.overlayStatic == true)
+            local texID         = opts.overlay.GetTextureID and opts.overlay:GetTextureID() or opts.overlay
+            local overlayStatic = (opts.overlayStatic == true)
 
-			if overlayStatic then
-				-- Full-size looking glass
-				dl:AddImage(
-					texID,
-					ImVec2(bar_pos.x - pad, bar_pos.y - pad),
-					ImVec2(bar_max.x + pad, bar_max.y + pad),
-					uv0, uv1,
-					tint
-				)
-			else
-				-- Dynamic: clip overlay to the filled portion (bottom -> top), and clip UVs accordingly
-				if filled_h > 2.0 then
-					-- fill_min is the TOP of the filled region, fill_max is the bottom
-					local oMin   = ImVec2(bar_pos.x - pad, fill_min.y - pad)
-					local oMax   = ImVec2(bar_max.x + pad, bar_max.y + pad)
+            if overlayStatic then
+                -- Full-size looking glass
+                dl:AddImage(
+                    texID,
+                    ImVec2(bar_pos.x - pad, bar_pos.y - pad),
+                    ImVec2(bar_max.x + pad, bar_max.y + pad),
+                    uv0, uv1,
+                    tint
+                )
+            else
+                -- Dynamic: clip overlay to the filled portion (bottom -> top), and clip UVs accordingly
+                if filled_h > 2.0 then
+                    -- fill_min is the TOP of the filled region, fill_max is the bottom
+                    local oMin   = ImVec2(bar_pos.x - pad, fill_min.y - pad)
+                    local oMax   = ImVec2(bar_max.x + pad, bar_max.y + pad)
 
-					-- Clip UVs so the bottom stays aligned and we only sample the filled fraction.
-					-- Keep uv1.y as the bottom, move uv0.y downward as progress decreases.
-					local vSpanY = (uv1.y - uv0.y)
-					local v0y    = uv1.y - (vSpanY * progress)
-					local uv0c   = ImVec2(uv0.x, v0y)
+                    -- Clip UVs so the bottom stays aligned and we only sample the filled fraction.
+                    -- Keep uv1.y as the bottom, move uv0.y downward as progress decreases.
+                    local vSpanY = (uv1.y - uv0.y)
+                    local v0y    = uv1.y - (vSpanY * progress)
+                    local uv0c   = ImVec2(uv0.x, v0y)
 
-					dl:AddImage(texID, oMin, oMax, uv0c, uv1, tint)
-				end
-			end
-		end
-	end
+                    dl:AddImage(texID, oMin, oMax, uv0c, uv1, tint)
+                end
+            end
+        end
+    end
 
-	if showTicks and tickEvery > 0 then DrawTicks() end
+    if showTicks and tickEvery > 0 then DrawTicks() end
 
-	-- Text (centered)
-	if showText then
-		local pctText = string.format(textFmt, progress * 100.0)
-		local txtSize = ImGui.CalcTextSizeVec(pctText)
-		local txtPos = ImVec2(
-			bar_pos.x + (bar_size.x - txtSize.x) * 0.5,
-			bar_pos.y + (bar_size.y - txtSize.y) * 0.5
-		)
-		dl:AddText(txtPos, IM_COL32(255, 255, 255, 200), pctText)
-	end
+    -- Text (centered)
+    if showText then
+        local pctText = string.format(textFmt, progress * 100.0)
+        local txtSize = ImGui.CalcTextSizeVec(pctText)
+        local txtPos = ImVec2(
+            bar_pos.x + (bar_size.x - txtSize.x) * 0.5,
+            bar_pos.y + (bar_size.y - txtSize.y) * 0.5
+        )
+        dl:AddText(txtPos, IM_COL32(255, 255, 255, 200), pctText)
+    end
 
-	-- Border
-	if borderOn then
-		local colU32
-		if borderCol == nil then
-			colU32 = IM_COL32(255, 255, 255, 120)
-		elseif type(borderCol) == "number" then
-			colU32 = borderCol
-		else
-			colU32 = ImGui.ColorConvertFloat4ToU32(borderCol)
-		end
-		dl:AddRect(bar_pos, bar_max, colU32, rounding, flags, borderTh)
-	end
+    -- Border
+    if borderOn then
+        local colU32
+        if borderCol == nil then
+            colU32 = IM_COL32(255, 255, 255, 120)
+        elseif type(borderCol) == "number" then
+            colU32 = borderCol
+        else
+            colU32 = ImGui.ColorConvertFloat4ToU32(borderCol)
+        end
+        dl:AddRect(bar_pos, bar_max, colU32, rounding, flags, borderTh)
+    end
 
-	-- Reserve space
-	ImGui.Dummy(ImVec2(bar_size.x, bar_size.y + padEnd))
-	return progress
+    -- Reserve space
+    ImGui.Dummy(ImVec2(bar_size.x, bar_size.y + padEnd))
+    return progress
 end
 
 ---Draw a horizontal Progress bar using ImAnim efx
 ---@param label string Label ID for the bar
----@param percent float|integer Percentage (0-100 or 0.0-1.0) to fill the bar
+---@param percent number Percentage (0-100 or 0.0-1.0) to fill the bar
 ---@param lowCol ImVec4|table|nil Color at 0% fill
 ---@param highCol ImVec4|table|nil Color at 100% fill
 ---@param opts table|nil Optional settings:
 ---@return integer
 function StatusBar.DrawProgress(label, percent, lowCol, highCol, opts)
-	opts = opts or {}
-	if opts.vertical == true then
+    opts = opts or {}
+    if opts.vertical == true then
         opts.fillGradientDir = ImGradientDir.Vertical
-		return StatusBar.DrawProgressVert(label, percent, lowCol, highCol, opts)
-	end
-	if lowCol == nil then lowCol = ImVec4(ImGui.GetStyleColor(ImGuiCol.PlotHistogram)) end
-	if highCol == nil then highCol = ImVec4(ImGui.GetStyleColor(ImGuiCol.PlotHistogram)) end
+        return StatusBar.DrawProgressVert(label, percent, lowCol, highCol, opts)
+    end
+    if lowCol == nil then lowCol = ImVec4(ImGui.GetStyleColor(ImGuiCol.PlotHistogram)) end
+    if highCol == nil then highCol = ImVec4(ImGui.GetStyleColor(ImGuiCol.PlotHistogram)) end
 
-	local now       = mq.gettime() -- milliseconds since launch
-	local dl        = ImGui.GetWindowDrawList()
-	local borderOn  = (opts.border == true)
-	local borderTh  = opts.borderThickness or 1.0
-	local borderCol = opts.borderColor or ImVec4(0.8, 0.8, 0.8, 1.0)
-	local height    = opts.height or 24.0
-	local width     = opts.width or 0.0 -- if 0, will use all available horizontal space
-	local padEnd    = opts.padEnd or 20.0
-	local rounding  = opts.rounding or ImGui.GetStyle().FrameRounding
-	local showText  = (opts.showText == true)
-	local textFmt   = opts.textFmt or "%.0f%%"
-	local showTicks = (opts.showTicks == true)
-	local tickEvery = opts.tickEvery or 0.05
-	local tickAlpha = opts.tickAlpha or 80
-	local shimmerOn = (opts.shimmer == true)
-	local glowOn    = (opts.glow == true)
-	local bgU32     = opts.bgU32 or IM_COL32(30, 32, 40, 255)
-	local tweenSec  = opts.tweenSeconds or 0.35
-	local gradOn    = (opts.fillGradient == true)
-	local gradMode  = opts.fillGradientMode or "static" -- "static" or "dynamic"
-	local gradDir   = opts.fillGradientDir or ImGradientDir.Horizontal   -- "lr" or "tb"
-	local flags     = opts.flags or 0
-	local target    = to01(percent)
-	local id        = ImGui.GetID(label)
+    local now        = mq.gettime() -- milliseconds since launch
+    local dl         = ImGui.GetWindowDrawList()
+    local borderOn   = (opts.border == true)
+    local borderTh   = opts.borderThickness or 1.0
+    local borderCol  = opts.borderColor or ImVec4(0.8, 0.8, 0.8, 1.0)
+    local height     = opts.height or 24.0
+    local width      = opts.width or 0.0 -- if 0, will use all available horizontal space
+    local padEnd     = opts.padEnd or 20.0
+    local rounding   = opts.rounding or ImGui.GetStyle().FrameRounding
+    local showText   = (opts.showText == true)
+    local textFmt    = opts.textFmt or "%.0f%%"
+    local textString = opts.textString or nil -- if set, overrides textFmt and progress-based text
+    local showTicks  = (opts.showTicks == true)
+    local tickEvery  = opts.tickEvery or 0.05
+    local tickAlpha  = opts.tickAlpha or 80
+    local shimmerOn  = (opts.shimmer == true)
+    local glowOn     = (opts.glow == true)
+    local bgU32      = opts.bgU32 or IM_COL32(30, 32, 40, 255)
+    local tweenSec   = opts.tweenSeconds or 0.35
+    local gradOn     = (opts.fillGradient == true)
+    local gradMode   = opts.fillGradientMode or "static"                -- "static" or "dynamic"
+    local gradDir    = opts.fillGradientDir or ImGradientDir.Horizontal -- "lr" or "tb"
+    local flags      = opts.flags or 0
+    local target     = to01(percent)
+    local id         = ImGui.GetID(label)
 
-	local progress  = ImAnim.TweenFloat(
-		id,
-		ImHashStr(label),
-		target,
-		tweenSec,
-		ImAnim.EasePreset(IamEaseType.OutExpo),
-		IamPolicy.Crossfade,
-		0 -- dt not required when using internal timing
-	)
+    local progress   = ImAnim.TweenFloat(
+        id,
+        ImHashStr(label),
+        target,
+        tweenSec,
+        ImAnim.EasePreset(IamEaseType.OutExpo),
+        IamPolicy.Crossfade,
+        0 -- dt not required when using internal timing
+    )
 
-	progress        = clamp01(progress)
-	-- layout
-	local bar_pos   = ImGui.GetCursorScreenPosVec()
-	local avail     = ImGui.GetContentRegionAvailVec()
-	if width <= 3 then width = avail.x - padEnd end
-	if width < 10 then width = 10 end
-	local bar_size = ImVec2(width, height)
-	local bar_max  = ImVec2(bar_pos.x + bar_size.x, bar_pos.y + bar_size.y)
+    progress         = clamp01(progress)
+    -- layout
+    local bar_pos    = ImGui.GetCursorScreenPosVec()
+    local avail      = ImGui.GetContentRegionAvailVec()
+    if width <= 3 then width = avail.x - padEnd end
+    if width < 10 then width = 10 end
+    local bar_size = ImVec2(width, height)
+    local bar_max  = ImVec2(bar_pos.x + bar_size.x, bar_pos.y + bar_size.y)
 
-	dl:AddRectFilled(bar_pos, bar_max, bgU32, rounding)
+    dl:AddRectFilled(bar_pos, bar_max, bgU32, rounding)
 
 
-	---Draw tick marks on progress bars at desired intervals
-	local function DrawTicks()
-		local tickW = opts.tickThickness or 1.0
-		local insetY = 3.0
-		local y1 = bar_pos.y + insetY
-		local y2 = bar_pos.y + bar_size.y - insetY
+    ---Draw tick marks on progress bars at desired intervals
+    local function DrawTicks()
+        local tickW = opts.tickThickness or 1.0
+        local insetY = 3.0
+        local y1 = bar_pos.y + insetY
+        local y2 = bar_pos.y + bar_size.y - insetY
 
-		local steps = math.floor(1.0 / tickEvery + 0.5)
-		for i = 1, steps - 1 do   -- start at 1, end at steps-1 (skip 0% and 100%)
-			local t = i * tickEvery
-			if t <= 0.0 or t >= 1.0 then break end
+        local steps = math.floor(1.0 / tickEvery + 0.5)
+        for i = 1, steps - 1 do -- start at 1, end at steps-1 (skip 0% and 100%)
+            local t = i * tickEvery
+            if t <= 0.0 or t >= 1.0 then break end
 
-			local x = bar_pos.x + (bar_size.x * t)
-			dl:AddRectFilled(
-				ImVec2(x - tickW * 0.5, y1),
-				ImVec2(x + tickW * 0.5, y2),
-				IM_COL32(255, 255, 255, tickAlpha),
-				0.0
-			)
-		end
-	end
+            local x = bar_pos.x + (bar_size.x * t)
+            dl:AddRectFilled(
+                ImVec2(x - tickW * 0.5, y1),
+                ImVec2(x + tickW * 0.5, y2),
+                IM_COL32(255, 255, 255, tickAlpha),
+                0.0
+            )
+        end
+    end
 
-	--ticks on background
-	-- if showTicks and tickEvery > 0 then DrawTicks() end
+    --ticks on background
+    -- if showTicks and tickEvery > 0 then DrawTicks() end
 
-	-- fill
-	local filled_w = bar_size.x * progress
-	if filled_w > 2.0 then
-		local fill_max = ImVec2(bar_pos.x + filled_w, bar_pos.y + bar_size.y)
+    -- fill
+    local filled_w = bar_size.x * progress
+    if filled_w > 2.0 then
+        local fill_max = ImVec2(bar_pos.x + filled_w, bar_pos.y + bar_size.y)
 
-		if gradOn then
-			-- Gradient endpoints:
-			-- static: low -> high across the fill
-			-- dynamic: right edge tracks current progress color
-			local colorLeft, colorRight
-			if gradMode == "dynamic" then
-				colorLeft = lowCol
-				colorRight = ImAnim.GetBlendedColor(lowCol, highCol, progress, IamColorSpace.OKLAB)
-			else
-				colorLeft = lowCol
-				colorRight = highCol
-			end
+        if gradOn then
+            -- Gradient endpoints:
+            -- static: low -> high across the fill
+            -- dynamic: right edge tracks current progress color
+            local colorLeft, colorRight
+            if gradMode == "dynamic" then
+                colorLeft = lowCol
+                colorRight = ImAnim.GetBlendedColor(lowCol, highCol, progress, IamColorSpace.OKLAB)
+            else
+                colorLeft = lowCol
+                colorRight = highCol
+            end
 
-			local colorLow = ImGui.ColorConvertFloat4ToU32(colorLeft)
-			local colorHigh = ImGui.ColorConvertFloat4ToU32(colorRight)
+            local colorLow = ImGui.ColorConvertFloat4ToU32(colorLeft)
+            local colorHigh = ImGui.ColorConvertFloat4ToU32(colorRight)
 
-				dl:AddRectGradientFilled(
-					bar_pos, fill_max,
-					colorLow,
-					colorHigh,
-					gradDir,
-					rounding, -- rounding
-					flags
-				)
-		else
-			-- Original single-color fill
-			local fill_col = ImAnim.GetBlendedColor(lowCol, highCol, progress, IamColorSpace.OKLAB)
-			local fill_u32 = ImGui.ColorConvertFloat4ToU32(fill_col)
-			dl:AddRectFilled(bar_pos, fill_max, fill_u32, rounding, flags)
-		end
+            AddRectGradientFilled(dl,
+                bar_pos, fill_max,
+                colorLow,
+                colorHigh,
+                gradDir,
+                rounding,
+                flags
+            )
+        else
+            -- Original single-color fill
+            local fill_col = ImAnim.GetBlendedColor(lowCol, highCol, progress, IamColorSpace.OKLAB)
+            local fill_u32 = ImGui.ColorConvertFloat4ToU32(fill_col)
+            dl:AddRectFilled(bar_pos, fill_max, fill_u32, rounding, flags)
+        end
 
-		-- glow edge (overlay matches full fill shape; transparent until the last glowThickness)
-		if glowOn then
-			local thick = opts.glowThickness or bar_size.x * 0.2
-			local aMax  = opts.glowAlphaMax or 90 -- 0..255
+        -- glow edge (overlay matches full fill shape; transparent until the last glowThickness)
+        if glowOn then
+            local thick = opts.glowThickness or bar_size.x * 0.2
+            local aMax  = opts.glowAlphaMax or 90 -- 0..255
 
-			-- Avoid odd artifacts on extremely small fills
-			if filled_w > 2.0 and thick > 0.0 then
-				-- Start the glow 'thick' pixels before the end, but not before the bar start
-				local splitX = math.max(bar_pos.x, (bar_pos.x + filled_w) - thick)
+            -- Avoid odd artifacts on extremely small fills
+            if filled_w > 2.0 and thick > 0.0 then
+                -- Start the glow 'thick' pixels before the end, but not before the bar start
+                local splitX     = math.max(bar_pos.x, (bar_pos.x + filled_w) - thick)
 
-				local gmin = ImVec2(splitX, bar_pos.y)
-				local gmax = fill_max
+                local gmin       = ImVec2(splitX, bar_pos.y)
+                local gmax       = fill_max
 
-				local col_trans  = IM_COL32(0, 0, 0, 0)
-				local col_bright = IM_COL32(255, 255, 255, aMax)
+                local col_trans  = IM_COL32(0, 0, 0, 0)
+                local col_bright = IM_COL32(255, 255, 255, aMax)
 
-				-- Clip to filled region so the glow follows the rounded end-cap perfectly
-				dl:PushClipRect(bar_pos, fill_max, true)
+                -- Clip to filled region so the glow follows the rounded end-cap perfectly
+                dl:PushClipRect(bar_pos, fill_max, true)
 
-				-- Fade left->right toward the cap edge
-				dl:AddRectGradientFilled(
-					gmin, gmax,
-					col_trans,  col_bright,
-					ImGradientDir.Horizontal,
-					rounding,
-					flags
-				)
+                -- Fade left->right toward the cap edge
+                AddRectGradientFilled(dl,
+                    gmin, gmax,
+                    col_trans, col_bright,
+                    ImGradientDir.Horizontal,
+                    rounding,
+                    flags
+                )
 
-				dl:PopClipRect()
-			end
-		end
-		
-		-- shimmer
-		if shimmerOn then
-			local shimmerFollows = (opts.shimmerFollows ~= false) -- default true
-			local shimmerSpeed = opts.shimmerSpeed or 0.5 -- cycles per second
-			local shimmerWidth = opts.shimmerWidth or 60.0
-			local deadzone = opts.shimmerDeadzone or 0.001
-			local barState = getBarState(id, now)
+                dl:PopClipRect()
+            end
+        end
 
-			-- Current phase under existing anchor (0..1)
-			local phase = (((now - (barState.t0 or now)) * 0.001) * shimmerSpeed) % 1.0
+        -- shimmer
+        if shimmerOn then
+            local shimmerFollows = (opts.shimmerFollows ~= false) -- default true
+            local shimmerSpeed = opts.shimmerSpeed or 0.5         -- cycles per second
+            local shimmerWidth = opts.shimmerWidth or 60.0
+            local deadzone = opts.shimmerDeadzone or 0.001
+            local barState = getBarState(id, now)
 
-			if shimmerFollows then
-				-- Determine direction from progress movement
-				local delta = progress - (barState.lastP or progress)
+            -- Current phase under existing anchor (0..1)
+            local phase = (((now - (barState.t0 or now)) * 0.001) * shimmerSpeed) % 1.0
 
-				local newDir = barState.dir or 1
-				if delta > deadzone then newDir = 1 end
-				if delta < -deadzone then newDir = -1 end
+            if shimmerFollows then
+                -- Determine direction from progress movement
+                local delta = progress - (barState.lastP or progress)
 
-				-- If direction changed, re-anchor time so phase continues smoothly
-				if newDir ~= (barState.dir or 1) then
-					barState.t0 = now - (phase / shimmerSpeed) * 1000.0
-					barState.dir = newDir
-				end
-			else
-				-- Force always left-to-right
-				barState.dir = 1
-			end
+                local newDir = barState.dir or 1
+                if delta > deadzone then newDir = 1 end
+                if delta < -deadzone then newDir = -1 end
 
-			-- Recompute phase after possible re-anchor
-			phase = (((now - (barState.t0 or now)) * 0.001) * shimmerSpeed) % 1.0
+                -- If direction changed, re-anchor time so phase continues smoothly
+                if newDir ~= (barState.dir or 1) then
+                    barState.t0 = now - (phase / shimmerSpeed) * 1000.0
+                    barState.dir = newDir
+                end
+            else
+                -- Force always left-to-right
+                barState.dir = 1
+            end
 
-			-- Convert phase to position; reverse only if following and decreasing
-			local pos01 = phase
-			if shimmerFollows and (barState.dir or 1) < 0 then
-				pos01 = 1.0 - phase
-			end
+            -- Recompute phase after possible re-anchor
+            phase = (((now - (barState.t0 or now)) * 0.001) * shimmerSpeed) % 1.0
 
-			local shimmer_pos = pos01 * filled_w
-			if shimmer_pos < filled_w then
-				local shimmer_alpha = 0.15 * math.sin((shimmer_pos / filled_w) * math.pi)
-				local a_sh = math.floor(shimmer_alpha * 255)
+            -- Convert phase to position; reverse only if following and decreasing
+            local pos01 = phase
+            if shimmerFollows and (barState.dir or 1) < 0 then
+                pos01 = 1.0 - phase
+            end
+
+            local shimmer_pos = pos01 * filled_w
+            if shimmer_pos < filled_w then
+                local shimmer_alpha = 0.15 * math.sin((shimmer_pos / filled_w) * math.pi)
+                local a_sh = math.floor(shimmer_alpha * 255)
                 local startShimCol = IM_COL32(255, 255, 255, 0)
                 local endShimCol = IM_COL32(255, 255, 255, a_sh)
                 if barState.dir == -1 then
@@ -515,84 +613,85 @@ function StatusBar.DrawProgress(label, percent, lowCol, highCol, opts)
                     startShimCol = IM_COL32(255, 255, 255, a_sh)
                 end
 
-				dl:AddRectGradientFilled(
-					ImVec2(bar_pos.x + shimmer_pos, bar_pos.y),
-					ImVec2(bar_pos.x + shimmer_pos + shimmerWidth, bar_pos.y + bar_size.y),
-				    startShimCol,
-					endShimCol,
-					ImGradientDir.Horizontal,
-					rounding,
-					flags
-				)
-			end
+                AddRectGradientFilled(dl,
+                    ImVec2(bar_pos.x + shimmer_pos, bar_pos.y),
+                    ImVec2(bar_pos.x + shimmer_pos + shimmerWidth, bar_pos.y + bar_size.y),
+                    startShimCol,
+                    endShimCol,
+                    ImGradientDir.Horizontal,
+                    rounding,
+                    flags
+                )
+            end
 
-			-- update last progress at end of shimmer evaluation
-			barState.lastP = progress
-		end
-	end
+            -- update last progress at end of shimmer evaluation
+            barState.lastP = progress
+        end
+    end
 
-	--ticks on top of the fill bar
-	if showTicks and tickEvery > 0 then DrawTicks() end
+    --ticks on top of the fill bar
+    if showTicks and tickEvery > 0 then DrawTicks() end
 
-	-- Overlay image mask
-	if opts.overlayOn and opts.overlay ~= nil then
-		local pad   = opts.overlayPadding or 0.0
-		local uv0   = opts.overlayUv0 or ImVec2(0, 0)
-		local uv1   = opts.overlayUv1 or ImVec2(1, 1)
-		local tint  = opts.overlayTint or IM_COL32(255, 255, 255, 255)
+    -- Overlay image mask
+    if opts.overlayOn and opts.overlay ~= nil then
+        local pad   = opts.overlayPadding or 0.0
+        local uv0   = opts.overlayUv0 or ImVec2(0, 0)
+        local uv1   = opts.overlayUv1 or ImVec2(1, 1)
+        local tint  = opts.overlayTint or IM_COL32(255, 255, 255, 255)
 
-		local texID = opts.overlay.GetTextureID and opts.overlay:GetTextureID() or opts.overlay
-		if (opts.overlayStatic == true) then
-			-- "Looking glass": always full-size, full UVs
-			dl:AddImage(
-				texID,
-				ImVec2(bar_pos.x - pad, bar_pos.y - pad),
-				ImVec2(bar_max.x + pad, bar_max.y + pad),
-				uv0, uv1,
-				tint
-			)
-		else
-			-- Dynamic: clip overlay to the filled portion (and clip UVs to match)
-			if filled_w > 2.0 then
-				local oMin   = ImVec2(bar_pos.x - pad, bar_pos.y - pad)
-				local oMax   = ImVec2(bar_pos.x + filled_w + pad, bar_max.y + pad)
+        local texID = opts.overlay.GetTextureID and opts.overlay:GetTextureID() or opts.overlay
+        if (opts.overlayStatic == true) then
+            -- "Looking glass": always full-size, full UVs
+            dl:AddImage(
+                texID,
+                ImVec2(bar_pos.x - pad, bar_pos.y - pad),
+                ImVec2(bar_max.x + pad, bar_max.y + pad),
+                uv0, uv1,
+                tint
+            )
+        else
+            -- Dynamic: clip overlay to the filled portion (and clip UVs to match)
+            if filled_w > 2.0 then
+                local oMin   = ImVec2(bar_pos.x - pad, bar_pos.y - pad)
+                local oMax   = ImVec2(bar_pos.x + filled_w + pad, bar_max.y + pad)
 
-				-- Shrink UV span to match the filled fraction, anchored on the left
-				local uSpanX = (uv1.x - uv0.x)
-				local u1x    = uv0.x + (uSpanX * progress)
-				local uv1c   = ImVec2(u1x, uv1.y)
+                -- Shrink UV span to match the filled fraction, anchored on the left
+                local uSpanX = (uv1.x - uv0.x)
+                local u1x    = uv0.x + (uSpanX * progress)
+                local uv1c   = ImVec2(u1x, uv1.y)
 
-				dl:AddImage(texID, oMin, oMax, uv0, uv1c, tint)
-			end
-		end
-	end
+                dl:AddImage(texID, oMin, oMax, uv0, uv1c, tint)
+            end
+        end
+    end
 
-	-- text
-	if showText then
-		local pctText = string.format(textFmt, progress * 100.0)
-		local txtSize = ImGui.CalcTextSizeVec(pctText)
-		local txtPos = ImVec2(
-			bar_pos.x + (bar_size.x - txtSize.x) * 0.5,
-			bar_pos.y + (bar_size.y - txtSize.y) * 0.5
-		)
-		dl:AddText(txtPos, IM_COL32(255, 255, 255, 200), pctText)
-	end
+    -- text
+    if showText then
+        local pctText = textString and textString or string.format(textFmt, progress * 100.0)
+        local txtSize = ImGui.CalcTextSizeVec(pctText)
+        local txtPos = ImVec2(
+            bar_pos.x + (bar_size.x - txtSize.x) * 0.5,
+            bar_pos.y + (bar_size.y - txtSize.y) * 0.5
+        )
+        dl:AddText(ImVec2(txtPos.x + 1, txtPos.y + 2), IM_COL32(0, 0, 0, 200), pctText)
+        dl:AddText(txtPos, IM_COL32(255, 255, 255, 255), pctText)
+    end
 
-	-- Border (draw last so it frames everything)
-	if borderOn then
-		local colU32
-		if borderCol == nil then
-			colU32 = IM_COL32(255, 255, 255, 120)
-		elseif type(borderCol) == "number" then
-			colU32 = borderCol
-		else
-			colU32 = ImGui.ColorConvertFloat4ToU32(borderCol)
-		end
-		dl:AddRect(bar_pos, bar_max, colU32, rounding, flags, borderTh)
-	end
+    -- Border (draw last so it frames everything)
+    if borderOn then
+        local colU32
+        if borderCol == nil then
+            colU32 = IM_COL32(255, 255, 255, 120)
+        elseif type(borderCol) == "number" then
+            colU32 = borderCol
+        else
+            colU32 = ImGui.ColorConvertFloat4ToU32(borderCol)
+        end
+        dl:AddRect(bar_pos, bar_max, colU32, rounding, flags, borderTh)
+    end
 
-	ImGui.Dummy(ImVec2(bar_size.x, bar_size.y))
-	return progress
+    ImGui.Dummy(ImVec2(bar_size.x, bar_size.y))
+    return progress
 end
 
 return StatusBar

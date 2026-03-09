@@ -68,13 +68,13 @@ local targetDots        = {}
 local firstTargetID     = nil
 
 local Module            = {}
-local loadedExeternally = MyUI_ScriptName ~= nil
+local loadedExeternally = MyUI ~= nil
 Module.Name             = "MyDots"
 Module.IsRunning        = false
 Module.TempSettings     = {}
 
 if loadedExeternally then
-    Module.Utils = MyUI_Utils
+    Module.Utils = MyUI.Utils
 else
     Module.Utils = require('lib.common')
 end
@@ -830,7 +830,7 @@ end
 function Module.MainLoop()
     if loadedExeternally then
         ---@diagnostic disable-next-line: undefined-global
-        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+        if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
 
     winFlags = winFlagsDefaults

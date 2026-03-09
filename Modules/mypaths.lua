@@ -13,7 +13,7 @@ local Module            = {}
 Module.Name             = 'MyPaths'
 Module.IsRunning        = false
 ---@diagnostic disable:undefined-global
-local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+local loadedExeternally = MyUI ~= nil and true or false
 local MySelf            = mq.TLO.Me
 
 if not loadedExeternally then
@@ -29,17 +29,17 @@ if not loadedExeternally then
     Module.Theme       = {}
     Module.MyClass     = MySelf.Class.ShortName()
 else
-    Module.Utils       = MyUI_Utils
-    Module.ThemeLoader = MyUI_ThemeLoader
-    Module.Icons       = MyUI_Icons
-    Module.CharLoaded  = MyUI_CharLoaded
-    Module.Server      = MyUI_Server
-    Module.Base64      = MyUI_Base64
-    Module.PackageMan  = MyUI_PackageMan
-    Module.SQLite3     = MyUI_SQLite3
-    Module.ThemeFile   = MyUI_ThemeFile
-    Module.Theme       = MyUI_Theme
-    Module.MyClass     = MyUI_CharClass
+    Module.Utils       = MyUI.Utils
+    Module.ThemeLoader = MyUI.ThemeLoader
+    Module.Icons       = MyUI.Icons
+    Module.CharLoaded  = MyUI.CharLoaded
+    Module.Server      = MyUI.Server
+    Module.Base64      = MyUI.Base64
+    Module.PackageMan  = MyUI.PackageMan
+    Module.SQLite3     = MyUI.SQLite3
+    Module.ThemeFile   = MyUI.ThemeFile
+    Module.Theme       = MyUI.Theme
+    Module.MyClass     = MyUI.CharClass
 end
 
 Module.TempSettings                                              = {}
@@ -1298,7 +1298,7 @@ local sFlag = false
 local function DrawStatus()
     ImGui.BeginGroup()
     -- Set Window Font Scale
-    
+
 
     if showHUD and ImGui.IsWindowHovered() then
         mousedOverFlag = true
@@ -1431,7 +1431,6 @@ local function DrawStatus()
 end
 
 local function RenderDebugMessages(scale)
-    
     if ImGui.BeginChild("Tabs##DebugTab", -1, -1, ImGuiChildFlags.AutoResizeX) then
         if ImGui.Button(Module.Icons.MD_OPEN_IN_NEW) then
             Module.TempSettings.PopDebug = true
@@ -1447,7 +1446,7 @@ local function RenderDebugMessages(scale)
         ImGui.SameLine()
         ImGui.TextColored(ImVec4(0, 1, 1, 1), "%0.2f s", Module.TempSettings.Cycle or 0)
         ImGui.Separator()
-        
+
         if ImGui.BeginTable('DebugTable', 5, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.Resizable, ImGuiTableFlags.Reorderable, ImGuiTableFlags.Hideable), ImVec2(0.0, 0.0)) then
             ImGui.TableSetupColumn('Time##', ImGuiTableColumnFlags.WidthFixed, 100)
             ImGui.TableSetupColumn('Zone##', ImGuiTableColumnFlags.WidthFixed, 100)
@@ -1478,7 +1477,6 @@ local function RenderDebugMessages(scale)
         end
     end
     ImGui.EndChild()
-    
 end
 
 function Module.RenderControls(scale, working_table)
@@ -1490,7 +1488,7 @@ function Module.RenderControls(scale, working_table)
     if not NavSet.doNav then
         ImGui.SetNextItemWidth(120)
         -- if ImGui.BeginCombo("##SelectPath", NavSet.SelectedPath) then
-        --     
+        --
         --     if not Paths[currZone] then Paths[currZone] = {} end
         --     for name, data in pairs(Paths[currZone]) do
         --         local isSelected = name == NavSet.SelectedPath
@@ -1502,7 +1500,6 @@ function Module.RenderControls(scale, working_table)
         -- end
         local tmpP = {}
         if ImGui.BeginCombo("Path##SelectPath", NavSet.SelectedPath) then
-            
             if not Paths[currZone] then Paths[currZone] = {} end
             for k, data in pairs(Paths[currZone]) do
                 table.insert(tmpP, k)
@@ -1528,7 +1525,6 @@ function Module.RenderControls(scale, working_table)
         end
         ImGui.PopStyleColor()
         if ImGui.IsItemHovered() then
-            
             ImGui.SetTooltip("Delete Path")
         end
     else
@@ -1563,7 +1559,6 @@ function Module.RenderControls(scale, working_table)
             end
             ImGui.PopStyleColor()
             if ImGui.IsItemHovered() then
-                
                 ImGui.SetTooltip("Copy Path")
             end
         else
@@ -1588,7 +1583,6 @@ function Module.RenderControls(scale, working_table)
             ImGui.PopStyleColor()
         end
         if ImGui.IsItemHovered() then
-            
             ImGui.SetTooltip("Export: " .. currZone .. " : " .. NavSet.SelectedPath)
         end
         if ImGui.SmallButton("Write lua File") then
@@ -1687,7 +1681,6 @@ function Module.RenderControls(scale, working_table)
             ImGui.PopStyleColor()
         end
         if ImGui.IsItemHovered() then
-            
             ImGui.SetTooltip("Add " .. currZone .. ": " .. NavSet.SelectedPath .. " to Chain")
         end
 
@@ -1709,7 +1702,6 @@ function Module.RenderControls(scale, working_table)
         end
         if SavedChains ~= nil then
             if ImGui.BeginCombo("##SelectChain", NavSet.SelectedChain) then
-                
                 for name, data in pairs(SavedChains) do
                     local isSelected = name == NavSet.SelectedChain
                     if ImGui.Selectable(name, isSelected) then
@@ -1734,7 +1726,6 @@ function Module.RenderControls(scale, working_table)
         ImGui.SetNextItemWidth(120)
 
         if ImGui.BeginCombo("Zone##SelectChainZone", NavSet.ChainZone) then
-            
             if not Paths[NavSet.ChainZone] then Paths[NavSet.ChainZone] = {} end
             for k, name in pairs(tmpCZ) do
                 local isSelected = name == NavSet.ChainZone
@@ -1748,7 +1739,6 @@ function Module.RenderControls(scale, working_table)
             ImGui.SetNextItemWidth(120)
 
             if ImGui.BeginCombo("Path##SelectChainPath", NavSet.ChainPath) then
-                
                 if not Paths[NavSet.ChainZone] then Paths[NavSet.ChainZone] = {} end
                 for k, data in pairs(Paths[NavSet.ChainZone]) do
                     table.insert(tmpCP, k)
@@ -1988,7 +1978,7 @@ function Module.RenderPathData(scale, working_table)
         if NavSet.SelectedPath ~= 'None' then
             local closestWaypointIndex = FindIndexClosestWaypoint(working_table)
 
-            
+
             if ImGui.BeginTable('PathTable##WpList', 6, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.ScrollX, ImGuiTableFlags.Resizable, ImGuiTableFlags.Reorderable, ImGuiTableFlags.Hideable), -1, -1) then
                 ImGui.TableSetupColumn('WP#', ImGuiTableColumnFlags.WidthFixed, 40)
                 ImGui.TableSetupColumn('Loc', ImGuiTableColumnFlags.WidthFixed, 120)
@@ -2265,7 +2255,7 @@ function Module.RenderGUI()
                 ImGui.EndMenuBar()
             end
             -- Set Window Font Scale
-            
+
             if NavSet.PausedActiveGN then
                 if mq.TLO.SpawnCount('gm')() > 0 then
                     ImGui.TextColored(1, 0, 0, 1, "!!%s GM in Zone %s!!", Module.Icons.FA_BELL, Module.Icons.FA_BELL)
@@ -2392,7 +2382,6 @@ function Module.RenderGUI()
             -- Tabs
             -- ImGui.BeginChild("Tabs##MainTabs", -1, -1,ImGuiChildFlags.AutoResizeX)
             if ImGui.BeginTabBar('MainTabBar') then
-                
                 if not Module.TempSettings.ControlsPopped then
                     if ImGui.BeginTabItem('Controls') then
                         if ImGui.BeginChild("Tabs##Controls", -1, -1, ImGuiChildFlags.AutoResizeX) then
@@ -2432,7 +2421,7 @@ function Module.RenderGUI()
             -- ImGui.EndChild()
         end
         -- Reset Font Scale
-        
+
         -- Unload Theme
         Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
         ImGui.End()
@@ -2495,7 +2484,7 @@ function Module.RenderGUI()
         end
         if showConfig then
             -- Set Window Font Scale
-            
+
             if ImGui.CollapsingHeader('Theme##Settings' .. Module.Name) then
                 -- Configure ThemeZ --
                 ImGui.SeparatorText("Theme##" .. Module.Name)
@@ -2744,7 +2733,7 @@ function Module.RenderGUI()
             end
         end
         -- Reset Window Font Scale
-        
+
         Module.ThemeLoader.EndTheme(ColCntConf, StyCntConf)
         ImGui.End()
     end
@@ -2783,7 +2772,7 @@ function Module.RenderGUI()
         end
         ImGui.PopStyleColor()
         -- Set Window Font Scale
-        
+
         ImGui.End()
     end
 
@@ -3123,7 +3112,7 @@ end
 function Module.MainLoop()
     if loadedExeternally then
         ---@diagnostic disable-next-line: undefined-global
-        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+        if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
 
     local justZoned = false

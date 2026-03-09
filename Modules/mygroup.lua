@@ -12,7 +12,7 @@ Module.ActorMailBox     = 'MyGroup'
 
 Module.IsRunning        = false
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+local loadedExeternally = MyUI ~= nil and true or false
 
 if not loadedExeternally then
     Module.Utils       = require('lib.common')
@@ -27,17 +27,17 @@ if not loadedExeternally then
     Module.ThemeLoader = require('lib.theme_loader')
     Module.ProgressBar = require('lib.progressBars')
 else
-    Module.Utils = MyUI_Utils
-    Module.Actor = MyUI_Actor
-    Module.Colors = MyUI_Colors
-    Module.Icons = MyUI_Icons
-    Module.CharLoaded = MyUI_CharLoaded
-    Module.Server = MyUI_Server
-    Module.Mode = MyUI_Mode
-    Module.ThemeFile = MyUI_ThemeFile
-    Module.Theme = MyUI_Theme
-    Module.ThemeLoader = MyUI_ThemeLoader
-    Module.ProgressBar = MyUI_ProgressBar
+    Module.Utils = MyUI.Utils
+    Module.Actor = MyUI.Actor
+    Module.Colors = MyUI.Colors
+    Module.Icons = MyUI.Icons
+    Module.CharLoaded = MyUI.CharLoaded
+    Module.Server = MyUI.Server
+    Module.Mode = MyUI.Mode
+    Module.ThemeFile = MyUI.ThemeFile
+    Module.Theme = MyUI.Theme
+    Module.ThemeLoader = MyUI.ThemeLoader
+    Module.ProgressBar = MyUI.ProgressBar
 end
 local Utils              = Module.Utils
 local ToggleFlags        = bit32.bor(
@@ -538,20 +538,30 @@ local function DrawGroupMember(id)
         defOpts.padEnd = 4.0
     end
     defOpts.rounding = defOpts.rounding >= defOpts.height / 2 and defOpts.height / 2 or defOpts.rounding
+
+    if settings[Module.Name].ShowValOnBar then
+        defOpts.showText = true
+        defOpts.textString = groupData[memberName] ~= nil and string.format("%d / %d", groupData[memberName].CurHP, groupData[memberName].MaxHP) or
+            string.format("%d%%", hpPct)
+    end
+
     Module.ProgressBar.DrawProgress("HP##" .. memberName,
         hpPct,
         minHP, maxHP, settings[Module.Name].DynamicHP and defOpts or { width = 0.0, height = barSize * Scale, })
-    if settings[Module.Name].ShowValOnBar then
-        ImGui.SetCursorPos(cursorX + 2, cursorY)
 
-        local txtLabel = groupData[memberName] ~= nil and
-            string.format("%d / %d", groupData[memberName].CurHP, groupData[memberName].MaxHP) or
-            string.format("%d%%", hpPct)
+    defOpts.showText = false
+    defOpts.textString = nil
+    -- if settings[Module.Name].ShowValOnBar then
+    --     ImGui.SetCursorPos(cursorX + 2, cursorY)
 
-        ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
+    --     local txtLabel = groupData[memberName] ~= nil and
+    --         string.format("%d / %d", groupData[memberName].CurHP, groupData[memberName].MaxHP) or
+    --         string.format("%d%%", hpPct)
 
-        ImGui.Text(txtLabel)
-    end
+    --     ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
+    --     Module.Utils.DropShadow(txtLabel, { Opacity = 0.8, Enabled = true, })
+    --     -- ImGui.Text(txtLabel)
+    -- end
     -- ImGui.PopStyleColor()
 
 
@@ -568,28 +578,39 @@ local function DrawGroupMember(id)
                 defOpts.fillGradientMode = "static"
                 defOpts.rounding = defOpts.rounding >= defOpts.height / 2 and defOpts.height / 2 or defOpts.rounding
 
+                if settings[Module.Name].ShowValOnBar then
+                    defOpts.showText = true
+                    defOpts.textString = groupData[memberName] ~= nil and string.format("%d / %d", groupData[memberName].CurMana, groupData[memberName].MaxMana) or
+                        string.format("%d%%", mpPct)
+                end
+
                 Module.ProgressBar.DrawProgress("MP##" .. memberName,
                     mpPct,
                     manaMin, manaMax, settings[Module.Name].DynamicMP and defOpts or { width = 0.0, height = barSize * Scale, })
-                if settings[Module.Name].ShowValOnBar then
-                    ImGui.SetCursorPos(cursorX + 2, cursorY)
 
-                    local txtLabel = groupData[memberName] ~= nil and
-                        string.format("%d / %d", groupData[memberName].CurMana, groupData[memberName].MaxMana) or
-                        string.format("%d%%", mpPct)
+                defOpts.showText = false
+                defOpts.textString = nil
 
-                    ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
+                -- if settings[Module.Name].ShowValOnBar then
+                --     ImGui.SetCursorPos(cursorX + 2, cursorY)
 
-                    ImGui.Text(txtLabel)
-                end
+                --     local txtLabel = groupData[memberName] ~= nil and
+                --         string.format("%d / %d", groupData[memberName].CurMana, groupData[memberName].MaxMana) or
+                --         string.format("%d%%", mpPct)
+
+                --     ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
+
+                --     Module.Utils.DropShadow(txtLabel, { Opacity = 0.8, Enabled = true, })
+                --     -- ImGui.Text(txtLabel)
+                -- end
             end
         end
     end
     if showEnd then
         --My Endurance bar
         cursorX, cursorY = ImGui.GetCursorPos()
-        local endurMin = settings[Module.Name].DynamicEnd and retCol("EndurMin") or Module.Colors.color('yellow2')
-        local endurMax = settings[Module.Name].DynamicEnd and retCol("EndurMax") or Module.Colors.color('yellow2')
+        local endurMin = settings[Module.Name].DynamicHP and retCol("EndurMin") or Module.Colors.color('yellow2')
+        local endurMax = settings[Module.Name].DynamicHP and retCol("EndurMax") or Module.Colors.color('yellow2')
         -- ImGui.ProgressBar((enPct / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctEndurance' .. id)
         -- ImGui.PopStyleColor()
 
@@ -597,16 +618,25 @@ local function DrawGroupMember(id)
         defOpts.fillGradientMode = "dynamic"
         defOpts.rounding = defOpts.rounding >= defOpts.height / 2 and defOpts.height / 2 or defOpts.rounding
 
+        if settings[Module.Name].ShowValOnBar then
+            defOpts.showText = true
+            defOpts.textString = groupData[memberName] ~= nil and string.format("%d / %d", groupData[memberName].CurEnd, groupData[memberName].MaxEnd) or
+                string.format("%d%%", enPct)
+        end
+
         Module.ProgressBar.DrawProgress("END##" .. memberName,
             enPct,
             endurMin, endurMax, settings[Module.Name].DynamicHP and defOpts or { width = 0.0, height = barSize * Scale, })
 
-        if settings[Module.Name].ShowValOnBar then
-            local txtLabel = groupData[memberName] ~= nil and string.format("%d / %d", groupData[memberName].CurEnd, groupData[memberName].MaxEnd) or string.format("%d%%", enPct)
-            ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
+        defOpts.showText = false
+        defOpts.textString = nil
+        -- if settings[Module.Name].ShowValOnBar then
+        --     local txtLabel = groupData[memberName] ~= nil and string.format("%d / %d", groupData[memberName].CurEnd, groupData[memberName].MaxEnd) or string.format("%d%%", enPct)
+        --     ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
 
-            ImGui.Text(txtLabel)
-        end
+        --     Module.Utils.DropShadow(txtLabel, { Opacity = 0.8, Enabled = true, })
+        --     --  ImGui.Text(txtLabel)
+        -- end
     end
 
     ImGui.EndGroup()
@@ -1075,10 +1105,17 @@ local function DrawSelf()
     end
     defOpts.rounding = defOpts.rounding >= defOpts.height / 2 and defOpts.height / 2 or defOpts.rounding
 
+    if settings[Module.Name].ShowValOnBar then
+        defOpts.showText = true
+        defOpts.textString = string.format("%d / %d", mySelf.CurrentHPs(), mySelf.MaxHPs())
+    end
+
     Module.ProgressBar.DrawProgress("HP##Self",
         mySelf.PctHPs() or 0,
         hpMin, hpMax, settings[Module.Name].DynamicHP and defOpts or { width = 0.0, height = barSize * Scale, })
 
+    defOpts.showText = false
+    defOpts.textString = nil
     -- ImGui.ProgressBar(((tonumber(mySelf.PctHPs() or 0)) / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctHpsSelf')
     -- ImGui.PopStyleColor()
     if ImGui.IsItemHovered() then
@@ -1086,15 +1123,15 @@ local function DrawSelf()
         GetInfoToolTip(0, false)
         ImGui.EndTooltip()
     end
-    if settings[Module.Name].ShowValOnBar then
-        ImGui.SetCursorPos(cursorX + 2, cursorY)
+    -- if settings[Module.Name].ShowValOnBar then
+    --     ImGui.SetCursorPos(cursorX + 2, cursorY)
 
-        local txtLabel = string.format("%d / %d", mySelf.CurrentHPs(), mySelf.MaxHPs())
+    --     local txtLabel = string.format("%d / %d", mySelf.CurrentHPs(), mySelf.MaxHPs())
 
-        ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
-
-        ImGui.Text(txtLabel)
-    end
+    --     ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
+    --     Module.Utils.DropShadow(txtLabel, { Opacity = 0.8, Enabled = true, })
+    --     -- ImGui.Text(txtLabel)
+    -- end
 
 
     --My Mana Bar
@@ -1111,9 +1148,17 @@ local function DrawSelf()
                 defOpts.fillGradientMode = "static"
                 defOpts.rounding = defOpts.rounding >= defOpts.height / 2 and defOpts.height / 2 or defOpts.rounding
 
+                if settings[Module.Name].ShowValOnBar then
+                    defOpts.showText = true
+                    defOpts.textString = string.format("%d / %d", mySelf.CurrentMana(), mySelf.MaxMana())
+                end
+
                 Module.ProgressBar.DrawProgress("MP##Self",
                     mySelf.PctMana() or 0,
                     manaMin, manaMax, settings[Module.Name].DynamicMP and defOpts or { padEnd = 15, width = 0.0, height = barSize * Scale, })
+
+                defOpts.showText = false
+                defOpts.textString = nil
 
                 -- ImGui.ProgressBar(((tonumber(mySelf.PctMana() or 0)) / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctManaSelf')
                 -- ImGui.PopStyleColor()
@@ -1122,15 +1167,16 @@ local function DrawSelf()
                     GetInfoToolTip(0, false)
                     ImGui.EndTooltip()
                 end
-                if settings[Module.Name].ShowValOnBar then
-                    ImGui.SetCursorPos(cursorX + 2, cursorY)
+                -- if settings[Module.Name].ShowValOnBar then
+                --     ImGui.SetCursorPos(cursorX + 2, cursorY)
 
-                    local txtLabel = string.format("%d / %d", mySelf.CurrentMana(), mySelf.MaxMana())
+                --     local txtLabel = string.format("%d / %d", mySelf.CurrentMana(), mySelf.MaxMana())
 
-                    ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
+                --     ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
 
-                    ImGui.Text(txtLabel)
-                end
+                --     Module.Utils.DropShadow(txtLabel, { Opacity = 0.8, Enabled = true, })
+                --     -- ImGui.Text(txtLabel)
+                -- end
             end
         end
     end
@@ -1145,22 +1191,31 @@ local function DrawSelf()
         defOpts.fillGradientMode = "dynamic"
         defOpts.rounding = defOpts.rounding >= defOpts.height / 2 and defOpts.height / 2 or defOpts.rounding
 
+        if settings[Module.Name].ShowValOnBar then
+            defOpts.showText = true
+            defOpts.textString = string.format("%d / %d", mySelf.CurrentEndurance(), mySelf.MaxEndurance())
+        end
+
         Module.ProgressBar.DrawProgress("END##Self",
             mySelf.PctEndurance() or 0,
             endurMin, endurMax, settings[Module.Name].DynamicHP and defOpts or { padEnd = 15, width = 0.0, height = barSize * Scale, })
+
+        defOpts.showText = false
+        defOpts.textString = nil
 
         if ImGui.IsItemHovered() then
             ImGui.BeginTooltip()
             GetInfoToolTip(0, false)
             ImGui.EndTooltip()
         end
-        if settings[Module.Name].ShowValOnBar then
-            local txtLabel = string.format("%d / %d", mySelf.CurrentEndurance(), mySelf.MaxEndurance())
+        -- if settings[Module.Name].ShowValOnBar then
+        --     local txtLabel = string.format("%d / %d", mySelf.CurrentEndurance(), mySelf.MaxEndurance())
 
-            ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
+        --     ImGui.SetCursorPos(ImGui.GetWindowContentRegionWidth() * 0.5 - (ImGui.CalcTextSize(txtLabel) * 0.5), cursorY - 2)
 
-            ImGui.Text(txtLabel)
-        end
+        --     Module.Utils.DropShadow(txtLabel, { Opacity = 0.8, Enabled = true, })
+        --     -- ImGui.Text(txtLabel)
+        -- end
     end
 
     -- Pet Health
@@ -1534,18 +1589,18 @@ function Module.RenderGUI()
                 ImGui.SameLine()
                 if loadedExeternally then
                     if ImGui.Button('Edit ThemeZ') then
-                        if MyUI_Modules.ThemeZ ~= nil then
-                            if MyUI_Modules.ThemeZ.IsRunning then
-                                MyUI_Modules.ThemeZ.ShowGui = true
+                        if MyUI.Modules.ThemeZ ~= nil then
+                            if MyUI.Modules.ThemeZ.IsRunning then
+                                MyUI.Modules.ThemeZ.ShowGui = true
                             else
-                                MyUI_TempSettings.ModuleChanged = true
-                                MyUI_TempSettings.ModuleName = 'ThemeZ'
-                                MyUI_TempSettings.ModuleEnabled = true
+                                MyUI.TempSettings.ModuleChanged = true
+                                MyUI.TempSettings.ModuleName = 'ThemeZ'
+                                MyUI.TempSettings.ModuleEnabled = true
                             end
                         else
-                            MyUI_TempSettings.ModuleChanged = true
-                            MyUI_TempSettings.ModuleName = 'ThemeZ'
-                            MyUI_TempSettings.ModuleEnabled = true
+                            MyUI.TempSettings.ModuleChanged = true
+                            MyUI.TempSettings.ModuleName = 'ThemeZ'
+                            MyUI.TempSettings.ModuleEnabled = true
                         end
                     end
                 end
@@ -1887,23 +1942,23 @@ end
 
 local function getMyInfo()
     local mySelf = mq.TLO.Me
-    raidSize = MyUI_MyData ~= nil and MyUI_MyData.RaidSize or (mq.TLO.Raid.Members() or 0)
-    raidLeader = MyUI_MyData ~= nil and MyUI_MyData.RaidLeader or (mq.TLO.Raid.Leader() or 'N/A')
+    raidSize = MyUI.MyData ~= nil and MyUI.MyData.RaidSize or (mq.TLO.Raid.Members() or 0)
+    raidLeader = MyUI.MyData ~= nil and MyUI.MyData.RaidLeader or (mq.TLO.Raid.Leader() or 'N/A')
     groupData[Module.CharLoaded] = {
-        Name = MyUI_MyData ~= nil and MyUI_MyData.Name or mySelf.Name(),
-        Level = MyUI_MyData ~= nil and MyUI_MyData.Level or (mySelf.Level() or 0),
-        CurHP = MyUI_MyData ~= nil and MyUI_MyData.CurHP or (mySelf.CurrentHPs() or 0),
-        MaxHP = MyUI_MyData ~= nil and MyUI_MyData.MaxHP or (mySelf.MaxHPs() or 0),
-        CurMana = MyUI_MyData ~= nil and MyUI_MyData.CurMana or (mySelf.CurrentMana() or 0),
-        MaxMana = MyUI_MyData ~= nil and MyUI_MyData.MaxMana or (mySelf.MaxMana() or 0),
-        CurEnd = MyUI_MyData ~= nil and MyUI_MyData.CurEnd or (mySelf.CurrentEndurance() or 0),
-        MaxEnd = MyUI_MyData ~= nil and MyUI_MyData.MaxEnd or (mySelf.MaxEndurance() or 0),
-        Class = MyUI_MyData ~= nil and MyUI_MyData.ClassShort or (mySelf.Class.ShortName() or 'N/A'),
-        Sitting = MyUI_MyData ~= nil and MyUI_MyData.Sitting or (mySelf.Sitting() or false),
-        ID = MyUI_MyData ~= nil and MyUI_MyData.ID or (mq.TLO.Me.ID() or 0),
-        Pet = MyUI_MyData ~= nil and MyUI_MyData.Pet or (mq.TLO.Me.Pet() or 0),
+        Name = MyUI.MyData ~= nil and MyUI.MyData.Name or mySelf.Name(),
+        Level = MyUI.MyData ~= nil and MyUI.MyData.Level or (mySelf.Level() or 0),
+        CurHP = MyUI.MyData ~= nil and MyUI.MyData.CurHP or (mySelf.CurrentHPs() or 0),
+        MaxHP = MyUI.MyData ~= nil and MyUI.MyData.MaxHP or (mySelf.MaxHPs() or 0),
+        CurMana = MyUI.MyData ~= nil and MyUI.MyData.CurMana or (mySelf.CurrentMana() or 0),
+        MaxMana = MyUI.MyData ~= nil and MyUI.MyData.MaxMana or (mySelf.MaxMana() or 0),
+        CurEnd = MyUI.MyData ~= nil and MyUI.MyData.CurEnd or (mySelf.CurrentEndurance() or 0),
+        MaxEnd = MyUI.MyData ~= nil and MyUI.MyData.MaxEnd or (mySelf.MaxEndurance() or 0),
+        Class = MyUI.MyData ~= nil and MyUI.MyData.ClassShort or (mySelf.Class.ShortName() or 'N/A'),
+        Sitting = MyUI.MyData ~= nil and MyUI.MyData.Sitting or (mySelf.Sitting() or false),
+        ID = MyUI.MyData ~= nil and MyUI.MyData.ID or (mq.TLO.Me.ID() or 0),
+        Pet = MyUI.MyData ~= nil and MyUI.MyData.Pet or (mq.TLO.Me.Pet() or 0),
         Zone = Module.MyZone,
-        Velocity = MyUI_MyData ~= nil and MyUI_MyData.Speed or (mq.TLO.Me.Speed() or 0),
+        Velocity = MyUI.MyData ~= nil and MyUI.MyData.Speed or (mq.TLO.Me.Speed() or 0),
         Check = os.clock(),
     }
     Module.GetMemberData()
@@ -1968,7 +2023,7 @@ local clockTimer = mq.gettime()
 function Module.MainLoop()
     if loadedExeternally then
         ---@diagnostic disable-next-line: undefined-global
-        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+        if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
 
     meID = mq.TLO.Me.ID()

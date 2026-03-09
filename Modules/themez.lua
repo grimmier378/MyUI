@@ -1,7 +1,7 @@
 local mq = require('mq')
 local ImGui = require 'ImGui'
 local Module = {}
-local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+local loadedExeternally = MyUI ~= nil and true or false
 Module.Name = "ThemeZ"   -- Name of the module used when loading and unloaing the modules.
 Module.IsRunning = false -- Keep track of running state. if not running we can unload it.
 Module.ShowGui = true
@@ -10,8 +10,8 @@ if not loadedExeternally then
     Module.Utils = require('lib.common')
     Module.ThemeLoader = require('lib.theme_loader')
 else
-    Module.Utils = MyUI_Utils
-    Module.ThemeLoader = MyUI_ThemeLoader
+    Module.Utils = MyUI.Utils
+    Module.ThemeLoader = MyUI.ThemeLoader
 end
 
 local defaults = require('defaults.themes')
@@ -40,10 +40,27 @@ for k, v in pairs(getmetatable(ImGuiCol).__index) do
     local defaultColors = {}
     if type(v) == 'number' then
         defaultColors[k] = ImGui.GetStyleColorVec4(v)
-        defaults.Theme[1].Color[ImGuiCol[k]] = {
+        defaults.Theme[1].Color[v] = {
             Color = { defaultColors[k].x, defaultColors[k].y, defaultColors[k].z, defaultColors[k].w, },
             PropertyName = k,
         }
+    end
+end
+for k, v in pairs(getmetatable(ImGuiStyleVar).__index) do
+    local styleData = ImGui.GetStyle().k
+    if type(v) == 'number' then
+        if type(styleData) == 'table' then
+            defaults.Theme[1].Style[v] = {
+                X = styleData.x,
+                Y = styleData.y,
+                PropertyName = k,
+            }
+        elseif type(styleData) == 'number' then
+            defaults.Theme[1].Style[v] = {
+                Size = styleData,
+                PropertyName = k,
+            }
+        end
     end
 end
 --Helper Functioons
@@ -88,6 +105,8 @@ local function loadSettings()
         end
     end
 
+    tempSettings.Theme[1] = {}
+    tempSettings.Theme[1] = defaults.Theme[1]
     if styleFlag then writeSettings(themeFileOld, tempSettings) end
 end
 
@@ -299,8 +318,8 @@ local sFlag = false
 local sorteedKeys = {}
 local function SortColors()
     local keys = {}
-    for k, v in pairs(defaults.Theme[1].Color) do
-        table.insert(keys, { id = ImGuiCol[v.PropertyName], name = v.PropertyName, })
+    for k, v in pairs(getmetatable(ImGuiCol).__index) do
+        table.insert(keys, { id = v, name = k, })
     end
 
     table.sort(keys, function(a, b)
@@ -340,9 +359,16 @@ function Module.RenderGUI()
             end
             local newName = tempSettings.Theme[loadedID]['Name'] or 'New'
             -- Save Current Theme to Config
-            local pressed = ImGui.Button("Save")
-            if pressed then
+            if ImGui.Button("Save") then
                 if tmpName == '' then tmpName = themeName end
+
+                -- -- clean up any old colors that don't exist anymore.
+                -- for k, v in pairs(tempSettings.Theme[loadedID].Color) do
+                --     if k ~= ImGuiCol[v.PropertyName] then
+                --         tempSettings.Theme[loadedID].Color[k] = nil
+                --     end
+                -- end
+
                 if tempSettings.Theme[loadedID]['Name'] ~= tmpName then
                     local nID = Module.Utils.GetNextID(tempSettings.Theme)
                     tempSettings.Theme[nID] = {
@@ -351,6 +377,7 @@ function Module.RenderGUI()
                     }
                     loadedID = nID
                 end
+
                 themeName = tmpName
                 writeSettings(themeFileOld, tempSettings)
                 theme = Module.Utils.Deepcopy(tempSettings)
@@ -427,10 +454,18 @@ function Module.RenderGUI()
                 end
                 ImGui.BeginChild('Colors', cWidth, (sFlag and headerHeight * 0.5 or headerHeight) - 20, ImGuiChildFlags.Borders)
 
+                local seen = {} -- make sure we arean't duplicating entries
+
                 for i = 1, #sorteedKeys do
                     local pID = sorteedKeys[i].id
                     local pData = tempSettings.Theme[loadedID]['Color'][pID] or defaults.Theme[1].Color[pID]
-                    if pData ~= nil then
+                    if pData ~= nil and pID == ImGuiCol[sorteedKeys[i].name] then
+                        if not seen[pData.PropertyName] then
+                            seen[pData.PropertyName] = true
+                        else
+                            goto continue
+                        end
+
                         local propertyName = pData.PropertyName
                         if propertyName ~= nil then
                             ImGui.PushID(propertyName .. "##Color")
@@ -445,6 +480,7 @@ function Module.RenderGUI()
                             end
                         end
                     end
+                    ::continue::
                 end
 
                 ImGui.EndChild()
@@ -467,8 +503,6 @@ function Module.RenderGUI()
 
             ImGui.EndChild()
         end
-        -- ImGui.PopStyleVar(StyleCount)
-        -- ImGui.PopStyleColor(ColorCount)
         Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
         ImGui.End()
     end
@@ -504,7 +538,7 @@ end
 --
 function Module.MainLoop()
     if loadedExeternally then
-        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+        if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
 end
 

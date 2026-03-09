@@ -424,8 +424,8 @@ local function DrawCatSubCatTree(picker, tbl, type)
                 if ImGui.TreeNode(subCategory) then
                     local abilitySubCategory = abilityCategory[subCategory]
                     for _, ability in ipairs(abilitySubCategory) do
-                        MyUI_Utils.Animation_Spell:SetTextureCell(ability.Icon)
-                        ImGui.DrawTextureAnimation(MyUI_Utils.Animation_Spell, 20, 20)
+                        MyUI.Utils.Animation_Spell:SetTextureCell(ability.Icon)
+                        ImGui.DrawTextureAnimation(MyUI.Utils.Animation_Spell, 20, 20)
                         ImGui.SameLine()
                         if ability.TargetType then AbilityPicker:SetTextColor(ability) end
                         if ImGui.Selectable(string.format('%s - %s', ability.Level, ability.Name), false) then
@@ -471,8 +471,8 @@ local function DrawAATree(picker, altAbilities)
         for _, type in ipairs(altAbilities.Types) do
             if ImGui.TreeNode(type) then
                 for _, altAbility in ipairs(altAbilities[type]) do
-                    MyUI_Utils.Animation_Spell:SetTextureCell(altAbility.Icon)
-                    ImGui.DrawTextureAnimation(MyUI_Utils.Animation_Spell, 20, 20)
+                    MyUI.Utils.Animation_Spell:SetTextureCell(altAbility.Icon)
+                    ImGui.DrawTextureAnimation(MyUI.Utils.Animation_Spell, 20, 20)
                     ImGui.SameLine()
                     if altAbility.TargetType then AbilityPicker:SetTextColor(altAbility) end
                     if ImGui.Selectable(altAbility.Name, false) then
@@ -511,8 +511,8 @@ end
 local function DrawItemTree(picker, items)
     if ImGui.TreeNode('Items') then
         for _, item in ipairs(items) do
-            MyUI_Utils.Animation_Item:SetTextureCell(item.Icon - 500)
-            ImGui.DrawTextureAnimation(MyUI_Utils.Animation_Item, 20, 20)
+            MyUI.Utils.Animation_Item:SetTextureCell(item.Icon - 500)
+            ImGui.DrawTextureAnimation(MyUI.Utils.Animation_Item, 20, 20)
             ImGui.SameLine()
             if item.TargetType then AbilityPicker:SetTextColor(item) end
             if ImGui.Selectable(string.format('%s - %s', item.Name, item.SpellName), false) then

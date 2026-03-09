@@ -1,53 +1,48 @@
-local mq             = require('mq')
-local ImGui          = require 'ImGui'
+local mq                         = require('mq')
+local ImGui                      = require 'ImGui'
+MyUI                             = { Version = '1.0.0', ScriptName = 'MyUI', }
 
-MyUI_PackageMan      = require('mq.PackageMan')
-MyUI_Actor           = require('actors')
-MyUI_CharData        = require('lib.char_data')
-MyUI_SQLite3         = MyUI_PackageMan.Require('lsqlite3')
-MyUI_ProgressBar     = require('lib.progressBars')
-MyUI_Version         = '1.0.0'
-MyUI_ScriptName      = 'MyUI'
-MyUI_Path            = mq.luaDir .. '/myui/'
-
-MyUI_Icons           = require('mq.ICONS')
-MyUI_Base64          = require('lib.base64') -- Ensure you have a base64 module available
-
-MyUI_Utils           = require('lib.common')
-
-MyUI_LoadModules     = require('lib.modules')
-MyUI_Colors          = require('lib.colors')
-MyUI_ThemeLoader     = require('lib.theme_loader')
-MyUI_AbilityPicker   = require('lib.AbilityPicker')
-MyUI_Grimmier_Img    = MyUI_Utils.SetImage(MyUI_Path .. "images/GrimGUI.png")
+MyUI.PackageMan                  = require('mq.PackageMan')
+MyUI.Actor                       = require('actors')
+MyUI.CharData                    = require('lib.char_data')
+MyUI.SQLite3                     = MyUI.PackageMan.Require('lsqlite3')
+MyUI.ProgressBar                 = require('lib.progressBars')
+MyUI.Path                        = mq.luaDir .. '/myui/'
+MyUI.Icons                       = require('mq.ICONS')
+MyUI.Base64                      = require('lib.base64') -- Ensure you have a base64 module available
+MyUI.Utils                       = require('lib.common')
+MyUI.LoadModules                 = require('lib.modules')
+MyUI.Colors                      = require('lib.colors')
+MyUI.ThemeLoader                 = require('lib.theme_loader')
+MyUI.AbilityPicker               = require('lib.AbilityPicker')
+MyUI.Grimmier_Img                = MyUI.Utils.SetImage(MyUI.Path .. "images/GrimGUI.png")
 
 -- build, char, server info
-MyUI_CharLoaded      = mq.TLO.Me.DisplayName()
-MyUI_Server          = mq.TLO.EverQuest.Server()
-MyUI_Build           = mq.TLO.MacroQuest.BuildName()
-MyUI_Guild           = mq.TLO.Me.Guild() or "none"
-MyUI_CharClass       = mq.TLO.Me.Class.ShortName() or "none"
+MyUI.CharLoaded                  = mq.TLO.Me.DisplayName()
+MyUI.Server                      = mq.TLO.EverQuest.Server()
+MyUI.Build                       = mq.TLO.MacroQuest.BuildName()
+MyUI.Guild                       = mq.TLO.Me.Guild() or "none"
+MyUI.CharClass                   = mq.TLO.Me.Class.ShortName() or "none"
 
-local MyActor        = MyUI_Actor.register('myui', function(message) end)
-local mods           = {}
+local MyActor                    = MyUI.Actor.register('myui', function(message) end)
+local mods                       = {}
 
-MyUI_InitPctComplete = 0
-MyUI_NumModsEnabled  = 0
-MyUI_CurLoading      = 'Loading Modules...'
-MyUI_Modules         = {}
-MyUI_Mode            = 'driver'
-MyUI_ConfPath        = mq.configDir .. '/MyUI/' .. MyUI_Server:gsub(" ", "_") .. '/'
-MyUI_SettingsFile    = MyUI_ConfPath .. MyUI_CharLoaded .. '.lua'
-MyUI_MyChatLoaded    = false
-MyUI_MyChatHandler   = nil
-
+MyUI.InitPctComplete             = 0
+MyUI.NumModsEnabled              = 0
+MyUI.CurLoading                  = 'Loading Modules...'
+MyUI.Modules                     = {}
+MyUI.Mode                        = 'driver'
+MyUI.ConfPath                    = mq.configDir .. '/MyUI/' .. MyUI.Server:gsub(" ", "_") .. '/'
+MyUI.SettingsFile                = MyUI.ConfPath .. MyUI.CharLoaded .. '.lua'
+MyUI.MyChatLoaded                = false
+MyUI.MyChatHandler               = nil
 
 local ToggleFlags                = bit32.bor(
-    MyUI_Utils.ImGuiToggleFlags.RightLabel,
-    MyUI_Utils.ImGuiToggleFlags.PulseOnHover,
-    MyUI_Utils.ImGuiToggleFlags.StarKnob,
-    MyUI_Utils.ImGuiToggleFlags.AnimateOnHover
---MyUI_Utils.ImGuiToggleFlags.KnobBorder
+    MyUI.Utils.ImGuiToggleFlags.RightLabel,
+    MyUI.Utils.ImGuiToggleFlags.PulseOnHover,
+    MyUI.Utils.ImGuiToggleFlags.StarKnob,
+    MyUI.Utils.ImGuiToggleFlags.AnimateOnHover
+--MyUI.Utils.ImGuiToggleFlags.KnobBorder
 )
 
 local default_list               = {
@@ -77,7 +72,7 @@ local default_list               = {
     "MapButton",
 }
 
-MyUI_DefaultConfig               = {
+MyUI.DefaultConfig               = {
     ShowMain = true,
     ThemeName = 'Default',
     mods_list = {
@@ -98,7 +93,7 @@ MyUI_DefaultConfig               = {
         [13] = { name = 'AAParty', enabled = false, },
         [14] = { name = 'AlertMaster', enabled = false, },
         [15] = { name = 'ThemeZ', enabled = false, },
-        [16] = { name = 'BigBag', enabled = false, }, -- Customized Fork of Cold's Big Bag
+        [16] = { name = 'BigBag', enabled = false, },  -- Customized Fork of Cold's Big Bag
         [17] = { name = 'XPTrack', enabled = false, }, -- Customized Fork of Derple's XPTrack
         [18] = { name = 'MyStats', enabled = false, },
         [19] = { name = 'iTrack', enabled = false, },
@@ -106,62 +101,62 @@ MyUI_DefaultConfig               = {
         --[20] = { name = 'MyDots', enabled = false, }, -- Customized Fork of Zathus' MyDots
     },
 }
-MyUI_Settings                    = {}
-MyUI_TempSettings                = {}
-MyUI_Theme                       = {}
-MyUI_ThemeFile                   = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
-MyUI_ThemeName                   = 'Default'
-MyUI_TempSettings.MyChatWinName  = nil
-MyUI_TempSettings.MyChatFocusKey = nil
-MyUI_MyData                      = {}
-MyUI_MyPetData                   = {}
+MyUI.Settings                    = {}
+MyUI.TempSettings                = {}
+MyUI.Theme                       = {}
+MyUI.ThemeFile                   = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
+MyUI.ThemeName                   = 'Default'
+MyUI.TempSettings.MyChatWinName  = nil
+MyUI.TempSettings.MyChatFocusKey = nil
+MyUI.MyData                      = {}
+MyUI.MyPetData                   = {}
 
-local MyUI_IsRunning             = false
+MyUI.IsRunning                   = false
 
 local function LoadTheme()
-    if MyUI_Utils.File.Exists(MyUI_ThemeFile) then
-        MyUI_Theme = dofile(MyUI_ThemeFile)
+    if MyUI.Utils.File.Exists(MyUI.ThemeFile) then
+        MyUI.Theme = dofile(MyUI.ThemeFile)
     else
-        MyUI_Theme = require('defaults.themes')
-        mq.pickle(MyUI_ThemeFile, MyUI_Theme)
+        MyUI.Theme = require('defaults.themes')
+        mq.pickle(MyUI.ThemeFile, MyUI.Theme)
     end
 end
 
 local function sortModules()
-    table.sort(MyUI_Settings.mods_list, function(a, b)
+    table.sort(MyUI.Settings.mods_list, function(a, b)
         return a.name < b.name
     end)
 end
 
 local function LoadSettings()
-    if MyUI_Utils.File.Exists(MyUI_SettingsFile) then
-        MyUI_Settings = dofile(MyUI_SettingsFile)
+    if MyUI.Utils.File.Exists(MyUI.SettingsFile) then
+        MyUI.Settings = dofile(MyUI.SettingsFile)
     else
-        MyUI_Settings = MyUI_DefaultConfig
-        mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+        MyUI.Settings = MyUI.DefaultConfig
+        mq.pickle(MyUI.SettingsFile, MyUI.Settings)
         LoadSettings()
     end
 
-    local newSetting = MyUI_Utils.CheckDefaultSettings(MyUI_DefaultConfig, MyUI_Settings)
-    -- newSetting = MyUI_Utils.CheckDefaultSettings(MyUI_DefaultConfig.mods_list, MyUI_Settings.mods_list) or newSetting
+    local newSetting = MyUI.Utils.CheckDefaultSettings(MyUI.DefaultConfig, MyUI.Settings)
+    -- newSetting = MyUI.Utils.CheckDefaultSettings(MyUI.DefaultConfig.mods_list, MyUI.Settings.mods_list) or newSetting
     for _, v in pairs(default_list) do
         local found = false
-        for _, data in ipairs(MyUI_Settings.mods_list) do
+        for _, data in ipairs(MyUI.Settings.mods_list) do
             if data.name == v then
                 found = true
                 break
             end
         end
         if not found then
-            table.insert(MyUI_Settings.mods_list, { name = v, enabled = false, })
+            table.insert(MyUI.Settings.mods_list, { name = v, enabled = false, })
             newSetting = true
         end
     end
     sortModules()
     LoadTheme()
-    MyUI_ThemeName = MyUI_Settings.ThemeName
+    MyUI.ThemeName = MyUI.Settings.ThemeName
     if newSetting then
-        mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+        mq.pickle(MyUI.SettingsFile, MyUI.Settings)
     end
 end
 
@@ -169,35 +164,35 @@ end
 local function RenderLoader()
     ImGui.SetNextWindowSize(ImVec2(400, 80), ImGuiCond.Always)
     ImGui.SetNextWindowPos(ImVec2(ImGui.GetIO().DisplaySize.x / 2 - 200, ImGui.GetIO().DisplaySize.y / 3 - 75), ImGuiCond.Always)
-    local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
+    local ColorCount, StyleCount = MyUI.ThemeLoader.StartTheme(MyUI.ThemeName, MyUI.Theme)
     ImGui.Begin("MyUI Loader", nil, bit32.bor(ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoResize, ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoScrollbar))
-    ImGui.Image(MyUI_Grimmier_Img:GetTextureID(), ImVec2(60, 60))
+    ImGui.Image(MyUI.Grimmier_Img:GetTextureID(), ImVec2(60, 60))
     ImGui.SetCursorPosY(ImGui.GetCursorPosY() - 35)
     ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 70)
-    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, 0.2, 0.7, 1 - (MyUI_InitPctComplete / 100), MyUI_InitPctComplete / 100)
-    ImGui.ProgressBar(MyUI_InitPctComplete / 100, ImVec2(310, 0), MyUI_CurLoading)
+    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, 0.2, 0.7, 1 - (MyUI.InitPctComplete / 100), MyUI.InitPctComplete / 100)
+    ImGui.ProgressBar(MyUI.InitPctComplete / 100, ImVec2(310, 0), MyUI.CurLoading)
     ImGui.PopStyleColor()
-    MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
+    MyUI.ThemeLoader.EndTheme(ColorCount, StyleCount)
     ImGui.End()
 end
 
 local function HelpDocumentation()
     local prefix = '\aw[\atMyUI\aw] '
-    MyUI_Utils.PrintOutput('MyUI', true, '%s\agtWelcome to \atMyUI', prefix)
-    MyUI_Utils.PrintOutput('MyUI', true, '%s\ayCommands:', prefix)
-    MyUI_Utils.PrintOutput('MyUI', true, '%s\ao/myui \agshow\aw - Toggle the Main UI', prefix)
-    MyUI_Utils.PrintOutput('MyUI', true, '%s\ao/myui \agexit\aw - Exit the script', prefix)
-    MyUI_Utils.PrintOutput('MyUI', true, '%s\ao/myui \agload \at[\aymoduleName\at]\aw - Load a module', prefix)
-    MyUI_Utils.PrintOutput('MyUI', true, '%s\ao/myui \agunload \at[\aymoduleName\at]\aw - Unload a module', prefix)
-    MyUI_Utils.PrintOutput('MyUI', true, '%s\ao/myui \agnew \at[\aymoduleName\at]\aw - Add a new module', prefix)
-    MyUI_Utils.PrintOutput('MyUI', true, '%s\ayStartup:', prefix)
-    MyUI_Utils.PrintOutput('MyUI', true, '%s\ao/lua run myui \aw[\ayclient\aw|\aydriver\aw]\aw - Start the Sctipt in either Driver or Client Mode, Default(Driver) if not specified',
+    MyUI.Utils.PrintOutput('MyUI', true, '%s\agtWelcome to \atMyUI', prefix)
+    MyUI.Utils.PrintOutput('MyUI', true, '%s\ayCommands:', prefix)
+    MyUI.Utils.PrintOutput('MyUI', true, '%s\ao/myui \agshow\aw - Toggle the Main UI', prefix)
+    MyUI.Utils.PrintOutput('MyUI', true, '%s\ao/myui \agexit\aw - Exit the script', prefix)
+    MyUI.Utils.PrintOutput('MyUI', true, '%s\ao/myui \agload \at[\aymoduleName\at]\aw - Load a module', prefix)
+    MyUI.Utils.PrintOutput('MyUI', true, '%s\ao/myui \agunload \at[\aymoduleName\at]\aw - Unload a module', prefix)
+    MyUI.Utils.PrintOutput('MyUI', true, '%s\ao/myui \agnew \at[\aymoduleName\at]\aw - Add a new module', prefix)
+    MyUI.Utils.PrintOutput('MyUI', true, '%s\ayStartup:', prefix)
+    MyUI.Utils.PrintOutput('MyUI', true, '%s\ao/lua run myui \aw[\ayclient\aw|\aydriver\aw]\aw - Start the Sctipt in either Driver or Client Mode, Default(Driver) if not specified',
         prefix)
 end
 
 local function GetSortedModuleNames()
     local sorted_names = {}
-    for _, data in ipairs(MyUI_Settings.mods_list) do
+    for _, data in ipairs(MyUI.Settings.mods_list) do
         table.insert(sorted_names, data.name)
     end
     table.sort(sorted_names)
@@ -205,27 +200,27 @@ local function GetSortedModuleNames()
 end
 
 local function InitModules()
-    for idx, data in ipairs(MyUI_Settings.mods_list) do
-        if data.enabled and MyUI_Modules[data.name] ~= nil and MyUI_Modules[data.name].ActorMailBox ~= nil then
+    for idx, data in ipairs(MyUI.Settings.mods_list) do
+        if data.enabled and MyUI.Modules[data.name] ~= nil and MyUI.Modules[data.name].ActorMailBox ~= nil then
             local message = {
                 Subject = 'Hello',
                 Message = 'Hello',
-                Name = MyUI_CharLoaded,
-                Guild = MyUI_Guild,
+                Name = MyUI.CharLoaded,
+                Guild = MyUI.Guild,
                 Tell = '',
                 Check = os.time,
             }
-            MyActor:send({ mailbox = MyUI_Modules[data.name].ActorMailBox, script = data.name:lower(), }, message)
-            MyActor:send({ mailbox = MyUI_Modules[data.name].ActorMailBox, script = 'myui', }, message)
+            MyActor:send({ mailbox = MyUI.Modules[data.name].ActorMailBox, script = data.name:lower(), }, message)
+            MyActor:send({ mailbox = MyUI.Modules[data.name].ActorMailBox, script = 'myui', }, message)
         end
     end
 end
 
 local function RenderModules()
-    for _, data in ipairs(MyUI_Settings.mods_list) do
-        if data.enabled and MyUI_Modules[data.name] ~= nil then
-            if MyUI_Modules[data.name].RenderGUI ~= nil then
-                MyUI_Modules[data.name].RenderGUI()
+    for _, data in ipairs(MyUI.Settings.mods_list) do
+        if data.enabled and MyUI.Modules[data.name] ~= nil then
+            if MyUI.Modules[data.name].RenderGUI ~= nil then
+                MyUI.Modules[data.name].RenderGUI()
             end
         end
     end
@@ -233,78 +228,78 @@ end
 
 local function ProcessModuleChanges()
     -- Enable/Disable Modules
-    if MyUI_TempSettings.ModuleChanged then
-        local module_name = MyUI_TempSettings.ModuleName
-        local enabled = MyUI_TempSettings.ModuleEnabled
+    if MyUI.TempSettings.ModuleChanged then
+        local module_name = MyUI.TempSettings.ModuleName
+        local enabled = MyUI.TempSettings.ModuleEnabled
 
-        for idx, data in ipairs(MyUI_Settings.mods_list) do
+        for idx, data in ipairs(MyUI.Settings.mods_list) do
             if data.name == module_name then
-                MyUI_Settings.mods_list[idx].enabled = enabled
+                MyUI.Settings.mods_list[idx].enabled = enabled
                 if enabled then
                     table.insert(mods, module_name)
-                    MyUI_Modules[module_name] = MyUI_LoadModules.load(module_name)
+                    MyUI.Modules[module_name] = MyUI.LoadModules.load(module_name)
                     InitModules()
                 else
                     for i, v in ipairs(mods) do
                         if v == module_name then
-                            if MyUI_Modules[module_name] ~= nil then
-                                if MyUI_Modules[module_name].Unload ~= nil then
-                                    MyUI_Modules[module_name].Unload()
+                            if MyUI.Modules[module_name] ~= nil then
+                                if MyUI.Modules[module_name].Unload ~= nil then
+                                    MyUI.Modules[module_name].Unload()
                                 end
-                                MyUI_LoadModules.unload(module_name)
-                                -- MyUI_Modules[module_name] = nil
+                                MyUI.LoadModules.unload(module_name)
+                                -- MyUI.Modules[module_name] = nil
                             end
                             table.remove(mods, i)
                         end
                     end
                     InitModules()
                 end
-                mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+                mq.pickle(MyUI.SettingsFile, MyUI.Settings)
                 break
             end
         end
         sortModules()
-        MyUI_TempSettings.ModuleChanged = false
+        MyUI.TempSettings.ModuleChanged = false
     end
 
     -- Add Custom Module
-    if MyUI_TempSettings.AddCustomModule then
+    if MyUI.TempSettings.AddCustomModule then
         local found = false
-        for _, data in ipairs(MyUI_Settings.mods_list) do
-            if data.name:lower() == MyUI_TempSettings.AddModule:lower() then
+        for _, data in ipairs(MyUI.Settings.mods_list) do
+            if data.name:lower() == MyUI.TempSettings.AddModule:lower() then
                 found = true
                 break
             end
         end
         if not found then
-            table.insert(MyUI_Settings.mods_list, { name = MyUI_TempSettings.AddModule, enabled = false, })
+            table.insert(MyUI.Settings.mods_list, { name = MyUI.TempSettings.AddModule, enabled = false, })
             sortModules()
-            mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+            mq.pickle(MyUI.SettingsFile, MyUI.Settings)
         end
-        MyUI_TempSettings.AddModule = ''
-        MyUI_TempSettings.AddCustomModule = false
+        MyUI.TempSettings.AddModule = ''
+        MyUI.TempSettings.AddCustomModule = false
     end
 
     -- Remove Module
-    if MyUI_TempSettings.RemoveModule then
-        for idx, data in ipairs(MyUI_Settings.mods_list) do
-            if data.name:lower() == MyUI_TempSettings.AddModule:lower() then
+    if MyUI.TempSettings.RemoveModule then
+        for idx, data in ipairs(MyUI.Settings.mods_list) do
+            if data.name:lower() == MyUI.TempSettings.AddModule:lower() then
                 for i, v in ipairs(mods) do
                     if v == data.name then
-                        MyUI_Modules[data.name].Unload()
-                        MyUI_LoadModules.unload(data.name)
-                        -- MyUI_Modules[data.name] = nil
+                        MyUI.Modules[data.name].Unload()
+                        MyUI.LoadModules.unload(data.name)
+                        -- MyUI.Modules[data.name] = nil
                         table.remove(mods, i)
                     end
                 end
-                table.remove(MyUI_Settings.mods_list, idx)
+                table.remove(MyUI.Settings.mods_list, idx)
                 sortModules()
-                mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+                mq.pickle(MyUI.SettingsFile, MyUI.Settings)
                 break
             end
         end
-        MyUI_TempSettings.AddModule = ''
-        MyUI_TempSettings.RemoveModule = false
+        MyUI.TempSettings.AddModule = ''
+        MyUI.TempSettings.RemoveModule = false
     end
 end
 
@@ -320,7 +315,7 @@ local function DrawContextItem(group_type)
         label = 'AllGroups'
     end
 
-    ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('teal'))
+    ImGui.PushStyleColor(ImGuiCol.Text, MyUI.Colors.color('teal'))
     if ImGui.MenuItem(string.format('Start %s Clients', label)) then
         mq.cmdf('/%s /lua run myui client', gpCmd)
     end
@@ -328,7 +323,7 @@ local function DrawContextItem(group_type)
 
     ImGui.Spacing()
 
-    ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('tangarine'))
+    ImGui.PushStyleColor(ImGuiCol.Text, MyUI.Colors.color('tangarine'))
     if ImGui.MenuItem(string.format('Stop %s Clients', label)) then
         mq.cmdf('/%s /myui quit', gpCmd)
     end
@@ -336,7 +331,7 @@ local function DrawContextItem(group_type)
 
     ImGui.Spacing()
 
-    ImGui.PushStyleColor(ImGuiCol.Text, MyUI_Colors.color('pink2'))
+    ImGui.PushStyleColor(ImGuiCol.Text, MyUI.Colors.color('pink2'))
     if ImGui.MenuItem(string.format('Stop %s ALL', label)) then
         mq.cmdf('/%s /myui quit', gpCmdAll)
     end
@@ -361,23 +356,25 @@ local function DrawContextMenu()
     end
 
     if ImGui.MenuItem('Exit') then
-        MyUI_IsRunning = false
+        MyUI.IsRunning = false
     end
 end
 
 local function RenderDebug()
-    if not MyUI_TempSettings.Debug then
+    if not MyUI.TempSettings.Debug then
         return
     end
-    local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
+    local ColorCount, StyleCount = MyUI.ThemeLoader.StartTheme(MyUI.ThemeName, MyUI.Theme)
     ImGui.SetNextWindowSize(ImVec2(400, 200), ImGuiCond.FirstUseEver)
     ImGui.SetNextWindowPos(ImVec2(100, 100), ImGuiCond.FirstUseEver)
-    local open_debug, show_debug = ImGui.Begin(MyUI_ScriptName .. " Debug##" .. MyUI_CharLoaded, true)
+    local open_debug, show_debug = ImGui.Begin(MyUI.ScriptName .. " Debug##" .. MyUI.CharLoaded, true)
     if not open_debug then
-        MyUI_TempSettings.Debug = false
+        MyUI.TempSettings.Debug = false
         show_debug = false
     end
     if show_debug then
+        ImGui.PushFont(ImGui.ConsoleFont, 16)
+
         local totalTime = 0
         local tempSort = GetSortedModuleNames()
         if ImGui.BeginTable("Module Processing", 2, ImGuiTableFlags.Borders) then
@@ -386,17 +383,17 @@ local function RenderDebug()
             ImGui.TableHeadersRow()
 
             for _, name in ipairs(tempSort or {}) do
-                if MyUI_TempSettings.ModuleProcessing[name] ~= nil then
+                if MyUI.TempSettings.ModuleProcessing[name] ~= nil then
                     ImGui.TableNextRow()
                     ImGui.TableNextColumn()
                     ImGui.Indent()
-                    ImGui.Text(MyUI_TempSettings.ModuleProcessing[name].ModName)
+                    ImGui.Text(MyUI.TempSettings.ModuleProcessing[name].ModName)
                     ImGui.Unindent()
                     ImGui.TableNextColumn()
                     ImGui.Indent()
-                    ImGui.Text(string.format("%.0f", MyUI_TempSettings.ModuleProcessing[name].Timer or 0))
+                    ImGui.Text(string.format("%.0f", MyUI.TempSettings.ModuleProcessing[name].Timer or 0))
                     ImGui.Unindent()
-                    totalTime = totalTime + (MyUI_TempSettings.ModuleProcessing[name].Timer or 0)
+                    totalTime = totalTime + (MyUI.TempSettings.ModuleProcessing[name].Timer or 0)
                 end
             end
             ImGui.EndTable()
@@ -405,24 +402,25 @@ local function RenderDebug()
         ImGui.Text("Total Time:")
         local ttSec = totalTime / 1000
         ImGui.SameLine()
-        ImGui.TextColored(MyUI_Colors.color(ttSec < 1 and 'green' or (ttSec < 2 and 'yellow' or 'red')), "%.3f seconds", ttSec)
+        ImGui.TextColored(MyUI.Colors.color(ttSec < 1 and 'green' or (ttSec < 2 and 'yellow' or 'red')), "%.3f seconds", ttSec)
+        ImGui.PopFont()
     end
 
-    MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
+    MyUI.ThemeLoader.EndTheme(ColorCount, StyleCount)
     ImGui.End()
 end
 
 local function RenderMini()
-    local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
-    local openMini, showMini = ImGui.Begin(MyUI_ScriptName .. "##Mini" .. MyUI_CharLoaded, true,
+    local ColorCount, StyleCount = MyUI.ThemeLoader.StartTheme(MyUI.ThemeName, MyUI.Theme)
+    local openMini, showMini = ImGui.Begin(MyUI.ScriptName .. "##Mini" .. MyUI.CharLoaded, true,
         bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar))
 
     if not openMini then
-        MyUI_IsRunning = false
+        MyUI.IsRunning = false
     end
     if showMini then
-        if ImGui.ImageButton("MyUI", MyUI_Grimmier_Img:GetTextureID(), ImVec2(30, 30)) then
-            MyUI_Settings.ShowMain = not MyUI_Settings.ShowMain
+        if ImGui.ImageButton("MyUI", MyUI.Grimmier_Img:GetTextureID(), ImVec2(30, 30)) then
+            MyUI.Settings.ShowMain = not MyUI.Settings.ShowMain
         end
     end
     if ImGui.BeginPopupContextWindow() then
@@ -430,59 +428,61 @@ local function RenderMini()
         ImGui.Separator()
         ImGui.EndPopup()
     end
-    if MyUI_TempSettings.MyChatWinName ~= nil and MyUI_TempSettings.MyChatFocusKey ~= nil then
-        if ImGui.IsKeyPressed(ImGuiKey[MyUI_TempSettings.MyChatFocusKey]) then
-            ImGui.SetWindowFocus(MyUI_TempSettings.MyChatWinName)
+    if MyUI.TempSettings.MyChatWinName ~= nil and MyUI.TempSettings.MyChatFocusKey ~= nil then
+        if ImGui.IsKeyPressed(ImGuiKey[MyUI.TempSettings.MyChatFocusKey]) then
+            ImGui.SetWindowFocus(MyUI.TempSettings.MyChatWinName)
         end
     end
-    MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
+    MyUI.ThemeLoader.EndTheme(ColorCount, StyleCount)
     ImGui.End()
 end
 
-local function MyUI_Render()
-    if MyUI_InitPctComplete < 100 and MyUI_NumModsEnabled > 0 then
+function MyUI.Render()
+    if MyUI.InitPctComplete < 100 and MyUI.NumModsEnabled > 0 then
         RenderLoader()
     else
-        if MyUI_Settings.ShowMain then
-            local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
+        if MyUI.Settings.ShowMain then
+            local ColorCount, StyleCount = MyUI.ThemeLoader.StartTheme(MyUI.ThemeName, MyUI.Theme)
 
             Minimized = false
             ImGui.SetNextWindowSize(400, 200, ImGuiCond.FirstUseEver)
             ImGui.SetNextWindowSizeConstraints(ImVec2(200, 200), ImVec2(4000, 4000))
-            -- local ColorCount, StyleCount = MyUI_ThemeLoader.StartTheme(MyUI_ThemeName, MyUI_Theme)
-            local open_gui, show_gui = ImGui.Begin(MyUI_ScriptName .. "##" .. MyUI_CharLoaded, true, ImGuiWindowFlags.None)
+            ImGui.PushFont(ImGui.ConsoleFont, 16)
+
+            -- local ColorCount, StyleCount = MyUI.ThemeLoader.StartTheme(MyUI.ThemeName, MyUI.Theme)
+            local open_gui, show_gui = ImGui.Begin(MyUI.ScriptName .. "##" .. MyUI.CharLoaded, true, ImGuiWindowFlags.None)
 
             if not open_gui then
-                MyUI_Settings.ShowMain = false
+                MyUI.Settings.ShowMain = false
                 Minimized = true
-                mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+                mq.pickle(MyUI.SettingsFile, MyUI.Settings)
             end
 
             if show_gui then
                 if ImGui.IsWindowFocused() then
                     if ImGui.IsKeyPressed(ImGuiKey.Escape) then
-                        MyUI_Settings.ShowMain = false
+                        MyUI.Settings.ShowMain = false
                         Minimized = true
-                        mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+                        mq.pickle(MyUI.SettingsFile, MyUI.Settings)
                     end
                 end
-                ImGui.Text(MyUI_Icons.MD_SETTINGS)
+                ImGui.Text(MyUI.Icons.MD_SETTINGS)
                 if ImGui.BeginPopupContextItem() then
                     DrawContextMenu()
                     ImGui.EndPopup()
                 end
                 if ImGui.CollapsingHeader('Theme##Coll' .. 'MyUI') then
-                    ImGui.Text("Cur Theme: %s", MyUI_ThemeName)
+                    ImGui.Text("Cur Theme: %s", MyUI.ThemeName)
                     -- Combo Box Load Theme
 
-                    if ImGui.BeginCombo("Load Theme##MyBuffs", MyUI_ThemeName) then
-                        for k, data in pairs(MyUI_Theme.Theme) do
-                            local isSelected = data.Name == MyUI_ThemeName
+                    if ImGui.BeginCombo("Load Theme##MyBuffs", MyUI.ThemeName) then
+                        for k, data in pairs(MyUI.Theme.Theme) do
+                            local isSelected = data.Name == MyUI.ThemeName
                             if ImGui.Selectable(data.Name, isSelected) then
-                                if MyUI_ThemeName ~= data.Name then
-                                    MyUI_ThemeName = data.Name
-                                    MyUI_Settings.ThemeName = MyUI_ThemeName
-                                    mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+                                if MyUI.ThemeName ~= data.Name then
+                                    MyUI.ThemeName = data.Name
+                                    MyUI.Settings.ThemeName = MyUI.ThemeName
+                                    mq.pickle(MyUI.SettingsFile, MyUI.Settings)
                                 end
                             end
                         end
@@ -496,18 +496,18 @@ local function MyUI_Render()
 
                     ImGui.SameLine()
                     if ImGui.Button('Edit ThemeZ') then
-                        if MyUI_Modules.ThemeZ ~= nil then
-                            if MyUI_Modules.ThemeZ.IsRunning then
-                                MyUI_Modules.ThemeZ.ShowGui = true
+                        if MyUI.Modules['ThemeZ'] ~= nil then
+                            if MyUI.Modules['ThemeZ'].IsRunning then
+                                MyUI.Modules['ThemeZ'].ShowGui = true
                             else
-                                MyUI_TempSettings.ModuleChanged = true
-                                MyUI_TempSettings.ModuleName = 'ThemeZ'
-                                MyUI_TempSettings.ModuleEnabled = true
+                                MyUI.TempSettings.ModuleChanged = true
+                                MyUI.TempSettings.ModuleName = 'ThemeZ'
+                                MyUI.TempSettings.ModuleEnabled = true
                             end
                         else
-                            MyUI_TempSettings.ModuleChanged = true
-                            MyUI_TempSettings.ModuleName = 'ThemeZ'
-                            MyUI_TempSettings.ModuleEnabled = true
+                            MyUI.TempSettings.ModuleChanged = true
+                            MyUI.TempSettings.ModuleName = 'ThemeZ'
+                            MyUI.TempSettings.ModuleEnabled = true
                         end
                     end
                 end
@@ -517,11 +517,11 @@ local function MyUI_Render()
                 local col = math.floor((sizeX or 125) / 125) or 1
                 if ImGui.BeginTable("Modules", col, ImGuiWindowFlags.None) then
                     local tempSort = GetSortedModuleNames()
-                    local sorted_names = MyUI_Utils.SortTableColumns(nil, tempSort, col)
+                    local sorted_names = MyUI.Utils.SortTableColumns(nil, tempSort, col)
 
                     for _, name in ipairs(sorted_names) do
                         local module_data = nil
-                        for _, data in ipairs(MyUI_Settings.mods_list) do
+                        for _, data in ipairs(MyUI.Settings.mods_list) do
                             if data.name == name then
                                 module_data = data
                                 goto continue
@@ -533,7 +533,7 @@ local function MyUI_Render()
                             local pressed = false
                             ImGui.TableNextColumn()
                             ImGui.SetNextItemWidth(120)
-                            local new_state = MyUI_Utils.DrawToggle(module_data.name,
+                            local new_state = MyUI.Utils.DrawToggle(module_data.name,
                                 module_data.enabled,
                                 ToggleFlags,
                                 ImVec2(46, 20),
@@ -547,9 +547,9 @@ local function MyUI_Render()
 
                             -- If checkbox changed, set flags for processing
                             if new_state ~= module_data.enabled then
-                                MyUI_TempSettings.ModuleChanged = true
-                                MyUI_TempSettings.ModuleName = module_data.name
-                                MyUI_TempSettings.ModuleEnabled = new_state
+                                MyUI.TempSettings.ModuleChanged = true
+                                MyUI.TempSettings.ModuleName = module_data.name
+                                MyUI.TempSettings.ModuleEnabled = new_state
                             end
                         end
                     end
@@ -558,19 +558,19 @@ local function MyUI_Render()
 
                 -- Add Custom Module Section
                 ImGui.SetNextItemWidth(150)
-                MyUI_TempSettings.AddModule = ImGui.InputText("Add Custom Module", MyUI_TempSettings.AddModule or '')
+                MyUI.TempSettings.AddModule = ImGui.InputText("Add Custom Module", MyUI.TempSettings.AddModule or '')
 
-                MyUI_TempSettings.Debug = MyUI_Utils.DrawToggle("Debug Mode", MyUI_TempSettings.Debug, ToggleFlags, 16)
-                if MyUI_TempSettings.AddModule ~= '' then
+                MyUI.TempSettings.Debug = MyUI.Utils.DrawToggle("Debug Mode", MyUI.TempSettings.Debug, ToggleFlags, 16)
+                if MyUI.TempSettings.AddModule ~= '' then
                     if ImGui.Button("Add") then
-                        MyUI_TempSettings.AddCustomModule = true
+                        MyUI.TempSettings.AddCustomModule = true
                     end
 
                     local found = false
                     for _, v in pairs(default_list) do
-                        if v:lower() == MyUI_TempSettings.AddModule:lower() then
+                        if v:lower() == MyUI.TempSettings.AddModule:lower() then
                             found = true
-                            MyUI_TempSettings.AddModule = ''
+                            MyUI.TempSettings.AddModule = ''
                             goto found_one
                         end
                     end
@@ -578,15 +578,14 @@ local function MyUI_Render()
                     if not found then
                         ImGui.SameLine()
                         if ImGui.Button("Remove") then
-                            MyUI_TempSettings.RemoveModule = true
+                            MyUI.TempSettings.RemoveModule = true
                         end
                     end
                 end
             end
-
-            MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
+            MyUI.ThemeLoader.EndTheme(ColorCount, StyleCount)
             ImGui.End()
-            -- MyUI_ThemeLoader.EndTheme(ColorCount, StyleCount)
+            ImGui.PopFont()
         end
 
         RenderModules()
@@ -596,39 +595,39 @@ local function MyUI_Render()
     RenderMini()
 end
 
-MyUI_TempSettings.ModuleProcessing = {}
-MyUI_TempSettings.Debug = false
-local function MyUI_Main()
+MyUI.TempSettings.ModuleProcessing = {}
+MyUI.TempSettings.Debug = false
+function MyUI.Main()
     local ModTimer
-    while MyUI_IsRunning do
+    while MyUI.IsRunning do
         if mq.TLO.EverQuest.GameState() ~= "INGAME" then mq.exit() end
         mq.doevents()
         ProcessModuleChanges()
-        MyUI_MyData = MyUI_CharData.GetMyData()
-        MyUI_MyData.Buffs, MyUI_MyData.DebuffsOnMe = MyUI_CharData.GetBuffs()
-        MyUI_MyData.Songs = MyUI_CharData.GetSongs()
-        MyUI_MyPetData = MyUI_CharData.GetPetData()
-        for idx, data in ipairs(MyUI_Settings.mods_list) do
+        MyUI.MyData = MyUI.CharData.GetMyData()
+        MyUI.MyData.Buffs, MyUI.MyData.DebuffsOnMe = MyUI.CharData.GetBuffs()
+        MyUI.MyData.Songs = MyUI.CharData.GetSongs()
+        MyUI.MyPetData = MyUI.CharData.GetPetData()
+        for idx, data in ipairs(MyUI.Settings.mods_list) do
             if data.enabled then
                 mq.doevents()
-                if MyUI_TempSettings.Debug then
+                if MyUI.TempSettings.Debug then
                     ModTimer = mq.gettime()
                 else
                     ModTimer = 0
                 end
-                local moduleData = MyUI_Modules[data.name]
+                local moduleData = MyUI.Modules[data.name]
                 if moduleData and moduleData.MainLoop ~= nil then moduleData.MainLoop() end
                 -- printf("Module: \at%s\ax took \ay%.2f ms\ax to run", data.name, (os.clock() - ModTimer) * 1000)
-                if MyUI_TempSettings.Debug then
-                    if MyUI_TempSettings.ModuleProcessing[data.name] == nil then
-                        MyUI_TempSettings.ModuleProcessing[data.name] = {}
+                if MyUI.TempSettings.Debug then
+                    if MyUI.TempSettings.ModuleProcessing[data.name] == nil then
+                        MyUI.TempSettings.ModuleProcessing[data.name] = {}
                     end
-                    MyUI_TempSettings.ModuleProcessing[data.name] = { ModName = data.name, Timer = (mq.gettime() - ModTimer), }
+                    MyUI.TempSettings.ModuleProcessing[data.name] = { ModName = data.name, Timer = (mq.gettime() - ModTimer), }
                 else
-                    MyUI_TempSettings.ModuleProcessing[data.name] = nil
+                    MyUI.TempSettings.ModuleProcessing[data.name] = nil
                 end
             else
-                MyUI_TempSettings.ModuleProcessing[data.name] = nil
+                MyUI.TempSettings.ModuleProcessing[data.name] = nil
             end
         end
         mq.doevents()
@@ -639,13 +638,13 @@ end
 local args = { ..., }
 local function CheckMode(value)
     if value == nil then
-        MyUI_Mode = 'driver'
+        MyUI.Mode = 'driver'
         return
     end
     if value[1] == 'client' then
-        MyUI_Mode = 'client'
+        MyUI.Mode = 'client'
     elseif value[1] == 'driver' then
-        MyUI_Mode = 'driver'
+        MyUI.Mode = 'driver'
     end
 end
 
@@ -655,50 +654,50 @@ local function CommandHandler(...)
     if #args > 1 then
         local module_name = args[2]:lower()
         if args[1] == 'unload' then
-            for k, _ in pairs(MyUI_Modules) do
+            for k, _ in pairs(MyUI.Modules) do
                 if k:lower() == module_name then
-                    MyUI_LoadModules.CheckRunning(false, k)
-                    MyUI_Utils.PrintOutput('MyUI', true, "\ay%s \awis \arExiting\aw...", k)
+                    MyUI.LoadModules.CheckRunning(false, k)
+                    MyUI.Utils.PrintOutput('MyUI', true, "\ay%s \awis \arExiting\aw...", k)
                     goto finished_cmd
                 end
             end
         elseif args[1] == 'load' then
-            for _, data in ipairs(MyUI_Settings.mods_list) do
+            for _, data in ipairs(MyUI.Settings.mods_list) do
                 local tmpName = data.name:lower()
                 if tmpName == module_name then
-                    if MyUI_Modules[data.name] ~= nil then
-                        if MyUI_Modules[data.name].IsRunning then
-                            MyUI_Utils.PrintOutput('MyUI', true, "\ay%s \awis \agAlready Loaded\aw...", data.name)
+                    if MyUI.Modules[data.name] ~= nil then
+                        if MyUI.Modules[data.name].IsRunning then
+                            MyUI.Utils.PrintOutput('MyUI', true, "\ay%s \awis \agAlready Loaded\aw...", data.name)
                             goto finished_cmd
                         end
                     else
-                        MyUI_TempSettings.ModuleChanged = true
-                        MyUI_TempSettings.ModuleName = data.name
-                        MyUI_TempSettings.ModuleEnabled = true
-                        MyUI_Utils.PrintOutput('MyUI', true, "\ay%s \awis \agLoaded\aw...", data.name)
+                        MyUI.TempSettings.ModuleChanged = true
+                        MyUI.TempSettings.ModuleName = data.name
+                        MyUI.TempSettings.ModuleEnabled = true
+                        MyUI.Utils.PrintOutput('MyUI', true, "\ay%s \awis \agLoaded\aw...", data.name)
                         goto finished_cmd
                     end
                 end
             end
         elseif args[1] == 'new' then
-            MyUI_TempSettings.AddModule = args[2]
-            MyUI_TempSettings.AddCustomModule = true
-            MyUI_Utils.PrintOutput('MyUI', true, "\ay%s \awis \agAdded\aw...", args[2])
+            MyUI.TempSettings.AddModule = args[2]
+            MyUI.TempSettings.AddCustomModule = true
+            MyUI.Utils.PrintOutput('MyUI', true, "\ay%s \awis \agAdded\aw...", args[2])
             goto finished_cmd
         elseif args[1] == 'remove' then
-            MyUI_TempSettings.AddModule = args[2]
-            MyUI_TempSettings.RemoveModule = true
-            MyUI_Utils.PrintOutput('MyUI', true, "\ay%s \awis \arRemoved\aw...", args[2])
+            MyUI.TempSettings.AddModule = args[2]
+            MyUI.TempSettings.RemoveModule = true
+            MyUI.Utils.PrintOutput('MyUI', true, "\ay%s \awis \arRemoved\aw...", args[2])
             goto finished_cmd
         end
-        MyUI_Utils.PrintOutput('MyUI', true, "\aoModule Named: \ay%s was \arNot Found\aw...", args[2])
+        MyUI.Utils.PrintOutput('MyUI', true, "\aoModule Named: \ay%s was \arNot Found\aw...", args[2])
     else
         if args[1] == 'show' then
-            MyUI_Settings.ShowMain = not MyUI_Settings.ShowMain
-            mq.pickle(MyUI_SettingsFile, MyUI_Settings)
+            MyUI.Settings.ShowMain = not MyUI.Settings.ShowMain
+            mq.pickle(MyUI.SettingsFile, MyUI.Settings)
         elseif args[1] == 'exit' or args[1] == 'quit' then
-            MyUI_IsRunning = false
-            MyUI_Utils.PrintOutput('MyUI', true, "\ay%s \awis \arExiting\aw...", MyUI_ScriptName)
+            MyUI.IsRunning = false
+            MyUI.Utils.PrintOutput('MyUI', true, "\ay%s \awis \arExiting\aw...", MyUI.ScriptName)
         else
             HelpDocumentation()
         end
@@ -710,32 +709,32 @@ local function StartUp()
     mq.bind('/myui', CommandHandler)
     CheckMode(args)
     LoadSettings()
-    MyUI_MyData = MyUI_CharData.GetMyData()
-    MyUI_MyData.Buffs, MyUI_MyData.DebuffsOnMe = MyUI_CharData.GetBuffs()
-    MyUI_MyData.Songs = MyUI_CharData.GetSongs()
-    MyUI_MyPetData = MyUI_CharData.GetPetData()
+    MyUI.MyData = MyUI.CharData.GetMyData()
+    MyUI.MyData.Buffs, MyUI.MyData.DebuffsOnMe = MyUI.CharData.GetBuffs()
+    MyUI.MyData.Songs = MyUI.CharData.GetSongs()
+    MyUI.MyPetData = MyUI.CharData.GetPetData()
 
-    mq.imgui.init(MyUI_ScriptName, MyUI_Render)
-    for _, data in ipairs(MyUI_Settings.mods_list) do
-        if (data.name == 'MyGroup' or data.name == 'MyBuffs' or data.name == 'AAParty') and MyUI_Mode == 'client' then
+    mq.imgui.init(MyUI.ScriptName, MyUI.Render)
+    for _, data in ipairs(MyUI.Settings.mods_list) do
+        if (data.name == 'MyGroup' or data.name == 'MyBuffs' or data.name == 'AAParty') and MyUI.Mode == 'client' then
             data.enabled = true
         end
         if data.enabled then
             table.insert(mods, data.name)
-            MyUI_NumModsEnabled = MyUI_NumModsEnabled + 1
+            MyUI.NumModsEnabled = MyUI.NumModsEnabled + 1
         end
     end
-    if MyUI_NumModsEnabled > 0 then
-        MyUI_Modules = MyUI_LoadModules.loadAll(mods)
+    if MyUI.NumModsEnabled > 0 then
+        MyUI.Modules = MyUI.LoadModules.loadAll(mods)
     else
-        MyUI_InitPctComplete = 100
+        MyUI.InitPctComplete = 100
     end
 
     InitModules()
 
-    MyUI_IsRunning = true
+    MyUI.IsRunning = true
     HelpDocumentation()
 end
 
 StartUp()
-MyUI_Main()
+MyUI.Main()

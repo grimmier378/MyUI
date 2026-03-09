@@ -10,7 +10,7 @@ local ImPlot              = require('ImPlot')
 local ScrollingPlotBuffer = require('lib.scrolling_plot_buffer')
 local OnEmu               = (mq.TLO.MacroQuest.BuildName():lower() or "") == "emu"
 local Module              = {}
-local loadedExeternally   = MyUI_ScriptName ~= nil
+local loadedExeternally   = MyUI ~= nil
 Module.Name               = "XPTrack"
 Module.IsRunning          = false
 if not loadedExeternally then
@@ -23,14 +23,14 @@ if not loadedExeternally then
     Module.ThemeFile   = string.format('%s/MyUI/ThemeZ.lua', mq.configDir)
     Module.Theme       = {}
 else
-    Module.Utils       = MyUI_Utils
-    Module.Icons       = MyUI_Icons
-    Module.ThemeLoader = MyUI_ThemeLoader
-    Module.Actor       = MyUI_Actor
-    Module.CharLoaded  = MyUI_CharLoaded
-    Module.Server      = MyUI_Server
-    Module.ThemeFile   = MyUI_ThemeFile
-    Module.Theme       = MyUI_Theme
+    Module.Utils       = MyUI.Utils
+    Module.Icons       = MyUI.Icons
+    Module.ThemeLoader = MyUI.ThemeLoader
+    Module.Actor       = MyUI.Actor
+    Module.CharLoaded  = MyUI.CharLoaded
+    Module.Server      = MyUI.Server
+    Module.ThemeFile   = MyUI.ThemeFile
+    Module.Theme       = MyUI.Theme
 end
 local ConfigFile           = string.format("%s/MyUI/XPTrack/%s/%s.lua", mq.configDir, Module.Server, Module.CharLoaded)
 
@@ -523,7 +523,7 @@ Module.Utils.PrintOutput('XPTraclk', false, "\aw[\atXP Track\ax] \aoCommand: \ay
 function Module.MainLoop()
     if loadedExeternally then
         ---@diagnostic disable-next-line: undefined-global
-        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+        if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
 
     local now = math.floor(getTime())

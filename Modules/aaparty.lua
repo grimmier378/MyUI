@@ -10,7 +10,7 @@ Module.DisplayName      = 'AA Party'
 Module.TempSettings     = {}
 Module.Settings         = {}
 
-local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+local loadedExeternally = MyUI ~= nil and true or false
 if not loadedExeternally then
     Module.Utils       = require('lib.common')
     Module.ThemeLoader = require('lib.theme_loader')
@@ -22,15 +22,15 @@ if not loadedExeternally then
     Module.Colors      = require('lib.colors')
     Module.Server      = mq.TLO.MacroQuest.Server():gsub(" ", "_")
 else
-    Module.Utils       = MyUI_Utils
-    Module.ThemeLoader = MyUI_ThemeLoader
-    Module.Actor       = MyUI_Actor
-    Module.CharLoaded  = MyUI_CharLoaded
-    Module.Mode        = MyUI_Mode
-    Module.ThemeFile   = MyUI_ThemeFile
-    Module.Theme       = MyUI_Theme
-    Module.Colors      = MyUI_Colors
-    Module.Server      = MyUI_Server
+    Module.Utils       = MyUI.Utils
+    Module.ThemeLoader = MyUI.ThemeLoader
+    Module.Actor       = MyUI.Actor
+    Module.CharLoaded  = MyUI.CharLoaded
+    Module.Mode        = MyUI.Mode
+    Module.ThemeFile   = MyUI.ThemeFile
+    Module.Theme       = MyUI.Theme
+    Module.Colors      = MyUI.Colors
+    Module.Server      = MyUI.Server
 end
 local ToggleFlags                                                       = bit32.bor(Module.Utils.ImGuiToggleFlags.StarKnob,
     Module.Utils.ImGuiToggleFlags.PulseOnHover,
@@ -365,16 +365,16 @@ end
 
 function Module:GetMyAA()
     local changed      = false
-    local tmpExpAA     = MyUI_MyData ~= nil and MyUI_MyData.PctAAExp or (myself.PctAAExp() or 0)
+    local tmpExpAA     = MyUI.MyData ~= nil and MyUI.MyData.PctAAExp or (myself.PctAAExp() or 0)
     local tmpSettingAA = mq.TLO.Window("AAWindow/AAW_PercentCount").Text() or '0'
-    local tmpPts       = MyUI_MyData ~= nil and MyUI_MyData.AAPoints or (myself.AAPoints() or 0)
-    local tmpPtsTotal  = MyUI_MyData ~= nil and MyUI_MyData.AAPointsTotal or (myself.AAPointsTotal() or 0)
-    local tmpPtsSpent  = MyUI_MyData ~= nil and MyUI_MyData.AAPointsSpent or (myself.AAPointsSpent() or 0)
-    local tmpPctXP     = MyUI_MyData ~= nil and MyUI_MyData.PctExp or (myself.PctExp() or 0)
-    local tmpLvl       = MyUI_MyData ~= nil and MyUI_MyData.Level or (myself.Level() or 0)
-    local cState       = MyUI_MyData ~= nil and MyUI_MyData.CombatState or (myself.CombatState() or "")
-    local tmpAirSupply = MyUI_MyData ~= nil and MyUI_MyData.PctAirSupply or (myself.PctAirSupply() or 0)
-    MyGroupLeader      = MyUI_MyData ~= nil and MyUI_MyData.GroupLeader or (mq.TLO.Group.Leader() or "NoGroup")
+    local tmpPts       = MyUI.MyData ~= nil and MyUI.MyData.AAPoints or (myself.AAPoints() or 0)
+    local tmpPtsTotal  = MyUI.MyData ~= nil and MyUI.MyData.AAPointsTotal or (myself.AAPointsTotal() or 0)
+    local tmpPtsSpent  = MyUI.MyData ~= nil and MyUI.MyData.AAPointsSpent or (myself.AAPointsSpent() or 0)
+    local tmpPctXP     = MyUI.MyData ~= nil and MyUI.MyData.PctExp or (myself.PctExp() or 0)
+    local tmpLvl       = MyUI.MyData ~= nil and MyUI.MyData.Level or (myself.Level() or 0)
+    local cState       = MyUI.MyData ~= nil and MyUI.MyData.CombatState or (myself.CombatState() or "")
+    local tmpAirSupply = MyUI.MyData ~= nil and MyUI.MyData.PctAirSupply or (myself.PctAirSupply() or 0)
+    MyGroupLeader      = MyUI.MyData ~= nil and MyUI.MyData.GroupLeader or (mq.TLO.Group.Leader() or "NoGroup")
     if firstRun or (PctAA ~= tmpExpAA or SettingAA ~= tmpSettingAA or PtsAA ~= tmpPts or
             PtsSpent ~= tmpPtsSpent or PtsTotal ~= tmpPtsTotal or tmpLvl ~= MeLevel or tmpPctXP ~= PctExp or
             cState ~= LastState or tmpAirSupply ~= lastAirValue) then
@@ -594,9 +594,9 @@ function Module.RenderGUI()
                                     if aaActor ~= nil then
                                         if ImGui.IsKeyDown(ImGuiMod.Ctrl) then
                                             aaActor:send({ mailbox = 'aa_party', script = 'aaparty', },
-                                                { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'min', })
+                                                { Name = MyUI.CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'min', })
                                             aaActor:send({ mailbox = 'aa_party', script = 'myui', },
-                                                { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'min', })
+                                                { Name = MyUI.CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'min', })
                                         else
                                             aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, Module:GenerateContent(groupData[i].Name, 'Action', 'Less'))
                                             aaActor:send({ mailbox = 'aa_party', script = 'myui', }, Module:GenerateContent(groupData[i].Name, 'Action', 'Less'))
@@ -624,9 +624,9 @@ function Module.RenderGUI()
                                 if aaActor ~= nil then
                                     if ImGui.IsItemHovered() and ImGui.IsMouseClicked(ImGuiMouseButton.Left) and ImGui.IsKeyDown(ImGuiMod.Ctrl) then
                                         aaActor:send({ mailbox = 'aa_party', script = 'aaparty', },
-                                            { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'mid', })
+                                            { Name = MyUI.CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'mid', })
                                         aaActor:send({ mailbox = 'aa_party', script = 'myui', },
-                                            { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'mid', })
+                                            { Name = MyUI.CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'mid', })
                                     end
                                 end
 
@@ -634,9 +634,9 @@ function Module.RenderGUI()
                                     if aaActor ~= nil then
                                         if ImGui.IsKeyDown(ImGuiMod.Ctrl) then
                                             aaActor:send({ mailbox = 'aa_party', script = 'aaparty', },
-                                                { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'max', })
+                                                { Name = MyUI.CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'max', })
                                             aaActor:send({ mailbox = 'aa_party', script = 'myui', },
-                                                { Name = MyUI_CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'max', })
+                                                { Name = MyUI.CharLoaded, Subject = 'Set', DoWho = groupData[i].Name, DoWhat = 'max', })
                                         else
                                             aaActor:send({ mailbox = 'aa_party', script = 'myui', }, Module:GenerateContent(groupData[i].Name, 'Action', 'More'))
                                             aaActor:send({ mailbox = 'aa_party', script = 'aaparty', }, Module:GenerateContent(groupData[i].Name, 'Action', 'More'))
@@ -761,18 +761,18 @@ function Module.RenderGUI()
                     if not loadedExeternally then
                         mq.cmd("/lua run themez")
                     else
-                        if MyUI_Modules.ThemeZ ~= nil then
-                            if MyUI_Modules.ThemeZ.IsRunning then
-                                MyUI_Modules.ThemeZ.ShowGui = true
+                        if MyUI.Modules.ThemeZ ~= nil then
+                            if MyUI.Modules.ThemeZ.IsRunning then
+                                MyUI.Modules.ThemeZ.ShowGui = true
                             else
-                                MyUI_TempSettings.ModuleChanged = true
-                                MyUI_TempSettings.ModuleName = 'ThemeZ'
-                                MyUI_TempSettings.ModuleEnabled = true
+                                MyUI.TempSettings.ModuleChanged = true
+                                MyUI.TempSettings.ModuleName = 'ThemeZ'
+                                MyUI.TempSettings.ModuleEnabled = true
                             end
                         else
-                            MyUI_TempSettings.ModuleChanged = true
-                            MyUI_TempSettings.ModuleName = 'ThemeZ'
-                            MyUI_TempSettings.ModuleEnabled = true
+                            MyUI.TempSettings.ModuleChanged = true
+                            MyUI.TempSettings.ModuleName = 'ThemeZ'
+                            MyUI.TempSettings.ModuleEnabled = true
                         end
                     end
                 end
@@ -919,7 +919,7 @@ local clockTimer = mq.gettime()
 
 function Module.MainLoop()
     if loadedExeternally then
-        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+        if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
     local elapsedTime = mq.gettime() - clockTimer
     if elapsedTime >= 2000 then

@@ -13,7 +13,7 @@ Module.Name             = 'ChatRelay'
 Module.DisplayName      = 'Chat Relay'
 
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+local loadedExeternally = MyUI ~= nil and true or false
 
 if not loadedExeternally then
     Module.Utils       = require('lib.common')
@@ -27,16 +27,16 @@ if not loadedExeternally then
     Module.Theme       = require('defaults.themes')
     Module.Path        = string.format("%s/%s/", mq.luaDir, Module.Name)
 else
-    Module.Utils = MyUI_Utils
-    Module.ThemeLoader = MyUI_ThemeLoader
-    Module.Actor = MyUI_Actor
-    Module.CharLoaded = MyUI_CharLoaded
-    Module.Guild = MyUI_Guild
-    Module.Server = MyUI_Server
-    Module.Mode = MyUI_Mode
-    Module.ThemeFile = MyUI_ThemeFile
-    Module.Theme = MyUI_Theme
-    Module.Path = MyUI_Path
+    Module.Utils = MyUI.Utils
+    Module.ThemeLoader = MyUI.ThemeLoader
+    Module.Actor = MyUI.Actor
+    Module.CharLoaded = MyUI.CharLoaded
+    Module.Guild = MyUI.Guild
+    Module.Server = MyUI.Server
+    Module.Mode = MyUI.Mode
+    Module.ThemeFile = MyUI.ThemeFile
+    Module.Theme = MyUI.Theme
+    Module.Path = MyUI.Path
 end
 Module.ImgPath                          = Module.Path .. "images/phone.png"
 local Utils                             = Module.Utils
@@ -663,7 +663,7 @@ local clockTimer = mq.gettime()
 function Module.MainLoop()
     if loadedExeternally then
         ---@diagnostic disable-next-line: undefined-global
-        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+        if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
     mq.doevents()
     local elapsedTime = mq.gettime() - clockTimer

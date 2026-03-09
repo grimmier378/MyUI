@@ -1,11 +1,10 @@
----@diagnostic disable: inject-field, undefined-global
 local mq                = require('mq')
 local ImGui             = require('ImGui')
 local zep               = require('Zep')
 
 local MAX_HISTORY_COUNT = 100
 
-local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+local loadedExeternally = MyUI ~= nil
 local Module            = {}
 if not loadedExeternally then
     Module.Utils       = require('lib.common')
@@ -15,20 +14,23 @@ if not loadedExeternally then
     Module.Icons       = require('mq.ICONS')
     Module.Guild       = mq.TLO.Me.Guild()
     Module.Server      = mq.TLO.MacroQuest.Server()
-    Module.ThemesFile  = MyUI_ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI_ThemeFile
+    Module.ThemesFile  = MyUI.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI.ThemeFile
     Module.Theme       = {}
     Module.Mode        = 'driver'
+    Module.PackageMan  = require('mq.PackageMan')
+    Module.SQLite3     = Module.PackageMan.Require('lsqlite3')
 else
-    Module.Utils = MyUI_Utils
-    Module.ThemeLoader = MyUI_ThemeLoader
-    Module.Actor = MyUI_Actor
-    Module.CharLoaded = MyUI_CharLoaded
-    Module.Icons = MyUI_Icons
-    Module.Guild = MyUI_Guild
-    Module.Server = MyUI_Server
-    Module.Mode = MyUI_Mode
-    Module.ThemesFile = MyUI_ThemeFile
-    Module.Theme = MyUI_Theme
+    Module.Utils = MyUI.Utils
+    Module.ThemeLoader = MyUI.ThemeLoader
+    Module.Actor = MyUI.Actor
+    Module.CharLoaded = MyUI.CharLoaded
+    Module.Icons = MyUI.Icons
+    Module.Guild = MyUI.Guild
+    Module.Server = MyUI.Server
+    Module.Mode = MyUI.Mode
+    Module.ThemesFile = MyUI.ThemeFile
+    Module.Theme = MyUI.Theme
+    Module.SQLite3 = MyUI.SQLite3
 end
 Module.Name              = "MyChat"
 Module.IsRunning         = false
@@ -48,10 +50,11 @@ Module.LogFile           = string.format('%s/MyUI/MyChat/%s/Logs/%s.log', mq.con
 Module.SHOW              = true
 Module.openGUI           = true
 Module.openConfigGUI     = false
-Module.refreshLinkDB     = 10
-Module.mainEcho          = '/say'
--- Module.doRefresh         = false
 Module.SettingsFile      = string.format('%s/MyUI/MyChat/%s/%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
+Module.DBPath            = string.format('%s/MyUI/MyChat/MyChat.db', mq.configDir)
+Module.ActivePresetID    = nil
+Module.ActivePresetName  = ''
+Module.PresetList        = {}
 
 Module.KeyFocus          = false
 Module.KeyName           = 'RightShift'
@@ -65,7 +68,6 @@ Module.commandBuffer     = ''
 Module.commandHistory    = {}
 Module.commandIndex      = nil
 Module.timeStamps        = true
-Module.doLinks           = false
 -- Consoles
 Module.Consoles          = {}
 -- Flags
@@ -77,7 +79,6 @@ Module.PopOutFlags       = bit32.bor(ImGuiWindowFlags.NoScrollbar)
 -- local var's
 
 local setFocus                                  = false
-local commandBuffer                             = ''
 local addChannel                                = false -- Are we adding a new channel or editing an old one
 local sortedChannels                            = {}
 local timeStamps, newEvent, newFilter           = true, false, false
@@ -88,16 +89,26 @@ local lastImport                                = 'none' -- file name of the las
 local windowNum                                 = 0      --unused will remove later.
 local fromConf                                  = false  -- Did we open the edit channel window from the main config window? if we did we will go back to that window after closing.
 local gIcon                                     = Module.Icons.MD_SETTINGS
-local firstPass, forceIndex, doLinks            = true, false, false
--- local doRefresh                                 = false
+local firstPass, forceIndex                     = true, false
 local mainBuffer                                = {}
 local importFile                                = 'Server_Name/CharName.lua'
 local settingsOld                               = string.format('%s/MyChat_%s_%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
 local cleanImport                               = false
 local enableSpam, resetConsoles                 = false, false
 local eChan                                     = '/say'
-local fontSizes                                 = {}
 local logFileHandle                             = nil
+-- Spam reverse-filter: track lines already claimed by real channel events
+local claimedLines                              = {}
+local claimedLinesTTL                           = {}
+local CLAIMED_TTL                               = 0.5
+local showPresetSaveInput                       = false
+local newPresetName                             = ''
+local showPresetRenameInput                     = false
+local renamePresetName                          = ''
+-- Deferred delete tracking (processed after draw loop)
+local pendingDeleteEvent                        = nil -- {chanID, eventID}
+local pendingDeleteFilter                       = nil -- {chanID, eventID, filterID}
+local pendingDeleteChannel                      = nil -- chanID
 
 local keyboardKeys                              = {
     [1]  = 'GraveAccent',
@@ -147,6 +158,10 @@ local MyColorFlags = bit32.bor(
     ImGuiColorEditFlags.NoTooltip,
     ImGuiColorEditFlags.NoLabel
 )
+
+-- Forward declarations for local functions referenced by Module methods
+local SetUpConsoles
+local BuildEvents
 
 
 ---Converts ConColor String to ColorVec Table
@@ -198,9 +213,767 @@ local function writeLogToFile(line)
     end
 end
 
+---Opens the SQLite database, sets PRAGMAs, returns db handle or nil
+---@return userdata|nil db handle
+function Module.OpenDB()
+    local db = Module.SQLite3.open(Module.DBPath)
+    if not db then
+        Module.Utils.PrintOutput('MyUI', nil, 'Failed to open the MyChat Database')
+        return nil
+    end
+    db:busy_timeout(2000)
+    db:exec('PRAGMA journal_mode=WAL;')
+    db:exec('PRAGMA foreign_keys = ON;')
+    return db
+end
+
+---Creates the database schema if it doesn't exist
+function Module.InitDB()
+    local db = Module.OpenDB()
+    if not db then return end
+
+    db:exec([[
+        CREATE TABLE IF NOT EXISTS global_settings (
+            char_name TEXT NOT NULL,
+            server    TEXT NOT NULL DEFAULT '',
+            key       TEXT NOT NULL,
+            value     TEXT NOT NULL,
+            PRIMARY KEY (char_name, server, key)
+        );
+
+        CREATE TABLE IF NOT EXISTS presets (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            preset_name TEXT NOT NULL,
+            server      TEXT NOT NULL DEFAULT '',
+            description TEXT DEFAULT '',
+            created_by  TEXT NOT NULL,
+            created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(preset_name, server)
+        );
+
+        CREATE TABLE IF NOT EXISTS channels (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            preset_id      INTEGER NOT NULL,
+            channel_id     INTEGER NOT NULL,
+            name           TEXT NOT NULL DEFAULT 'New',
+            enabled        INTEGER NOT NULL DEFAULT 0,
+            echo           TEXT NOT NULL DEFAULT '/say',
+            main_enable    INTEGER NOT NULL DEFAULT 1,
+            enable_links   INTEGER NOT NULL DEFAULT 0,
+            pop_out        INTEGER NOT NULL DEFAULT 0,
+            locked         INTEGER NOT NULL DEFAULT 0,
+            scale          REAL NOT NULL DEFAULT 1.0,
+            main_font_size INTEGER NOT NULL DEFAULT 16,
+            tab_order      INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(preset_id, channel_id),
+            FOREIGN KEY (preset_id) REFERENCES presets(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS events (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel_row_id INTEGER NOT NULL,
+            event_index    INTEGER NOT NULL,
+            event_string   TEXT NOT NULL DEFAULT 'new',
+            enabled        INTEGER NOT NULL DEFAULT 1,
+            UNIQUE(channel_row_id, event_index),
+            FOREIGN KEY (channel_row_id) REFERENCES channels(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS filters (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_row_id   INTEGER NOT NULL,
+            filter_index   INTEGER NOT NULL,
+            filter_string  TEXT NOT NULL DEFAULT '',
+            color_r        REAL NOT NULL DEFAULT 1.0,
+            color_g        REAL NOT NULL DEFAULT 1.0,
+            color_b        REAL NOT NULL DEFAULT 1.0,
+            color_a        REAL NOT NULL DEFAULT 1.0,
+            enabled        INTEGER NOT NULL DEFAULT 1,
+            hidden         INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(event_row_id, filter_index),
+            FOREIGN KEY (event_row_id) REFERENCES events(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS char_active_preset (
+            char_name TEXT NOT NULL,
+            server    TEXT NOT NULL DEFAULT '',
+            preset_id INTEGER NOT NULL,
+            PRIMARY KEY (char_name, server),
+            FOREIGN KEY (preset_id) REFERENCES presets(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS char_channel_overrides (
+            char_name  TEXT NOT NULL,
+            server     TEXT NOT NULL DEFAULT '',
+            channel_id INTEGER NOT NULL,
+            preset_id  INTEGER NOT NULL,
+            PRIMARY KEY (char_name, server, channel_id),
+            FOREIGN KEY (preset_id) REFERENCES presets(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_channels_preset ON channels(preset_id);
+        CREATE INDEX IF NOT EXISTS idx_events_channel ON events(channel_row_id);
+        CREATE INDEX IF NOT EXISTS idx_filters_event ON filters(event_row_id);
+    ]])
+
+    db:exec('PRAGMA wal_checkpoint;')
+    db:close()
+end
+
+--- Global settings keys and their types/defaults for DB storage
+local globalSettingsKeys = {
+    locked       = { type = 'bool',   default = false },
+    timeStamps   = { type = 'bool',   default = true },
+    Scale        = { type = 'number', default = 1.0 },
+    LoadTheme    = { type = 'string', default = 'Default' },
+    doLinks      = { type = 'bool',   default = true },
+    mainEcho     = { type = 'string', default = '/say' },
+    MainFontSize = { type = 'number', default = 16 },
+    LogCommands  = { type = 'bool',   default = false },
+    keyFocus     = { type = 'bool',   default = false },
+    keyName      = { type = 'string', default = 'RightShift' },
+}
+
+---Checks if this character has data in the DB
+---@return boolean
+function Module.HasDBData()
+    local db = Module.OpenDB()
+    if not db then return false end
+    local stmt = db:prepare('SELECT preset_id FROM char_active_preset WHERE char_name = ? AND server = ? LIMIT 1')
+    if not stmt then db:close() return false end
+    stmt:bind_values(Module.CharLoaded, Module.Server)
+    local hasData = stmt:step() == Module.SQLite3.ROW
+    stmt:finalize()
+    db:close()
+    return hasData
+end
+
+---Migrates a pickle settings table into the database as a new preset
+---@param settings table -- the settings table from pickle
+---@param charName string -- character name
+function Module.MigratePickleToDB(settings, charName)
+    local db = Module.OpenDB()
+    if not db then return end
+
+    local presetName = charName .. '_migrated'
+    local serverName = Module.Server
+
+    -- Check if preset already exists for this server
+    local check = db:prepare('SELECT id FROM presets WHERE preset_name = ? AND server = ?')
+    check:bind_values(presetName, serverName)
+    if check:step() == Module.SQLite3.ROW then
+        check:finalize()
+        db:close()
+        return -- already migrated
+    end
+    check:finalize()
+
+    db:exec('BEGIN TRANSACTION')
+
+    -- Create preset
+    local pStmt = db:prepare('INSERT INTO presets (preset_name, server, created_by) VALUES (?, ?, ?)')
+    pStmt:bind_values(presetName, serverName, charName)
+    pStmt:step()
+    pStmt:finalize()
+    local presetID = db:last_insert_rowid()
+
+    -- Insert global settings
+    for key, meta in pairs(globalSettingsKeys) do
+        local val = settings[key]
+        if val ~= nil then
+            local strVal
+            if meta.type == 'bool' then
+                strVal = val and '1' or '0'
+            else
+                strVal = tostring(val)
+            end
+            local gStmt = db:prepare('INSERT OR REPLACE INTO global_settings (char_name, server, key, value) VALUES (?, ?, ?, ?)')
+            gStmt:bind_values(charName, serverName, key, strVal)
+            gStmt:step()
+            gStmt:finalize()
+        end
+    end
+
+    -- Insert channels, events, filters
+    if settings.Channels then
+        for channelID, channelData in pairs(settings.Channels) do
+            local cStmt = db:prepare([[
+                INSERT INTO channels (preset_id, channel_id, name, enabled, echo, main_enable, enable_links, pop_out, locked, scale, main_font_size, tab_order)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ]])
+            cStmt:bind_values(
+                presetID,
+                channelID,
+                channelData.Name or 'New',
+                (channelData.enabled and 1 or 0),
+                channelData.Echo or '/say',
+                (channelData.MainEnable ~= false) and 1 or 0,
+                (channelData.enableLinks and 1 or 0),
+                (channelData.PopOut and 1 or 0),
+                (channelData.locked and 1 or 0),
+                channelData.Scale or 1.0,
+                channelData.MainFontSize or channelData.FontSize or 16,
+                channelData.TabOrder or 0
+            )
+            cStmt:step()
+            cStmt:finalize()
+            local channelRowID = db:last_insert_rowid()
+
+            if channelData.Events then
+                for eventIndex, eventData in pairs(channelData.Events) do
+                    local eStmt = db:prepare([[
+                        INSERT INTO events (channel_row_id, event_index, event_string, enabled)
+                        VALUES (?, ?, ?, ?)
+                    ]])
+                    eStmt:bind_values(
+                        channelRowID,
+                        eventIndex,
+                        eventData.eventString or 'new',
+                        (eventData.enabled ~= false) and 1 or 0
+                    )
+                    eStmt:step()
+                    eStmt:finalize()
+                    local eventRowID = db:last_insert_rowid()
+
+                    if eventData.Filters then
+                        for filterIndex, filterData in pairs(eventData.Filters) do
+                            local color = filterData.color or { 1.0, 1.0, 1.0, 1.0 }
+                            local fStmt = db:prepare([[
+                                INSERT INTO filters (event_row_id, filter_index, filter_string, color_r, color_g, color_b, color_a, enabled, hidden)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            ]])
+                            fStmt:bind_values(
+                                eventRowID,
+                                filterIndex,
+                                filterData.filterString or '',
+                                color[1] or 1.0,
+                                color[2] or 1.0,
+                                color[3] or 1.0,
+                                color[4] or 1.0,
+                                (filterData.enabled ~= false) and 1 or 0,
+                                (filterData.hidden and 1 or 0)
+                            )
+                            fStmt:step()
+                            fStmt:finalize()
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Set as active preset for this character
+    local aStmt = db:prepare('INSERT OR REPLACE INTO char_active_preset (char_name, server, preset_id) VALUES (?, ?, ?)')
+    aStmt:bind_values(charName, serverName, presetID)
+    aStmt:step()
+    aStmt:finalize()
+
+    db:exec('COMMIT')
+    db:exec('PRAGMA wal_checkpoint;')
+    db:close()
+
+    Module.ActivePresetID = presetID
+    Module.ActivePresetName = presetName
+end
+
+---Loads settings from the database into Module.Settings
+---@return boolean success
+function Module.LoadSettingsFromDB()
+    local db = Module.OpenDB()
+    if not db then return false end
+
+    -- Get active preset
+    local presetID = nil
+    local aStmt = db:prepare('SELECT preset_id FROM char_active_preset WHERE char_name = ? AND server = ? LIMIT 1')
+    if not aStmt then db:close() return false end
+    aStmt:bind_values(Module.CharLoaded, Module.Server)
+    for row in aStmt:nrows() do
+        presetID = row.preset_id
+    end
+    aStmt:finalize()
+    if not presetID then
+        db:close()
+        return false
+    end
+
+    -- Get preset name
+    local pStmt = db:prepare('SELECT preset_name FROM presets WHERE id = ?')
+    pStmt:bind_values(presetID)
+    for row in pStmt:nrows() do
+        Module.ActivePresetName = row.preset_name
+    end
+    pStmt:finalize()
+    Module.ActivePresetID = presetID
+
+    -- Load global settings
+    local settings = { Channels = {} }
+    local gStmt = db:prepare('SELECT key, value FROM global_settings WHERE char_name = ? AND server = ?')
+    gStmt:bind_values(Module.CharLoaded, Module.Server)
+    for row in gStmt:nrows() do
+        local meta = globalSettingsKeys[row.key]
+        if meta then
+            if meta.type == 'bool' then
+                settings[row.key] = row.value == '1'
+            elseif meta.type == 'number' then
+                settings[row.key] = tonumber(row.value) or meta.default
+            else
+                settings[row.key] = row.value
+            end
+        end
+    end
+    gStmt:finalize()
+
+    -- Load channels for this preset
+    local cStmt = db:prepare('SELECT * FROM channels WHERE preset_id = ?')
+    cStmt:bind_values(presetID)
+    for cRow in cStmt:nrows() do
+        local chanID = cRow.channel_id
+        settings.Channels[chanID] = {
+            Name        = cRow.name,
+            enabled     = cRow.enabled == 1,
+            Echo        = cRow.echo,
+            MainEnable  = cRow.main_enable == 1,
+            enableLinks = cRow.enable_links == 1,
+            PopOut      = cRow.pop_out == 1,
+            locked      = cRow.locked == 1,
+            Scale       = cRow.scale,
+            FontSize    = cRow.main_font_size,
+            TabOrder    = cRow.tab_order,
+            Events      = {},
+        }
+        local channelRowID = cRow.id
+
+        -- Load events for this channel
+        local eStmt = db:prepare('SELECT * FROM events WHERE channel_row_id = ? ORDER BY event_index')
+        eStmt:bind_values(channelRowID)
+        for eRow in eStmt:nrows() do
+            local eIdx = eRow.event_index
+            settings.Channels[chanID].Events[eIdx] = {
+                eventString = eRow.event_string,
+                enabled     = eRow.enabled == 1,
+                Filters     = {},
+            }
+            local eventRowID = eRow.id
+
+            -- Load filters for this event
+            local fStmt = db:prepare('SELECT * FROM filters WHERE event_row_id = ? ORDER BY filter_index')
+            fStmt:bind_values(eventRowID)
+            for fRow in fStmt:nrows() do
+                local fIdx = fRow.filter_index
+                settings.Channels[chanID].Events[eIdx].Filters[fIdx] = {
+                    filterString = fRow.filter_string,
+                    color        = { fRow.color_r, fRow.color_g, fRow.color_b, fRow.color_a },
+                    enabled      = fRow.enabled == 1,
+                    hidden       = fRow.hidden == 1,
+                }
+            end
+            fStmt:finalize()
+        end
+        eStmt:finalize()
+    end
+    cStmt:finalize()
+
+    -- Check for channel overrides (mix-and-match)
+    local oStmt = db:prepare('SELECT channel_id, preset_id FROM char_channel_overrides WHERE char_name = ? AND server = ?')
+    oStmt:bind_values(Module.CharLoaded, Module.Server)
+    local overrides = {}
+    for oRow in oStmt:nrows() do
+        table.insert(overrides, { channel_id = oRow.channel_id, preset_id = oRow.preset_id })
+    end
+    oStmt:finalize()
+
+    for _, override in ipairs(overrides) do
+        local overrideChanID = override.channel_id
+        local overridePresetID = override.preset_id
+
+        -- Load the overridden channel from the other preset
+        local ocStmt = db:prepare('SELECT * FROM channels WHERE preset_id = ? AND channel_id = ?')
+        ocStmt:bind_values(overridePresetID, overrideChanID)
+        for cRow in ocStmt:nrows() do
+            settings.Channels[overrideChanID] = {
+                Name        = cRow.name,
+                enabled     = cRow.enabled == 1,
+                Echo        = cRow.echo,
+                MainEnable  = cRow.main_enable == 1,
+                enableLinks = cRow.enable_links == 1,
+                PopOut      = cRow.pop_out == 1,
+                locked      = cRow.locked == 1,
+                Scale       = cRow.scale,
+                FontSize    = cRow.main_font_size,
+                TabOrder    = cRow.tab_order,
+                Events      = {},
+            }
+            local channelRowID = cRow.id
+
+            local eStmt = db:prepare('SELECT * FROM events WHERE channel_row_id = ? ORDER BY event_index')
+            eStmt:bind_values(channelRowID)
+            for eRow in eStmt:nrows() do
+                local eIdx = eRow.event_index
+                settings.Channels[overrideChanID].Events[eIdx] = {
+                    eventString = eRow.event_string,
+                    enabled     = eRow.enabled == 1,
+                    Filters     = {},
+                }
+                local eventRowID = eRow.id
+
+                local fStmt = db:prepare('SELECT * FROM filters WHERE event_row_id = ? ORDER BY filter_index')
+                fStmt:bind_values(eventRowID)
+                for fRow in fStmt:nrows() do
+                    local fIdx = fRow.filter_index
+                    settings.Channels[overrideChanID].Events[eIdx].Filters[fIdx] = {
+                        filterString = fRow.filter_string,
+                        color        = { fRow.color_r, fRow.color_g, fRow.color_b, fRow.color_a },
+                        enabled      = fRow.enabled == 1,
+                        hidden       = fRow.hidden == 1,
+                    }
+                end
+                fStmt:finalize()
+            end
+            eStmt:finalize()
+        end
+        ocStmt:finalize()
+    end
+
+    db:close()
+
+    Module.Settings = settings
+    return true
+end
+
+---Writes current Module.Settings to the database for the active preset
+function Module.WriteSettingsToDB()
+    if not Module.ActivePresetID then return end
+    local db = Module.OpenDB()
+    if not db then return end
+
+    db:exec('BEGIN TRANSACTION')
+
+    -- Update global settings
+    for key, meta in pairs(globalSettingsKeys) do
+        local val = Module.Settings[key]
+        if val ~= nil then
+            local strVal
+            if meta.type == 'bool' then
+                strVal = val and '1' or '0'
+            else
+                strVal = tostring(val)
+            end
+            local gStmt = db:prepare('INSERT OR REPLACE INTO global_settings (char_name, server, key, value) VALUES (?, ?, ?, ?)')
+            gStmt:bind_values(Module.CharLoaded, Module.Server, key, strVal)
+            gStmt:step()
+            gStmt:finalize()
+        end
+    end
+
+    -- Delete existing channels/events/filters for this preset (CASCADE handles children)
+    local dStmt = db:prepare('DELETE FROM channels WHERE preset_id = ?')
+    dStmt:bind_values(Module.ActivePresetID)
+    dStmt:step()
+    dStmt:finalize()
+
+    -- Re-insert channels, events, filters
+    if Module.Settings.Channels then
+        for channelID, channelData in pairs(Module.Settings.Channels) do
+            local cStmt = db:prepare([[
+                INSERT INTO channels (preset_id, channel_id, name, enabled, echo, main_enable, enable_links, pop_out, locked, scale, main_font_size, tab_order)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ]])
+            cStmt:bind_values(
+                Module.ActivePresetID,
+                channelID,
+                channelData.Name or 'New',
+                (channelData.enabled and 1 or 0),
+                channelData.Echo or '/say',
+                (channelData.MainEnable ~= false) and 1 or 0,
+                (channelData.enableLinks and 1 or 0),
+                (channelData.PopOut and 1 or 0),
+                (channelData.locked and 1 or 0),
+                channelData.Scale or 1.0,
+                channelData.FontSize or 16,
+                channelData.TabOrder or 0
+            )
+            cStmt:step()
+            cStmt:finalize()
+            local channelRowID = db:last_insert_rowid()
+
+            if channelData.Events then
+                for eventIndex, eventData in pairs(channelData.Events) do
+                    local eStmt = db:prepare([[
+                        INSERT INTO events (channel_row_id, event_index, event_string, enabled)
+                        VALUES (?, ?, ?, ?)
+                    ]])
+                    eStmt:bind_values(
+                        channelRowID,
+                        eventIndex,
+                        eventData.eventString or 'new',
+                        (eventData.enabled ~= false) and 1 or 0
+                    )
+                    eStmt:step()
+                    eStmt:finalize()
+                    local eventRowID = db:last_insert_rowid()
+
+                    if eventData.Filters then
+                        for filterIndex, filterData in pairs(eventData.Filters) do
+                            local color = filterData.color or { 1.0, 1.0, 1.0, 1.0 }
+                            local fStmt = db:prepare([[
+                                INSERT INTO filters (event_row_id, filter_index, filter_string, color_r, color_g, color_b, color_a, enabled, hidden)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            ]])
+                            fStmt:bind_values(
+                                eventRowID,
+                                filterIndex,
+                                filterData.filterString or '',
+                                color[1] or 1.0,
+                                color[2] or 1.0,
+                                color[3] or 1.0,
+                                color[4] or 1.0,
+                                (filterData.enabled ~= false) and 1 or 0,
+                                (filterData.hidden and 1 or 0)
+                            )
+                            fStmt:step()
+                            fStmt:finalize()
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Update preset timestamp
+    local uStmt = db:prepare("UPDATE presets SET updated_at = datetime('now') WHERE id = ?")
+    uStmt:bind_values(Module.ActivePresetID)
+    uStmt:step()
+    uStmt:finalize()
+
+    db:exec('COMMIT')
+    db:close()
+
+    Module.SortChannels()
+end
+
+---Returns a list of all presets: { {id=N, name='...', created_by='...', created_at='...'}, ... }
+---@return table
+function Module.GetPresetList()
+    local list = {}
+    local db = Module.OpenDB()
+    if not db then return list end
+    local stmt = db:prepare('SELECT id, preset_name, server, created_by, created_at FROM presets ORDER BY server, preset_name')
+    if not stmt then db:close() return list end
+    for row in stmt:nrows() do
+        table.insert(list, {
+            id         = row.id,
+            name       = row.preset_name,
+            server     = row.server,
+            created_by = row.created_by,
+            created_at = row.created_at,
+        })
+    end
+    stmt:finalize()
+    db:close()
+    Module.PresetList = list
+    return list
+end
+
+---Creates a new empty preset
+---@param name string
+---@return integer|nil presetID
+function Module.CreatePreset(name)
+    local db = Module.OpenDB()
+    if not db then return nil end
+    local stmt = db:prepare('INSERT INTO presets (preset_name, server, created_by) VALUES (?, ?, ?)')
+    if not stmt then db:close() return nil end
+    stmt:bind_values(name, Module.Server, Module.CharLoaded)
+    local rc = stmt:step()
+    stmt:finalize()
+    if rc ~= Module.SQLite3.DONE then
+        db:close()
+        return nil
+    end
+    local id = db:last_insert_rowid()
+    db:close()
+    return id
+end
+
+---Deletes a preset by ID (CASCADE removes channels/events/filters)
+---@param presetID integer
+---@return boolean
+function Module.DeletePreset(presetID)
+    local db = Module.OpenDB()
+    if not db then return false end
+    local stmt = db:prepare('DELETE FROM presets WHERE id = ?')
+    stmt:bind_values(presetID)
+    local rc = stmt:step()
+    stmt:finalize()
+    -- Also clean up char_active_preset entries
+    local cStmt = db:prepare('DELETE FROM char_active_preset WHERE preset_id = ?')
+    cStmt:bind_values(presetID)
+    cStmt:step()
+    cStmt:finalize()
+    -- Clean up overrides
+    local oStmt = db:prepare('DELETE FROM char_channel_overrides WHERE preset_id = ?')
+    oStmt:bind_values(presetID)
+    oStmt:step()
+    oStmt:finalize()
+    db:close()
+    return rc == Module.SQLite3.DONE
+end
+
+---Copies a preset to a new name, returns the new preset ID
+---@param fromPresetID integer
+---@param newName string
+---@return integer|nil
+function Module.CopyPreset(fromPresetID, newName)
+    local db = Module.OpenDB()
+    if not db then return nil end
+
+    db:exec('BEGIN TRANSACTION')
+
+    -- Create new preset
+    local pStmt = db:prepare('INSERT INTO presets (preset_name, server, created_by) VALUES (?, ?, ?)')
+    pStmt:bind_values(newName, Module.Server, Module.CharLoaded)
+    local rc = pStmt:step()
+    pStmt:finalize()
+    if rc ~= Module.SQLite3.DONE then
+        db:exec('ROLLBACK')
+        db:close()
+        return nil
+    end
+    local newPresetID = db:last_insert_rowid()
+
+    -- Copy channels
+    local cStmt = db:prepare('SELECT * FROM channels WHERE preset_id = ?')
+    cStmt:bind_values(fromPresetID)
+    for cRow in cStmt:nrows() do
+        local icStmt = db:prepare([[
+            INSERT INTO channels (preset_id, channel_id, name, enabled, echo, main_enable, enable_links, pop_out, locked, scale, main_font_size, tab_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ]])
+        icStmt:bind_values(newPresetID, cRow.channel_id, cRow.name, cRow.enabled, cRow.echo,
+            cRow.main_enable, cRow.enable_links, cRow.pop_out, cRow.locked, cRow.scale,
+            cRow.main_font_size, cRow.tab_order)
+        icStmt:step()
+        icStmt:finalize()
+        local newChanRowID = db:last_insert_rowid()
+
+        -- Copy events for this channel
+        local eStmt = db:prepare('SELECT * FROM events WHERE channel_row_id = ?')
+        eStmt:bind_values(cRow.id)
+        for eRow in eStmt:nrows() do
+            local ieStmt = db:prepare('INSERT INTO events (channel_row_id, event_index, event_string, enabled) VALUES (?, ?, ?, ?)')
+            ieStmt:bind_values(newChanRowID, eRow.event_index, eRow.event_string, eRow.enabled)
+            ieStmt:step()
+            ieStmt:finalize()
+            local newEventRowID = db:last_insert_rowid()
+
+            -- Copy filters for this event
+            local fStmt = db:prepare('SELECT * FROM filters WHERE event_row_id = ?')
+            fStmt:bind_values(eRow.id)
+            for fRow in fStmt:nrows() do
+                local ifStmt = db:prepare([[
+                    INSERT INTO filters (event_row_id, filter_index, filter_string, color_r, color_g, color_b, color_a, enabled, hidden)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ]])
+                ifStmt:bind_values(newEventRowID, fRow.filter_index, fRow.filter_string,
+                    fRow.color_r, fRow.color_g, fRow.color_b, fRow.color_a,
+                    fRow.enabled, fRow.hidden)
+                ifStmt:step()
+                ifStmt:finalize()
+            end
+            fStmt:finalize()
+        end
+        eStmt:finalize()
+    end
+    cStmt:finalize()
+
+    db:exec('COMMIT')
+    db:close()
+    return newPresetID
+end
+
+---Sets the active preset for the current character and reloads
+---@param presetID integer
+function Module.SwitchPreset(presetID)
+    local db = Module.OpenDB()
+    if not db then return end
+
+    -- Remove old active preset
+    local dStmt = db:prepare('DELETE FROM char_active_preset WHERE char_name = ? AND server = ?')
+    dStmt:bind_values(Module.CharLoaded, Module.Server)
+    dStmt:step()
+    dStmt:finalize()
+
+    -- Set new active preset
+    local iStmt = db:prepare('INSERT INTO char_active_preset (char_name, server, preset_id) VALUES (?, ?, ?)')
+    iStmt:bind_values(Module.CharLoaded, Module.Server, presetID)
+    iStmt:step()
+    iStmt:finalize()
+    db:close()
+
+    -- Unregister all events
+    for eventName, _ in pairs(Module.eventNames) do
+        mq.unevent(eventName)
+    end
+    Module.eventNames = {}
+
+    -- Reload from DB
+    Module.LoadSettingsFromDB()
+    Module.tempSettings = Module.Settings
+
+    -- Rebuild consoles and events
+    for channelID, _ in pairs(Module.Consoles) do
+        Module.Consoles[channelID].console = nil
+    end
+    for channelID, _ in pairs(Module.Settings.Channels) do
+        if not Module.Consoles[channelID] then
+            Module.Consoles[channelID] = {}
+        end
+        SetUpConsoles(channelID)
+    end
+    Module.console = nil
+    Module.console = zep.Console.new("Chat##Console")
+    BuildEvents()
+    Module.SortChannels()
+end
+
+---Renames a preset
+---@param presetID integer
+---@param newName string
+---@return boolean
+function Module.RenamePreset(presetID, newName)
+    local db = Module.OpenDB()
+    if not db then return false end
+    local stmt = db:prepare('UPDATE presets SET preset_name = ? WHERE id = ?')
+    stmt:bind_values(newName, presetID)
+    local rc = stmt:step()
+    stmt:finalize()
+    db:close()
+    if rc == Module.SQLite3.DONE then
+        if Module.ActivePresetID == presetID then
+            Module.ActivePresetName = newName
+        end
+        return true
+    end
+    return false
+end
+
+---Saves current settings as a new preset with the given name
+---@param name string
+---@return integer|nil presetID
+function Module.SaveAsNewPreset(name)
+    -- First write current settings to active preset to ensure they're saved
+    Module.WriteSettingsToDB()
+    -- Then copy the active preset
+    local newID = Module.CopyPreset(Module.ActivePresetID, name)
+    if newID then
+        Module.GetPresetList()
+    end
+    return newID
+end
+
 ---Build the consoles for each channel based on ChannelID
 ---@param channelID integer -- the channel ID number for the console we are setting up
-local function SetUpConsoles(channelID)
+SetUpConsoles = function(channelID)
     if Module.Consoles[channelID].console == nil then
         Module.Consoles[channelID].txtBuffer = {
             [1] = {
@@ -211,9 +984,7 @@ local function SetUpConsoles(channelID)
         Module.Consoles[channelID].CommandBuffer = ''
         Module.Consoles[channelID].CommandHistory = {}
         Module.Consoles[channelID].txtAutoScroll = true
-        -- ChatWin.Consoles[channelID].enableLinks = ChatWin.Settings[channelID].enableLinks
         Module.Consoles[channelID].console = zep.Console.new(channelID .. "##Console")
-        -- Module.Consoles[channelID].console.fontSize = Module.Settings.Channels[channelID].FontSize or 16
     end
 end
 
@@ -282,36 +1053,25 @@ local function reIndexSettings(file, table)
     mq.pickle(file, table)
 end
 
----Convert MQ event Strings from #*#blah #1# formats to a lua parsable pattern
-local function convertEventString(oldFormat)
-    -- local pattern = oldFormat:gsub("#", "")
-    local pattern = oldFormat:gsub("#%*#", ".*")
-    -- Convert * to Lua's wildcard .*
-    -- pattern = pattern:gsub("#%*#", ".*")
-    -- Convert n (where n is any number) to Lua's wildcard .*
-    pattern = pattern:gsub("#%d#", ".*")
-
-    -- Escape special characters that are not part of the wildcard transformation and should be literal
-    -- Specifically targeting parentheses, plus, minus, and other special characters not typically part of text.
-    pattern = pattern:gsub("([%^%[%$%(%)%.%]]%+%?])", "%%%1") -- Escaping special characters that might disrupt the pattern matching
-
-    -- Do not escape brackets if they form part of the control structure of the pattern
-    pattern = pattern:gsub("%[", "%%%[")
-    pattern = pattern:gsub("%]", "%%%]")
-    -- print(pattern)
-    return pattern
-end
-
 ---Writes settings from the settings table passed to the setting file (full path required)
 -- Uses mq.pickle to serialize the table and write to file
 ---@param file string -- File Name and path
 ---@param table table -- Table of settings to write
 local function writeSettings(file, table)
-    mq.pickle(file, table)
+    Module.WriteSettingsToDB()
     Module.SortChannels()
 end
 
 local function loadSettings()
+    -- Try loading from DB first
+    if Module.HasDBData() then
+        if Module.LoadSettingsFromDB() then
+            -- successfully loaded from DB, skip pickle loading
+            goto settings_loaded
+        end
+    end
+
+    -- Fallback: load from pickle files
     if not Module.Utils.File.Exists(Module.SettingsFile) then
         settingsOld = string.format('%s/MyChat_%s_%s.lua', mq.configDir, Module.Server:gsub(' ', '_'), Module.CharLoaded)
         if Module.Utils.File.Exists(settingsOld) then
@@ -320,7 +1080,6 @@ local function loadSettings()
         else
             Module.Settings = Module.defaults
             mq.pickle(Module.SettingsFile, Module.defaults)
-            -- loadSettings()
         end
     else
         -- Load settings from the Lua config file
@@ -331,14 +1090,10 @@ local function loadSettings()
         end
     end
 
-    for i = 10, 40 do
-        if i % 2 == 0 then
-            table.insert(fontSizes, i)
-            if i == 12 then
-                table.insert(fontSizes, 13) -- this is the default font size so keep it in the list
-            end
-        end
-    end
+    -- Migrate pickle to DB on first load
+    Module.MigratePickleToDB(Module.Settings, Module.CharLoaded)
+
+    ::settings_loaded::
 
     if Module.Settings.Channels[0] == nil then
         Module.Settings.Channels[0] = {}
@@ -484,11 +1239,10 @@ local function loadSettings()
     forceIndex = false
     Module.KeyFocus = Module.Settings.keyFocus ~= nil or false
     Module.KeyName = Module.Settings.keyName ~= nil and Module.Settings.keyName or 'RightShift'
-    -- writeSettings(Module.SettingsFile, Module.Settings)
     Module.tempSettings = Module.Settings
 end
 
-local function BuildEvents()
+BuildEvents = function()
     Module.eventNames = {}
     for channelID, channelData in pairs(Module.Settings.Channels) do
         local eventOptions = { keepLinks = channelData.enableLinks, }
@@ -617,8 +1371,6 @@ local function CheckNPC(line)
     else
         return false, name
     end
-    -- printf("CheckNPC: \at%s", name)
-    -- print(check)
     name = name:gsub(" $", "")
     local check = string.format("npc =\"%s\"", name)
     local check2 = string.format("pet =\"%s\"", name)
@@ -659,7 +1411,6 @@ end
 ---@return boolean
 function Module.EventChat(channelID, eventName, line, spam)
     local conLine = line
-    -- if spam then print('Called from Spam') end
     local eventDetails = Module.eventNames[eventName]
     if not eventDetails then return false end
     if not eventDetails.enabled then return false end
@@ -698,12 +1449,10 @@ function Module.EventChat(channelID, eventName, line, spam)
                         elseif string.find(fString, 'PT3') then
                             local npc, npcName = CheckNPC(line)
                             local tagged = false
-                            -- print(npcName)
                             if gSize > 0 then
                                 for g = 1, gSize do
                                     if mq.TLO.Spawn(string.format("%s", npcName)).Master.Name() == mq.TLO.Group.Member(g).Name() then
                                         fString = string.gsub(fString, 'PT3', npcName)
-                                        -- print(npcName)
                                         tagged = true
                                         break
                                     end
@@ -713,7 +1462,6 @@ function Module.EventChat(channelID, eventName, line, spam)
                                 for r = 1, rSize do
                                     if mq.TLO.Spawn(string.format("%s", npcName)).Master.Name() == mq.TLO.Raid.Member(r).Name() then
                                         fString = string.gsub(fString, 'PT3', npcName)
-                                        -- print(npcName)
                                         tagged = true
                                         break
                                     end
@@ -749,8 +1497,6 @@ function Module.EventChat(channelID, eventName, line, spam)
                             fString = string.gsub(fString, 'G4', mq.TLO.Group.Member(4).Name() or 'NO GROUP')
                         elseif string.find(fString, 'G5') then
                             fString = string.gsub(fString, 'G5', mq.TLO.Group.Member(5).Name() or 'NO GROUP')
-                        elseif string.find(fString, 'RL') then
-                            fString = string.gsub(fString, 'RL', mq.TLO.Raid.Leader.Name() or 'NO RAID')
                         elseif string.find(fString, 'H1') then
                             fString = CheckGroup(fString, line, 'healer')
                         elseif string.find(fString, 'GP1') then
@@ -773,10 +1519,8 @@ function Module.EventChat(channelID, eventName, line, spam)
                         end
                     end
                 end
-                ::next_filter::
             end
             ::found_match::
-            --print(tostring(#eventDetails.Filters))
             if matchCount == 0 and haveFilters then return fMatch end -- we had filters and didn't match so leave
             if not spam then
                 if string.lower(Module.Settings.Channels[channelID].Name) == 'consider' then
@@ -804,7 +1548,6 @@ function Module.EventChat(channelID, eventName, line, spam)
                 -- write main console
                 if Module.tempSettings.Channels[channelID].MainEnable then
                     Module.Utils.AppendColoredTimestamp(Module.console, tStamp, conLine, colorCode, timeStamps)
-                    -- ChatWin.console:AppendText(colorCode,conLine)
                     local z = getNextID(mainBuffer)
 
                     if z > 1 then
@@ -843,6 +1586,10 @@ function Module.EventChat(channelID, eventName, line, spam)
                         table.remove(txtBuffer, 1)
                     end
                 end
+
+                -- Mark this line as claimed so Spam channel skips it
+                claimedLines[conLine] = true
+                claimedLinesTTL[conLine] = os.clock()
             end
             return fMatch
         else
@@ -855,77 +1602,45 @@ function Module.EventChat(channelID, eventName, line, spam)
     end
 end
 
----Reads in the line and channelID of the triggered events. Parses the line against the Events and Filters for that channel.
----@param channelID integer @ The ID number of the Channel the triggered event belongs to
+---Spam reverse filter: shows only lines NOT already claimed by another channel's event.
+---@param channelID integer @ The ID number of the Spam channel (9000)
+---@param line string @ the line of text captured by the #*# catch-all event
 function Module.EventChatSpam(channelID, line)
-    local eventDetails = Module.eventNames
-    local conLine = line
-    if not eventDetails then return end
-    if Module.Consoles[channelID] then
-        local txtBuffer = Module.Consoles[channelID].txtBuffer -- Text buffer for the channel ID we are working with.
-        local colorVec = { 1, 1, 1, 1, }                       -- Color Code to change line to, default is white
-        local fMatch = false
-        local gSize = mq.TLO.Me.GroupSize()                    -- size of the group including yourself
-        gSize = gSize - 1
-        if txtBuffer then
-            for cID, cData in pairs(Module.Settings.Channels) do
-                if cID ~= channelID then
-                    for eID, eData in pairs(cData.Events) do
-                        local tmpEname = string.format("event_%d_%d", cID, eID)
-                        for name, data in pairs(Module.eventNames) do
-                            if name ~= 'event_9000_1' and name == tmpEname then
-                                local eventPattern = convertEventString(data.eventString)
-                                if string.match(line, eventPattern) then
-                                    fMatch = Module.EventChat(cID, name, line, true)
-                                    -- print(tostring(fMatch))
-                                end
-                                -- we found a match lets exit this loop.
-                                if fMatch == true then break end
-                            end
-                        end
-                        if fMatch == true then break end
-                    end
-                end
-                if fMatch == true then break end
-            end
-
-            if fMatch then return end -- we have an event for this already
-            local tStamp = mq.TLO.Time.Time24()
-            local i = getNextID(txtBuffer)
-            local colorCode = ImVec4(colorVec[1], colorVec[2], colorVec[3], colorVec[4])
-
-            if timeStamps then
-                line = string.format("%s %s", tStamp, line)
-            end
-            -- write channel console
-            if Module.Consoles[channelID].console then
-                Module.Utils.AppendColoredTimestamp(Module.Consoles[channelID].console, tStamp, conLine, colorCode, timeStamps)
-                -- ChatWin.Consoles[channelID].console:AppendText(colorCode, conLine)
-            end
-
-            -- ZOOM Console hack
-            if i > 1 then
-                if txtBuffer[i - 1].text == '' then i = i - 1 end
-            end
-            -- Add the new line to the buffer
-            txtBuffer[i] = {
-                color = colorVec,
-                text = line,
-            }
-            -- cleanup zoom buffer
-            -- Check if the buffer exceeds 1000 lines
-            local bufferLength = #txtBuffer
-            if bufferLength > zBuffer then
-                -- Remove excess lines
-                for j = 1, bufferLength - zBuffer do
-                    table.remove(txtBuffer, 1)
-                end
-            end
-        else
-            print("Error: txtBuffer is nil for channelID " .. channelID)
+    -- Clean stale claimed entries
+    local now = os.clock()
+    for k, t in pairs(claimedLinesTTL) do
+        if now - t > CLAIMED_TTL then
+            claimedLines[k] = nil
+            claimedLinesTTL[k] = nil
         end
-    else
-        print("Error: ChatWin.Consoles[channelID] is nil for channelID " .. channelID)
+    end
+
+    -- If any real channel already claimed this line, skip it
+    if claimedLines[line] then return end
+
+    -- Write to spam console (unclaimed line)
+    if not Module.Consoles[channelID] then return end
+    local txtBuffer = Module.Consoles[channelID].txtBuffer
+    if not txtBuffer then return end
+
+    local tStamp = mq.TLO.Time.Time24()
+    local colorVec = { 1, 1, 1, 1 }
+    local colorCode = ImVec4(colorVec[1], colorVec[2], colorVec[3], colorVec[4])
+
+    if Module.Consoles[channelID].console then
+        Module.Utils.AppendColoredTimestamp(Module.Consoles[channelID].console, tStamp, line, colorCode, timeStamps)
+    end
+
+    local displayLine = timeStamps and string.format("%s %s", tStamp, line) or line
+    local i = getNextID(txtBuffer)
+    if i > 1 and txtBuffer[i - 1].text == '' then i = i - 1 end
+    txtBuffer[i] = { color = colorVec, text = displayLine }
+
+    local bufferLength = #txtBuffer
+    if bufferLength > zBuffer then
+        for j = 1, bufferLength - zBuffer do
+            table.remove(txtBuffer, 1)
+        end
     end
 end
 
@@ -1072,7 +1787,6 @@ end
 local function DrawChatWindow()
     -- Main menu bar
     if ImGui.BeginMenuBar() then
-        
         local lockedIcon = Module.Settings.locked and Module.Icons.FA_LOCK .. '##lockTabButton_MyChat' or
             Module.Icons.FA_UNLOCK .. '##lockTablButton_MyChat'
         if ImGui.Button(lockedIcon) then
@@ -1082,7 +1796,6 @@ local function DrawChatWindow()
             ResetEvents()
         end
         if ImGui.IsItemHovered() then
-            
             ImGui.BeginTooltip()
             ImGui.Text("Lock Window")
             ImGui.EndTooltip()
@@ -1091,14 +1804,13 @@ local function DrawChatWindow()
             Module.openConfigGUI = not Module.openConfigGUI
         end
         if ImGui.IsItemHovered() then
-            
             ImGui.BeginTooltip()
             ImGui.Text("Open Main Config")
             ImGui.EndTooltip()
         end
         if ImGui.BeginMenu('Options##' .. windowNum) then
             local spamOn
-            
+
             _, Module.console.autoScroll = ImGui.MenuItem('Auto-scroll##' .. windowNum, nil, Module.console.autoScroll)
             _, LocalEcho = ImGui.MenuItem('Local echo##' .. windowNum, nil, LocalEcho)
             _, timeStamps = ImGui.MenuItem('Time Stamps##' .. windowNum, nil, timeStamps)
@@ -1110,7 +1822,6 @@ local function DrawChatWindow()
             end
             if Module.KeyFocus then
                 if ImGui.BeginMenu('Focus Key') then
-                    
                     if ImGui.BeginCombo('##FocusKey', Module.KeyName) then
                         for _, key in pairs(keyboardKeys) do
                             local isSelected = Module.KeyName == key
@@ -1132,7 +1843,7 @@ local function DrawChatWindow()
             end
             if ImGui.IsItemHovered() then
                 ImGui.BeginTooltip()
-                
+
                 ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(1, 0, 0, 1))
                 ImGui.Text("!!! WARNING !!!")
                 ImGui.Text("This will re-Index the ID's in your settings file!!")
@@ -1150,8 +1861,6 @@ local function DrawChatWindow()
                 Module.console:Clear()
             end
             if ImGui.MenuItem('Exit##' .. windowNum) then
-                -- ChatWin.SHOW = false
-                -- ChatWin.openGUI = false
                 mq.RemoveTopLevelObject('MyChatTlo')
                 Module.IsRunning = false
             end
@@ -1166,16 +1875,16 @@ local function DrawChatWindow()
             ImGui.EndMenu()
         end
         if ImGui.BeginMenu('Channels##' .. windowNum) then
-            
             for _, Data in ipairs(sortedChannels) do
-                -- for channelID, settings in pairs(ChatWin.Settings.Channels) do
                 local channelID = Data[1]
-                local enabled = Module.Settings.Channels[channelID].enabled
-                local name = Module.Settings.Channels[channelID].Name
-                if channelID ~= 9000 or enableSpam then
-                    if ImGui.MenuItem(name, '', enabled) then
-                        Module.Settings.Channels[channelID].enabled = not enabled
-                        writeSettings(Module.SettingsFile, Module.Settings)
+                if Module.Settings.Channels[channelID] then
+                    local enabled = Module.Settings.Channels[channelID].enabled
+                    local name = Module.Settings.Channels[channelID].Name
+                    if channelID ~= 9000 or enableSpam then
+                        if ImGui.MenuItem(name, '', enabled) then
+                            Module.Settings.Channels[channelID].enabled = not enabled
+                            writeSettings(Module.SettingsFile, Module.Settings)
+                        end
                     end
                 end
             end
@@ -1183,17 +1892,17 @@ local function DrawChatWindow()
         end
 
         if ImGui.BeginMenu('Links##' .. windowNum) then
-            
             for _, Data in ipairs(sortedChannels) do
-                -- for channelID, settings in pairs(ChatWin.Settings.Channels) do
                 local channelID = Data[1]
-                local enableLinks = Module.Settings.Channels[channelID].enableLinks
-                local name = Module.Settings.Channels[channelID].Name
-                if channelID ~= 9000 then
-                    if ImGui.MenuItem(name, '', enableLinks) then
-                        Module.Settings.Channels[channelID].enableLinks = not enableLinks
-                        writeSettings(Module.SettingsFile, Module.Settings)
-                        ModifyEvent(channelID)
+                if Module.Settings.Channels[channelID] then
+                    local enableLinks = Module.Settings.Channels[channelID].enableLinks
+                    local name = Module.Settings.Channels[channelID].Name
+                    if channelID ~= 9000 then
+                        if ImGui.MenuItem(name, '', enableLinks) then
+                            Module.Settings.Channels[channelID].enableLinks = not enableLinks
+                            writeSettings(Module.SettingsFile, Module.Settings)
+                            ModifyEvent(channelID)
+                        end
                     end
                 end
             end
@@ -1202,18 +1911,18 @@ local function DrawChatWindow()
             ImGui.EndMenu()
         end
         if ImGui.BeginMenu('PopOut##' .. windowNum) then
-            
             for _, Data in ipairs(sortedChannels) do
-                -- for channelID, settings in pairs(ChatWin.Settings.Channels) do
                 local channelID = Data[1]
-                if channelID ~= 9000 or enableSpam then
-                    local PopOut = Module.Settings.Channels[channelID].PopOut
-                    local name = Module.Settings.Channels[channelID].Name
-                    if ImGui.MenuItem(name, '', PopOut) then
-                        PopOut = not PopOut
-                        Module.Settings.Channels[channelID].PopOut = PopOut
-                        Module.tempSettings.Channels[channelID].PopOut = PopOut
-                        writeSettings(Module.SettingsFile, Module.Settings)
+                if Module.Settings.Channels[channelID] then
+                    if channelID ~= 9000 or enableSpam then
+                        local PopOut = Module.Settings.Channels[channelID].PopOut
+                        local name = Module.Settings.Channels[channelID].Name
+                        if ImGui.MenuItem(name, '', PopOut) then
+                            PopOut = not PopOut
+                            Module.Settings.Channels[channelID].PopOut = PopOut
+                            Module.tempSettings.Channels[channelID].PopOut = PopOut
+                            writeSettings(Module.SettingsFile, Module.Settings)
+                        end
                     end
                 end
             end
@@ -1221,15 +1930,136 @@ local function DrawChatWindow()
             ImGui.EndMenu()
         end
 
+        if ImGui.BeginMenu('Presets##' .. windowNum) then
+            ImGui.Text('Active: ' .. (Module.ActivePresetName or 'None'))
+            ImGui.Separator()
+
+            -- Load Preset submenu
+            if ImGui.BeginMenu('Load Preset##' .. windowNum) then
+                local presets = Module.GetPresetList()
+                for _, preset in ipairs(presets) do
+                    local isActive = preset.id == Module.ActivePresetID
+                    local label = preset.name
+                    if preset.server ~= Module.Server then
+                        label = label .. ' [' .. preset.server .. ']'
+                    end
+                    if isActive then label = label .. ' (active)' end
+                    if ImGui.MenuItem(label .. '##load_' .. preset.id, nil, isActive) then
+                        if not isActive then
+                            Module.SwitchPreset(preset.id)
+                        end
+                    end
+                    if ImGui.IsItemHovered() then
+                        ImGui.BeginTooltip()
+                        ImGui.Text('Server: ' .. (preset.server or ''))
+                        ImGui.Text('Created by: ' .. preset.created_by)
+                        ImGui.Text('Created: ' .. preset.created_at)
+                        ImGui.EndTooltip()
+                    end
+                end
+                ImGui.EndMenu()
+            end
+
+            -- Save As New Preset
+            if ImGui.MenuItem('Save As New Preset...##' .. windowNum) then
+                showPresetSaveInput = true
+                newPresetName = Module.ActivePresetName .. '_copy'
+            end
+
+            -- Rename Current Preset
+            if ImGui.MenuItem('Rename Current Preset...##' .. windowNum) then
+                showPresetRenameInput = true
+                renamePresetName = Module.ActivePresetName
+            end
+
+            -- Copy from another preset
+            if ImGui.BeginMenu('Copy Preset##' .. windowNum) then
+                local presets = Module.GetPresetList()
+                for _, preset in ipairs(presets) do
+                    if preset.id ~= Module.ActivePresetID then
+                        if ImGui.MenuItem(preset.name .. '##copy_' .. preset.id) then
+                            local copyName = preset.name .. '_copy'
+                            Module.CopyPreset(preset.id, copyName)
+                            Module.GetPresetList()
+                        end
+                    end
+                end
+                ImGui.EndMenu()
+            end
+
+            ImGui.Separator()
+
+            -- Delete Preset
+            if ImGui.BeginMenu('Delete Preset##' .. windowNum) then
+                local presets = Module.GetPresetList()
+                for _, preset in ipairs(presets) do
+                    if preset.id ~= Module.ActivePresetID then
+                        if ImGui.MenuItem(preset.name .. '##del_' .. preset.id) then
+                            Module.DeletePreset(preset.id)
+                            Module.GetPresetList()
+                        end
+                    else
+                        ImGui.MenuItem(preset.name .. ' (active)##del_' .. preset.id, nil, false, false)
+                    end
+                end
+                ImGui.EndMenu()
+            end
+
+            ImGui.EndMenu()
+        end
+
+        -- Preset Save popup
+        if showPresetSaveInput then
+            ImGui.OpenPopup('Save New Preset##Popup')
+        end
+        if ImGui.BeginPopup('Save New Preset##Popup') then
+            ImGui.Text('Enter preset name:')
+            newPresetName = ImGui.InputText('##PresetNameInput', newPresetName, 256)
+            if ImGui.Button('Save##PresetSave') then
+                if newPresetName ~= '' then
+                    Module.SaveAsNewPreset(newPresetName)
+                end
+                showPresetSaveInput = false
+                ImGui.CloseCurrentPopup()
+            end
+            ImGui.SameLine()
+            if ImGui.Button('Cancel##PresetSaveCancel') then
+                showPresetSaveInput = false
+                ImGui.CloseCurrentPopup()
+            end
+            ImGui.EndPopup()
+        end
+
+        -- Preset Rename popup
+        if showPresetRenameInput then
+            ImGui.OpenPopup('Rename Preset##Popup')
+        end
+        if ImGui.BeginPopup('Rename Preset##Popup') then
+            ImGui.Text('Enter new name:')
+            renamePresetName = ImGui.InputText('##PresetRenameInput', renamePresetName, 256)
+            if ImGui.Button('Rename##PresetRename') then
+                if renamePresetName ~= '' and Module.ActivePresetID then
+                    Module.RenamePreset(Module.ActivePresetID, renamePresetName)
+                end
+                showPresetRenameInput = false
+                ImGui.CloseCurrentPopup()
+            end
+            ImGui.SameLine()
+            if ImGui.Button('Cancel##PresetRenameCancel') then
+                showPresetRenameInput = false
+                ImGui.CloseCurrentPopup()
+            end
+            ImGui.EndPopup()
+        end
+
         ImGui.EndMenuBar()
     end
 
     -- Begin Tabs Bars
-    
+
     if ImGui.BeginTabBar('Channels##', Module.tabFlags) then
         -- Begin Main tab
         if ImGui.BeginTabItem('Main##' .. windowNum) then
-            
             if ImGui.IsItemHovered() then
                 ImGui.BeginTooltip()
                 ImGui.Text('Main')
@@ -1242,7 +2072,6 @@ local function DrawChatWindow()
             local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
             contentSizeY = contentSizeY - footerHeight
             if ImGui.BeginPopupContextWindow() then
-                
                 if ImGui.Selectable('Clear##' .. windowNum) then
                     Module.console:Clear()
                     mainBuffer = {}
@@ -1253,9 +2082,8 @@ local function DrawChatWindow()
             Module.console:Render(ImVec2(0, contentSizeY))
             --Command Line
             ImGui.Separator()
-            local textFlags = bit32.bor(0,
+            local textFlags = bit32.bor(
                 ImGuiInputTextFlags.EnterReturnsTrue,
-                -- not implemented yet
                 ImGuiInputTextFlags.CallbackCompletion,
                 ImGuiInputTextFlags.CallbackHistory
             )
@@ -1304,15 +2132,13 @@ local function DrawChatWindow()
         end
         -- End Main tab
         -- Begin other tabs
-        -- for tabNum = 1 , #ChatWin.Settings.Channels do
         for _, channelData in ipairs(sortedChannels) do
             local channelID = channelData[1] or 0
-            if Module.Settings.Channels[channelID].enabled then
+            if Module.Settings.Channels[channelID] and Module.Settings.Channels[channelID].enabled then
                 local name = Module.Settings.Channels[channelID].Name:gsub("^%d+%s*", "") .. '##' .. windowNum
                 local links = Module.Settings.Channels[channelID].enableLinks
                 local enableMain = Module.Settings.Channels[channelID].MainEnable
                 local PopOut = Module.Settings.Channels[channelID].PopOut
-                -- local tNameZ = zoom and 'Disable Zoom' or 'Enable Zoom'
                 local tNameP = PopOut and 'Disable PopOut' or 'Enable PopOut'
                 local tNameM = enableMain and 'Disable Main' or 'Enable Main'
                 local tNameL = links and 'Disable Links' or 'Enable Links'
@@ -1326,15 +2152,13 @@ local function DrawChatWindow()
                 end
 
                 if not PopOut then
-                    
                     if ImGui.BeginTabItem(name) then
                         activeTabID = channelID
-                        
+
                         if ImGui.IsItemHovered() then
                             tabToolTip()
                         end
                         if ImGui.BeginPopupContextWindow() then
-                            
                             if ImGui.Selectable('Configure##' .. windowNum) then
                                 editChanID = channelID
                                 addChannel = false
@@ -1381,6 +2205,14 @@ local function DrawChatWindow()
                                 Module.Consoles[channelID].txtBuffer = {}
                             end
 
+                            ImGui.Separator()
+                            if ImGui.Selectable(Module.Icons.FA_ARROW_LEFT .. ' Move Left##' .. windowNum) then
+                                Module.MoveTab(channelID, 'left')
+                            end
+                            if ImGui.Selectable(Module.Icons.FA_ARROW_RIGHT .. ' Move Right##' .. windowNum) then
+                                Module.MoveTab(channelID, 'right')
+                            end
+
                             ImGui.EndPopup()
                         end
 
@@ -1425,7 +2257,7 @@ function Module.RenderGUI()
     end
 
     for channelID, data in pairs(Module.Settings.Channels) do
-        if Module.Settings.Channels[channelID].enabled then
+        if data and data.enabled then
             local name = Module.Settings.Channels[channelID].Name .. '##' .. windowNum
             local PopOut = Module.Settings.Channels[channelID].PopOut
             local ShowPop = Module.Settings.Channels[channelID].PopOut
@@ -1451,7 +2283,6 @@ function Module.RenderGUI()
                         ResetEvents()
                     end
                     if ImGui.IsItemHovered() then
-                        
                         ImGui.BeginTooltip()
                         ImGui.Text("Lock Window")
                         ImGui.EndTooltip()
@@ -1473,7 +2304,6 @@ function Module.RenderGUI()
                         Module.openConfigGUI = false
                     end
                     if ImGui.IsItemHovered() then
-                        
                         ImGui.BeginTooltip()
                         ImGui.Text("Opens the Edit window for this channel")
                         ImGui.EndTooltip()
@@ -1489,7 +2319,7 @@ function Module.RenderGUI()
                         ImGui.End()
                     end
                 end
-                
+
                 Module.ThemeLoader.EndTheme(PopoutColorCount, PopoutStyleCount)
 
                 ImGui.End()
@@ -1498,6 +2328,60 @@ function Module.RenderGUI()
     end
     if Module.openEditGUI then Module.Edit_GUI() end
     if Module.openConfigGUI then Module.Config_GUI() end
+
+    -- Process deferred deletes after all GUI drawing is complete
+    if pendingDeleteChannel then
+        local chanID = pendingDeleteChannel
+        pendingDeleteChannel = nil
+        Module.BackupSettings()
+        Module.tempSettings.Channels[chanID] = nil
+        Module.tempEventStrings[chanID] = nil
+        Module.tempChanColors[chanID] = nil
+        Module.tempFiltColors[chanID] = nil
+        Module.tempFilterStrings[chanID] = nil
+        Module.tempFilterEnabled[chanID] = nil
+        Module.tempFilterHidden[chanID] = nil
+        Module.Settings = Module.tempSettings
+        ResetEvents()
+        resetEvnts = true
+        Module.openEditGUI = false
+        Module.openConfigGUI = false
+    end
+
+    if pendingDeleteEvent then
+        local chanID, evtID = pendingDeleteEvent[1], pendingDeleteEvent[2]
+        pendingDeleteEvent = nil
+        if Module.tempSettings.Channels[chanID] and Module.tempSettings.Channels[chanID].Events then
+            Module.tempSettings.Channels[chanID].Events[evtID] = nil
+        end
+        if Module.tempEventStrings[chanID] then Module.tempEventStrings[chanID][evtID] = nil end
+        if Module.tempChanColors[chanID] then Module.tempChanColors[chanID][evtID] = nil end
+        if Module.tempFiltColors[chanID] then Module.tempFiltColors[chanID][evtID] = nil end
+        if Module.tempFilterStrings[chanID] then Module.tempFilterStrings[chanID][evtID] = nil end
+        Module.hString[evtID] = nil
+        Module.Settings = Module.tempSettings
+        ResetEvents()
+    end
+
+    if pendingDeleteFilter then
+        local chanID, evtID, fltID = pendingDeleteFilter[1], pendingDeleteFilter[2], pendingDeleteFilter[3]
+        pendingDeleteFilter = nil
+        if Module.tempSettings.Channels[chanID] and Module.tempSettings.Channels[chanID].Events[evtID]
+            and Module.tempSettings.Channels[chanID].Events[evtID].Filters then
+            Module.tempSettings.Channels[chanID].Events[evtID].Filters[fltID] = nil
+        end
+        if Module.tempFilterStrings[chanID] and Module.tempFilterStrings[chanID][evtID] then
+            Module.tempFilterStrings[chanID][evtID][fltID] = nil
+        end
+        if Module.tempFiltColors[chanID] and Module.tempFiltColors[chanID][evtID] then
+            Module.tempFiltColors[chanID][evtID][fltID] = nil
+        end
+        if Module.tempChanColors[chanID] and Module.tempChanColors[chanID][evtID] then
+            Module.tempChanColors[chanID][evtID][fltID] = nil
+        end
+        Module.Settings = Module.tempSettings
+        ResetEvents()
+    end
 
     if not openMain then
         Module.IsRunning = false
@@ -1516,7 +2400,6 @@ function Module.AddChannel(editChanID, isNewChannel)
     local tmpName = 'NewChan'
     local tmpString = 'NewString'
     local tmpEcho = '/say'
-    local tmpFilter = 'NewFilter'
     local channelData = {}
 
     if not Module.tempEventStrings[editChanID] then Module.tempEventStrings[editChanID] = {} end
@@ -1525,31 +2408,42 @@ function Module.AddChannel(editChanID, isNewChannel)
     if not Module.tempFilterEnabled[editChanID] then Module.tempFilterEnabled[editChanID] = {} end
     if not Module.tempChanColors[editChanID] then Module.tempChanColors[editChanID] = {} end
     if not Module.tempFilterStrings[editChanID] then Module.tempFilterStrings[editChanID] = {} end
-    if not Module.tempEventStrings[editChanID] then channelData[editChanID] = {} end
     if not Module.tempEventStrings[editChanID][editEventID] then Module.tempEventStrings[editChanID][editEventID] = {} end
     if not Module.tempFilterHidden[editChanID] then Module.tempFilterHidden[editChanID] = {} end
 
     if not isNewChannel then
         if Module.tempSettings.Channels[editChanID] ~= nil then
             for eID, eData in pairs(Module.tempSettings.Channels[editChanID].Events) do
-                if not Module.tempFiltColors[editChanID][eID] then Module.tempFiltColors[editChanID][eID] = {} end
-                if not Module.tempFilterEnabled[editChanID][eID] then Module.tempFilterEnabled[editChanID][eID] = {} end
-                if not Module.tempFilterHidden[editChanID][eID] then Module.tempFilterHidden[editChanID][eID] = {} end
-                for fID, fData in pairs(eData.Filters) do
-                    if not Module.tempFiltColors[editChanID][eID][fID] then Module.tempFiltColors[editChanID][eID][fID] = {} end
-                    -- if not tempFiltColors[editChanID][eID][fID] then tempFiltColors[editChanID][eID][fID] = {} end
-                    Module.tempFiltColors[editChanID][eID][fID] = fData.color or { 1, 1, 1, 1, }
-                    Module.tempFilterEnabled[editChanID][eID][fID] = Module.Settings.Channels[editChanID].Events[eID].Filters[fID].enabled
-                    Module.tempFilterHidden[editChanID][eID][fID] = Module.Settings.Channels[editChanID].Events[eID].Filters[fID].hidden
+                if eData and eData.Filters then
+                    if not Module.tempFiltColors[editChanID][eID] then Module.tempFiltColors[editChanID][eID] = {} end
+                    if not Module.tempFilterEnabled[editChanID][eID] then Module.tempFilterEnabled[editChanID][eID] = {} end
+                    if not Module.tempFilterHidden[editChanID][eID] then Module.tempFilterHidden[editChanID][eID] = {} end
+                    for fID, fData in pairs(eData.Filters) do
+                        if fData then
+                            if not Module.tempFiltColors[editChanID][eID][fID] then Module.tempFiltColors[editChanID][eID][fID] = {} end
+                            Module.tempFiltColors[editChanID][eID][fID] = fData.color or { 1, 1, 1, 1, }
+                            if Module.Settings.Channels[editChanID] and Module.Settings.Channels[editChanID].Events[eID]
+                                and Module.Settings.Channels[editChanID].Events[eID].Filters[fID] then
+                                Module.tempFilterEnabled[editChanID][eID][fID] = Module.Settings.Channels[editChanID].Events[eID].Filters[fID].enabled
+                                Module.tempFilterHidden[editChanID][eID][fID] = Module.Settings.Channels[editChanID].Events[eID].Filters[fID].hidden
+                            end
+                        end
+                    end
                 end
             end
         end
     end
 
-
     if Module.tempSettings.Channels[editChanID] ~= nil then
         channelData = Module.tempSettings.Channels
     else
+        -- Find max tab order for placement at end
+        local maxTabOrder = 0
+        for _, v in pairs(Module.Settings.Channels) do
+            if v and v.TabOrder and v.TabOrder < 9000 and v.TabOrder > maxTabOrder then
+                maxTabOrder = v.TabOrder
+            end
+        end
         channelData = {
             [editChanID] = {
                 ['enabled'] = false,
@@ -1559,6 +2453,7 @@ function Module.AddChannel(editChanID, isNewChannel)
                 ['MainEnable'] = true,
                 ['PopOut'] = false,
                 ['EnableLinks'] = false,
+                ['TabOrder'] = maxTabOrder + 1,
                 ['Events'] = {
                     [1] = {
                         ['enabled'] = true,
@@ -1580,7 +2475,6 @@ function Module.AddChannel(editChanID, isNewChannel)
 
     if newEvent then
         local maxEventId = getNextID(channelData[editChanID].Events)
-        -- print(maxEventId)
         channelData[editChanID]['Events'][maxEventId] = {
             ['enabled'] = true,
             ['eventString'] = 'new',
@@ -1596,9 +2490,8 @@ function Module.AddChannel(editChanID, isNewChannel)
         newEvent = false
     end
     ---------------- Buttons Sliders and Channel Name ------------------------
-    
+
     if not isNewChannel then
-        --print(channelData.Name)
         if not Module.tempEventStrings[editChanID].Name then
             Module.tempEventStrings[editChanID].Name = channelData[editChanID].Name
         end
@@ -1638,7 +2531,7 @@ function Module.AddChannel(editChanID, isNewChannel)
                     local tempEString = eventData.eventString or 'New'
                     if tempEString == '' then tempEString = 'New' end
                     channelEvents[eventId] = channelEvents[eventId] or { color = { 1.0, 1.0, 1.0, 1.0, }, Filters = {}, }
-                    channelEvents[eventId].eventString = tempEString --eventData.eventString
+                    channelEvents[eventId].eventString = tempEString
                     channelEvents[eventId].color = Module.tempChanColors[editChanID][eventId] or channelEvents[eventId].color
                     channelEvents[eventId].Filters = {}
                     for filterID, filterData in pairs(Module.tempFilterStrings[editChanID][eventId] or {}) do
@@ -1646,9 +2539,9 @@ function Module.AddChannel(editChanID, isNewChannel)
                         if tempFString == '' or tempFString == nil then tempFString = 'New' end
                         channelEvents[eventId].Filters[filterID] = {
                             filterString = tempFString,
-                            color = Module.tempFiltColors[editChanID][eventId][filterID] or { 1.0, 1.0, 1.0, 1.0, }, -- Default to white with full opacity if color not found
-                            enabled = Module.tempFilterEnabled[editChanID][eventId][filterID],
-                            hidden = Module.tempFilterHidden[editChanID][eventId][filterID],
+                            color = (Module.tempFiltColors[editChanID][eventId] and Module.tempFiltColors[editChanID][eventId][filterID]) or { 1.0, 1.0, 1.0, 1.0, },
+                            enabled = Module.tempFilterEnabled[editChanID][eventId] and Module.tempFilterEnabled[editChanID][eventId][filterID],
+                            hidden = Module.tempFilterHidden[editChanID][eventId] and Module.tempFilterHidden[editChanID][eventId][filterID],
                         }
                     end
                 end
@@ -1665,21 +2558,8 @@ function Module.AddChannel(editChanID, isNewChannel)
     end
     ImGui.SameLine()
     if ImGui.Button("DELETE Channel##" .. editChanID) then
-        -- Delete the event
-        Module.BackupSettings()
-        Module.tempSettings.Channels[editChanID] = nil
-        Module.tempEventStrings[editChanID] = nil
-        Module.tempChanColors[editChanID] = nil
-        Module.tempFiltColors[editChanID] = nil
-        Module.tempFilterStrings[editChanID] = nil
-        Module.tempFilterEnabled[editChanID] = nil
-        Module.tempFilterHidden[editChanID] = nil
-
-        isNewChannel = false
-        ResetEvents()
-        resetEvnts = true
-        Module.openEditGUI = false
-        Module.openConfigGUI = false
+        -- Defer delete to after draw loop completes
+        pendingDeleteChannel = editChanID
     end
     ImGui.SameLine()
     if ImGui.Button(' Close ##_close') then
@@ -1700,16 +2580,23 @@ function Module.AddChannel(editChanID, isNewChannel)
     ImGui.SeparatorText('Events and Filters')
     if ImGui.BeginChild("Details##") then
         ------------------------------ table -------------------------------------
-        if channelData[editChanID] ~= nil then
-            if channelData[editChanID].Events ~= nil then
-                for eventID, eventDetails in ipairs(channelData[editChanID].Events) do
+        if channelData[editChanID] ~= nil and channelData[editChanID].Events ~= nil then
+            -- Build sorted event list to avoid ipairs nil-gap issues
+            local eventIDs = {}
+            for eID, _ in pairs(channelData[editChanID].Events) do
+                table.insert(eventIDs, eID)
+            end
+            table.sort(eventIDs)
+
+            for _, eventID in ipairs(eventIDs) do
+                local eventDetails = channelData[editChanID].Events[eventID]
+                if eventDetails and eventDetails.eventString then
                     if Module.hString[eventID] == nil then Module.hString[eventID] = string.format(channelData[editChanID].Name .. ' : ' .. eventDetails.eventString) end
                     if ImGui.CollapsingHeader(Module.hString[eventID]) then
                         local contentSizeX = ImGui.GetWindowContentRegionWidth()
-                        
+
                         if ImGui.BeginChild('Events##' .. eventID, contentSizeX, 0.0, bit32.bor(ImGuiChildFlags.Borders, ImGuiChildFlags.AutoResizeY)) then
                             if ImGui.BeginTable("Channel Events##" .. editChanID, 4, bit32.bor(ImGuiTableFlags.NoHostExtendX)) then
-                                
                                 ImGui.TableSetupColumn("ID's##_", ImGuiTableColumnFlags.WidthAlwaysAutoResize, 100)
                                 ImGui.TableSetupColumn("Strings", ImGuiTableColumnFlags.WidthStretch, 150)
                                 ImGui.TableSetupColumn("Color", ImGuiTableColumnFlags.WidthFixed, 50)
@@ -1719,22 +2606,16 @@ function Module.AddChannel(editChanID, isNewChannel)
                                 ImGui.TableSetColumnIndex(0)
 
                                 if ImGui.Button('Add Filter') then
-                                    newFilter = true
-                                    if newFilter then
-                                        --printf("eID: %s", eventID )
-                                        if not channelData[editChanID].Events[eventID].Filters then
-                                            channelData[editChanID].Events[eventID].Filters = {}
-                                        end
-                                        local maxFilterId = getNextID(channelData[editChanID].Events[eventID]['Filters'])
-                                        --printf("fID: %s",maxFilterId)
-                                        channelData[editChanID]['Events'][eventID].Filters[maxFilterId] = {
-                                            ['filterString'] = 'new',
-                                            ['color'] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1, },
-                                            ['enabled'] = true,
-                                            ['hidden'] = false,
-                                        }
-                                        newFilter = false
+                                    if not channelData[editChanID].Events[eventID].Filters then
+                                        channelData[editChanID].Events[eventID].Filters = {}
                                     end
+                                    local maxFilterId = getNextID(channelData[editChanID].Events[eventID]['Filters'])
+                                    channelData[editChanID]['Events'][eventID].Filters[maxFilterId] = {
+                                        ['filterString'] = 'new',
+                                        ['color'] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1, },
+                                        ['enabled'] = true,
+                                        ['hidden'] = false,
+                                    }
                                 end
                                 if ImGui.IsItemHovered() then
                                     ImGui.BeginTooltip()
@@ -1761,27 +2642,20 @@ function Module.AddChannel(editChanID, isNewChannel)
                                 tmpString = Module.tempEventStrings[editChanID][eventID].eventString
                                 local bufferKey = editChanID .. "_" .. tostring(eventID)
                                 tmpString = ImGui.InputText("Event String##EventString" .. bufferKey, tmpString, 256)
-                                Module.hString[eventID] = Module.hString[eventID]
                                 if Module.tempEventStrings[editChanID][eventID].eventString ~= tmpString then Module.tempEventStrings[editChanID][eventID].eventString = tmpString end
 
                                 ImGui.TableSetColumnIndex(2)
 
                                 if not Module.tempChanColors[editChanID][eventID] then
-                                    Module.tempChanColors[editChanID][eventID] = eventDetails.Filters[0].color or { 1.0, 1.0, 1.0, 1.0, } -- Default to white with full opacity
+                                    local defColor = (eventDetails.Filters and eventDetails.Filters[0] and eventDetails.Filters[0].color) or { 1.0, 1.0, 1.0, 1.0, }
+                                    Module.tempChanColors[editChanID][eventID] = defColor
                                 end
-
-
 
                                 Module.tempChanColors[editChanID][eventID] = ImGui.ColorEdit4("##Color" .. bufferKey, Module.tempChanColors[editChanID][eventID], MyColorFlags)
                                 ImGui.TableSetColumnIndex(3)
                                 if ImGui.Button("Delete##" .. bufferKey) then
-                                    -- Delete the event
-                                    Module.tempSettings.Channels[editChanID].Events[eventID] = nil
-                                    Module.tempEventStrings[editChanID][eventID] = nil
-                                    Module.tempChanColors[editChanID][eventID] = nil
-                                    Module.tempFiltColors[editChanID][eventID] = nil
-                                    Module.tempFilterStrings[editChanID][eventID] = nil
-                                    ResetEvents()
+                                    -- Defer event delete to after draw loop
+                                    pendingDeleteEvent = { editChanID, eventID }
                                 end
                                 ImGui.TableNextRow()
                                 ImGui.TableSetColumnIndex(0)
@@ -1793,8 +2667,18 @@ function Module.AddChannel(editChanID, isNewChannel)
                                 ImGui.TableSetColumnIndex(3)
                                 ImGui.SeparatorText('')
                                 --------------- Filters ----------------------
-                                for filterID, filterData in ipairs(eventDetails.Filters) do
-                                    if filterID > 0 then --and filterData.filterString ~= '' then
+                                -- Build sorted filter list to avoid ipairs nil-gap issues
+                                local filterIDs = {}
+                                if eventDetails.Filters then
+                                    for fID, _ in pairs(eventDetails.Filters) do
+                                        if fID > 0 then table.insert(filterIDs, fID) end
+                                    end
+                                    table.sort(filterIDs)
+                                end
+
+                                for _, filterID in ipairs(filterIDs) do
+                                    local filterData = eventDetails.Filters[filterID]
+                                    if filterData then
                                         ImGui.TableNextRow()
                                         ImGui.TableSetColumnIndex(0)
                                         ImGui.Text("fID: %s", tostring(filterID))
@@ -1806,56 +2690,54 @@ function Module.AddChannel(editChanID, isNewChannel)
                                             Module.tempFilterStrings[editChanID][eventID][filterID] = filterData.filterString
                                         end
                                         local tempFilter = Module.tempFilterStrings[editChanID][eventID][filterID]
-                                        -- Display the filter string input field
                                         local tmpKey = string.format("%s_%s", eventID, filterID)
                                         tempFilter, _ = ImGui.InputText("Filter String##_" .. tmpKey, tempFilter)
-                                        -- Update the filter string in tempFilterStrings
                                         if Module.tempFilterStrings[editChanID][eventID][filterID] ~= tempFilter then
                                             Module.tempFilterStrings[editChanID][eventID][filterID] = tempFilter
                                         end
                                         ImGui.SameLine()
                                         if Module.tempFilterEnabled[editChanID][eventID] == nil then Module.tempFilterEnabled[editChanID][eventID] = {} end
-                                        local tmpEnabl = Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['enabled']
+                                        local tmpEnabl = filterData.enabled
                                         tmpEnabl, _ = Module.Utils.DrawToggle("Enabled##_" .. tmpKey, tmpEnabl)
-                                        if Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['enabled'] ~= tmpEnabl then
+                                        if filterData.enabled ~= tmpEnabl then
                                             Module.tempFilterEnabled[editChanID][eventID][filterID] = tmpEnabl
-                                            Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['enabled'] = tmpEnabl
+                                            filterData.enabled = tmpEnabl
+                                            if Module.tempSettings.Channels[editChanID] and Module.tempSettings.Channels[editChanID].Events[eventID]
+                                                and Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID] then
+                                                Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID].enabled = tmpEnabl
+                                            end
                                             Module.Settings = Module.tempSettings
-                                            mq.pickle(Module.SettingsFile, Module.Settings)
+                                            Module.WriteSettingsToDB()
                                         end
                                         ImGui.SameLine()
                                         if Module.tempFilterHidden[editChanID][eventID] == nil then Module.tempFilterHidden[editChanID][eventID] = {} end
-                                        local tmpHidden = Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['hidden']
+                                        local tmpHidden = filterData.hidden or false
                                         local hiddenLabel = tmpHidden and Module.Icons.FA_EYE_SLASH or Module.Icons.FA_EYE
                                         hiddenLabel = hiddenLabel .. "##_" .. tmpKey
                                         tmpHidden, _ = Module.Utils.DrawToggle(hiddenLabel, tmpHidden)
-                                        if Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['hidden'] ~= tmpHidden then
+                                        if (filterData.hidden or false) ~= tmpHidden then
                                             Module.tempFilterHidden[editChanID][eventID][filterID] = tmpHidden
-                                            Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID]['hidden'] = tmpHidden
+                                            filterData.hidden = tmpHidden
+                                            if Module.tempSettings.Channels[editChanID] and Module.tempSettings.Channels[editChanID].Events[eventID]
+                                                and Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID] then
+                                                Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID].hidden = tmpHidden
+                                            end
                                             Module.Settings = Module.tempSettings
-                                            mq.pickle(Module.SettingsFile, Module.Settings)
+                                            Module.WriteSettingsToDB()
                                         end
 
                                         ImGui.TableSetColumnIndex(2)
                                         if not Module.tempFiltColors[editChanID][eventID] then Module.tempFiltColors[editChanID][eventID] = {} end
                                         if not Module.tempFiltColors[editChanID][eventID][filterID] then
-                                            Module.tempFiltColors[editChanID][eventID][filterID] = filterData.color or
-                                                {}
+                                            Module.tempFiltColors[editChanID][eventID][filterID] = filterData.color or { 1, 1, 1, 1, }
                                         end
-                                        local tmpColor = {}
-                                        tmpColor = filterData['color']
-                                        -- Display the color picker for the filter
-                                        filterData['color'] = ImGui.ColorEdit4("##Color_" .. filterID, tmpColor, MyColorFlags)
+                                        local tmpColor = filterData.color or { 1, 1, 1, 1, }
+                                        filterData.color = ImGui.ColorEdit4("##Color_" .. filterID, tmpColor, MyColorFlags)
                                         if Module.tempFiltColors[editChanID][eventID][filterID] ~= tmpColor then Module.tempFiltColors[editChanID][eventID][filterID] = tmpColor end
                                         ImGui.TableSetColumnIndex(3)
                                         if ImGui.Button("Delete##_" .. filterID) then
-                                            -- Delete the Filter
-                                            Module.tempSettings.Channels[editChanID].Events[eventID].Filters[filterID] = nil
-                                            --printf("chanID: %s, eID: %s, fID: %s",editChanID,eventID,filterID)
-                                            Module.tempFilterStrings[editChanID][eventID][filterID] = nil
-                                            Module.tempChanColors[editChanID][eventID][filterID] = nil
-                                            Module.tempFiltColors[editChanID][eventID][filterID] = nil
-                                            ResetEvents()
+                                            -- Defer filter delete to after draw loop
+                                            pendingDeleteFilter = { editChanID, eventID, filterID }
                                         end
                                     end
                                 end
@@ -1872,22 +2754,30 @@ function Module.AddChannel(editChanID, isNewChannel)
         end
     end
     ImGui.EndChild()
-    
 end
 
 local function buildConfig()
-    lastID = 0
+    -- Build a stable sorted list of channel IDs by name
+    local configChannelIDs = {}
+    for cID, cData in pairs(Module.tempSettings.Channels) do
+        if cData then
+            table.insert(configChannelIDs, { id = cID, name = cData.Name or '' })
+        end
+    end
+    table.sort(configChannelIDs, function(a, b) return a.name < b.name end)
+
     if ImGui.BeginChild("Channels##") then
-        for channelID, channelData in pairs(Module.tempSettings.Channels) do
-            if channelID ~= lastID then
+        for _, entry in ipairs(configChannelIDs) do
+            local channelID = entry.id
+            local channelData = Module.tempSettings.Channels[channelID]
+            if channelData then
                 if ImGui.CollapsingHeader(channelData.Name) then
                     local contentSizeX = ImGui.GetWindowContentRegionWidth()
-                    
+
                     if ImGui.BeginChild('Channels##' .. channelID, contentSizeX, 0.0, bit32.bor(ImGuiChildFlags.Borders, ImGuiChildFlags.AutoResizeY, ImGuiChildFlags.AlwaysAutoResize)) then
                         -- Begin a table for events within this channel
 
                         if ImGui.BeginTable("ChannelEvents_" .. channelData.Name, 4, bit32.bor(ImGuiTableFlags.Resizable, ImGuiTableFlags.RowBg, ImGuiTableFlags.Borders)) then
-                            
                             -- Set up table columns once
                             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 50)
                             ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthAlwaysAutoResize, 100)
@@ -1896,35 +2786,41 @@ local function buildConfig()
                             -- Iterate through each event in the channel
                             local once = true
                             for eventId, eventDetails in pairs(channelData.Events) do
-                                local bufferKey = channelID .. "_" .. tostring(eventId)
-                                local name = channelData.Name
-                                local channelKey = "##ChannelName" .. channelID
-                                ImGui.TableNextRow()
-                                ImGui.TableSetColumnIndex(0)
-                                if once then
-                                    if ImGui.Button("Edit Channel##" .. bufferKey) then
-                                        editChanID = channelID
-                                        addChannel = false
-                                        Module.tempSettings = Module.Settings
-                                        Module.openEditGUI = true
-                                        Module.openConfigGUI = false
+                                if eventDetails and eventDetails.eventString then
+                                    local bufferKey = channelID .. "_" .. tostring(eventId)
+                                    ImGui.TableNextRow()
+                                    ImGui.TableSetColumnIndex(0)
+                                    if once then
+                                        if ImGui.Button("Edit Channel##" .. bufferKey) then
+                                            editChanID = channelID
+                                            addChannel = false
+                                            Module.tempSettings = Module.Settings
+                                            Module.openEditGUI = true
+                                            Module.openConfigGUI = false
+                                        end
+                                        once = false
+                                    else
+                                        ImGui.Dummy(1, 1)
                                     end
-                                    once = false
-                                else
-                                    ImGui.Dummy(1, 1)
+                                    ImGui.TableSetColumnIndex(1)
+                                    if Module.tempSettings.Channels[channelID] and Module.tempSettings.Channels[channelID].Events[eventId] then
+                                        Module.tempSettings.Channels[channelID].Events[eventId].enabled = Module.Utils.DrawToggle('Enabled##' .. eventId,
+                                            Module.tempSettings.Channels[channelID].Events[eventId].enabled)
+                                    end
+                                    ImGui.TableSetColumnIndex(2)
+                                    ImGui.Text(eventDetails.eventString)
+                                    ImGui.TableSetColumnIndex(3)
+                                    local filterColor = { 1.0, 1.0, 1.0, 1.0, }
+                                    if eventDetails.Filters and eventDetails.Filters[0] then
+                                        if not eventDetails.Filters[0].color then
+                                            eventDetails.Filters[0].color = filterColor
+                                        end
+                                        filterColor = eventDetails.Filters[0].color
+                                    end
+                                    ImGui.ColorEdit4("##Color" .. bufferKey, filterColor,
+                                        bit32.bor(ImGuiColorEditFlags.NoOptions, ImGuiColorEditFlags.NoPicker, ImGuiColorEditFlags.NoInputs, ImGuiColorEditFlags.NoTooltip,
+                                            ImGuiColorEditFlags.NoLabel))
                                 end
-                                ImGui.TableSetColumnIndex(1)
-                                Module.tempSettings.Channels[channelID].Events[eventId].enabled = Module.Utils.DrawToggle('Enabled##' .. eventId,
-                                    Module.tempSettings.Channels[channelID].Events[eventId].enabled)
-                                ImGui.TableSetColumnIndex(2)
-                                ImGui.Text(eventDetails.eventString)
-                                ImGui.TableSetColumnIndex(3)
-                                if not eventDetails.Filters[0].color then
-                                    eventDetails.Filters[0].color = { 1.0, 1.0, 1.0, 1.0, } -- Default to white with full opacity
-                                end
-                                ImGui.ColorEdit4("##Color" .. bufferKey, eventDetails.Filters[0].color,
-                                    bit32.bor(ImGuiColorEditFlags.NoOptions, ImGuiColorEditFlags.NoPicker, ImGuiColorEditFlags.NoInputs, ImGuiColorEditFlags.NoTooltip,
-                                        ImGuiColorEditFlags.NoLabel))
                             end
                             -- End the table for this channel
                             ImGui.EndTable()
@@ -1933,7 +2829,6 @@ local function buildConfig()
                     ImGui.EndChild()
                 end
             end
-            lastID = channelID
         end
     end
     ImGui.EndChild()
@@ -1947,7 +2842,6 @@ function Module.Config_GUI(open)
     open, show = ImGui.Begin("Event Configuration", open, bit32.bor(ImGuiWindowFlags.None))
     if not open then Module.openConfigGUI = false end
     if show then
-        
         -- Add a button to add a new row
         if ImGui.Button("Add Channel") then
             editChanID = getNextID(Module.Settings.Channels)
@@ -1965,18 +2859,18 @@ function Module.Config_GUI(open)
         ImGui.SameLine()
         if loadedExeternally then
             if ImGui.Button('Edit ThemeZ') then
-                if MyUI_Modules.ThemeZ ~= nil then
-                    if MyUI_Modules.ThemeZ.IsRunning then
-                        MyUI_Modules.ThemeZ.ShowGui = true
+                if MyUI.Modules.ThemeZ ~= nil then
+                    if MyUI.Modules.ThemeZ.IsRunning then
+                        MyUI.Modules.ThemeZ.ShowGui = true
                     else
-                        MyUI_TempSettings.ModuleChanged = true
-                        MyUI_TempSettings.ModuleName = 'ThemeZ'
-                        MyUI_TempSettings.ModuleEnabled = true
+                        MyUI.TempSettings.ModuleChanged = true
+                        MyUI.TempSettings.ModuleName = 'ThemeZ'
+                        MyUI.TempSettings.ModuleEnabled = true
                     end
                 else
-                    MyUI_TempSettings.ModuleChanged = true
-                    MyUI_TempSettings.ModuleName = 'ThemeZ'
-                    MyUI_TempSettings.ModuleEnabled = true
+                    MyUI.TempSettings.ModuleChanged = true
+                    MyUI.TempSettings.ModuleName = 'ThemeZ'
+                    MyUI.TempSettings.ModuleEnabled = true
                 end
             end
         end
@@ -2001,18 +2895,14 @@ function Module.Config_GUI(open)
                 mq.cmd("/msgbox 'No File Found!")
             else
                 Module.BackupSettings()
-                -- Load settings from the Lua config file
-                local newSettings = {}
+                local newSettings = dofile(tmp)
                 local newID = getNextID(Module.tempSettings.Channels)
 
-                newSettings = dofile(tmp)
-                -- print(tostring(cleanImport))
                 if not cleanImport and lastImport ~= tmp then
                     for cID, cData in pairs(newSettings.Channels) do
                         for existingCID, existingCData in pairs(Module.tempSettings.Channels) do
                             if existingCData.Name == cData.Name then
-                                local newName = cData.Name .. '_NEW'
-                                cData.Name = newName
+                                cData.Name = cData.Name .. '_NEW'
                             end
                         end
                         Module.tempSettings.Channels[newID] = cData
@@ -2024,6 +2914,108 @@ function Module.Config_GUI(open)
                 end
                 lastImport = tmp
                 ResetEvents()
+            end
+        end
+        ImGui.SameLine()
+        if ImGui.Button('Import as New Preset') then
+            local tmp = mq.configDir .. '/MyUI/MyChat/' .. importFile
+            if not Module.Utils.File.Exists(tmp) then
+                mq.cmd("/msgbox 'No File Found!")
+            else
+                local importedSettings = dofile(tmp)
+                if importedSettings and importedSettings.Channels then
+                    local presetName = importFile:gsub('%.lua$', ''):gsub('[/\\]', '_')
+                    Module.MigratePickleToDB(importedSettings, presetName)
+                    Module.GetPresetList()
+                end
+            end
+        end
+
+        if ImGui.CollapsingHeader("Preset Management##Header") then
+            ImGui.SeparatorText('Active Preset')
+            ImGui.Text('Current: %s', Module.ActivePresetName or 'None')
+            if Module.ActivePresetID then
+                ImGui.SameLine()
+                ImGui.Text('(ID: %d)', Module.ActivePresetID)
+            end
+
+            ImGui.SeparatorText('Load Preset')
+            local presets = Module.GetPresetList()
+            if #presets > 0 then
+                if ImGui.BeginCombo('##PresetCombo', Module.ActivePresetName or 'Select...') then
+                    for _, preset in ipairs(presets) do
+                        local isActive = preset.id == Module.ActivePresetID
+                        local label = preset.name
+                        if preset.server ~= Module.Server then
+                            label = label .. ' [' .. preset.server .. ']'
+                        end
+                        if isActive then label = label .. ' (active)' end
+                        if ImGui.Selectable(label .. '##conf_' .. preset.id, isActive) then
+                            if not isActive then
+                                Module.SwitchPreset(preset.id)
+                                Module.tempSettings = Module.Settings
+                            end
+                        end
+                        if ImGui.IsItemHovered() then
+                            ImGui.BeginTooltip()
+                            ImGui.Text('Created by: ' .. preset.created_by)
+                            ImGui.Text('Created: ' .. preset.created_at)
+                            ImGui.EndTooltip()
+                        end
+                    end
+                    ImGui.EndCombo()
+                end
+            else
+                ImGui.Text('No presets found.')
+            end
+
+            ImGui.SeparatorText('Save / Copy / Delete')
+            -- Save As New Preset
+            newPresetName = ImGui.InputText('New Preset Name##ConfPresetName', newPresetName, 256)
+            if ImGui.Button('Save As New Preset##Conf') then
+                if newPresetName ~= '' then
+                    local newID = Module.SaveAsNewPreset(newPresetName)
+                    if newID then
+                        newPresetName = ''
+                    end
+                end
+            end
+            ImGui.SameLine()
+            -- Rename
+            if ImGui.Button('Rename Current##Conf') then
+                if newPresetName ~= '' and Module.ActivePresetID then
+                    Module.RenamePreset(Module.ActivePresetID, newPresetName)
+                    newPresetName = ''
+                end
+            end
+
+            -- Copy / Delete other presets
+            if #presets > 1 then
+                ImGui.Spacing()
+                for _, preset in ipairs(presets) do
+                    if preset.id ~= Module.ActivePresetID then
+                        local displayName = preset.name
+                        if preset.server ~= Module.Server then
+                            displayName = displayName .. ' [' .. preset.server .. ']'
+                        end
+                        ImGui.Text(displayName)
+                        ImGui.SameLine()
+                        if ImGui.Button('Copy##conf_copy_' .. preset.id) then
+                            Module.CopyPreset(preset.id, preset.name .. '_copy')
+                            Module.GetPresetList()
+                        end
+                        ImGui.SameLine()
+                        if ImGui.Button('Load##conf_load_' .. preset.id) then
+                            Module.SwitchPreset(preset.id)
+                            Module.tempSettings = Module.Settings
+                        end
+                        ImGui.SameLine()
+                        if ImGui.Button('Delete##conf_del_' .. preset.id) then
+                            Module.DeletePreset(preset.id)
+                            Module.GetPresetList()
+                        end
+                    end
+                end
             end
         end
 
@@ -2063,17 +3055,10 @@ function Module.Config_GUI(open)
             writeSettings(Module.SettingsFile, Module.Settings)
         end
         ImGui.SeparatorText('Channels and Events Overview')
-        table.sort(Module.tempSettings.Channels, function(a, b)
-            if a ~= nil and b ~= nil then
-                return a.Name < b.Name
-            else
-                return false
-            end
-        end)
         buildConfig()
     end
     Module.ThemeLoader.EndTheme(ColorCountConf, StyleCountConf)
-    
+
     ImGui.End()
 end
 
@@ -2087,8 +3072,6 @@ function Module.Edit_GUI(open)
     open, showEdit = ImGui.Begin("Channel Editor", open, bit32.bor(ImGuiWindowFlags.None))
     if not open then Module.openEditGUI = false end
     if showEdit then
-        
-
         if addChannel then Module.createExternConsole(string.format("New Channel %s", editChanID)) end
         Module.AddChannel(editChanID, addChannel)
 
@@ -2101,7 +3084,7 @@ function Module.Edit_GUI(open)
             editEventID = 0
         end
     end
-    
+
     Module.ThemeLoader.EndTheme(ColorCountEdit, StyleCountEdit)
     ImGui.End()
 end
@@ -2168,7 +3151,6 @@ function Module.ExecCommand(text)
         Module.console:AppendText(IM_COL32(128, 128, 128), "> %s", text)
     end
 
-    -- todo: implement history
     if string.len(text) > 0 then
         text = Module.StringTrim(text)
         if text == 'clear' then
@@ -2203,7 +3185,6 @@ function Module.ChannelExecCommand(text, channelID)
     end
 
     eChan = '/say'
-    -- todo: implement history
     if string.len(text) > 0 then
         text = Module.StringTrim(text)
         if text == 'clear' then
@@ -2237,6 +3218,13 @@ function Module.createExternConsole(name)
         end
     end
     local newID = getNextID(Module.Settings.Channels)
+    -- Place new channel at the end of the tab order
+    local maxOrder = 0
+    for _, v in pairs(Module.Settings.Channels) do
+        if v and v.TabOrder and v.TabOrder < 9000 and v.TabOrder > maxOrder then
+            maxOrder = v.TabOrder
+        end
+    end
     Module.Settings.Channels[newID] = {
         ['enabled'] = true,
         ['Name'] = name,
@@ -2246,6 +3234,7 @@ function Module.createExternConsole(name)
         ['PopOut'] = false,
         ['look'] = false,
         ['EnableLinks'] = true,
+        ['TabOrder'] = maxOrder + 1,
         ['commandBuffer'] = "",
         ['Events'] = {
             [1] = {
@@ -2289,42 +3278,82 @@ end
 function Module.SortChannels()
     sortedChannels = {}
     for k, v in pairs(Module.Settings.Channels) do
-        table.insert(sortedChannels, { k, v.Name, })
+        if v then
+            table.insert(sortedChannels, { k, v.Name, v.TabOrder or 999 })
+        end
     end
 
-    -- Sort function to first sort by numeric prefixes (if the first word is a number),
-    -- then sort alphabetically for non-numeric names
+    -- Sort by TabOrder (lower = further left), then alphabetically as tiebreaker
     table.sort(sortedChannels, function(a, b)
-        -- Extract the first word from both names
-        local firstWordA = a[2]:match("^%S+")
-        local firstWordB = b[2]:match("^%S+")
-
-        -- Check if the first word is a number
-        local aIsNumeric = tonumber(firstWordA) ~= nil
-        local bIsNumeric = tonumber(firstWordB) ~= nil
-
-        if aIsNumeric and bIsNumeric then
-            -- Both are numeric, so sort by numeric value
-            return tonumber(firstWordA) < tonumber(firstWordB)
-        elseif aIsNumeric ~= bIsNumeric then
-            -- One is numeric, one is not; numeric comes first
-            return aIsNumeric
-        else
-            -- Neither are numeric, sort alphabetically
-            return a[2] < b[2]
+        if a[3] ~= b[3] then
+            return a[3] < b[3]
         end
+        return a[2] < b[2]
     end)
+end
+
+---Swaps two channels' TabOrder values and re-sorts
+---@param channelID integer -- the channel to move
+---@param direction string -- 'left' or 'right'
+function Module.MoveTab(channelID, direction)
+    -- Find current position in sortedChannels
+    local curIdx = nil
+    for i, entry in ipairs(sortedChannels) do
+        if entry[1] == channelID then
+            curIdx = i
+            break
+        end
+    end
+    if not curIdx then return end
+
+    local swapIdx = nil
+    if direction == 'left' then
+        -- Find the nearest visible, non-popped-out channel to the left
+        for i = curIdx - 1, 1, -1 do
+            local sid = sortedChannels[i][1]
+            if Module.Settings.Channels[sid] and Module.Settings.Channels[sid].enabled
+                and not Module.Settings.Channels[sid].PopOut then
+                swapIdx = i
+                break
+            end
+        end
+    elseif direction == 'right' then
+        -- Find the nearest visible, non-popped-out channel to the right
+        for i = curIdx + 1, #sortedChannels do
+            local sid = sortedChannels[i][1]
+            if Module.Settings.Channels[sid] and Module.Settings.Channels[sid].enabled
+                and not Module.Settings.Channels[sid].PopOut then
+                swapIdx = i
+                break
+            end
+        end
+    end
+
+    if not swapIdx then return end
+
+    -- Swap TabOrder values
+    local curChanID = sortedChannels[curIdx][1]
+    local swapChanID = sortedChannels[swapIdx][1]
+    local tmpOrder = Module.Settings.Channels[curChanID].TabOrder
+    Module.Settings.Channels[curChanID].TabOrder = Module.Settings.Channels[swapChanID].TabOrder
+    Module.Settings.Channels[swapChanID].TabOrder = tmpOrder
+    Module.tempSettings = Module.Settings
+    writeSettings(Module.SettingsFile, Module.Settings)
+    Module.SortChannels()
 end
 
 function Module.Unload()
     for eventName, _ in pairs(Module.eventNames) do
         mq.unevent(eventName)
     end
-    MyUI_MyChatLoaded = false
-    MyUI_MyChatHandler = nil
+    if MyUI ~= nil then
+        MyUI.MyChatLoaded = false
+        MyUI.MyChatHandler = nil
+    end
 end
 
 local function init()
+    Module.InitDB()
     if not Module.Utils.File.Exists(Module.Logtouch) then
         mq.pickle(Module.Logtouch, { touched = true, })
     end
@@ -2334,7 +3363,6 @@ local function init()
     -- initialize the console
     if Module.console == nil then
         Module.console = zep.Console.new("Chat##Console")
-        -- Module.console.fontSize = Module.Settings.MainFontSize or 16
         mainBuffer = {
             [1] = {
                 color = { [1] = 1, [2] = 1, [3] = 1, [4] = 1, },
@@ -2345,6 +3373,7 @@ local function init()
 
     Module.console:AppendText("\ay[\aw%s\ay]\at Welcome to \agMyChat!", mq.TLO.Time())
     Module.SortChannels()
+    Module.GetPresetList()
     Module.IsRunning = true
 
     if not loadedExeternally then
@@ -2355,11 +3384,11 @@ end
 
 function Module.MainLoop()
     if loadedExeternally then
-        MyUI_TempSettings.MyChatWinName = string.format('My Chat - Main')
-        MyUI_TempSettings.MyChatFocusKey = Module.Settings.keyName
-        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then
-            MyUI_TempSettings.MyChatWinName = nil
-            MyUI_TempSettings.MyChatFocusKey = nil
+        MyUI.TempSettings.MyChatWinName = string.format('My Chat - Main')
+        MyUI.TempSettings.MyChatFocusKey = Module.Settings.keyName
+        if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then
+            MyUI.TempSettings.MyChatWinName = nil
+            MyUI.TempSettings.MyChatFocusKey = nil
             return
         end
     end
@@ -2394,6 +3423,15 @@ function Module.MainLoop()
     end
 
     mq.doevents()
+
+    -- Periodic cleanup of claimed lines to prevent memory growth
+    local now = os.clock()
+    for k, t in pairs(claimedLinesTTL) do
+        if now - t > CLAIMED_TTL then
+            claimedLines[k] = nil
+            claimedLinesTTL[k] = nil
+        end
+    end
 end
 
 function Module.LocalLoop()
@@ -2401,11 +3439,14 @@ function Module.LocalLoop()
         Module.MainLoop()
         mq.delay(1)
     end
+    Module.Unload()
 end
 
 init()
 
-MyUI_MyChatLoaded = true
-MyUI_MyChatHandler = Module.MyChatHandler
+if MyUI ~= nil then
+    MyUI.MyChatLoaded = true
+    MyUI.MyChatHandler = Module.MyChatHandler
+end
 
 return Module

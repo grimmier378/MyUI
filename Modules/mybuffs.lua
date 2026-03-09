@@ -34,7 +34,7 @@ Module.iconSize         = 24
 Module.NumBuffs         = 0
 Module.MyGroupLeader    = mq.TLO.Group.Leader() or 'NoGroup'
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+local loadedExeternally = MyUI ~= nil and true or false
 if not loadedExeternally then
     Module.Utils       = require('lib.common')
     Module.Actor       = require('actors')
@@ -47,17 +47,17 @@ if not loadedExeternally then
     Module.ThemeLoader = require('lib.theme_loader')
     Module.ProgressBar = require('lib.ProgressBar')
 else
-    Module.Utils = MyUI_Utils
-    Module.Actor = MyUI_Actor
-    Module.CharLoaded = MyUI_CharLoaded
-    Module.Mode = MyUI_Mode
-    Module.Icons = MyUI_Icons
-    Module.Server = MyUI_Server
-    Module.ThemeFile = MyUI_ThemeFile
-    Module.Theme = MyUI_Theme
-    Module.ThemeLoader = MyUI_ThemeLoader
-    Module.Path = MyUI_Path
-    Module.ProgressBar = MyUI_ProgressBar
+    Module.Utils = MyUI.Utils
+    Module.Actor = MyUI.Actor
+    Module.CharLoaded = MyUI.CharLoaded
+    Module.Mode = MyUI.Mode
+    Module.Icons = MyUI.Icons
+    Module.Server = MyUI.Server
+    Module.ThemeFile = MyUI.ThemeFile
+    Module.Theme = MyUI.Theme
+    Module.ThemeLoader = MyUI.ThemeLoader
+    Module.Path = MyUI.Path
+    Module.ProgressBar = MyUI.ProgressBar
 end
 local Utils                            = Module.Utils
 local ToggleFlags                      = bit32.bor(
@@ -488,9 +488,9 @@ local function GetBuffs()
             end
         end
     else
-        Module.buffTable = MyUI_MyData.Buffs
-        debuffOnMe       = MyUI_MyData.DebuffsOnMe
-        Module.songTable = MyUI_MyData.Songs
+        Module.buffTable = MyUI.MyData.Buffs
+        debuffOnMe       = MyUI.MyData.DebuffsOnMe
+        Module.songTable = MyUI.MyData.Songs
         for _, v in pairs(Module.buffTable) do
             if v.Name ~= '' then
                 Module.TempSettings.MyBuffsNames[v.Name] = true
@@ -1567,18 +1567,18 @@ function Module.RenderGUI()
                 ImGui.SameLine()
                 if loadedExeternally then
                     if ImGui.Button('Edit ThemeZ') then
-                        if MyUI_Modules.ThemeZ ~= nil then
-                            if MyUI_Modules.ThemeZ.IsRunning then
-                                MyUI_Modules.ThemeZ.ShowGui = true
+                        if MyUI.Modules.ThemeZ ~= nil then
+                            if MyUI.Modules.ThemeZ.IsRunning then
+                                MyUI.Modules.ThemeZ.ShowGui = true
                             else
-                                MyUI_TempSettings.ModuleChanged = true
-                                MyUI_TempSettings.ModuleName = 'ThemeZ'
-                                MyUI_TempSettings.ModuleEnabled = true
+                                MyUI.TempSettings.ModuleChanged = true
+                                MyUI.TempSettings.ModuleName = 'ThemeZ'
+                                MyUI.TempSettings.ModuleEnabled = true
                             end
                         else
-                            MyUI_TempSettings.ModuleChanged = true
-                            MyUI_TempSettings.ModuleName = 'ThemeZ'
-                            MyUI_TempSettings.ModuleEnabled = true
+                            MyUI.TempSettings.ModuleChanged = true
+                            MyUI.TempSettings.ModuleName = 'ThemeZ'
+                            MyUI.TempSettings.ModuleEnabled = true
                         end
                     end
                 end
@@ -2145,7 +2145,7 @@ end
 function Module.MainLoop()
     if loadedExeternally then
         ---@diagnostic disable-next-line: undefined-global
-        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+        if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
     Module.MyGroupLeader = mq.TLO.Group.Leader() or 'NoGroup'
     if Module.TempSettings.NewFav ~= nil then

@@ -12,7 +12,7 @@ Module.Name = 'PlayerTarg'
 Module.IsRunning = false
 
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+local loadedExeternally = MyUI ~= nil and true or false
 
 if not loadedExeternally then
     Module.Utils = require('lib.common')
@@ -25,15 +25,15 @@ if not loadedExeternally then
     Module.ThemeLoader = require('lib.theme_loader')
     Module.ProgressBar = require('lib.progressBars')
 else
-    Module.Utils = MyUI_Utils
-    Module.Icons = MyUI_Icons
-    Module.Colors = MyUI_Colors
-    Module.CharLoaded = MyUI_CharLoaded
-    Module.Server = MyUI_Server
-    Module.ThemeFile = MyUI_ThemeFile
-    Module.Theme = MyUI_Theme
-    Module.ThemeLoader = MyUI_ThemeLoader
-    Module.ProgressBar = MyUI_ProgressBar
+    Module.Utils = MyUI.Utils
+    Module.Icons = MyUI.Icons
+    Module.Colors = MyUI.Colors
+    Module.CharLoaded = MyUI.CharLoaded
+    Module.Server = MyUI.Server
+    Module.ThemeFile = MyUI.ThemeFile
+    Module.Theme = MyUI.Theme
+    Module.ThemeLoader = MyUI.ThemeLoader
+    Module.ProgressBar = MyUI.ProgressBar
 end
 local Utils                                         = Module.Utils
 local ToggleFlags                                   = bit32.bor(
@@ -94,7 +94,7 @@ local defaults, settings, themeRowBG, themeBorderBG = {}, {}, {}, {}
 themeRowBG                                          = { 1, 1, 1, 0, }
 themeBorderBG                                       = { 1, 1, 1, 1, }
 
-local MySelf = {}
+local MySelf                                        = {}
 defaults                                            = {
     Scale = 1.0,
     LoadTheme = 'Default',
@@ -127,6 +127,11 @@ defaults                                            = {
     DynamicHP = false,
     DynamicMP = false,
     DynamicEnd = false,
+    GradientHP = false,
+    GradientMP = false,
+    GradientEnd = false,
+    GradientTargetHP = false,
+    GradientToTHP = false,
     FlashBorder = true,
     MouseOver = false,
     WinTransparency = 1.0,
@@ -553,7 +558,7 @@ local function drawBar(opts)
     local colorMax     = opts.colorMax
 
     if fontScale then
-        
+
     end
 
     local initialPosition = ImGui.GetCursorScreenPosVec()
@@ -574,7 +579,7 @@ local function drawBar(opts)
     if not dynamicColor then
         useColMin, useColMax = staticColor, staticColor
     end
-    defOpts.fillGradient = settings[Module.Name].fillGradient == true
+    defOpts.fillGradient = opts.fillGradient or false
     defOpts.fillGradientDir = settings[Module.Name].fillGradientDir or ImGradientDir.Horizontal
     defOpts.showTicks = settings[Module.Name].ShowTicks == true
     defOpts.tickEvery = settings[Module.Name].TickPct ~= nil and (settings[Module.Name].TickPct / 100) or 0.2
@@ -636,7 +641,6 @@ local function drawBar(opts)
 
     if fontScale then
         -- Assume previous font scale value was 1. Appears to be no getter.
-        
     end
 end
 
@@ -661,21 +665,21 @@ local function getMyStatus()
         Class = mq.TLO.Me.Class.Name() or '',
         Poisoned = mq.TLO.Me.Poisoned() or false,
         Cursed = mq.TLO.Me.Cursed() or false,
-         Diseased = mq.TLO.Me.Diseased() or false,  
-         Corrupted = mq.TLO.Me.Corrupted() or false,
-         Dotted = mq.TLO.Me.Dotted() or false,
-         CombatState = mq.TLO.Me.CombatState() or "UNKNOWN",
-         GroupMainTank = mq.TLO.Group.MainTank.ID() or 0,
-         GroupMainAssist = mq.TLO.Group.MainAssist.ID() or 0,
-         GroupPuller = mq.TLO.Group.Puller.ID() or 0,
-         GroupLeader = mq.TLO.Group.Leader.ID() or 0,
-         Heading = mq.TLO.Me.Heading() or "??",
-         -- active disc
-         --[[mq.TLO.Me.ActiveDisc()
+        Diseased = mq.TLO.Me.Diseased() or false,
+        Corrupted = mq.TLO.Me.Corrupted() or false,
+        Dotted = mq.TLO.Me.Dotted() or false,
+        CombatState = mq.TLO.Me.CombatState() or "UNKNOWN",
+        GroupMainTank = mq.TLO.Group.MainTank.ID() or 0,
+        GroupMainAssist = mq.TLO.Group.MainAssist.ID() or 0,
+        GroupPuller = mq.TLO.Group.Puller.ID() or 0,
+        GroupLeader = mq.TLO.Group.Leader.ID() or 0,
+        Heading = mq.TLO.Me.Heading() or "??",
+        -- active disc
+        --[[mq.TLO.Me.ActiveDisc()
         lastActiveDiscTotalSeconds = mq.TLO.Me.ActiveDisc.Duration.TotalSeconds()]]
         ActiveDisc = mq.TLO.Me.ActiveDisc() ~= nil or false,
         ActiveDiscName = mq.TLO.Me.ActiveDisc.Name() or '',
-        ActiveDiscDuration = mq.TLO.Me.ActiveDisc.Duration.TotalSeconds() or 0,    
+        ActiveDiscDuration = mq.TLO.Me.ActiveDisc.Duration.TotalSeconds() or 0,
     }
 end
 
@@ -761,6 +765,7 @@ function Module.RenderTargetOfTarget()
             centerText   = text,
             centerColor  = targetTextColor,
 
+            fillGradient = settings[Module.Name].GradientToTHP,
             staticColor  = staticColor,
             dynamicColor = settings[Module.Name].DynamicToTHP,
             colorMin     = ImColor(colorToTHpMin),
@@ -781,7 +786,6 @@ local function PlayerTargConf_GUI()
 
     if not open then openConfigGUI = false end
     if showConfigGUI then
-        
         ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(1, 0.4, 0.4, 0.9))
         if ImGui.Button("Reset Defaults") then
             settings = dofile(configFile)
@@ -822,18 +826,18 @@ local function PlayerTargConf_GUI()
             ImGui.SameLine()
             if loadedExeternally then
                 if ImGui.Button('Edit ThemeZ') then
-                    if MyUI_Modules.ThemeZ ~= nil then
-                        if MyUI_Modules.ThemeZ.IsRunning then
-                            MyUI_Modules.ThemeZ.ShowGui = true
+                    if MyUI.Modules.ThemeZ ~= nil then
+                        if MyUI.Modules.ThemeZ.IsRunning then
+                            MyUI.Modules.ThemeZ.ShowGui = true
                         else
-                            MyUI_TempSettings.ModuleChanged = true
-                            MyUI_TempSettings.ModuleName = 'ThemeZ'
-                            MyUI_TempSettings.ModuleEnabled = true
+                            MyUI.TempSettings.ModuleChanged = true
+                            MyUI.TempSettings.ModuleName = 'ThemeZ'
+                            MyUI.TempSettings.ModuleEnabled = true
                         end
                     else
-                        MyUI_TempSettings.ModuleChanged = true
-                        MyUI_TempSettings.ModuleName = 'ThemeZ'
-                        MyUI_TempSettings.ModuleEnabled = true
+                        MyUI.TempSettings.ModuleChanged = true
+                        MyUI.TempSettings.ModuleName = 'ThemeZ'
+                        MyUI.TempSettings.ModuleEnabled = true
                     end
                 end
             end
@@ -903,51 +907,67 @@ local function PlayerTargConf_GUI()
         ImGui.Spacing()
 
         if ImGui.CollapsingHeader("Dynamic Bar Colors##" .. Module.Name) then
-            ImGui.SeparatorText("Self")
-            settings[Module.Name].DynamicHP = Module.Utils.DrawToggle('Dynamic HP Bar', settings[Module.Name].DynamicHP, ToggleFlags)
-            ImGui.SameLine()
-            ImGui.SetNextItemWidth(60)
-            colorHpMin = ImGui.ColorEdit4("HP Min Color##" .. Module.Name, colorHpMin, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
-            ImGui.SameLine()
-            ImGui.SetNextItemWidth(60)
-            colorHpMax = ImGui.ColorEdit4("HP Max Color##" .. Module.Name, colorHpMax, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
+            if ImGui.BeginTable("DynamicColors##" .. Module.Name, 4, ImGuiTableFlags.BordersInner) then
+                ImGui.TableNextRow()
+                ImGui.TableNextColumn()
+                settings[Module.Name].DynamicHP = Module.Utils.DrawToggle('Dynamic HP Bar', settings[Module.Name].DynamicHP, ToggleFlags)
+                ImGui.TableNextColumn()
+                ImGui.SetNextItemWidth(60)
+                colorHpMin = ImGui.ColorEdit4("HP Min Color##" .. Module.Name, colorHpMin, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
+                ImGui.TableNextColumn()
+                ImGui.SetNextItemWidth(60)
+                colorHpMax = ImGui.ColorEdit4("HP Max Color##" .. Module.Name, colorHpMax, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
+                ImGui.TableNextColumn()
+                settings[Module.Name].GradientHP = Module.Utils.DrawToggle('Gradient HP Bar', settings[Module.Name].GradientHP, ToggleFlags)
 
-            settings[Module.Name].DynamicMP = Module.Utils.DrawToggle('Dynamic Mana Bar', settings[Module.Name].DynamicMP, ToggleFlags)
-            ImGui.SameLine()
-            ImGui.SetNextItemWidth(60)
-            colorMpMin = ImGui.ColorEdit4("Mana Min Color##" .. Module.Name, colorMpMin, bit32.bor(ImGuiColorEditFlags.NoInputs))
-            ImGui.SameLine()
-            ImGui.SetNextItemWidth(60)
-            colorMpMax = ImGui.ColorEdit4("Mana Max Color##" .. Module.Name, colorMpMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
+                ImGui.TableNextColumn()
+                settings[Module.Name].DynamicMP = Module.Utils.DrawToggle('Dynamic Mana Bar', settings[Module.Name].DynamicMP, ToggleFlags)
+                ImGui.TableNextColumn()
+                ImGui.SetNextItemWidth(60)
+                colorMpMin = ImGui.ColorEdit4("Mana Min Color##" .. Module.Name, colorMpMin, bit32.bor(ImGuiColorEditFlags.NoInputs))
+                ImGui.TableNextColumn()
+                ImGui.SetNextItemWidth(60)
+                colorMpMax = ImGui.ColorEdit4("Mana Max Color##" .. Module.Name, colorMpMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
+                ImGui.TableNextColumn()
+                settings[Module.Name].GradientMP = Module.Utils.DrawToggle('Gradient Mana Bar', settings[Module.Name].GradientMP, ToggleFlags)
 
-            settings[Module.Name].DynamicEnd = Module.Utils.DrawToggle('Dynamic Endurance Bar', settings[Module.Name].DynamicEnd, ToggleFlags)
-            ImGui.SameLine()
-            ImGui.SetNextItemWidth(60)
-            colorEndMin = ImGui.ColorEdit4("Endurance Min Color##" .. Module.Name, colorEndMin, bit32.bor(ImGuiColorEditFlags.NoInputs))
-            ImGui.SameLine()
-            ImGui.SetNextItemWidth(60)
-            colorEndMax = ImGui.ColorEdit4("Endurance Max Color##" .. Module.Name, colorEndMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
+                ImGui.TableNextColumn()
+                settings[Module.Name].DynamicEnd = Module.Utils.DrawToggle('Dynamic Endurance Bar', settings[Module.Name].DynamicEnd, ToggleFlags)
+                ImGui.TableNextColumn()
+                ImGui.SetNextItemWidth(60)
+                colorEndMin = ImGui.ColorEdit4("Endurance Min Color##" .. Module.Name, colorEndMin, bit32.bor(ImGuiColorEditFlags.NoInputs))
+                ImGui.TableNextColumn()
+                ImGui.SetNextItemWidth(60)
+                colorEndMax = ImGui.ColorEdit4("Endurance Max Color##" .. Module.Name, colorEndMax, bit32.bor(ImGuiColorEditFlags.NoInputs))
+                ImGui.TableNextColumn()
+                settings[Module.Name].GradientEnd = Module.Utils.DrawToggle('Gradient Endurance Bar', settings[Module.Name].GradientEnd, ToggleFlags)
 
-            ImGui.SeparatorText("Target")
+                ImGui.TableNextColumn()
+                settings[Module.Name].DynamicTargetHP = Module.Utils.DrawToggle('Dynamic Target HP Bar', settings[Module.Name].DynamicTargetHP, ToggleFlags)
+                ImGui.TableNextColumn()
+                ImGui.SetNextItemWidth(60)
+                colorTargetHpMin = ImGui.ColorEdit4("Target HP Min Color##" .. Module.Name, colorTargetHpMin, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
+                ImGui.TableNextColumn()
+                ImGui.SetNextItemWidth(60)
+                colorTargetHpMax = ImGui.ColorEdit4("Target HP Max Color##" .. Module.Name, colorTargetHpMax, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
+                ImGui.TableNextColumn()
+                settings[Module.Name].GradientTargetHP = Module.Utils.DrawToggle('Gradient Target HP Bar', settings[Module.Name].GradientTargetHP, ToggleFlags)
 
-            settings[Module.Name].DynamicTargetHP = Module.Utils.DrawToggle('Dynamic Target HP Bar', settings[Module.Name].DynamicTargetHP, ToggleFlags)
-            ImGui.SameLine()
-            ImGui.SetNextItemWidth(60)
-            colorTargetHpMin = ImGui.ColorEdit4("Target HP Min Color##" .. Module.Name, colorTargetHpMin, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
-            ImGui.SameLine()
-            ImGui.SetNextItemWidth(60)
-            colorTargetHpMax = ImGui.ColorEdit4("Target HP Max Color##" .. Module.Name, colorTargetHpMax, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
+                ImGui.TableNextColumn()
+                settings[Module.Name].DynamicToTHP = Module.Utils.DrawToggle('Dynamic Target of Target HP Bar', settings[Module.Name].DynamicToTHP, ToggleFlags)
+                ImGui.TableNextColumn()
+                ImGui.SetNextItemWidth(60)
+                colorToTHpMin = ImGui.ColorEdit4("Target of Target HP Min Color##" .. Module.Name, colorToTHpMin,
+                    bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
+                ImGui.TableNextColumn()
+                ImGui.SetNextItemWidth(60)
+                colorToTHpMax = ImGui.ColorEdit4("Target of Target HP Max Color##" .. Module.Name, colorToTHpMax,
+                    bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
+                ImGui.TableNextColumn()
+                settings[Module.Name].GradientToTHP = Module.Utils.DrawToggle('Gradient Target of Target HP Bar', settings[Module.Name].GradientToTHP, ToggleFlags)
 
-            ImGui.SeparatorText("Target of Target")
-
-            settings[Module.Name].DynamicToTHP = Module.Utils.DrawToggle('Dynamic Target of Target HP Bar', settings[Module.Name].DynamicToTHP, ToggleFlags)
-            ImGui.SameLine()
-            ImGui.SetNextItemWidth(60)
-            colorToTHpMin = ImGui.ColorEdit4("Target of Target HP Min Color##" .. Module.Name, colorToTHpMin, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
-            ImGui.SameLine()
-            ImGui.SetNextItemWidth(60)
-            colorToTHpMax = ImGui.ColorEdit4("Target of Target HP Max Color##" .. Module.Name, colorToTHpMax, bit32.bor(ImGuiColorEditFlags.AlphaBar, ImGuiColorEditFlags.NoInputs))
-
+                ImGui.EndTable()
+            end
 
             ImGui.SeparatorText("Bar Options")
             settings[Module.Name].ShimmerEfx, changed = Module.Utils.DrawToggle('Shimmer Effect##' .. Module.Name, settings[Module.Name].ShimmerEfx, ToggleFlags)
@@ -1109,7 +1129,7 @@ local function PlayerTargConf_GUI()
     end
 
     Module.ThemeLoader.EndTheme(ColorCountConf, StyleCountConf)
-    
+
     ImGui.End()
 end
 
@@ -1225,6 +1245,7 @@ local function drawTarget(prependSeparator)
             rightText2   = tRace,
             rightColor2  = targetTextColor,
 
+            fillGradient = settings[Module.Name].GradientTargetHP,
             staticColor  = staticColor,
             dynamicColor = settings[Module.Name].DynamicTargetHP,
             colorMin     = ImColor(colorTargetHpMin),
@@ -1255,22 +1276,23 @@ local function drawTarget(prependSeparator)
             end
 
             drawBar({
-                label       = '##pctAggro',
-                percentage  = percentage,
-                width       = ImGui.GetContentRegionAvail(),
-                height      = progressSizeAggro,
+                label        = '##pctAggro',
+                percentage   = percentage,
+                width        = ImGui.GetContentRegionAvail(),
+                height       = progressSizeAggro,
 
-                dropShadow  = true,
-                fontScale   = FontScale,
+                dropShadow   = true,
+                fontScale    = FontScale,
 
-                leftText    = secondaryAggroPlayer,
-                leftColor   = targetTextColor,
-                centerText  = tostring(percentage) .. "%",
-                centerColor = targetTextColor,
-                rightText   = secondaryAggroPercentage,
-                rightColor  = targetTextColor,
+                leftText     = secondaryAggroPlayer,
+                leftColor    = targetTextColor,
+                centerText   = tostring(percentage) .. "%",
+                centerColor  = targetTextColor,
+                rightText    = secondaryAggroPercentage,
+                rightColor   = targetTextColor,
 
-                staticColor = ImColor(staticColor),
+                fillGradient = false,
+                staticColor  = ImColor(staticColor),
             })
             -- ImGui.EndGroup()
         end
@@ -1400,9 +1422,9 @@ function Module.RenderGUI()
                 -- Name
 
                 ImGui.TableSetColumnIndex(0)
-                
+
                 ImGui.Text(" %s", MySelf.Name)
-                
+
                 if MySelf.Poisoned and MySelf.Diseased then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
                     Module.Utils.DrawStatusIcon(2579, 'item', 'Diseased and Posioned', iconSize)
@@ -1439,13 +1461,11 @@ function Module.RenderGUI()
                 -- Visiblity
                 ImGui.TableSetColumnIndex(1)
                 if target() ~= nil then
-                    
                     if target.LineOfSight() then
                         ImGui.TextColored(ImVec4(0, 1, 0, 1), Module.Icons.MD_VISIBILITY)
                     else
                         ImGui.TextColored(ImVec4(0.9, 0, 0, 1), Module.Icons.MD_VISIBILITY_OFF)
                     end
-                    
                 end
 
                 -- Icons
@@ -1468,7 +1488,7 @@ function Module.RenderGUI()
                 --  ImGui.SameLine()
                 ImGui.Text(' ')
                 ImGui.SameLine()
-                
+
                 ImGui.Text(MySelf.Heading or '??')
                 ImGui.PopStyleVar()
                 -- Lvl
@@ -1476,7 +1496,7 @@ function Module.RenderGUI()
                 ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 2, 0)
 
                 ImGui.Text(tostring(MySelf.Level or 0))
-                
+
                 if ImGui.IsItemHovered() then
                     ImGui.SetTooltip(GetInfoToolTip())
                 end
@@ -1522,6 +1542,7 @@ function Module.RenderGUI()
                 centerText   = text,
                 centerColor  = targetTextColor,
 
+                fillGradient = settings[Module.Name].GradientHP,
                 staticColor  = staticColor,
                 dynamicColor = settings[Module.Name].DynamicHP,
                 colorMin     = ImColor(colorHpMin),
@@ -1536,7 +1557,7 @@ function Module.RenderGUI()
                 if showValues and maxManaVal and maxManaVal > 0 then
                     text = string.format("%d / %d", MySelf.Mana or 0, maxManaVal)
                 else
-                    text = string.format("%.0f%%", percentage * 100)    
+                    text = string.format("%.0f%%", percentage * 100)
                 end
 
                 drawBar({
@@ -1555,6 +1576,7 @@ function Module.RenderGUI()
                     dynamicColor = settings[Module.Name].DynamicMP,
                     colorMin     = ImColor(colorMpMin),
                     colorMax     = ImColor(colorMpMax),
+                    fillGradient = settings[Module.Name].GradientMP,
                 })
                 ImGui.Spacing()
             end
@@ -1579,7 +1601,7 @@ function Module.RenderGUI()
 
                 centerText   = text,
                 centerColor  = targetTextColor,
-
+                fillGradient = settings[Module.Name].GradientEnd,
                 staticColor  = Module.Colors.color('yellow2'),
                 dynamicColor = settings[Module.Name].DynamicEnd,
                 colorMin     = ImColor(colorEndMin),
@@ -1695,8 +1717,6 @@ function Module.RenderGUI()
             breathBarShow = false
         end
         if showBreath then
-            
-
             local yPos = ImGui.GetCursorPosY()
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorBreathMin, colorBreathMax, breathPct)))
             ImGui.ProgressBar((breathPct / 100), ImGui.GetContentRegionAvail(), progressSize, '##pctBreath')
@@ -1711,7 +1731,6 @@ function Module.RenderGUI()
                 end
                 ImGui.EndPopup()
             end
-            
         end
         Module.ThemeLoader.EndTheme(ColorCountBreath, StyleCountBreath)
         ImGui.End()
@@ -1749,7 +1768,7 @@ local clockTimer = mq.gettime()
 function Module.MainLoop()
     if loadedExeternally then
         ---@diagnostic disable-next-line: undefined-global
-        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+        if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
 
     --local timeDiff = mq.gettime() - clockTimer

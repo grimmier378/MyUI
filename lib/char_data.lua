@@ -510,11 +510,11 @@ end
 --- Get Pet Data and return a table with pet information
 --- Pet data includes ID, Name, Type, Level, PctHPs, Distance, BuffCount, and Buffs
 ---@return table petStatus (sub tables ButtonStates, and Buffs)
----@return integer tmpBuffCnt # of buffs on pet
+---@return integer tmpBuffCnt # of buffs on pet`
 function CharData.GetPetData()
     local petStatus = {}
     petStatus.ID = myPet.ID() or 0
-    petStatus.Name = myPet.Name() or "None"
+    petStatus.Name = myPet.DisplayName() or "None"
     petStatus.Type = myPet.Type() or "None"
     petStatus.Level = myPet.Level() or 0
     petStatus.PctHPs = myPet.PctHPs() or 0
@@ -548,6 +548,16 @@ function CharData.GetPetData()
     petStatus.ButtonStates = GetButtonStates()
 
     return petStatus, petStatus.BuffCount
+end
+
+--- Retreives all data and returns it in a single nested table
+function CharData.GetAllData()
+    local dataTable = {}
+    dataTable = CharData.GetMyData()
+    dataTable.Buffs, dataTable.Debuffs = CharData.GetBuffs()
+    dataTable.Songs = CharData.GetSongs()
+    dataTable.PetData, dataTable.PetBuffCount = CharData.GetPetData()
+    return dataTable
 end
 
 return CharData

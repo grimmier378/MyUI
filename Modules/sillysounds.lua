@@ -5,18 +5,18 @@ local Module = {}
 
 Module.Name = "SillySounds"
 Module.IsRunning = false
-Module.Path = MyUI_Path ~= nil and MyUI_Path .. '/sounds/' or string.format("%s/%s/sounds/", mq.luaDir, Module.Name)
+Module.Path = MyUI.Path ~= nil and MyUI.Path .. '/sounds/' or string.format("%s/%s/sounds/", mq.luaDir, Module.Name)
 
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI_ScriptName ~= nil and true or false
+local loadedExeternally = MyUI ~= nil and true or false
 
 if not loadedExeternally then
-    MyUI_Utils = require('lib.common')
-    MyUI_Icons = require('mq.ICONS')
-    MyUI_CharLoaded = mq.TLO.Me.DisplayName()
-    MyUI_Server = mq.TLO.MacroQuest.Server()
+    MyUI.Utils = require('lib.common')
+    MyUI.Icons = require('mq.ICONS')
+    MyUI.CharLoaded = mq.TLO.Me.DisplayName()
+    MyUI.Server = mq.TLO.MacroQuest.Server()
 end
-Module.Utils = MyUI_Utils
+Module.Utils = MyUI.Utils
 
 local itemWatch = false
 
@@ -37,7 +37,7 @@ local timerPlay = 0
 local playing = false
 
 -- Main Settings
-local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, Module.Name, MyUI_Server, MyUI_CharLoaded)
+local configFile = string.format("%s/MyUI/%s/%s/%s.lua", mq.configDir, Module.Name, MyUI.Server, MyUI.CharLoaded)
 local settings, defaults = {}, {}
 local timerA, timerB = os.time(), os.time()
 local openConfigGUI = false
@@ -88,12 +88,12 @@ defaults = {
 
 -- Function to play sound allowing for simultaneous plays
 local function playSound(filename)
-    if MyUI_Utils.File.Exists(filename) then
+    if MyUI.Utils.File.Exists(filename) then
         timerPlay = os.time()
         playing = true
         winmm.sndPlaySoundA(filename, flags)
     else
-        MyUI_Utils.PrintOutput('MyUI', nil, '\aySound File \aw[\ag%s\aw]\ao is MISSING!!\ax', filename)
+        MyUI.Utils.PrintOutput('MyUI', nil, '\aySound File \aw[\ag%s\aw]\ao is MISSING!!\ax', filename)
     end
 end
 
@@ -151,7 +151,7 @@ end
 
 -- Settings
 local function loadSettings()
-    if not MyUI_Utils.File.Exists(configFile) then
+    if not MyUI.Utils.File.Exists(configFile) then
         settings = defaults
         mq.pickle(configFile, settings)
         loadSettings()
@@ -165,14 +165,14 @@ local function loadSettings()
     tmpTheme = settings.theme or 'default'
     local newSetting = false
 
-    newSetting = MyUI_Utils.CheckDefaultSettings(defaults, settings) or newSetting
-    newSetting = MyUI_Utils.CheckDefaultSettings(defaults.Sounds.default, settings.Sounds[settings.theme]) or newSetting
+    newSetting = MyUI.Utils.CheckDefaultSettings(defaults, settings) or newSetting
+    newSetting = MyUI.Utils.CheckDefaultSettings(defaults.Sounds.default, settings.Sounds[settings.theme]) or newSetting
 
     -- check for missing sound files
     for k, v in pairs(settings.Sounds[settings.theme]) do
-        if not MyUI_Utils.File.Exists(string.format("%s%s/%s", Module.Path, settings.theme, v.file)) then
+        if not MyUI.Utils.File.Exists(string.format("%s%s/%s", Module.Path, settings.theme, v.file)) then
             settings[k] = false
-            MyUI_Utils.PrintOutput('MyUI', nil, "\aySound file %s missing!!\n\tTurning %s \arOFF", string.format("%s%s/%s", Module.Path, settings.theme, v.file), k)
+            MyUI.Utils.PrintOutput('MyUI', nil, "\aySound file %s missing!!\n\tTurning %s \arOFF", string.format("%s%s/%s", Module.Path, settings.theme, v.file), k)
         end
     end
 
@@ -187,36 +187,36 @@ end
 -- Print Help
 local function helpList(type)
     if type == 'help' then
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ay%s Help\ax', Module.Name)
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds hit     \t \ag Toggles sound on and off for your hits\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds bonk    \t \ag Toggles sound on and off for you being hit\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds fizzle    \t \ag Toggles sound on and off for your spell fizzles\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds lvl     \t \ag Toggles sound on and off for when you Level\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds aa      \t \ag Toggles sound on and off for You gain AA\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds die     \t \ag Toggles sound on and off for your Deaths\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds hp      \t \ag Toggles sound on and off for Low Health\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds hp 1-100\t \ag Sets PctHPs to toggle low HP sound, 1-100\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds missing     \t \ag Toggles sound on and off for missing groupmembers\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds group 1-5\t \ag Sets the number of members in group with you, 1-5\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ay%s Volume Control\ax', Module.Name)
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds hit 0-100\t \ag Sets Volume for hits 0-100 accepts decimal values\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds bonk 0-100\t\ag Sets Volume for bonk 0-100 accepts decimal values\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds fizzle 0-100\t \ag Sets Volume for fizzle 0-100 accepts decimal values\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds lvl 0-100 \t\ag Sets Volume for lvl 0-100 accepts decimal values\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds aa 0-100 \t\ag Sets Volume for AA 0-100 accepts decimal values\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds die 0-100 \t\ag Sets Volume for die 0-100 accepts decimal values\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds volhp 0-100 \t\ag Sets Volume for lowHP 0-100 accepts decimal values\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds missing 0-100\t \ag Sets Volume for missing 0-100 accepts decimal values\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ay%s Other\ax', Module.Name)
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds help      \t\ag Brings up this list\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds config    \t\ag Opens Config GUI Window\ax')
-        MyUI_Utils.PrintOutput('MyUI', nil, '\at /sillysounds show      \t\ag Prints out the current settings\ax')
-        -- MyUI_Utils.PrintOutput('MyUI',nil,'\at /sillysounds quit      \t\ag Exits the script\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\ay%s Help\ax', Module.Name)
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds hit     \t \ag Toggles sound on and off for your hits\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds bonk    \t \ag Toggles sound on and off for you being hit\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds fizzle    \t \ag Toggles sound on and off for your spell fizzles\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds lvl     \t \ag Toggles sound on and off for when you Level\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds aa      \t \ag Toggles sound on and off for You gain AA\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds die     \t \ag Toggles sound on and off for your Deaths\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds hp      \t \ag Toggles sound on and off for Low Health\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds hp 1-100\t \ag Sets PctHPs to toggle low HP sound, 1-100\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds missing     \t \ag Toggles sound on and off for missing groupmembers\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds group 1-5\t \ag Sets the number of members in group with you, 1-5\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\ay%s Volume Control\ax', Module.Name)
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds hit 0-100\t \ag Sets Volume for hits 0-100 accepts decimal values\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds bonk 0-100\t\ag Sets Volume for bonk 0-100 accepts decimal values\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds fizzle 0-100\t \ag Sets Volume for fizzle 0-100 accepts decimal values\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds lvl 0-100 \t\ag Sets Volume for lvl 0-100 accepts decimal values\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds aa 0-100 \t\ag Sets Volume for AA 0-100 accepts decimal values\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds die 0-100 \t\ag Sets Volume for die 0-100 accepts decimal values\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds volhp 0-100 \t\ag Sets Volume for lowHP 0-100 accepts decimal values\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds missing 0-100\t \ag Sets Volume for missing 0-100 accepts decimal values\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\ay%s Other\ax', Module.Name)
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds help      \t\ag Brings up this list\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds config    \t\ag Opens Config GUI Window\ax')
+        MyUI.Utils.PrintOutput('MyUI', nil, '\at /sillysounds show      \t\ag Prints out the current settings\ax')
+        -- MyUI.Utils.PrintOutput('MyUI',nil,'\at /sillysounds quit      \t\ag Exits the script\ax')
     elseif type == 'show' then
-        MyUI_Utils.PrintOutput('MyUI', nil, '\ay%s Current Settings\ax', Module.Name)
+        MyUI.Utils.PrintOutput('MyUI', nil, '\ay%s Current Settings\ax', Module.Name)
         for k, v in pairs(settings) do
             if k ~= 'Sounds' then
-                MyUI_Utils.PrintOutput('MyUI', nil, "\at%s \ax:\ag %s\ax", k, tostring(v))
+                MyUI.Utils.PrintOutput('MyUI', nil, "\at%s \ax:\ag %s\ax", k, tostring(v))
             end
         end
     end
@@ -235,31 +235,31 @@ local function bind(...)
     if string.lower(key) == 'hit' then
         if value ~= nil then
             settings.volHit = value or 50
-            MyUI_Utils.PrintOutput('MyUI', nil, "setting %s Volume to %s", key, tostring(settings.volHit))
+            MyUI.Utils.PrintOutput('MyUI', nil, "setting %s Volume to %s", key, tostring(settings.volHit))
             playSound(string.format("%s%s/%s", Module.Path, settings.theme, settings.Sounds[settings.theme].soundHit.file))
         else
             settings.doHit = not settings.doHit
-            MyUI_Utils.PrintOutput('MyUI', nil, "setting %s to %s", key, tostring(settings.doHit))
+            MyUI.Utils.PrintOutput('MyUI', nil, "setting %s to %s", key, tostring(settings.doHit))
         end
         newSetting = true
     elseif string.lower(key) == 'bonk' then
         if value ~= nil then
             settings.volBonk = value or 50
-            MyUI_Utils.PrintOutput('MyUI', nil, "setting %s Volume to %d", key, tostring(settings.volBonk))
+            MyUI.Utils.PrintOutput('MyUI', nil, "setting %s Volume to %d", key, tostring(settings.volBonk))
             playSound(string.format("%s%s/%s", Module.Path, settings.theme, settings.Sounds[settings.theme].soundBonk.file))
         else
             settings.doBonk = not settings.doBonk
-            MyUI_Utils.PrintOutput('MyUI', nil, "setting %s to %s", key, tostring(settings.doBonk))
+            MyUI.Utils.PrintOutput('MyUI', nil, "setting %s to %s", key, tostring(settings.doBonk))
         end
         newSetting = true
     elseif string.lower(key) == 'aa' then
         if value ~= nil then
             settings.volAA = value or 50
-            MyUI_Utils.PrintOutput('MyUI', nil, "setting %s Volume to %d", key, tostring(settings.volAA))
+            MyUI.Utils.PrintOutput('MyUI', nil, "setting %s Volume to %d", key, tostring(settings.volAA))
             playSound(string.format("%s%s/%s", Module.Path, settings.theme, settings.Sounds[settings.theme].soundAA.file))
         else
             settings.doAA = not settings.doAA
-            MyUI_Utils.PrintOutput('MyUI', nil, "setting %s to %s", key, tostring(settings.doAA))
+            MyUI.Utils.PrintOutput('MyUI', nil, "setting %s to %s", key, tostring(settings.doAA))
         end
         newSetting = true
     elseif string.lower(key) == 'config' then
@@ -267,53 +267,53 @@ local function bind(...)
     elseif string.lower(key) == 'lvl' then
         if value ~= nil then
             settings.volLvl = value or 50
-            MyUI_Utils.PrintOutput('MyUI', nil, "setting %s Volume to %d", key, tostring(settings.volLvl))
+            MyUI.Utils.PrintOutput('MyUI', nil, "setting %s Volume to %d", key, tostring(settings.volLvl))
             playSound(string.format("%s%s/%s", Module.Path, settings.theme, settings.Sounds[settings.theme].soundLvl.file))
         else
             settings.doLvl = not settings.doLvl
-            MyUI_Utils.PrintOutput('MyUI', nil, "setting %s to %s", key, tostring(settings.doLvl))
+            MyUI.Utils.PrintOutput('MyUI', nil, "setting %s to %s", key, tostring(settings.doLvl))
         end
         newSetting = true
     elseif string.lower(key) == 'die' then
         if value ~= nil then
             settings.volDie = value or 50
-            MyUI_Utils.PrintOutput('MyUI', nil, "setting %s Volume to %d", key, tostring(settings.volDie))
+            MyUI.Utils.PrintOutput('MyUI', nil, "setting %s Volume to %d", key, tostring(settings.volDie))
             playSound(string.format("%s%s/%s", Module.Path, settings.theme, settings.Sounds[settings.theme].soundDie.file))
         else
             settings.doDie = not settings.doDie
-            MyUI_Utils.PrintOutput('MyUI', nil, "setting %s to %s", key, tostring(settings.doDie))
+            MyUI.Utils.PrintOutput('MyUI', nil, "setting %s to %s", key, tostring(settings.doDie))
         end
         newSetting = true
     elseif string.lower(key) == 'hp' then
         if value ~= nil then
             settings.lowHP = value or 0
-            MyUI_Utils.PrintOutput('MyUI', nil, "setting %s to %s", key, tostring(value))
+            MyUI.Utils.PrintOutput('MyUI', nil, "setting %s to %s", key, tostring(value))
         else
             settings.doLowHp = not settings.doLowHp
-            MyUI_Utils.PrintOutput('MyUI', nil, "setting %s to %s", key, tostring(settings.doLowHp))
+            MyUI.Utils.PrintOutput('MyUI', nil, "setting %s to %s", key, tostring(settings.doLowHp))
         end
         newSetting = true
     elseif string.lower(key) == 'volhp' then
         if value ~= nil then
             settings.volLowHp = value or 50
-            MyUI_Utils.PrintOutput('MyUI', nil, "setting %s Volume to %d", key, tostring(settings.volLowHp))
+            MyUI.Utils.PrintOutput('MyUI', nil, "setting %s Volume to %d", key, tostring(settings.volLowHp))
             playSound(string.format("%s%s/%s", Module.Path, settings.theme, settings.Sounds[settings.theme].soundLowHp.file))
             newSetting = true
         end
     elseif string.lower(key) == 'missing' then
         if value ~= nil then
             settings.volMissing = value or 50
-            MyUI_Utils.PrintOutput('MyUI', nil, "setting %s Volume to %s", key, tostring(settings.volMissing))
+            MyUI.Utils.PrintOutput('MyUI', nil, "setting %s Volume to %s", key, tostring(settings.volMissing))
             playSound(string.format("%s%s/%s", Module.Path, settings.theme, settings.Sounds[settings.theme].soundMissing.file))
         else
             settings.doMissing = not settings.doMissing
-            MyUI_Utils.PrintOutput('MyUI', nil, "setting %s to %s", key, tostring(settings.doMissing))
+            MyUI.Utils.PrintOutput('MyUI', nil, "setting %s to %s", key, tostring(settings.doMissing))
         end
         newSetting = true
     elseif string.lower(key) == 'group' then
         if value ~= nil then
             settings.groupMembers = value or 5
-            MyUI_Utils.PrintOutput('MyUI', nil, "setting %s to %d", key, tostring(settings.groupMembers))
+            MyUI.Utils.PrintOutput('MyUI', nil, "setting %s to %d", key, tostring(settings.groupMembers))
             newSetting = true
         end
     elseif string.lower(key) == 'help' or key == nil then
@@ -355,7 +355,7 @@ end
 -- UI
 function Module.RenderGUI()
     if not openConfigGUI then return end
-    local lbl = string.format("%s##%s", Module.Name, MyUI_CharLoaded)
+    local lbl = string.format("%s##%s", Module.Name, MyUI.CharLoaded)
     local openUI, openConfigUI = ImGui.Begin(lbl, true, bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoCollapse))
     if not openUI then
         openConfigGUI = not openConfigGUI
@@ -511,7 +511,7 @@ end
 function Module.MainLoop()
     if loadedExeternally then
         ---@diagnostic disable-next-line: undefined-global
-        if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+        if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
 
     mq.doevents()

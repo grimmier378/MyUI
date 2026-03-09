@@ -1,9 +1,10 @@
 local mq = require('mq')
 local ImGui = require('ImGui')
-local CommonUtils = require('mq.Utils')
-CommonUtils.Colors = require('lib.colors')
-CommonUtils.Animation_Item = mq.FindTextureAnimation('A_DragItem')
-CommonUtils.Animation_Spell = mq.FindTextureAnimation('A_SpellIcons')
+local Utils = require('mq.Utils')
+Utils.Colors = require('lib.colors')
+Utils.Animation_Item = mq.FindTextureAnimation('A_DragItem')
+Utils.Animation_Spell = mq.FindTextureAnimation('A_SpellIcons')
+
 
 ---Calcluate the color between two colors based on a value between 0 and 100.
 ---
@@ -14,7 +15,7 @@ CommonUtils.Animation_Spell = mq.FindTextureAnimation('A_SpellIcons')
 ---@param midColor table|nil  Optional mid range color
 ---@param midValue number|nil  Optional mid range value, where we switch from minColor to midColor and midColor to maxColor
 ---@return ImVec4  Returns the color as an ImVec4
-function CommonUtils.CalculateColor(minColor, maxColor, value, midColor, midValue)
+function Utils.CalculateColor(minColor, maxColor, value, midColor, midValue)
 	-- Ensure value is within the range of 0 to 100
 	value = math.max(0, math.min(100, value))
 	midValue = midValue or 50
@@ -48,62 +49,32 @@ function CommonUtils.CalculateColor(minColor, maxColor, value, midColor, midValu
 	return ImVec4(r, g, b, a)
 end
 
----@param type string  'item' or 'pwcs' or 'spell' type of icon to draw
----@param txt string  the tooltip text
----@param iconID integer|string  the icon id to draw
----@param iconSize integer|nil  the size of the icon to draw
-function CommonUtils.DrawStatusIcon(iconID, type, txt, iconSize)
-	iconSize = iconSize or 26
-	CommonUtils.Animation_Spell:SetTextureCell(iconID or 0)
-	CommonUtils.Animation_Item:SetTextureCell(iconID or 3996)
-	if type == 'item' then
-		ImGui.DrawTextureAnimation(CommonUtils.Animation_Item, iconSize, iconSize)
-	elseif type == 'pwcs' then
-		local animPWCS = mq.FindTextureAnimation(iconID)
-		animPWCS:SetTextureCell(iconID)
-		ImGui.DrawTextureAnimation(animPWCS, iconSize, iconSize)
-	else
-		ImGui.DrawTextureAnimation(CommonUtils.Animation_Spell, iconSize, iconSize)
-	end
-	if ImGui.IsItemHovered() then
-		ImGui.BeginTooltip()
-		if string.find(txt, "\\n") then
-			local lines = {}
-			for line in string.gmatch(txt, "[^\n]+") do
-				table.insert(lines, line)
-			end
-			for _, line in ipairs(lines) do
-				ImGui.Text(line)
-			end
-		else
-			ImGui.Text(txt)
-		end
-		ImGui.EndTooltip()
-	end
-end
 
-CommonUtils.ImGuiToggleFlags = {
+------------------ DRAW A TOGGLE ----------------
+---@enum ImGuiToggleFlags
+Utils.ImGuiToggleFlags = {
 	None           = 0,               -- No flags set
 	StarKnob       = bit32.lshift(1, 0), -- Uses Star and Moon shapes for the knob Star being enabled and Moon being disabled
 	RightLabel     = bit32.lshift(1, 1), -- Draw the Label on the right side of the toggle instead of the left
 	AnimateKnob    = bit32.lshift(1, 2), -- Animate the knob (spinning star or rocking moon)
-	SmilyKnob      = bit32.lshift(1, 3), -- Uses a smiley or frown face for the knob based on the value (true = smiley, false = frown)
-	GlowOnHover    = bit32.lshift(1, 4), -- Glow the knob on hover
-	AnimateOnHover = bit32.lshift(1, 5), -- Animate the knob on hover (spinning star or rocking moon)
-	PulseOnHover   = bit32.lshift(1, 6), -- Pulse the knob on hover (breathing effect)
-	KnobBorder     = bit32.lshift(1, 7), -- Draw a black border around the knob
+	GlowOnHover    = bit32.lshift(1, 3), -- Glow the knob on hover
+	AnimateOnHover = bit32.lshift(1, 4), -- Animate the knob on hover (spinning star or rocking moon)
+	PulseOnHover   = bit32.lshift(1,5), -- Pulse the knob on hover (breathing effect)
+	KnobBorder     = bit32.lshift(1, 6), -- Draw a black border around the knob
 }
 
 ---@param draw_list ImDrawList Draw list to draw from
 ---@param pos ImVec2 Posion to start from (top-left corner of the star)
 ---@param size number Diameter of the star's outter points as a circle
 ---@param star_color ImU32 Color as ImU32
----@param rotation number Rotation in radians (optional)
----@param num_points integer Number of points to draw (default 5)
----@param border boolean Optional border flag (default false)
-function CommonUtils.RenderStar(draw_list, pos, size, star_color, rotation, num_points, border)
+---@param rotation? number Rotation in radians (optional)
+---@param num_points? integer Number of points to draw (default 5)
+---@param border? boolean Optional border flag (default false)
+---@param border_color? ImVec4 Optional border color (default black)
+function Utils.RenderStar(draw_list, pos, size, star_color, rotation, num_points, border, border_color)
 	num_points = num_points or 5
 	rotation = rotation or 0
+	border_color = border_color or ImVec4(0, 0, 0, 1)
 	-- less than 4 points and we can't draw a star, 3 points should be a triangle, 2 is a line etc.
 	if num_points < 4 then
 		num_points = 4
@@ -130,10 +101,10 @@ function CommonUtils.RenderStar(draw_list, pos, size, star_color, rotation, num_
 
 		local rotated_triangle = {}
 		for _, p in ipairs(base_triangle) do
-			table.insert(rotated_triangle, CommonUtils.RotatePoint(p, center, angle))
+			table.insert(rotated_triangle, Utils.RotatePoint(p, center, angle))
 		end
 		if border then
-			draw_list:AddCircle(center, outer_radius, ImGui.GetColorU32(0.1, 0.1, 0.1, 0.4), 32, 2)
+			draw_list:AddCircle(center, outer_radius, ImGui.GetColorU32(border_color), 32, 2)
 		end
 		draw_list:AddConvexPolyFilled(rotated_triangle, star_color)
 	end
@@ -144,9 +115,11 @@ end
 ---@param size number Size of the moon (diameter)
 ---@param col ImU32 Color
 ---@param bg_color ImVec4 Background color (shadow color)
----@param rotation number Optional rotation in radians
----@param border boolean Optional border flag (default false)
-function CommonUtils.RenderMoon(draw_list, pos, size, col, bg_color, rotation, border)
+---@param rotation? number Optional rotation in radians
+---@param border? boolean Optional border flag (default false)
+---@param border_color? ImVec4 Optional border color (default black)
+function Utils.RenderMoon(draw_list, pos, size, col, bg_color, rotation, border, border_color)
+	border_color = border_color or ImVec4(0, 0, 0, 1)
 	local outer_radius = size * 0.5
 	local center = ImVec2(pos.x + outer_radius, pos.y + outer_radius)
 
@@ -160,7 +133,7 @@ function CommonUtils.RenderMoon(draw_list, pos, size, col, bg_color, rotation, b
 
 	-- Apply rotation if specified
 	if rotation and rotation ~= 0 then
-		cutout_center = CommonUtils.RotatePoint(cutout_center, center, rotation)
+		cutout_center = Utils.RotatePoint(cutout_center, center, rotation)
 	end
 
 	draw_list:AddCircleFilled(
@@ -178,7 +151,7 @@ function CommonUtils.RenderMoon(draw_list, pos, size, col, bg_color, rotation, b
 		32
 	)
 	if border then
-		draw_list:AddCircle(center, outer_radius, ImGui.GetColorU32(0.1, 0.1, 0.1, 0.5), 32, 2)
+		draw_list:AddCircle(center, outer_radius, ImGui.GetColorU32(border_color), 32, 2)
 	end
 end
 
@@ -197,48 +170,32 @@ end
 	]]
 ---@param id string Label and Id for the toggle button) clicking the label or the toggle will toggle the value
 ---@param value boolean Current value of the toggle button
----@param flags integer|nil combined bit flags (ImGuiToggleFlags.None, ImGuiToggleFlags.StarKnob, ImGuiToggleFlags.RightLabel, ImGuiToggleFlags.AnimateKnob)
----@param size ImVec2|number|nil -- ImVec2 Size of the toggle button (width, height) or height value if single number and width will default to height * 2.0
----@param on_color ImVec4|integer|nil Color for ON state, or number of points if passing star points
----@param off_color ImVec4|integer|nil ImVec4 Color for the Toggle when Off , or number of points if passing star points
----@param knob_color ImVec4|integer|nil ImVec4 Color for the Knob , or its the number of points if passing star points
----@param num_points integer|nil the number of points for the star knob (default 5)
+---@param flags? integer combined bit flags (ImGuiToggleFlags.None, ImGuiToggleFlags.StarKnob, ImGuiToggleFlags.RightLabel, ImGuiToggleFlags.AnimateKnob)
+---@param size? ImVec2|number -- ImVec2 Size of the toggle button (width, height) or height value if single number and width will default to height * 2.0
+---@param opts? table Optional parameters: OnColor, OffColor, KnobColor, NumPoints, BorderColor
 ---@return boolean value
 ---@return boolean clicked
-function CommonUtils.DrawToggle(id, value, flags, size, on_color, off_color, knob_color, num_points)
+function Utils.DrawToggle(id, value, flags, size, opts)
 	if not id or value == nil then return false, false end
+    local on_color = opts and opts.OnColor or ImGui.GetStyleColorVec4(ImGuiCol.FrameBgActive)
+    local off_color = opts and opts.OffColor or ImGui.GetStyleColorVec4(ImGuiCol.FrameBg)
+    local knob_color = opts and opts.KnobColor or ImVec4(1, 1, 1, 1)
+    local num_points = opts and opts.NumPoints or 5
+    local border_color = opts and opts.BorderColor or ImVec4(0, 0, 0, 1)
+
 	-- setup any defaults for mising params
-	size = type(size) == 'number' and ImVec2(size * 2, size) or size or ImVec2(32, 16)
+	size = type(size) == 'number' and ImVec2(size * 2, size) or (size ~= nil and size or ImVec2(32, 16))
 	local height = size.y or 16
 	local width = size.x or height * 2
 	-- if you omit a color you can still pass the number as the number of points
-	if type(on_color) == 'number' then
-		num_points = on_color
-		on_color = nil
-	elseif type(off_color) == 'number' then
-		num_points = off_color
-		off_color = nil
-	elseif type(knob_color) == 'number' then
-		num_points = knob_color
-		knob_color = nil
-	end
 
-	on_color = on_color or ImGui.GetStyleColorVec4(ImGuiCol.FrameBgActive)
-	off_color = off_color or ImGui.GetStyleColorVec4(ImGuiCol.FrameBg)
-	knob_color = knob_color or ImVec4(1, 1, 1, 1) -- default white
-
-	local star_knob = flags and bit32.band(flags, CommonUtils.ImGuiToggleFlags.StarKnob) ~= 0
-	local right_label = flags and bit32.band(flags, CommonUtils.ImGuiToggleFlags.RightLabel) ~= 0
-	local animate_knob = flags and bit32.band(flags, CommonUtils.ImGuiToggleFlags.AnimateKnob) ~= 0
-	local smily_knob = flags and bit32.band(flags, CommonUtils.ImGuiToggleFlags.SmilyKnob) ~= 0
-	local glow_on_hover = flags and bit32.band(flags, CommonUtils.ImGuiToggleFlags.GlowOnHover) ~= 0
-	local animate_on_hover = flags and bit32.band(flags, CommonUtils.ImGuiToggleFlags.AnimateOnHover) ~= 0
-	local pulse_on_hover = flags and bit32.band(flags, CommonUtils.ImGuiToggleFlags.PulseOnHover) ~= 0
-	local knob_border = flags and bit32.band(flags, CommonUtils.ImGuiToggleFlags.KnobBorder) ~= 0
-
-	if smily_knob then
-		star_knob = false
-	end
+	local star_knob = flags and bit32.band(flags, Utils.ImGuiToggleFlags.StarKnob) ~= 0
+	local right_label = flags and bit32.band(flags, Utils.ImGuiToggleFlags.RightLabel) ~= 0
+	local animate_knob = flags and bit32.band(flags, Utils.ImGuiToggleFlags.AnimateKnob) ~= 0
+	local glow_on_hover = flags and bit32.band(flags, Utils.ImGuiToggleFlags.GlowOnHover) ~= 0
+	local animate_on_hover = flags and bit32.band(flags, Utils.ImGuiToggleFlags.AnimateOnHover) ~= 0
+	local pulse_on_hover = flags and bit32.band(flags, Utils.ImGuiToggleFlags.PulseOnHover) ~= 0
+	local knob_border = flags and bit32.band(flags, Utils.ImGuiToggleFlags.KnobBorder) ~= 0
 
 	num_points = num_points or 5
 
@@ -317,45 +274,39 @@ function CommonUtils.DrawToggle(id, value, flags, size, on_color, off_color, kno
 			if not should_animate then
 				star_rotation = 0
 			end
-			CommonUtils.RenderStar(
+			Utils.RenderStar(
 				draw_list,
 				ImVec2(knob_x - fill_radius, pos.y + radius - fill_radius),
 				radius * 1.6,
 				final_knob_col,
 				star_rotation,
 				num_points,
-				knob_border)
+				knob_border,
+                border_color)
 		else
 			local moon_rotation = math.sin(os.clock() * 2) * (math.pi / 18)
 			if not should_animate then
 				moon_rotation = 0
 			end
-			CommonUtils.RenderMoon(draw_list, ImVec2(knob_x - fill_radius, pos.y + radius - fill_radius), radius * 1.6,
-				final_knob_col, off_color, moon_rotation, knob_border)
+			Utils.RenderMoon(draw_list, ImVec2(knob_x - fill_radius, pos.y + radius - fill_radius), radius * 1.6,
+				final_knob_col, off_color, moon_rotation, knob_border, border_color)
 		end
-	elseif smily_knob then
-		-- smily or froown based on value
-		CommonUtils.RenderSmiley(draw_list, ImVec2(knob_x - fill_radius, pos.y + radius - fill_radius), radius * 1.6,
-			final_knob_col, value)
 	else
 		-- Knob (circle) -- default circle toggle
-		local radiusOutline = radius * 0.85
-
 		draw_list:AddCircleFilled(
 			center,
 			fill_radius,
-			final_knob_col,
-			0
+			final_knob_col
 		)
 		-- Draw outline
 		if knob_border then
-			draw_list:AddCircle(center, fill_radius, ImGui.GetColorU32(0, 0, 0, 1), 32, 2)
+			draw_list:AddCircle(center, fill_radius, ImGui.GetColorU32(border_color), 32, 2)
 		end
 	end
 
 	-- apply any glow over the knob on hover
 	if glow_on_hover and is_hovered then
-		CommonUtils.DrawGlowAura(draw_list, center, fill_radius, knob_color)
+		Utils.DrawGlowAura(draw_list, center, fill_radius, knob_color)
 	end
 
 	-- Label on the right side of the toggle
@@ -371,75 +322,6 @@ function CommonUtils.DrawToggle(id, value, flags, size, on_color, off_color, kno
 	return value, clicked
 end
 
----@param draw_list ImDrawList
----@param pos ImVec2 Top-left position (for face center calculation)
----@param size number Diameter of face
----@param col ImU32 Color for face fill
----@param value boolean Value of the toggle (true for smiley, false for frown)
-function CommonUtils.RenderSmiley(draw_list, pos, size, col, value)
-	local center = ImVec2(pos.x + size * 0.5, pos.y + size * 0.5)
-	local radius = size * 0.5
-
-	-- Draw face color inside
-	draw_list:AddCircleFilled(center, radius * 0.9, col, 32)
-
-	-- Eyes
-	local eye_offset_x = radius * 0.4
-	local eye_offset_y = radius * 0.3
-	local eye_radius = radius * 0.1
-
-	draw_list:AddCircleFilled(ImVec2(center.x - eye_offset_x, center.y - eye_offset_y), eye_radius, ImGui.GetColorU32(0, 0, 0, 1), 12)
-	draw_list:AddCircleFilled(ImVec2(center.x + eye_offset_x, center.y - eye_offset_y), eye_radius, ImGui.GetColorU32(0, 0, 0, 1), 12)
-
-	-- Mouth (smile)
-	local mouth_radius = radius * 0.6
-	local mouth_center = ImVec2(center.x, center.y + radius * 0.2)
-
-	if not value then
-		-- Mouth (frown)
-		mouth_center = ImVec2(center.x, center.y + radius * 0.8) -- Move center *lower* for frown
-		draw_list:PathArcTo(mouth_center, mouth_radius * 0.5, math.pi * 1.25, math.pi * 1.75, 16)
-	else
-		-- Smiling arc (bottom half circle) kinda
-		draw_list:PathArcTo(mouth_center, mouth_radius * 0.5, math.pi * 0.25, math.pi * 0.75, 16)
-	end
-
-	draw_list:PathStroke(ImGui.GetColorU32(0, 0, 0, 1), ImDrawFlags.RoundCornersAll, radius * 0.08)
-	-- Draw black outline
-	draw_list:AddCircle(center, radius * 0.9, ImGui.GetColorU32(0, 0, 0, 1), 32, 2)
-end
-
----
-
----@param draw_list ImDrawList
----@param pos ImVec2 Top-left position
----@param size number
----@param col ImU32
-function CommonUtils.RenderFrown(draw_list, pos, size, col)
-	local center = ImVec2(pos.x + size * 0.5, pos.y + size * 0.5)
-	local radius = size * 0.5
-
-	-- Outline might apply this to the default circle toggle as well not sure though.
-	-- draw_list:AddCircleFilled(center, radius, ImGui.GetColorU32(0, 0, 0, 1), 32)
-	draw_list:AddCircleFilled(center, radius * 0.9, col, 32)
-
-	-- Eyes
-	local eye_offset_x = radius * 0.4
-	local eye_offset_y = radius * 0.3
-	local eye_radius = radius * 0.1
-
-	draw_list:AddCircleFilled(ImVec2(center.x - eye_offset_x, center.y - eye_offset_y), eye_radius, ImGui.GetColorU32(0, 0, 0, 1), 12)
-	draw_list:AddCircleFilled(ImVec2(center.x + eye_offset_x, center.y - eye_offset_y), eye_radius, ImGui.GetColorU32(0, 0, 0, 1), 12)
-
-	-- Mouth (frown)
-	local mouth_radius = radius * 0.6
-	local mouth_center = ImVec2(center.x, center.y + radius * 0.8) -- Move center *lower* for frown
-
-	-- Frown arc (top of a circle pointing down) hard to see if small but scales nicely
-	draw_list:PathArcTo(mouth_center, mouth_radius * 0.5, math.pi * 1.25, math.pi * 1.75, 16)
-	draw_list:PathStroke(ImGui.GetColorU32(0, 0, 0, 1), ImDrawFlags.RoundCornersAll, radius * 0.08)
-	draw_list:AddCircle(center, radius, ImGui.GetColorU32(0, 0, 0, 1), 32, 2)
-end
 
 -- Glow Aura
 ---@param draw_list ImDrawList
@@ -447,7 +329,7 @@ end
 ---@param base_radius number Base radius of the knob
 ---@param base_color ImVec4 Base color of the knob
 ---@param time_offset number|nil Optional clock offset for breathing
-function CommonUtils.DrawGlowAura(draw_list, center, base_radius, base_color, time_offset)
+function Utils.DrawGlowAura(draw_list, center, base_radius, base_color, time_offset)
 	time_offset = time_offset or 0
 	local t = (os.clock() + time_offset) * 2
 	local breathe = 0.5 + 0.5 * math.sin(t)
@@ -488,7 +370,7 @@ function CommonUtils.DrawGlowAura(draw_list, center, base_radius, base_color, ti
 	)
 end
 
-function CommonUtils.GetBreathingColor(base_color, do_breathe)
+function Utils.GetBreathingColor(base_color, do_breathe)
 	if not do_breathe then
 		return base_color
 	end
@@ -529,16 +411,18 @@ function CommonUtils.GetBreathingColor(base_color, do_breathe)
 	return ImVec4(r, g, b, a)
 end
 
+--------------------- END TOGGLES --------------
+
 ---Draw Text with Drop Shadow effects
 ---@param str any
 ---@param options table|nil # options Optional parameters: Enabled, Opacity, OffsetX, OffsetY
 ---@param shadCol ImVec4|nil Shadow Color
 ---@param txtCol ImVec4|nil Text Color
-function CommonUtils.DropShadow(str, options, shadCol, txtCol)
+function Utils.DropShadow(str, options, shadCol, txtCol)
 	options                 = options or {}
 	local enabled           = options.Enabled ~= false and options.Enabled or false
 	local opacity           = options.Opacity or 0.5
-	local shadowColor       = shadCol or CommonUtils.Colors.color('black')
+	local shadowColor       = shadCol or Utils.Colors.color('black')
 	local offsetX           = options.OffsetX or 2
 	local offsetY           = options.OffsetY or 2
 	local shadowWithOpacity = ImVec4(shadowColor.x, shadowColor.y, shadowColor.z, opacity)
@@ -559,12 +443,83 @@ function CommonUtils.DropShadow(str, options, shadCol, txtCol)
 end
 
 ---@param spawn MQSpawn
-function CommonUtils.GetConColor(spawn)
+function Utils.GetConColor(spawn)
 	local conColor = string.lower(spawn.ConColor()) or 'WHITE'
 	return conColor
 end
 
-function CommonUtils.SetImage(file_path)
+------------------ IMAGE MANIPULATION ------------------
+
+-- Animation
+
+---comment
+---@param textureMap MQTexture the texture map to draw from
+---@param rowNum integer the row number to draw from (0-7)
+---@param colNum integer the column number to draw from (0-3) there are 8 columns but we offset to get to the last 4. Any animation uses 4 cells at most.
+---@param colPerAnimation integer the number of columns per animation
+---@param spriteSheetSize integer the size of the sprite sheet
+---@param frameWidth integer the width of the frame
+---@param frameHeight integer the height of the frame
+---@param imgSize integer the size of the image to draw
+---@param isOffset boolean if true we will offset the column number by rightOffset
+---@param rightOffset integer the offset to apply to the column number
+---@param cursorX integer the x position to draw the image at
+---@param cursorY integer the y position to draw the image at
+function Utils.DrawAnimatedFrame(textureMap, rowNum, colNum, colPerAnimation, spriteSheetSize, frameWidth, frameHeight, imgSize, isOffset, rightOffset, cursorX, cursorY)
+    local genderOffset = isOffset and rightOffset or 0
+
+    local col = (colNum % colPerAnimation) + genderOffset
+
+    -- Normalize UVs
+    local u1 = (col * frameWidth) / spriteSheetSize
+    local v1 = (rowNum * frameHeight) / spriteSheetSize
+    local u2 = ((col + 1) * frameWidth) / spriteSheetSize
+    local v2 = ((rowNum + 1) * frameHeight) / spriteSheetSize
+
+    if textureMap then
+        ImGui.Image(textureMap:GetTextureID(), ImVec2(imgSize, imgSize), ImVec2(u1, v1), ImVec2(u2, v2))
+    end
+    ImGui.SetCursorPos(cursorX, cursorY)
+end
+
+
+--- Draw Status Icons from items, spells, or pwcs with tooltips
+---@param type string  'item' or 'pwcs' or 'spell' type of icon to draw
+---@param txt string  the tooltip text
+---@param iconID integer|string  the icon id to draw
+---@param iconSize integer|nil  the size of the icon to draw
+function Utils.DrawStatusIcon(iconID, type, txt, iconSize)
+    iconSize = iconSize or 26
+    Utils.Animation_Spell:SetTextureCell(iconID or 0)
+    Utils.Animation_Item:SetTextureCell(iconID or 3996)
+    if type == 'item' then
+        ImGui.DrawTextureAnimation(Utils.Animation_Item, iconSize, iconSize)
+    elseif type == 'pwcs' then
+        local animPWCS = mq.FindTextureAnimation(iconID)
+        animPWCS:SetTextureCell(iconID)
+        ImGui.DrawTextureAnimation(animPWCS, iconSize, iconSize)
+    else
+        ImGui.DrawTextureAnimation(Utils.Animation_Spell, iconSize, iconSize)
+    end
+    if ImGui.IsItemHovered() then
+        ImGui.BeginTooltip()
+        if string.find(txt, "\\n") then
+            local lines = {}
+            for line in string.gmatch(txt, "[^\n]+") do
+                table.insert(lines, line)
+            end
+            for _, line in ipairs(lines) do
+                ImGui.Text(line)
+            end
+        else
+            ImGui.Text(txt)
+        end
+        ImGui.EndTooltip()
+    end
+end
+
+
+function Utils.SetImage(file_path)
 	return mq.CreateTexture(file_path)
 end
 
@@ -580,7 +535,7 @@ end
 ---@param main_console boolean|nil  the main console if true we will print to the main console as well as the MyChat tab if it is loaded
 ---@param msg string  the message to output
 ---@param ... unknown  any additional arguments to format the message
-function CommonUtils.PrintOutput(mychat_tab, main_console, msg, ...)
+function Utils.PrintOutput(mychat_tab, main_console, msg, ...)
 	if main_console == nil then main_console = false end
 
 	msg = string.format(msg, ...)
@@ -597,7 +552,9 @@ function CommonUtils.PrintOutput(mychat_tab, main_console, msg, ...)
 	end
 end
 
-function CommonUtils.GetNextID(table)
+----------------- TABLE MANIPULATION -----------------
+
+function Utils.GetNextID(table)
 	local maxID = 0
 	for k, _ in pairs(table) do
 		local numericId = tonumber(k)
@@ -612,7 +569,7 @@ end
 ---@param sorted_keys table|nil  the sorted keys table (optional) if you have already sorted the keys
 ---@param num_columns integer  the number of column groups to sort the keys into
 ---@return table
-function CommonUtils.SortTableColumns(input_table, sorted_keys, num_columns)
+function Utils.SortTableColumns(input_table, sorted_keys, num_columns)
 	if input_table == nil and sorted_keys == nil then return {} end
 
 	-- If sorted_keys is provided, use it, otherwise extract the keys from the input_table
@@ -661,7 +618,7 @@ function CommonUtils.SortTableColumns(input_table, sorted_keys, num_columns)
 	return column_sorted
 end
 
-function CommonUtils.SortKeys(input_table)
+function Utils.SortKeys(input_table)
 	local keys = {}
 	for k, _ in pairs(input_table) do
 		table.insert(keys, k)
@@ -671,15 +628,15 @@ function CommonUtils.SortKeys(input_table)
 	return keys
 end
 
-function CommonUtils.Deepcopy(orig)
+function Utils.Deepcopy(orig)
 	local orig_type = type(orig)
 	local copy
 	if orig_type == 'table' then
 		copy = {}
 		for orig_key, orig_value in next, orig, nil do
-			copy[CommonUtils.Deepcopy(orig_key)] = CommonUtils.Deepcopy(orig_value)
+			copy[Utils.Deepcopy(orig_key)] = Utils.Deepcopy(orig_value)
 		end
-		setmetatable(copy, CommonUtils.Deepcopy(getmetatable(orig)))
+		setmetatable(copy, Utils.Deepcopy(getmetatable(orig)))
 	else -- number, string, boolean, etc
 		copy = orig
 	end
@@ -695,11 +652,11 @@ end
 ---@param default_settings table  the default settings table
 ---@param loaded_settings table  the loaded settings table
 ---@return boolean  returns true if a new setting was found
-function CommonUtils.CheckRemovedSettings(default_settings, loaded_settings)
+function Utils.CheckRemovedSettings(default_settings, loaded_settings)
 	local newSetting = false
 	for setting, value in pairs(loaded_settings or {}) do
 		if default_settings[setting] == nil then
-			CommonUtils.PrintOutput('MyUI', nil, "\ayFound Depreciated Setting: \ao%s \ayRemoving it from the Settings File.", setting)
+			Utils.PrintOutput('MyUI', nil, "\ayFound Depreciated Setting: \ao%s \ayRemoving it from the Settings File.", setting)
 			loaded_settings[setting] = nil
 			newSetting = true
 		end
@@ -716,21 +673,21 @@ end
 ---@param loaded_settings table  the loaded settings table
 ---@return boolean  returns true if a new setting was found
 ---@return table  returns the new loaded settings table with any new settings added
-function CommonUtils.CheckDefaultSettings(default_settings, loaded_settings)
+function Utils.CheckDefaultSettings(default_settings, loaded_settings)
 	local newSetting = false
 	local newTable = {}
 	for setting, value in pairs(default_settings or {}) do
 		if loaded_settings[setting] == nil then
 			if type(value) == 'table' then
-				loaded_settings[setting] = CommonUtils.Deepcopy(value)
-				newTable[setting] = CommonUtils.Deepcopy(value) -- Add the new setting to the loaded settings table
+				loaded_settings[setting] = Utils.Deepcopy(value)
+				newTable[setting] = Utils.Deepcopy(value) -- Add the new setting to the loaded settings table
 				newSetting = true
 			else
 				loaded_settings[setting] = value
 				newTable[setting] = value -- Add the new setting to the loaded settings table
 				newSetting = true
 			end
-			CommonUtils.PrintOutput('MyUI', nil, "\ayNew Default Setting: \ao%s \ayAdding it to the Settings File.", setting)
+			Utils.PrintOutput('MyUI', nil, "\ayNew Default Setting: \ao%s \ayAdding it to the Settings File.", setting)
 			loaded_settings[setting] = value
 		else
 			newTable[setting] = loaded_settings[setting] -- Keep the existing setting
@@ -739,13 +696,15 @@ function CommonUtils.CheckDefaultSettings(default_settings, loaded_settings)
 	return newSetting, newTable
 end
 
+------------------------  CONSOLE TEXT ---------------------
+
 -- Function to append colored text segments
 ---@param console any  the console we are writing to
 ---@param timestamp string  the timestamp for the line
 ---@param text string  the text we are writing
 ---@param textColor table|nil  the color we are writing the text in
 ---@param timeStamps boolean|nil  are we writing timestamps?
-function CommonUtils.AppendColoredTimestamp(console, timestamp, text, textColor, timeStamps)
+function Utils.AppendColoredTimestamp(console, timestamp, text, textColor, timeStamps)
 	if timeStamps == nil then timeStamps = true end
 	text = text:gsub("%[%d%d:%d%d:%d%d%] ", "")
 	if timeStamps then
@@ -764,7 +723,7 @@ function CommonUtils.AppendColoredTimestamp(console, timestamp, text, textColor,
 	end
 end
 
-function CommonUtils.GiveItem(target_id)
+function Utils.GiveItem(target_id)
 	if target_id == nil then return end
 	-- mq.cmdf("/target id %s", target_id)
 	mq.TLO.Spawn(target_id).DoTarget()
@@ -776,7 +735,7 @@ function CommonUtils.GiveItem(target_id)
 	end
 end
 
-function CommonUtils.MaskName(name)
+function Utils.MaskName(name)
 	local maskedName = name
 	if maskedName ~= nil then
 		maskedName = maskedName:gsub("([A-Za-z])", "X")
@@ -784,39 +743,8 @@ function CommonUtils.MaskName(name)
 	return maskedName
 end
 
--- Animation
 
----comment
----@param textureMap MQTexture the texture map to draw from
----@param rowNum integer the row number to draw from (0-7)
----@param colNum integer the column number to draw from (0-3) there are 8 columns but we offset to get to the last 4. Any animation uses 4 cells at most.
----@param colPerAnimation integer the number of columns per animation
----@param spriteSheetSize integer the size of the sprite sheet
----@param frameWidth integer the width of the frame
----@param frameHeight integer the height of the frame
----@param imgSize integer the size of the image to draw
----@param isOffset boolean if true we will offset the column number by rightOffset
----@param rightOffset integer the offset to apply to the column number
----@param cursorX integer the x position to draw the image at
----@param cursorY integer the y position to draw the image at
-function CommonUtils.DrawAnimatedFrame(textureMap, rowNum, colNum, colPerAnimation, spriteSheetSize, frameWidth, frameHeight, imgSize, isOffset, rightOffset, cursorX, cursorY)
-	local genderOffset = isOffset and rightOffset or 0
-
-	local col = (colNum % colPerAnimation) + genderOffset
-
-	-- Normalize UVs
-	local u1 = (col * frameWidth) / spriteSheetSize
-	local v1 = (rowNum * frameHeight) / spriteSheetSize
-	local u2 = ((col + 1) * frameWidth) / spriteSheetSize
-	local v2 = ((rowNum + 1) * frameHeight) / spriteSheetSize
-
-	if textureMap then
-		ImGui.Image(textureMap:GetTextureID(), ImVec2(imgSize, imgSize), ImVec2(u1, v1), ImVec2(u2, v2))
-	end
-	ImGui.SetCursorPos(cursorX, cursorY)
-end
-
-function CommonUtils.directions(heading)
+function Utils.directions(heading)
 	-- convert headings from letter values to degrees
 	local dirToDeg = {
 		N = 0,
@@ -840,9 +768,9 @@ function CommonUtils.directions(heading)
 end
 
 -- Tighter relative direction code for when I make better arrows.
-function CommonUtils.getRelativeDirection(spawnDir)
-	local meHeading = CommonUtils.directions(mq.TLO.Me.Heading())
-	local spawnHeadingTo = CommonUtils.directions(spawnDir)
+function Utils.getRelativeDirection(spawnDir)
+	local meHeading = Utils.directions(mq.TLO.Me.Heading())
+	local spawnHeadingTo = Utils.directions(spawnDir)
 	local difference = spawnHeadingTo - meHeading
 	difference = (difference + 360) % 360
 	return difference
@@ -853,7 +781,7 @@ end
 ---@param center ImVec2 Center Coordinates to rotate around
 ---@param angle number Angle in radians to roatate the point
 ---@return ImVec2 -- New point cooridnates after rotating
-function CommonUtils.RotatePoint(point, center, angle)
+function Utils.RotatePoint(point, center, angle)
 	local s = math.sin(angle)
 	local c = math.cos(angle)
 	local dx = point.x - center.x
@@ -870,7 +798,7 @@ end
 ---@param height number height of the arrow
 ---@param color ImVec4 color of the arrow
 ---@param angle number angle in radians to rotate the arrow
-function CommonUtils.DrawArrow(topPoint, width, height, color, angle)
+function Utils.DrawArrow(topPoint, width, height, color, angle)
 	local draw_list = ImGui.GetWindowDrawList()
 	local p1 = ImVec2(topPoint.x, topPoint.y)
 	local p2 = ImVec2(topPoint.x + width, topPoint.y + height)
@@ -880,9 +808,9 @@ function CommonUtils.DrawArrow(topPoint, width, height, color, angle)
 	local center_y = (p1.y + p2.y + p3.y) / 3
 	-- rotate
 	angle = angle + .01
-	p1 = CommonUtils.RotatePoint(p1, ImVec2(center_x, center_y), angle)
-	p2 = CommonUtils.RotatePoint(p2, ImVec2(center_x, center_y), angle)
-	p3 = CommonUtils.RotatePoint(p3, ImVec2(center_x, center_y), angle)
+	p1 = Utils.RotatePoint(p1, ImVec2(center_x, center_y), angle)
+	p2 = Utils.RotatePoint(p2, ImVec2(center_x, center_y), angle)
+	p3 = Utils.RotatePoint(p3, ImVec2(center_x, center_y), angle)
 	draw_list:AddTriangleFilled(p1, p2, p3, ImGui.GetColorU32(color))
 end
 
@@ -891,21 +819,21 @@ end
 ---@param range_orange integer|nil  the distance the color changes from green to orange default (600)
 ---@param range_red integer|nil  the distance the color changes from orange to red default (1200)
 ---@return ImVec4 color returns the color as an ImVec4
-function CommonUtils.ColorDistance(distance, range_orange, range_red)
+function Utils.ColorDistance(distance, range_orange, range_red)
 	local DistColorRanges = {
 		orange = range_orange or 600, -- distance the color changes from green to orange
 		red = range_red or 1200, -- distance the color changes from orange to red
 	}
 	if distance < DistColorRanges.orange then
 		-- Green color for Close Range
-		return CommonUtils.Colors.color('green')
+		return Utils.Colors.color('green')
 	elseif distance >= DistColorRanges.orange and distance <= DistColorRanges.red then
 		-- Orange color for Mid Range
-		return CommonUtils.Colors.color('orange')
+		return Utils.Colors.color('orange')
 	else
 		-- Red color for Far Distance
-		return CommonUtils.Colors.color('red')
+		return Utils.Colors.color('red')
 	end
 end
 
-return CommonUtils
+return Utils

@@ -38,10 +38,8 @@ end
 local Utils                                         = Module.Utils
 local ToggleFlags                                   = bit32.bor(
     Utils.ImGuiToggleFlags.PulseOnHover,
-    --Utils.ImGuiToggleFlags.SmilyKnob,
-    --Utils.ImGuiToggleFlags.GlowOnHover,
-    Utils.ImGuiToggleFlags.KnobBorder,
-    --Utils.ImGuiToggleFlags.StarKnob,
+    -- Utils.ImGuiToggleFlags.KnobBorder,
+    Utils.ImGuiToggleFlags.StarKnob,
     Utils.ImGuiToggleFlags.AnimateOnHover,
     Utils.ImGuiToggleFlags.RightLabel
 )
@@ -96,6 +94,7 @@ local defaults, settings, themeRowBG, themeBorderBG = {}, {}, {}, {}
 themeRowBG                                          = { 1, 1, 1, 0, }
 themeBorderBG                                       = { 1, 1, 1, 1, }
 
+local MySelf = {}
 defaults                                            = {
     Scale = 1.0,
     LoadTheme = 'Default',
@@ -151,6 +150,7 @@ defaults                                            = {
     BorderBars = false,
     fillGradient = true,
     fillGradientMode = "dynamic",
+    fillGradientDir = ImGradientDir.Horizontal,
 }
 
 -- Functions
@@ -170,6 +170,7 @@ local function loadOpts()
         height = 12 * FontScale,
         fillGradient = (settings[Module.Name].fillGradient == true),
         fillGradientMode = settings[Module.Name].fillGradientMode or "dynamic",
+        fillGradientDir = settings[Module.Name].fillGradientDir or ImGradientDir.Horizontal,
         rounding = 0.5,
         border = (settings[Module.Name].BorderBars == true),
         borderThickness = 1.5,
@@ -187,8 +188,8 @@ end
 local function GetInfoToolTip()
     return string.format(
         '%s\t\tlvl: %d\nClass: \t %s\nHealth:\t%d of %d\nMana:  \t%d of %d\nEnd: \t\t %d of %d\nExp: %d',
-        mq.TLO.Me.DisplayName(), mq.TLO.Me.Level(), mq.TLO.Me.Class.Name(), mq.TLO.Me.CurrentHPs(), mq.TLO.Me.MaxHPs(), mq.TLO.Me.CurrentMana(), mq.TLO.Me.MaxMana(),
-        mq.TLO.Me.CurrentEndurance(), mq.TLO.Me.MaxEndurance(), (mq.TLO.Me.PctExp() or 0)
+        MySelf.Name, MySelf.Level, MySelf.Class, MySelf.HP, MySelf.MaxHP, MySelf.Mana, MySelf.MaxMana,
+        MySelf.Endurance, MySelf.MaxEndurance, MySelf.PctExp
     )
 end
 
@@ -320,13 +321,13 @@ local function DrawInspectableSpellIcon(iconID, spell, i)
     if not spell.Beneficial() then
         beniColor = IM_COL32(255, 0, 0, 190)    --red detrimental
     end
-    if caster == mq.TLO.Me.DisplayName() and not spell.Beneficial() then
+    if caster == MySelf.Name and not spell.Beneficial() then
         beniColor = IM_COL32(190, 190, 20, 255) -- detrimental cast by me (yellow)
     end
     ImGui.GetWindowDrawList():AddRectFilled(ImGui.GetCursorScreenPosVec() + 1,
         ImGui.GetCursorScreenPosVec() + iconSize, beniColor)
     ImGui.SetCursorPos(cursor_x + 3, cursor_y + 3)
-    if caster == mq.TLO.Me.DisplayName() and spell.Beneficial() then
+    if caster == MySelf.Name and spell.Beneficial() then
         ImGui.DrawTextureAnimation(Module.Utils.Animation_Spell, iconSize - 6, iconSize - 6, true)
     else
         ImGui.DrawTextureAnimation(Module.Utils.Animation_Spell, iconSize - 5, iconSize - 5)
@@ -552,7 +553,7 @@ local function drawBar(opts)
     local colorMax     = opts.colorMax
 
     if fontScale then
-        ImGui.SetWindowFontScale(fontScale)
+        
     end
 
     local initialPosition = ImGui.GetCursorScreenPosVec()
@@ -574,14 +575,18 @@ local function drawBar(opts)
         useColMin, useColMax = staticColor, staticColor
     end
     defOpts.fillGradient = settings[Module.Name].fillGradient == true
+    defOpts.fillGradientDir = settings[Module.Name].fillGradientDir or ImGradientDir.Horizontal
     defOpts.showTicks = settings[Module.Name].ShowTicks == true
     defOpts.tickEvery = settings[Module.Name].TickPct ~= nil and (settings[Module.Name].TickPct / 100) or 0.2
     defOpts.tickAlpha = settings[Module.Name].TickAlpha ~= nil and settings[Module.Name].TickAlpha or 80
     defOpts.height = height or progressSize
     defOpts.width = width
     defOpts.shimmerFollows = true
-    ImGui.SetCursorScreenPos(initialPosition)
+    defOpts.rounding = ImGui.GetStyle().FrameRounding
+    defOpts.rounding = defOpts.rounding >= defOpts.height / 2 and defOpts.height / 2 or defOpts.rounding
 
+    ImGui.SetCursorScreenPos(initialPosition)
+    -- printf("rounding %s", defOpts.rounding)
     Module.ProgressBar.DrawProgress(label,
         percentage, useColMin, useColMax, defOpts)
 
@@ -631,8 +636,47 @@ local function drawBar(opts)
 
     if fontScale then
         -- Assume previous font scale value was 1. Appears to be no getter.
-        ImGui.SetWindowFontScale(1)
+        
     end
+end
+
+local function getMyStatus()
+    MySelf = {
+        ID = mq.TLO.Me.ID() or 0,
+        MeleeCombat = mq.TLO.Me.Combat() or false,
+        HP = mq.TLO.Me.CurrentHPs() or 0,
+        MaxHP = mq.TLO.Me.MaxHPs() or 0,
+        PctHP = mq.TLO.Me.PctHPs() or 0,
+        Mana = mq.TLO.Me.CurrentMana() or 0,
+        MaxMana = mq.TLO.Me.MaxMana() or 0,
+        PctMana = mq.TLO.Me.PctMana() or 0,
+        Endurance = mq.TLO.Me.CurrentEndurance() or 0,
+        MaxEndurance = mq.TLO.Me.MaxEndurance() or 0,
+        PctEndurance = mq.TLO.Me.PctEndurance() or 0,
+        PctExp = mq.TLO.Me.PctExp() or 0,
+        ---@diagnostic disable-next-line: undefined-field
+        PctAir = mq.TLO.Me.PctAirSupply() or 0,
+        Name = mq.TLO.Me.DisplayName() or '',
+        Level = mq.TLO.Me.Level() or 0,
+        Class = mq.TLO.Me.Class.Name() or '',
+        Poisoned = mq.TLO.Me.Poisoned() or false,
+        Cursed = mq.TLO.Me.Cursed() or false,
+         Diseased = mq.TLO.Me.Diseased() or false,  
+         Corrupted = mq.TLO.Me.Corrupted() or false,
+         Dotted = mq.TLO.Me.Dotted() or false,
+         CombatState = mq.TLO.Me.CombatState() or "UNKNOWN",
+         GroupMainTank = mq.TLO.Group.MainTank.ID() or 0,
+         GroupMainAssist = mq.TLO.Group.MainAssist.ID() or 0,
+         GroupPuller = mq.TLO.Group.Puller.ID() or 0,
+         GroupLeader = mq.TLO.Group.Leader.ID() or 0,
+         Heading = mq.TLO.Me.Heading() or "??",
+         -- active disc
+         --[[mq.TLO.Me.ActiveDisc()
+        lastActiveDiscTotalSeconds = mq.TLO.Me.ActiveDisc.Duration.TotalSeconds()]]
+        ActiveDisc = mq.TLO.Me.ActiveDisc() ~= nil or false,
+        ActiveDiscName = mq.TLO.Me.ActiveDisc.Name() or '',
+        ActiveDiscDuration = mq.TLO.Me.ActiveDisc.Duration.TotalSeconds() or 0,    
+    }
 end
 
 local function targetBuffs(count)
@@ -737,7 +781,7 @@ local function PlayerTargConf_GUI()
 
     if not open then openConfigGUI = false end
     if showConfigGUI then
-        ImGui.SetWindowFontScale(FontScale)
+        
         ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(1, 0.4, 0.4, 0.9))
         if ImGui.Button("Reset Defaults") then
             settings = dofile(configFile)
@@ -1065,7 +1109,7 @@ local function PlayerTargConf_GUI()
     end
 
     Module.ThemeLoader.EndTheme(ColorCountConf, StyleCountConf)
-    ImGui.SetWindowFontScale(1)
+    
     ImGui.End()
 end
 
@@ -1242,7 +1286,7 @@ local function drawTarget(prependSeparator)
         if tonumber(target.BuffCount() or 0) > 0 then
             local windowWidth, windowHeight = ImGui.GetContentRegionAvail()
             -- Begin a scrollable child
-            ImGui.BeginChild("TargetBuffsScrollRegion", ImVec2(windowWidth, windowHeight), ImGuiChildFlags.Border)
+            ImGui.BeginChild("TargetBuffsScrollRegion", ImVec2(windowWidth, windowHeight), ImGuiChildFlags.Borders)
             targetBuffs(tonumber(target.BuffCount()))
             ImGui.EndChild()
             -- End the scrollable region
@@ -1258,6 +1302,7 @@ local lastActiveDiscName = nil
 local lastActiveDiscTotalSeconds = nil
 function Module.RenderGUI()
     local flags = winFlag
+    ImGui.PushFont(nil, ImGui.GetFontSize() * FontScale)
     -- Default window size
     local target = mq.TLO.Target
     ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
@@ -1321,10 +1366,10 @@ function Module.RenderGUI()
             ImGui.BeginGroup()
             local tPFlags = tPlayerFlags
             local cFlag = bit32.bor(ImGuiChildFlags.AlwaysAutoResize)
-            if mq.TLO.Me.Combat() then
+            if MySelf.MeleeCombat then
                 if flashBorder then
                     ImGui.PushStyleColor(ImGuiCol.Border, 0.9, 0.1, 0.1, (cAlpha / 255))
-                    cFlag = bit32.bor(ImGuiChildFlags.Border, cFlag)
+                    cFlag = bit32.bor(ImGuiChildFlags.Borders, cFlag)
                     tPFlags = tPlayerFlags
                 else
                     ImGui.PushStyleColor(ImGuiCol.TableRowBg, 0.9, 0.1, 0.1, (cAlpha / 255))
@@ -1334,7 +1379,7 @@ function Module.RenderGUI()
             else
                 if flashBorder then
                     ImGui.PushStyleColor(ImGuiCol.Border, themeBorderBG[1], themeBorderBG[2], themeBorderBG[3], themeBorderBG[4])
-                    cFlag = bit32.bor(ImGuiChildFlags.Border, cFlag)
+                    cFlag = bit32.bor(ImGuiChildFlags.Borders, cFlag)
                     tPFlags = tPlayerFlags
                 else
                     ImGui.PushStyleColor(ImGuiCol.TableRowBg, themeRowBG[1], themeRowBG[2], themeRowBG[3], themeRowBG[4])
@@ -1355,40 +1400,38 @@ function Module.RenderGUI()
                 -- Name
 
                 ImGui.TableSetColumnIndex(0)
-                local meName = mq.TLO.Me.DisplayName()
-                ImGui.SetWindowFontScale(FontScale)
-                ImGui.Text(" %s", meName)
-                ImGui.SetWindowFontScale(1)
-                local combatState = mq.TLO.Me.CombatState()
-                if mq.TLO.Me.Poisoned() and mq.TLO.Me.Diseased() then
+                
+                ImGui.Text(" %s", MySelf.Name)
+                
+                if MySelf.Poisoned and MySelf.Diseased then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
                     Module.Utils.DrawStatusIcon(2579, 'item', 'Diseased and Posioned', iconSize)
-                elseif mq.TLO.Me.Poisoned() then
+                elseif MySelf.Poisoned then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
                     Module.Utils.DrawStatusIcon(42, 'spell', 'Posioned', iconSize)
-                elseif mq.TLO.Me.Diseased() then
+                elseif MySelf.Diseased then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
                     Module.Utils.DrawStatusIcon(41, 'spell', 'Diseased', iconSize)
-                elseif mq.TLO.Me.Dotted() then
+                elseif MySelf.Dotted then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
                     Module.Utils.DrawStatusIcon(5987, 'item', 'Dotted', iconSize)
-                elseif mq.TLO.Me.Cursed() then
+                elseif MySelf.Cursed then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
                     Module.Utils.DrawStatusIcon(5759, 'item', 'Cursed', iconSize)
-                elseif mq.TLO.Me.Corrupted() then
+                elseif MySelf.Corrupted then
                     ImGui.SameLine(ImGui.GetColumnWidth() - 45)
                     Module.Utils.DrawStatusIcon(5758, 'item', 'Corrupted', iconSize)
                 end
                 ImGui.SameLine(ImGui.GetColumnWidth() - 25)
-                if combatState == 'DEBUFFED' then
+                if MySelf.CombatState == 'DEBUFFED' then
                     Module.Utils.DrawStatusIcon('A_PWCSDebuff', 'pwcs', 'You are Debuffed and need a cure before resting.', iconSize)
-                elseif combatState == 'ACTIVE' then
+                elseif MySelf.CombatState == 'ACTIVE' then
                     Module.Utils.DrawStatusIcon('A_PWCSStanding', 'pwcs', 'You are not in combat and may rest at any time.', iconSize)
-                elseif combatState == 'COOLDOWN' then
+                elseif MySelf.CombatState == 'COOLDOWN' then
                     Module.Utils.DrawStatusIcon('A_PWCSTimer', 'pwcs', 'You are recovering from combat and can not reset yet', iconSize)
-                elseif combatState == 'RESTING' then
+                elseif MySelf.CombatState == 'RESTING' then
                     Module.Utils.DrawStatusIcon('A_PWCSRegen', 'pwcs', 'You are Resting.', iconSize)
-                elseif combatState == 'COMBAT' then
+                elseif MySelf.CombatState == 'COMBAT' then
                     Module.Utils.DrawStatusIcon('A_PWCSInCombat', 'pwcs', 'You are in Combat.', iconSize)
                 else
                     Module.Utils.DrawStatusIcon(3996, 'item', ' ', iconSize)
@@ -1396,28 +1439,28 @@ function Module.RenderGUI()
                 -- Visiblity
                 ImGui.TableSetColumnIndex(1)
                 if target() ~= nil then
-                    ImGui.SetWindowFontScale(FontScale)
+                    
                     if target.LineOfSight() then
                         ImGui.TextColored(ImVec4(0, 1, 0, 1), Module.Icons.MD_VISIBILITY)
                     else
                         ImGui.TextColored(ImVec4(0.9, 0, 0, 1), Module.Icons.MD_VISIBILITY_OFF)
                     end
-                    ImGui.SetWindowFontScale(1)
+                    
                 end
 
                 -- Icons
                 ImGui.TableSetColumnIndex(2)
                 ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 0, 0)
                 ImGui.Text('')
-                if mq.TLO.Group.MainTank.ID() == mq.TLO.Me.ID() then
+                if MySelf.GroupMainTank == MySelf.ID then
                     ImGui.SameLine()
                     Module.Utils.DrawStatusIcon('A_Tank', 'pwcs', 'Main Tank', iconSize)
                 end
-                if mq.TLO.Group.MainAssist.ID() == mq.TLO.Me.ID() then
+                if MySelf.GroupMainAssist == MySelf.ID then
                     ImGui.SameLine()
                     Module.Utils.DrawStatusIcon('A_Assist', 'pwcs', 'Main Assist', iconSize)
                 end
-                if mq.TLO.Group.Puller.ID() == mq.TLO.Me.ID() then
+                if MySelf.GroupPuller == MySelf.ID then
                     ImGui.SameLine()
                     Module.Utils.DrawStatusIcon('A_Puller', 'pwcs', 'Puller', iconSize)
                 end
@@ -1425,15 +1468,15 @@ function Module.RenderGUI()
                 --  ImGui.SameLine()
                 ImGui.Text(' ')
                 ImGui.SameLine()
-                ImGui.SetWindowFontScale(FontScale)
-                ImGui.Text(mq.TLO.Me.Heading() or '??')
+                
+                ImGui.Text(MySelf.Heading or '??')
                 ImGui.PopStyleVar()
                 -- Lvl
                 ImGui.TableSetColumnIndex(3)
                 ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 2, 0)
 
-                ImGui.Text(tostring(mq.TLO.Me.Level() or 0))
-                ImGui.SetWindowFontScale(1)
+                ImGui.Text(tostring(MySelf.Level or 0))
+                
                 if ImGui.IsItemHovered() then
                     ImGui.SetTooltip(GetInfoToolTip())
                 end
@@ -1449,22 +1492,22 @@ function Module.RenderGUI()
             ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 8, 1)
 
             -- My Health Bar
-            local percentage = tonumber(mq.TLO.Me.PctHPs() or 0)
+            local percentage = tonumber((MySelf.HP or 0) / (MySelf.MaxHP or 1))
             local staticColor
             if percentage <= 0 then
                 staticColor = Module.Colors.color('purple')
-            elseif percentage < 25 then
+            elseif percentage < 0.25 then
                 staticColor = Module.Colors.color('orange')
             else
                 staticColor = Module.Colors.color('red')
             end
 
             local text
-            local maxValue = mq.TLO.Me.MaxHPs()
-            if showValues and maxValue and maxValue ~= 100 then
-                text = string.format("%d / %d", mq.TLO.Me.CurrentHPs() or 0, maxValue)
+            local maxHPValue = MySelf.MaxHP
+            if showValues and maxHPValue and maxHPValue ~= 100 then
+                text = string.format("%d / %d", MySelf.HP or 0, maxHPValue)
             else
-                text = tostring(percentage) .. "%"
+                text = string.format("%.0f%%", percentage * 100)
             end
 
             drawBar({
@@ -1487,14 +1530,13 @@ function Module.RenderGUI()
             ImGui.Spacing()
 
             --My Mana Bar
-            if tonumber(mq.TLO.Me.MaxMana() or 0) > 0 then
-                local percentage = tonumber(mq.TLO.Me.PctMana() or 0)
-                local text
-                local maxValue = mq.TLO.Me.MaxMana()
-                if showValues and maxValue and maxValue ~= 100 then
-                    text = string.format("%d / %d", mq.TLO.Me.CurrentMana() or 0, maxValue)
+            if tonumber(MySelf.MaxMana or 0) > 0 then
+                percentage = tonumber((MySelf.Mana or 0) / (MySelf.MaxMana or 1))
+                local maxManaVal = MySelf.MaxMana
+                if showValues and maxManaVal and maxManaVal > 0 then
+                    text = string.format("%d / %d", MySelf.Mana or 0, maxManaVal)
                 else
-                    text = tostring(percentage) .. "%"
+                    text = string.format("%.0f%%", percentage * 100)    
                 end
 
                 drawBar({
@@ -1518,13 +1560,12 @@ function Module.RenderGUI()
             end
 
             --My Endurance bar
-            local percentage = tonumber(mq.TLO.Me.PctEndurance() or 0)
-            local text
-            local maxValue = mq.TLO.Me.MaxEndurance()
-            if showValues and maxValue and maxValue ~= 100 then
-                text = string.format("%d / %d", mq.TLO.Me.CurrentEndurance() or 0, maxValue)
+            percentage = tonumber((MySelf.Endurance or 0) / (MySelf.MaxEndurance or 1))
+            local maxEndValue = MySelf.MaxEndurance
+            if showValues and maxEndValue and maxEndValue ~= 0 then
+                text = string.format("%d / %d", MySelf.Endurance or 0, maxEndValue)
             else
-                text = tostring(percentage) .. "%"
+                text = string.format("%.0f%%", percentage * 100)
             end
 
             drawBar({
@@ -1603,7 +1644,7 @@ function Module.RenderGUI()
                 if mq.TLO.Cursor() then
                     mq.cmd("/autoinventory")
                 end
-                mq.cmdf("/target %s", mq.TLO.Me())
+                mq.cmdf("/target %s", MySelf.Name)
             end
             ImGui.PopStyleVar()
             --Target Info
@@ -1654,7 +1695,7 @@ function Module.RenderGUI()
             breathBarShow = false
         end
         if showBreath then
-            ImGui.SetWindowFontScale(FontScale)
+            
 
             local yPos = ImGui.GetCursorPosY()
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor(colorBreathMin, colorBreathMax, breathPct)))
@@ -1670,7 +1711,7 @@ function Module.RenderGUI()
                 end
                 ImGui.EndPopup()
             end
-            ImGui.SetWindowFontScale(1)
+            
         end
         Module.ThemeLoader.EndTheme(ColorCountBreath, StyleCountBreath)
         ImGui.End()
@@ -1683,6 +1724,8 @@ function Module.RenderGUI()
     if openConfigGUI then
         PlayerTargConf_GUI()
     end
+
+    ImGui.PopFont()
 end
 
 --Setup and Loop
@@ -1693,6 +1736,7 @@ end
 local function init()
     Module.IsRunning = true
     loadSettings()
+    getMyStatus()
     if not loadedExeternally then
         mq.imgui.init('GUI_Target', Module.RenderGUI)
         Module.LocalLoop()
@@ -1710,10 +1754,12 @@ function Module.MainLoop()
 
     --local timeDiff = mq.gettime() - clockTimer
     -- if timeDiff > 3 then
+    if mq.gettime() - clockTimer >= 100 then
+        clockTimer = mq.gettime()
+        getMyStatus()
+    end
 
-    ---@diagnostic disable-next-line: undefined-field
-    breathPct = mq.TLO.Me.PctAirSupply() or 100
-    if breathPct < 100 then
+    if MySelf.PctAir < 100 then
         breathBarShow = true
     else
         breathBarShow = false

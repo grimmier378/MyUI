@@ -42,10 +42,9 @@ end
 local Utils              = Module.Utils
 local ToggleFlags        = bit32.bor(
     Utils.ImGuiToggleFlags.PulseOnHover,
-    --Utils.ImGuiToggleFlags.SmilyKnob,
     Utils.ImGuiToggleFlags.GlowOnHover,
-    Utils.ImGuiToggleFlags.KnobBorder,
-    --Utils.ImGuiToggleFlags.StarKnob,
+    -- Utils.ImGuiToggleFlags.KnobBorder,
+    Utils.ImGuiToggleFlags.StarKnob,
     Utils.ImGuiToggleFlags.AnimateOnHover,
     Utils.ImGuiToggleFlags.RightLabel)
 local gIcon              = Module.Icons.MD_SETTINGS
@@ -200,8 +199,8 @@ local function loadOpts()
         shimmerWidth = 45,
         height = 12 * Scale,
         fillGradient = (settings[Module.Name].UseGradients == true),
+        fillGradientDir = ImGradientDir.Horizontal,
         fillGradientMode = "dynamic",
-        rounding = 0.0,
         border = (settings[Module.Name].BorderBars == true),
         borderSize = 1.0,
         borderColor = settings[Module.Name].Colors.Borders or Module.Colors.color('grey'),
@@ -212,6 +211,7 @@ local function loadOpts()
         tickAlpha = 100,
         width = 0.0,
         padEnd = 4.0,
+        rounding = ImGui.GetStyle().FrameRounding,
     }
 end
 
@@ -537,6 +537,7 @@ local function DrawGroupMember(id)
         defOpts.width = 0.0
         defOpts.padEnd = 4.0
     end
+    defOpts.rounding = defOpts.rounding >= defOpts.height / 2 and defOpts.height / 2 or defOpts.rounding
     Module.ProgressBar.DrawProgress("HP##" .. memberName,
         hpPct,
         minHP, maxHP, settings[Module.Name].DynamicHP and defOpts or { width = 0.0, height = barSize * Scale, })
@@ -565,6 +566,7 @@ local function DrawGroupMember(id)
                 -- ImGui.ProgressBar((mpPct / 100), ImGui.GetContentRegionAvail(), barSize * Scale, '##pctMana' .. id)
                 defOpts.height = barSize * Scale
                 defOpts.fillGradientMode = "static"
+                defOpts.rounding = defOpts.rounding >= defOpts.height / 2 and defOpts.height / 2 or defOpts.rounding
 
                 Module.ProgressBar.DrawProgress("MP##" .. memberName,
                     mpPct,
@@ -593,6 +595,7 @@ local function DrawGroupMember(id)
 
         defOpts.height = barSize * Scale
         defOpts.fillGradientMode = "dynamic"
+        defOpts.rounding = defOpts.rounding >= defOpts.height / 2 and defOpts.height / 2 or defOpts.rounding
 
         Module.ProgressBar.DrawProgress("END##" .. memberName,
             enPct,
@@ -643,9 +646,11 @@ local function DrawGroupMember(id)
                 defOpts.height = 48
                 defOpts.padEnd = 5
                 ImGui.SetCursorPos(petPosX, petPosY)
+                defOpts.rounding = defOpts.rounding >= defOpts.width / 2 and defOpts.width / 2 or defOpts.rounding
             else
                 defOpts.vertical = false
                 defOpts.width = 0.0
+                defOpts.rounding = defOpts.rounding >= defOpts.height / 2 and defOpts.height / 2 or defOpts.rounding
             end
 
             Module.ProgressBar.DrawProgress("PetHP##" .. memberName,
@@ -751,7 +756,7 @@ local function DrawRaidMember(id)
         return
     end
 
-    ImGui.BeginChild("##RaidMember" .. tostring(id), 0.0, (90 * RaidScale), bit32.bor(ImGuiChildFlags.Border), ImGuiWindowFlags.NoScrollbar)
+    ImGui.BeginChild("##RaidMember" .. tostring(id), 0.0, (90 * RaidScale), bit32.bor(ImGuiChildFlags.Borders), ImGuiWindowFlags.NoScrollbar)
     ImGui.BeginGroup()
     local sizeX, sizeY = ImGui.GetContentRegionAvail()
     if ImGui.BeginTable("##playerInfo" .. tostring(id), 3, tPlayerFlags) then
@@ -1068,6 +1073,7 @@ local function DrawSelf()
         defOpts.width = 0.0
         defOpts.padEnd = 4.0
     end
+    defOpts.rounding = defOpts.rounding >= defOpts.height / 2 and defOpts.height / 2 or defOpts.rounding
 
     Module.ProgressBar.DrawProgress("HP##Self",
         mySelf.PctHPs() or 0,
@@ -1103,6 +1109,8 @@ local function DrawSelf()
 
                 defOpts.height = barSize * Scale
                 defOpts.fillGradientMode = "static"
+                defOpts.rounding = defOpts.rounding >= defOpts.height / 2 and defOpts.height / 2 or defOpts.rounding
+
                 Module.ProgressBar.DrawProgress("MP##Self",
                     mySelf.PctMana() or 0,
                     manaMin, manaMax, settings[Module.Name].DynamicMP and defOpts or { padEnd = 15, width = 0.0, height = barSize * Scale, })
@@ -1135,6 +1143,8 @@ local function DrawSelf()
         -- ImGui.PopStyleColor()
         defOpts.height = barSize * Scale
         defOpts.fillGradientMode = "dynamic"
+        defOpts.rounding = defOpts.rounding >= defOpts.height / 2 and defOpts.height / 2 or defOpts.rounding
+
         Module.ProgressBar.DrawProgress("END##Self",
             mySelf.PctEndurance() or 0,
             endurMin, endurMax, settings[Module.Name].DynamicHP and defOpts or { padEnd = 15, width = 0.0, height = barSize * Scale, })
@@ -1169,11 +1179,15 @@ local function DrawSelf()
                 defOpts.vertical = true
                 defOpts.width = 15
                 defOpts.height = 48
+                defOpts.fillGradientDir = ImGradientDir.Vertical
                 defOpts.padEnd = 5
                 ImGui.SetCursorPos(petPosX, petPosY)
+                defOpts.rounding = defOpts.rounding >= defOpts.width / 2 and defOpts.width / 2 or defOpts.rounding
             else
                 defOpts.vertical = false
                 defOpts.width = 0.0
+                defOpts.fillGradientDir = ImGradientDir.Horizontal
+                defOpts.rounding = defOpts.rounding >= defOpts.height / 2 and defOpts.height / 2 or defOpts.rounding
             end
             Module.ProgressBar.DrawProgress("PET##Self",
                 mySelf.Pet.PctHPs() or 0,
@@ -1204,7 +1218,7 @@ end
 function Module.RenderGUI()
     if not Module.IsRunning then return end
     local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme, settings[Module.Name].MouseOver, mouseHover, settings[Module.Name].WinTransparency)
-
+    ImGui.PushFont(nil, ImGui.GetFontSize() * Scale)
     ------- Main Window --------
     if showGroupWindow then
         if currZone ~= lastZone then return end
@@ -1236,7 +1250,7 @@ function Module.RenderGUI()
                 end
                 ImGui.EndMenuBar()
             end
-            ImGui.SetWindowFontScale(Scale)
+
             -- Player Information
             if showSelf then
                 DrawSelf()
@@ -1258,7 +1272,7 @@ function Module.RenderGUI()
                     local dummyCount = 6 - mq.TLO.Me.GroupSize()
                     if mq.TLO.Me.GroupSize() == 0 then dummyCount = 5 end
                     for i = 1, dummyCount do
-                        ImGui.BeginChild("Dummy##" .. i, -1, 62, bit32.bor(ImGuiChildFlags.Border), ImGuiWindowFlags.NoScrollbar)
+                        ImGui.BeginChild("Dummy##" .. i, -1, 62, bit32.bor(ImGuiChildFlags.Borders), ImGuiWindowFlags.NoScrollbar)
                         ImGui.Dummy(ImGui.GetContentRegionAvail(), 75)
                         ImGui.EndChild()
                     end
@@ -1332,7 +1346,6 @@ function Module.RenderGUI()
             mimicMe = tmpMimic
         end
 
-        ImGui.SetWindowFontScale(1)
 
         if not openGUI then
             showGroupWindow = false
@@ -1340,8 +1353,6 @@ function Module.RenderGUI()
 
         ImGui.End()
     end
-
-
 
     if showRaidWindow and raidSize > 0 then
         if currZone ~= lastZone then return end
@@ -1373,7 +1384,7 @@ function Module.RenderGUI()
                 end
                 ImGui.EndMenuBar()
             end
-            ImGui.SetWindowFontScale(Scale)
+
 
             if raidSize > 0 then
                 local col = math.ceil(raidSize / 6) > 0 and math.ceil(raidSize / 6) or 1
@@ -1487,7 +1498,7 @@ function Module.RenderGUI()
             end
         end
 
-        ImGui.SetWindowFontScale(1)
+
 
         if not openGUI then
             showRaidWindow = false
@@ -1501,7 +1512,6 @@ function Module.RenderGUI()
         local open, configShow = ImGui.Begin("MyGroup Conf", true, bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoCollapse, ImGuiWindowFlags.AlwaysAutoResize))
         if not open then OpenConfigGUI = false end
         if configShow then
-            ImGui.SetWindowFontScale(Scale)
             if ImGui.CollapsingHeader("Theme##" .. Module.Name) then
                 ImGui.Text("Cur Theme: %s", themeName)
                 -- Combo Box Load Theme
@@ -1704,10 +1714,12 @@ function Module.RenderGUI()
                 loadOpts()
             end
         end
-        ImGui.SetWindowFontScale(1)
+
         ImGui.End()
     end
     Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
+
+    ImGui.PopFont()
 end
 
 function Module.Unload()
@@ -1780,20 +1792,21 @@ local function GenerateContent(sub)
         firstRun = false
     end
     return {
+        --[[groupData[Module.CharLoaded]]
         Subject  = Subject,
-        Who      = mq.TLO.Me.DisplayName(),
-        CurHP    = mq.TLO.Me.CurrentHPs(),
-        MaxHP    = mq.TLO.Me.MaxHPs(),
-        CurMana  = mq.TLO.Me.CurrentMana(),
-        MaxMana  = mq.TLO.Me.MaxMana(),
-        CurEnd   = mq.TLO.Me.CurrentEndurance(),
-        MaxEnd   = mq.TLO.Me.MaxEndurance(),
-        Check    = os.clock(),
-        Level    = mq.TLO.Me.Level(),
-        Class    = mq.TLO.Me.Class.ShortName(),
-        Sitting  = mq.TLO.Me.Sitting(),
-        Zone     = mq.TLO.Zone.Name(),
-        Velocity = mq.TLO.Me.Speed(),
+        Who      = groupData[Module.CharLoaded].Name,
+        CurHP    = groupData[Module.CharLoaded].CurHP,
+        MaxHP    = groupData[Module.CharLoaded].MaxHP,
+        CurMana  = groupData[Module.CharLoaded].CurMana,
+        MaxMana  = groupData[Module.CharLoaded].MaxMana,
+        CurEnd   = groupData[Module.CharLoaded].CurEnd,
+        MaxEnd   = groupData[Module.CharLoaded].MaxEnd,
+        Check    = groupData[Module.CharLoaded].Check,
+        Level    = groupData[Module.CharLoaded].Level,
+        Class    = groupData[Module.CharLoaded].Class,
+        Sitting  = groupData[Module.CharLoaded].Sitting,
+        Zone     = groupData[Module.CharLoaded].Zone,
+        Velocity = groupData[Module.CharLoaded].Velocity,
     }
 end
 
@@ -1874,23 +1887,23 @@ end
 
 local function getMyInfo()
     local mySelf = mq.TLO.Me
-    raidSize = mq.TLO.Raid.Members() or 0
-    raidLeader = mq.TLO.Raid.Leader() or 'N/A'
-    groupData[mySelf.Name()] = {
-        Name = mySelf.Name(),
-        Level = mySelf.Level() or 0,
-        CurHP = mySelf.CurrentHPs() or 0,
-        MaxHP = mySelf.MaxHPs() or 0,
-        CurMana = mySelf.CurrentMana() or 0,
-        MaxMana = mySelf.MaxMana() or 0,
-        CurEnd = mySelf.CurrentEndurance() or 0,
-        MaxEnd = mySelf.MaxEndurance() or 0,
-        Class = mySelf.Class.ShortName() or 'N/A',
-        Sitting = mySelf.Sitting() or false,
-        ID = mq.TLO.Me.ID() or 0,
-        Pet = mq.TLO.Me.Pet() or 0,
+    raidSize = MyUI_MyData ~= nil and MyUI_MyData.RaidSize or (mq.TLO.Raid.Members() or 0)
+    raidLeader = MyUI_MyData ~= nil and MyUI_MyData.RaidLeader or (mq.TLO.Raid.Leader() or 'N/A')
+    groupData[Module.CharLoaded] = {
+        Name = MyUI_MyData ~= nil and MyUI_MyData.Name or mySelf.Name(),
+        Level = MyUI_MyData ~= nil and MyUI_MyData.Level or (mySelf.Level() or 0),
+        CurHP = MyUI_MyData ~= nil and MyUI_MyData.CurHP or (mySelf.CurrentHPs() or 0),
+        MaxHP = MyUI_MyData ~= nil and MyUI_MyData.MaxHP or (mySelf.MaxHPs() or 0),
+        CurMana = MyUI_MyData ~= nil and MyUI_MyData.CurMana or (mySelf.CurrentMana() or 0),
+        MaxMana = MyUI_MyData ~= nil and MyUI_MyData.MaxMana or (mySelf.MaxMana() or 0),
+        CurEnd = MyUI_MyData ~= nil and MyUI_MyData.CurEnd or (mySelf.CurrentEndurance() or 0),
+        MaxEnd = MyUI_MyData ~= nil and MyUI_MyData.MaxEnd or (mySelf.MaxEndurance() or 0),
+        Class = MyUI_MyData ~= nil and MyUI_MyData.ClassShort or (mySelf.Class.ShortName() or 'N/A'),
+        Sitting = MyUI_MyData ~= nil and MyUI_MyData.Sitting or (mySelf.Sitting() or false),
+        ID = MyUI_MyData ~= nil and MyUI_MyData.ID or (mq.TLO.Me.ID() or 0),
+        Pet = MyUI_MyData ~= nil and MyUI_MyData.Pet or (mq.TLO.Me.Pet() or 0),
         Zone = Module.MyZone,
-        Velocity = mq.TLO.Me.Speed() or 0,
+        Velocity = MyUI_MyData ~= nil and MyUI_MyData.Speed or (mq.TLO.Me.Speed() or 0),
         Check = os.clock(),
     }
     Module.GetMemberData()

@@ -86,7 +86,7 @@ local tableFlags     = bit32.bor(
 )
 
 local childFlags     = bit32.bor(
-	ImGuiChildFlags.Border
+	ImGuiChildFlags.Borders
 -- ImGuiChildFlags.ResizeY
 )
 
@@ -303,7 +303,6 @@ local function DrawAATable(which_Table, label)
 	end
 	local sizeX, sizeY = ImGui.GetContentRegionAvail()
 	if ImGui.BeginChild("Child##" .. label, ImVec2(sizeX, sizeY * 0.7), childFlags) then
-		ImGui.SetWindowFontScale(Module.Settings.scale)
 
 		if ImGui.BeginTable(label .. "##TableData3", 6, tableFlags) then
 			ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch)
@@ -363,7 +362,6 @@ local function DrawAATable(which_Table, label)
 			end
 			ImGui.EndTable()
 		end
-		ImGui.SetWindowFontScale(1)
 	end
 	ImGui.EndChild()
 end
@@ -418,6 +416,7 @@ local tabPage = mq.TLO.Window("AAWindow/AAW_Subwindows")
 
 -- Exposed Functions
 function Module.RenderGUI()
+    ImGui.PushFont(nil, ImGui.GetFontSize() * Module.Settings.scale)
 	local styleCount, colorCount = Module.ThemeLoader.StartTheme(MyUI_ThemeName or Module.ThemeName, MyUI_Theme or Module.Theme)
 	if Module.ShowGui then
 		ImGui.SetNextWindowSize(ImVec2(600, 400), ImGuiCond.FirstUseEver)
@@ -435,7 +434,6 @@ function Module.RenderGUI()
 			ImGui.SameLine()
 			ImGui.SetNextItemWidth(100)
 			Module.Settings.scale, _ = ImGui.SliderFloat("Scale", Module.Settings.scale, 0.5, 2.0, "%.1f")
-			ImGui.SetWindowFontScale(Module.Settings.scale)
 
 			ImGui.Text("Available AA:")
 			ImGui.SameLine()
@@ -525,7 +523,6 @@ function Module.RenderGUI()
 				ImGui.PopTextWrapPos()
 			end
 			ImGui.EndChild()
-			ImGui.SetWindowFontScale(1)
 		end
 
 		ImGui.End()
@@ -534,6 +531,7 @@ function Module.RenderGUI()
 		RenderBtn()
 	end
 	MyUI_ThemeLoader.EndTheme(styleCount, colorCount)
+    ImGui.PopFont()
 end
 
 function Module.Unload()

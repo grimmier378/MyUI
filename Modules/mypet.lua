@@ -24,6 +24,7 @@ if not loadedExeternally then
 	Module.Server      = mq.TLO.MacroQuest.Server()
 	Module.Theme       = {}
 	Module.ThemeFile   = string.format('%s/MyUI/ThemeZ.lua', mq.configDir)
+    Module.ProgressBar = require('lib.progressBars')
 else
 	Module.Utils = MyUI_Utils
 	Module.Colors = MyUI_Colors
@@ -33,16 +34,15 @@ else
 	Module.Theme = MyUI_Theme
 	Module.ThemeFile = MyUI_ThemeFile
 	Module.ThemeLoader = MyUI_ThemeLoader
+    Module.ProgressBar = MyUI_ProgressBar
 end
 Module.TempSettings                                                               = {}
 Module.ButtonLabels                                                               = {}
 local Utils                                                                       = Module.Utils
 local ToggleFlags                                                                 = bit32.bor(
 	Utils.ImGuiToggleFlags.PulseOnHover,
-	--Utils.ImGuiToggleFlags.SmilyKnob,
-	--Utils.ImGuiToggleFlags.GlowOnHover,
-	Utils.ImGuiToggleFlags.KnobBorder,
-	--Utils.ImGuiToggleFlags.StarKnob,
+	-- Utils.ImGuiToggleFlags.KnobBorder,
+	Utils.ImGuiToggleFlags.StarKnob,
 	Utils.ImGuiToggleFlags.AnimateOnHover
 --Utils.ImGuiToggleFlags.RightLabel
 )
@@ -55,6 +55,8 @@ local locked, hasThemeZ                                                         
 local petHP, petTarg, petDist, petBuffs, petName, petTargHP, petLvl, petBuffCount = 0, nil, 0, {}, 'NO PET', 0, -1, 0
 local lastCheck                                                                   = 0
 local myPet                                                                       = mq.TLO.Pet
+local MAX_PET_BUFFS = 120
+
 local btnKeys                                                                     = {
 	"Attack",
 	"Back",
@@ -114,6 +116,11 @@ defaults                                                                        
 	AutoSize = false,
 	ButtonsRow = 2,
 	IconSize = 20,
+    UseGradients = true,
+    ShimmerEfx = false,
+    GlowEfx = false,
+    TickPct = 0.2,
+    ShowTicks = false,
 	Buttons = {
 		Attack = { show = true, cmd = "/pet attack", },
 		Back = { show = true, cmd = "/pet back off", },
@@ -148,6 +155,32 @@ defaults                                                                        
 	ColorTargMin = { 0.2, 0.2, 1.0, 1, },
 }
 
+local  defOpts = {} 
+local barHeight = 12
+local function loadOpts()
+barHeight = barHeight * settings[Module.Name].Scale
+defOpts = {
+    shimmer = true,
+    shimmerColor = Module.Colors.color('white'),
+    shimmerWidth = 45,
+    height = 12 * settings[Module.Name].Scale,
+    fillGradient = (settings[Module.Name].UseGradients == true),
+    fillGradientMode = "dynamic",
+    fillGradientDir = ImGradientDir.DiagTopLeftBottomRight,
+    border = false,
+    borderSize = 1.0,
+    borderColor = Module.Colors.color('grey'),
+    glow = (settings[Module.Name].GlowEfx == true),
+    showText = false,
+    showTicks = (settings[Module.Name].ShowTicks == true),
+    tickEvery = settings[Module.Name].TickPct ~= nil and settings[Module.Name].TickPct or 0.2,
+    tickAlpha = 100,
+    width = 0.0,
+    padEnd = 4.0,
+    rounding = ImGui.GetStyle().FrameRounding > 0.0 and ImGui.GetStyle().FrameRounding or (barHeight / 2),
+}
+end
+
 local function loadTheme()
 	-- Check for the Theme File
 	if Module.Utils.File.Exists(Module.ThemeFile) then
@@ -159,31 +192,51 @@ local function loadTheme()
 	end
 end
 
+local function GetButtonStates()
+    local stance = myPet.Stance() or "UNKNOWN"
+    btnInfo.follow = stance == 'FOLLOW' and true or false
+    btnInfo.guard = stance == 'GUARD' and true or false
+    btnInfo.sit = myPet.Sitting() and true or false
+    btnInfo.taunt = myPet.Taunt() and true or false
+    btnInfo.stop = myPet.Stop() and true or false
+    btnInfo.hold = myPet.Hold() and true or false
+    btnInfo.focus = myPet.Focus() and true or false
+    btnInfo.regroup = myPet.ReGroup() and true or false
+    btnInfo.ghold = myPet.GHold() and true or false
+end
+
 local function getPetData()
+    local buffTable = {}
 	if myPet() == 'NO PET' then
-		petBuffs = {}
-		return
+		return buffTable, 0
 	end
 	-- petBuffs = {}
 	local tmpBuffCnt = 0
-	for i = 1, 120 do
-		local name = mq.TLO.Me.PetBuff(i)() or 'None'
-		local id = mq.TLO.Spell(name).ID() or 0
-		local beneficial = mq.TLO.Spell(id).Beneficial() or nil
-		local icon = mq.TLO.Spell(id).SpellIcon() or 0
+    local buffCount = myPet.BuffCount() or 0
+	for i = 1, MAX_PET_BUFFS do
+        local buff = myPet.Buff(i)
+		local name = buff() or 'None'
+		local id = buff.ID() or 0
+		local beneficial = buff.Beneficial() or false
+		local icon = buff.SpellIcon() or 0
 		local slot = i
-		petBuffs[i] = {}
-		petBuffs[i] = { Name = name, ID = id, Beneficial = beneficial, Icon = icon, Slot = slot, }
+		buffTable[i] = {}
+		buffTable[i] = { Name = name, ID = id, Beneficial = beneficial, Icon = icon, Slot = slot, }
 		if name ~= 'None' then
 			tmpBuffCnt = tmpBuffCnt + 1
 		end
+        if tmpBuffCnt >= buffCount then
+            break
+        end
 	end
-	petBuffCount = tmpBuffCnt
+
+    GetButtonStates()
+
+	return buffTable, tmpBuffCnt
 end
 
 local function loadSettings()
 	local newSetting = false -- Check if we need to save the settings file
-
 	-- Check Settings
 	if not Module.Utils.File.Exists(configFile) then
 		if Module.Utils.File.Exists(configFileOld) then
@@ -224,19 +277,8 @@ local function loadSettings()
 	Module.TempSettings = settings[Module.Name]
 	-- Save the settings if new settings were added
 	if newSetting then mq.pickle(configFile, settings) end
-end
+loadOpts()
 
-local function GetButtonStates()
-	local stance = myPet.Stance()
-	btnInfo.follow = stance == 'FOLLOW' and true or false
-	btnInfo.guard = stance == 'GUARD' and true or false
-	btnInfo.sit = myPet.Sitting() and true or false
-	btnInfo.taunt = myPet.Taunt() and true or false
-	btnInfo.stop = myPet.Stop() and true or false
-	btnInfo.hold = myPet.Hold() and true or false
-	btnInfo.focus = myPet.Focus() and true or false
-	btnInfo.regroup = myPet.ReGroup() and true or false
-	btnInfo.ghold = myPet.GHold() and true or false
 end
 
 local function DrawInspectableSpellIcon(iconID, bene, name, i)
@@ -244,8 +286,7 @@ local function DrawInspectableSpellIcon(iconID, bene, name, i)
 	local cursor_x, cursor_y = ImGui.GetCursorPos()
 	local beniColor = IM_COL32(0, 20, 180, 190) -- blue benificial default color
 	if iconID == 0 then
-		ImGui.SetWindowFontScale(settings[Module.Name].Scale)
-		ImGui.Text("%s", i)
+		-- ImGui.Text("%s", i)
 		ImGui.PushID(tostring(iconID) .. i .. "_invis_btn")
 		ImGui.SetCursorPos(cursor_x, cursor_y)
 		ImGui.InvisibleButton("slot" .. tostring(i), ImVec2(iconSize, iconSize), bit32.bor(ImGuiButtonFlags.MouseButtonRight))
@@ -283,7 +324,6 @@ local function DrawInspectableSpellIcon(iconID, bene, name, i)
 		ImGui.EndPopup()
 	end
 	if ImGui.IsItemHovered() then
-		ImGui.SetWindowFontScale(settings[Module.Name].Scale)
 		ImGui.BeginTooltip()
 		ImGui.Text(sName)
 		ImGui.EndTooltip()
@@ -296,8 +336,10 @@ local function sortButtons()
 end
 
 function Module.RenderGUI()
+    ImGui.PushFont(nil,ImGui.GetFontSize() * settings[Module.Name].Scale)
 	if showMainGUI then
 		-- Sort the buttons before displaying them
+        loadOpts()
 		sortButtons()
 		if (autoHide and petName ~= 'NO PET') or not autoHide then
 			ImGui.SetNextWindowSize(ImVec2(275, 255), ImGuiCond.FirstUseEver)
@@ -315,7 +357,6 @@ function Module.RenderGUI()
 			-- Check if the window is showing
 			if showMain then
 				-- Set Window Font Scale
-				ImGui.SetWindowFontScale(scale)
 				if ImGui.BeginPopupContextWindow() then
 					if ImGui.MenuItem("Settings") then
 						-- Toggle Config Window
@@ -368,9 +409,17 @@ function Module.RenderGUI()
 							ImGui.TextColored((Module.Colors.color('green')), "%.0f", petDist)
 						end
 						local yPos = ImGui.GetCursorPosY() - 1
-						ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor({ 0.245, 0.245, 0.938, 1.000, }, { 0.976, 0.134, 0.134, 1.000, }, petHP, nil, 0)))
-						ImGui.ProgressBar(petHP / 100, -1, 15, "##")
-						ImGui.PopStyleColor()
+						-- ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Utils.CalculateColor({ 0.245, 0.245, 0.938, 1.000, }, { 0.976, 0.134, 0.134, 1.000, }, petHP, nil, 0)))
+
+                        -- ImGui.ProgressBar(petHP / 100, -1, 15, "##")
+                        Module.ProgressBar.DrawProgress(
+                            "Pet HP##PetHP",
+                            petHP / 100,
+                        ImColor(settings[Module.Name].ColorHPMin),
+                        ImColor(settings[Module.Name].ColorHPMax),
+                        defOpts
+                        )
+						-- ImGui.PopStyleColor()
 						ImGui.SetCursorPosY(yPos)
 						ImGui.SetCursorPosX(ImGui.GetColumnWidth() / 2)
 						ImGui.Text("%.1f%%", petHP)
@@ -389,10 +438,17 @@ function Module.RenderGUI()
 						local txCol = settings[Module.Name].ConColors[conCol]
 						ImGui.TextColored(ImVec4(txCol[1], txCol[2], txCol[3], txCol[4]), "%s", petTarg)
 						if petTarg ~= nil then
-							ImGui.PushStyleColor(ImGuiCol.PlotHistogram,
-								(Module.Utils.CalculateColor({ 0.165, 0.488, 0.162, 1.000, }, { 0.858, 0.170, 0.106, 1.000, }, petTargHP, nil, 0)))
-							ImGui.ProgressBar(petTargHP / 100, -1, 15)
-							ImGui.PopStyleColor()
+							-- ImGui.PushStyleColor(ImGuiCol.PlotHistogram,
+							-- 	(Module.Utils.CalculateColor({ 0.165, 0.488, 0.162, 1.000, }, { 0.858, 0.170, 0.106, 1.000, }, petTargHP, nil, 0)))
+							-- ImGui.ProgressBar(petTargHP / 100, -1, 15)
+							-- ImGui.PopStyleColor()
+                            Module.ProgressBar.DrawProgress(
+                                "Target HP##TargHP",
+                                petTargHP / 100,
+                            ImColor(settings[Module.Name].ColorTargMin),
+                            ImColor(settings[Module.Name].ColorTargMax),
+                            defOpts
+                        )
 						else
 							ImGui.Dummy(20, 15)
 						end
@@ -455,8 +511,6 @@ function Module.RenderGUI()
 						ImGui.EndTable()
 					end
 				end
-				-- Reset Font Scale
-				ImGui.SetWindowFontScale(1)
 			end
 			Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
 			ImGui.End()
@@ -639,6 +693,8 @@ function Module.RenderGUI()
 		Module.ThemeLoader.EndTheme(ColCntConf, StyCntConf)
 		ImGui.End()
 	end
+
+    ImGui.PopFont()
 end
 
 function Module.Unload()
@@ -653,23 +709,31 @@ local function Init()
 		hasThemeZ = true
 	end
 	-- Initialize ImGui	getPetData()
-	lastCheck = os.time()
-	GetButtonStates()
+	lastCheck = mq.gettime()
+
 	Module.IsRunning = true
 	if not loadedExeternally then
+        petBuffs, petBuffCount = getPetData()
+        GetButtonStates()
 		mq.imgui.init(Module.Name, Module.RenderGUI)
 		Module.LocalLoop()
-	end
+    else
+        petBuffs = MyUI_MyPetData.Buffs
+        petBuffCount = MyUI_MyPetData.BuffCount
+        btnInfo = MyUI_MyPetData.ButtonStates
+    end
 end
 
-local clockTimer = mq.gettime()
 function Module.MainLoop()
 	if loadedExeternally then
 		---@diagnostic disable-next-line: undefined-global
 		if not MyUI_LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+        petBuffs = MyUI_MyPetData.Buffs
+        petBuffCount = MyUI_MyPetData.BuffCount
+        btnInfo = MyUI_MyPetData.ButtonStates
 	end
 
-	local timeDiff = mq.gettime() - clockTimer
+	local timeDiff = mq.gettime() - lastCheck
 	if timeDiff > 100 then
 		petName = myPet.DisplayName() or 'NO PET'
 		-- Process ImGui Window Flag Changes
@@ -677,14 +741,10 @@ function Module.MainLoop()
 		winFlags = locked and bit32.bor(ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoResize, winFlags) or winFlags
 		-- winFlags = aSize and bit32.bor(winFlags, ImGuiWindowFlags.AlwaysAutoResize) or winFlags
 		winFlags = not showTitleBar and bit32.bor(winFlags, ImGuiWindowFlags.NoTitleBar) or winFlags
-		if petName ~= 'NO PET' then
-			GetButtonStates()
-			getPetData()
-		else
-			petBuffCount = 0
-			petBuffs = {}
-		end
-		clockTimer = mq.gettime()
+       if not loadedExeternally then
+        petBuffs, petBuffCount = getPetData()
+       end
+		lastCheck = mq.gettime()
 	end
 end
 

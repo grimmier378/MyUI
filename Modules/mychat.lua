@@ -69,7 +69,7 @@ Module.doLinks           = false
 -- Consoles
 Module.Consoles          = {}
 -- Flags
-Module.tabFlags          = bit32.bor(ImGuiTabBarFlags.Reorderable, ImGuiTabBarFlags.FittingPolicyResizeDown, ImGuiTabBarFlags.TabListPopupButton)
+Module.tabFlags          = bit32.bor(ImGuiTabBarFlags.Reorderable, ImGuiTabBarFlags.FittingPolicyShrink, ImGuiTabBarFlags.TabListPopupButton)
 Module.winFlags          = bit32.bor(ImGuiWindowFlags.MenuBar, ImGuiWindowFlags.NoScrollbar)
 Module.PopOutFlags       = bit32.bor(ImGuiWindowFlags.NoScrollbar)
 
@@ -1058,7 +1058,7 @@ local function DrawConsole(channelID)
 
     if focusKeyboard then
         local textSizeX, _ = ImGui.CalcTextSize(cmdBuffer)
-        ImGui.SetCursorPos(posX + textSizeX * ImGui.GetIO().FontGlobalScale, posY)
+        ImGui.SetCursorPos(posX + textSizeX, posY)
         ImGui.SetKeyboardFocusHere(-1)
         focusKeyboard = false
     end
@@ -1072,7 +1072,7 @@ end
 local function DrawChatWindow()
     -- Main menu bar
     if ImGui.BeginMenuBar() then
-        ImGui.SetWindowFontScale(Module.Settings.Scale)
+        
         local lockedIcon = Module.Settings.locked and Module.Icons.FA_LOCK .. '##lockTabButton_MyChat' or
             Module.Icons.FA_UNLOCK .. '##lockTablButton_MyChat'
         if ImGui.Button(lockedIcon) then
@@ -1082,7 +1082,7 @@ local function DrawChatWindow()
             ResetEvents()
         end
         if ImGui.IsItemHovered() then
-            ImGui.SetWindowFontScale(Module.Settings.Scale)
+            
             ImGui.BeginTooltip()
             ImGui.Text("Lock Window")
             ImGui.EndTooltip()
@@ -1091,14 +1091,14 @@ local function DrawChatWindow()
             Module.openConfigGUI = not Module.openConfigGUI
         end
         if ImGui.IsItemHovered() then
-            ImGui.SetWindowFontScale(Module.Settings.Scale)
+            
             ImGui.BeginTooltip()
             ImGui.Text("Open Main Config")
             ImGui.EndTooltip()
         end
         if ImGui.BeginMenu('Options##' .. windowNum) then
             local spamOn
-            ImGui.SetWindowFontScale(Module.Settings.Scale)
+            
             _, Module.console.autoScroll = ImGui.MenuItem('Auto-scroll##' .. windowNum, nil, Module.console.autoScroll)
             _, LocalEcho = ImGui.MenuItem('Local echo##' .. windowNum, nil, LocalEcho)
             _, timeStamps = ImGui.MenuItem('Time Stamps##' .. windowNum, nil, timeStamps)
@@ -1110,7 +1110,7 @@ local function DrawChatWindow()
             end
             if Module.KeyFocus then
                 if ImGui.BeginMenu('Focus Key') then
-                    ImGui.SetWindowFontScale(Module.Settings.Scale)
+                    
                     if ImGui.BeginCombo('##FocusKey', Module.KeyName) then
                         for _, key in pairs(keyboardKeys) do
                             local isSelected = Module.KeyName == key
@@ -1132,7 +1132,7 @@ local function DrawChatWindow()
             end
             if ImGui.IsItemHovered() then
                 ImGui.BeginTooltip()
-                ImGui.SetWindowFontScale(Module.Settings.Scale)
+                
                 ImGui.PushStyleColor(ImGuiCol.Text, ImVec4(1, 0, 0, 1))
                 ImGui.Text("!!! WARNING !!!")
                 ImGui.Text("This will re-Index the ID's in your settings file!!")
@@ -1166,7 +1166,7 @@ local function DrawChatWindow()
             ImGui.EndMenu()
         end
         if ImGui.BeginMenu('Channels##' .. windowNum) then
-            ImGui.SetWindowFontScale(Module.Settings.Scale)
+            
             for _, Data in ipairs(sortedChannels) do
                 -- for channelID, settings in pairs(ChatWin.Settings.Channels) do
                 local channelID = Data[1]
@@ -1183,7 +1183,7 @@ local function DrawChatWindow()
         end
 
         if ImGui.BeginMenu('Links##' .. windowNum) then
-            ImGui.SetWindowFontScale(Module.Settings.Scale)
+            
             for _, Data in ipairs(sortedChannels) do
                 -- for channelID, settings in pairs(ChatWin.Settings.Channels) do
                 local channelID = Data[1]
@@ -1202,7 +1202,7 @@ local function DrawChatWindow()
             ImGui.EndMenu()
         end
         if ImGui.BeginMenu('PopOut##' .. windowNum) then
-            ImGui.SetWindowFontScale(Module.Settings.Scale)
+            
             for _, Data in ipairs(sortedChannels) do
                 -- for channelID, settings in pairs(ChatWin.Settings.Channels) do
                 local channelID = Data[1]
@@ -1225,11 +1225,11 @@ local function DrawChatWindow()
     end
 
     -- Begin Tabs Bars
-    ImGui.SetWindowFontScale(1)
+    
     if ImGui.BeginTabBar('Channels##', Module.tabFlags) then
         -- Begin Main tab
         if ImGui.BeginTabItem('Main##' .. windowNum) then
-            ImGui.SetWindowFontScale(Module.Settings.Scale)
+            
             if ImGui.IsItemHovered() then
                 ImGui.BeginTooltip()
                 ImGui.Text('Main')
@@ -1242,7 +1242,7 @@ local function DrawChatWindow()
             local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
             contentSizeY = contentSizeY - footerHeight
             if ImGui.BeginPopupContextWindow() then
-                ImGui.SetWindowFontScale(Module.Settings.Scale)
+                
                 if ImGui.Selectable('Clear##' .. windowNum) then
                     Module.console:Clear()
                     mainBuffer = {}
@@ -1326,15 +1326,15 @@ local function DrawChatWindow()
                 end
 
                 if not PopOut then
-                    ImGui.SetWindowFontScale(1)
+                    
                     if ImGui.BeginTabItem(name) then
                         activeTabID = channelID
-                        ImGui.SetWindowFontScale(Module.Settings.Scale)
+                        
                         if ImGui.IsItemHovered() then
                             tabToolTip()
                         end
                         if ImGui.BeginPopupContextWindow() then
-                            ImGui.SetWindowFontScale(Module.Settings.Scale)
+                            
                             if ImGui.Selectable('Configure##' .. windowNum) then
                                 editChanID = channelID
                                 addChannel = false
@@ -1398,6 +1398,8 @@ end
 function Module.RenderGUI()
     if not Module.IsRunning then return end
 
+    ImGui.PushFont(nil, ImGui.GetFontSize() * Module.Settings.Scale)
+
     local windowName = 'My Chat - Main##' .. Module.CharLoaded .. '_' .. windowNum
     ImGui.SetWindowPos(windowName, ImVec2(20, 20), ImGuiCond.FirstUseEver)
     ImGui.SetNextWindowSize(ImVec2(640, 480), ImGuiCond.FirstUseEver)
@@ -1449,7 +1451,7 @@ function Module.RenderGUI()
                         ResetEvents()
                     end
                     if ImGui.IsItemHovered() then
-                        ImGui.SetWindowFontScale(Module.Settings.Scale)
+                        
                         ImGui.BeginTooltip()
                         ImGui.Text("Lock Window")
                         ImGui.EndTooltip()
@@ -1471,7 +1473,7 @@ function Module.RenderGUI()
                         Module.openConfigGUI = false
                     end
                     if ImGui.IsItemHovered() then
-                        ImGui.SetWindowFontScale(Module.Settings.Scale)
+                        
                         ImGui.BeginTooltip()
                         ImGui.Text("Opens the Edit window for this channel")
                         ImGui.EndTooltip()
@@ -1487,7 +1489,7 @@ function Module.RenderGUI()
                         ImGui.End()
                     end
                 end
-                ImGui.SetWindowFontScale(1)
+                
                 Module.ThemeLoader.EndTheme(PopoutColorCount, PopoutStyleCount)
 
                 ImGui.End()
@@ -1500,6 +1502,8 @@ function Module.RenderGUI()
     if not openMain then
         Module.IsRunning = false
     end
+
+    ImGui.PopFont()
 end
 
 -------------------------------- Configure Windows and Events GUI ---------------------------
@@ -1592,7 +1596,7 @@ function Module.AddChannel(editChanID, isNewChannel)
         newEvent = false
     end
     ---------------- Buttons Sliders and Channel Name ------------------------
-    ImGui.SetWindowFontScale(Module.Settings.Scale)
+    
     if not isNewChannel then
         --print(channelData.Name)
         if not Module.tempEventStrings[editChanID].Name then
@@ -1702,10 +1706,10 @@ function Module.AddChannel(editChanID, isNewChannel)
                     if Module.hString[eventID] == nil then Module.hString[eventID] = string.format(channelData[editChanID].Name .. ' : ' .. eventDetails.eventString) end
                     if ImGui.CollapsingHeader(Module.hString[eventID]) then
                         local contentSizeX = ImGui.GetWindowContentRegionWidth()
-                        ImGui.SetWindowFontScale(Module.Settings.Scale)
-                        if ImGui.BeginChild('Events##' .. eventID, contentSizeX, 0.0, bit32.bor(ImGuiChildFlags.Border, ImGuiChildFlags.AutoResizeY)) then
+                        
+                        if ImGui.BeginChild('Events##' .. eventID, contentSizeX, 0.0, bit32.bor(ImGuiChildFlags.Borders, ImGuiChildFlags.AutoResizeY)) then
                             if ImGui.BeginTable("Channel Events##" .. editChanID, 4, bit32.bor(ImGuiTableFlags.NoHostExtendX)) then
-                                ImGui.SetWindowFontScale(Module.Settings.Scale)
+                                
                                 ImGui.TableSetupColumn("ID's##_", ImGuiTableColumnFlags.WidthAlwaysAutoResize, 100)
                                 ImGui.TableSetupColumn("Strings", ImGuiTableColumnFlags.WidthStretch, 150)
                                 ImGui.TableSetupColumn("Color", ImGuiTableColumnFlags.WidthFixed, 50)
@@ -1868,7 +1872,7 @@ function Module.AddChannel(editChanID, isNewChannel)
         end
     end
     ImGui.EndChild()
-    ImGui.SetWindowFontScale(1)
+    
 end
 
 local function buildConfig()
@@ -1878,12 +1882,12 @@ local function buildConfig()
             if channelID ~= lastID then
                 if ImGui.CollapsingHeader(channelData.Name) then
                     local contentSizeX = ImGui.GetWindowContentRegionWidth()
-                    ImGui.SetWindowFontScale(Module.Settings.Scale)
-                    if ImGui.BeginChild('Channels##' .. channelID, contentSizeX, 0.0, bit32.bor(ImGuiChildFlags.Border, ImGuiChildFlags.AutoResizeY, ImGuiChildFlags.AlwaysAutoResize)) then
+                    
+                    if ImGui.BeginChild('Channels##' .. channelID, contentSizeX, 0.0, bit32.bor(ImGuiChildFlags.Borders, ImGuiChildFlags.AutoResizeY, ImGuiChildFlags.AlwaysAutoResize)) then
                         -- Begin a table for events within this channel
 
                         if ImGui.BeginTable("ChannelEvents_" .. channelData.Name, 4, bit32.bor(ImGuiTableFlags.Resizable, ImGuiTableFlags.RowBg, ImGuiTableFlags.Borders)) then
-                            ImGui.SetWindowFontScale(Module.Settings.Scale)
+                            
                             -- Set up table columns once
                             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 50)
                             ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthAlwaysAutoResize, 100)
@@ -1943,7 +1947,7 @@ function Module.Config_GUI(open)
     open, show = ImGui.Begin("Event Configuration", open, bit32.bor(ImGuiWindowFlags.None))
     if not open then Module.openConfigGUI = false end
     if show then
-        ImGui.SetWindowFontScale(Module.Settings.Scale)
+        
         -- Add a button to add a new row
         if ImGui.Button("Add Channel") then
             editChanID = getNextID(Module.Settings.Channels)
@@ -2069,7 +2073,7 @@ function Module.Config_GUI(open)
         buildConfig()
     end
     Module.ThemeLoader.EndTheme(ColorCountConf, StyleCountConf)
-    ImGui.SetWindowFontScale(1)
+    
     ImGui.End()
 end
 
@@ -2083,7 +2087,7 @@ function Module.Edit_GUI(open)
     open, showEdit = ImGui.Begin("Channel Editor", open, bit32.bor(ImGuiWindowFlags.None))
     if not open then Module.openEditGUI = false end
     if showEdit then
-        ImGui.SetWindowFontScale(Module.Settings.Scale)
+        
 
         if addChannel then Module.createExternConsole(string.format("New Channel %s", editChanID)) end
         Module.AddChannel(editChanID, addChannel)
@@ -2097,7 +2101,7 @@ function Module.Edit_GUI(open)
             editEventID = 0
         end
     end
-    ImGui.SetWindowFontScale(1)
+    
     Module.ThemeLoader.EndTheme(ColorCountEdit, StyleCountEdit)
     ImGui.End()
 end

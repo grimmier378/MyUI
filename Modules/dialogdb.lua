@@ -235,18 +235,18 @@ local function checkDialog()
 	if mq.TLO.Target() ~= nil then
 		CurrTarget = mq.TLO.Target.DisplayName()
 		CurrTarID = mq.TLO.Target.ID()
-		-- Module.Utils.Module.Utils.PrintOutput('MyUI',nil,"Server: %s  Zone: %s Target: %s",serverName,curZone,target)
+        currZoneShort = mq.TLO.Zone.ShortName() or 'None'
 		if Dialog[Module.Server] == nil then
 			return hasDialog
-		elseif Dialog[Module.Server][CurrTarget] == nil then
-			return hasDialog
-		elseif Dialog[Module.Server][CurrTarget][currZoneShort] == nil and Dialog[Module.Server][CurrTarget]['allzones'] == nil then
-			return hasDialog
-		elseif Dialog[Module.Server][CurrTarget][currZoneShort] ~= nil or Dialog[Module.Server][CurrTarget]['allzones'] ~= nil then
-			hasDialog = true
-			return hasDialog
-		end
-	end
+        end
+		if Dialog[Module.Server][CurrTarget] ~= nil then
+            if (next(Dialog[Module.Server][CurrTarget][currZoneShort] ~= nil and Dialog[Module.Server][CurrTarget][currZoneShort] or {}) ~= nil) or 
+            (next(Dialog[Module.Server][CurrTarget]['allzones'] ~= nil and Dialog[Module.Server][CurrTarget]['allzones'] or {}) ~= nil) then
+                hasDialog = true
+                return hasDialog
+            end
+        end
+    end
 	return hasDialog
 end
 
@@ -421,7 +421,7 @@ local function DrawEditWin(server, target, zone, desc, cmd)
 	ImGui.Text("Description:")
 	ImGui.SameLine(160)
 	ImGui.Text("Command:")
-	ImGui.BeginChild("##EditDialogChild", 0.0, 0.0, ImGuiChildFlags.Border)
+	ImGui.BeginChild("##EditDialogChild", 0.0, 0.0, ImGuiChildFlags.Borders)
 	for i, entry in ipairs(entries) do
 		ImGui.SetNextItemWidth(150)
 		entry.desc, _ = ImGui.InputText("##EditDialogDesc" .. i, entry.desc)
@@ -741,6 +741,7 @@ local function stripString(str)
 end
 
 local function DrawMainWin()
+    if not checkDialog() then return end
 	local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(Module.themeName, Module.Theme)
 	local openMain, showMain = ImGui.Begin("NPC Dialog##DialogDB_Main_" .. Module.CharLoaded, true, winFlags)
 	if not openMain then
@@ -1031,6 +1032,9 @@ function Module.MainLoop()
 	end
 	local elapsedTime = mq.gettime() - clockTimer
 	if elapsedTime >= 30 then
+        gSize = mq.TLO.Me.GroupSize()
+        rSize = mq.TLO.Raid.Members()
+
 		currZoneShort = mq.TLO.Zone.ShortName() or 'None'
 		if currZoneShort ~= lastZone then
 			tmpDesc = ''
@@ -1041,8 +1045,6 @@ function Module.MainLoop()
 			Module.editGUI = false
 			lastZone = currZoneShort
 			searchString = ""
-			gSize = mq.TLO.Me.GroupSize()
-			rSize = mq.TLO.Raid.Members()
 		end
 		if checkDialog() then
 			Module.ShowDialog = true

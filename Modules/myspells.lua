@@ -50,12 +50,9 @@ end
 local Utils                                                                                          = Module.Utils
 local ToggleFlags                                                                                    = bit32.bor(
 	Utils.ImGuiToggleFlags.PulseOnHover,
-	--Utils.ImGuiToggleFlags.SmilyKnob,
-	--Utils.ImGuiToggleFlags.GlowOnHover,
-	--Utils.ImGuiToggleFlags.KnobBorder,
+	-- Utils.ImGuiToggleFlags.KnobBorder,
 	Utils.ImGuiToggleFlags.StarKnob,
 	Utils.ImGuiToggleFlags.AnimateOnHover
---Utils.ImGuiToggleFlags.RightLabel
 )
 
 local isCaster                                                                                       = true
@@ -483,10 +480,11 @@ local function DrawConfigWin()
 		ImGui.EndCombo()
 	end
 
-	scale = ImGui.SliderFloat("Scale##DialogDB", scale, 0.5, 2)
+	scale = ImGui.InputFloat("Scale##DialogDB", scale, 0.05, 0.5)
 	if scale ~= settings[Module.Name].Scale then
 		if scale < 0.5 then scale = 0.5 end
 		if scale > 2 then scale = 2 end
+        settings[Module.Name].Scale = scale
 	end
 
 	if hasThemeZ or loadedExeternally then
@@ -628,6 +626,9 @@ end
 
 function Module.RenderGUI()
 	if not Module.IsRunning then return end
+
+    ImGui.PushFont(nil, ImGui.GetFontSize() * settings[Module.Name].Scale)
+
 	local winFlags = bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoFocusOnAppearing)
 	if not aSize then winFlags = bit32.bor(ImGuiWindowFlags.NoScrollbar, ImGuiWindowFlags.NoScrollWithMouse) end
 	if locked then winFlags = bit32.bor(winFlags, ImGuiWindowFlags.NoMove) end
@@ -735,8 +736,10 @@ function Module.RenderGUI()
 								Icon = spellBar[i].sIcon,
 								PushBack = mq.TLO.Spell(spellBar[i].sID).PushBack() or 0,
 							})
-							ImGui.Selectable(string.format("%s\nCost (%s)", spellBar[i].sName, mq.TLO.Spell(spellBar[i].sID).Mana() or 0),
-								false, ImGuiSelectableFlags.SpanAllColumns)
+                            local label = string.format("%s\nCost (%s)", spellBar[i].sName, mq.TLO.Spell(spellBar[i].sID).Mana() or 0)
+                            -- ImGui.Text(label)
+							ImGui.Selectable(label, 
+							false, ImGuiSelectableFlags.SpanAllColumns)
 							ImGui.PopStyleColor()
 							Module.RenderToolTipAndContext(i)
 							ImGui.Unindent(3)
@@ -900,7 +903,6 @@ function Module.RenderGUI()
 					ImGui.EndPopup()
 				end
 
-				ImGui.SetWindowFontScale(1)
 			end
 			ImGui.EndChild()
 		end
@@ -982,6 +984,8 @@ function Module.RenderGUI()
 		Module.ThemeLoader.EndTheme(ColorCountCast, StyleCountCast)
 		ImGui.End()
 	end
+
+    ImGui.PopFont()
 end
 
 function Module.Unload()

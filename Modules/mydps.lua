@@ -24,6 +24,7 @@ else
 	Module.ThemeFile = MyUI_ThemeFile
 	Module.Theme = MyUI_Theme
 end
+Module.DmgFloat                = require('lib.damageNumber')
 Module.PetName                 = mq.TLO.Pet.DisplayName() or 'NoPet'
 Module.TempSettings            = {}
 Module.TempSettings.LastUpdate = 0
@@ -32,8 +33,7 @@ Module.TempSettings.LastUpdate = 0
 local Utils                                                                                                                        = Module.Utils
 local ToggleFlags                                                                                                                  = bit32.bor(
 	Utils.ImGuiToggleFlags.PulseOnHover,
-	--Utils.ImGuiToggleFlags.SmilyKnob,
-	--Utils.ImGuiToggleFlags.StarKnob,
+    Utils.ImGuiToggleFlags.StarKnob,
 	Utils.ImGuiToggleFlags.RightLabel)
 local ActorDPS                                                                                                                     = nil
 local configFile                                                                                                                   = string.format("%s/MyUI/%s/%s/%s.lua",
@@ -89,6 +89,8 @@ local defaults                                                                  
 		showCombatWindow       = true,
 		useTheme               = 'Default',
 		autoStart              = false,
+		showAnchors            = false,
+		showFloatingDmg        = false,
 		OutputTab              = Module.Name,
 	},
 	MeleeColors = {
@@ -110,7 +112,96 @@ local defaults                                                                  
 		['critHeals'] = { 0, 1, 1, 1, },
 		['dot'] = { 1, 1, 0, 1, },
 	},
+	Anchors = {
+		hitme = { pos = { x = 300, y = 200, }, show = true, point = nil, useForeground = false, atMouse = false, enabled = true, },
+		crits = { pos = { x = 400, y = 200, }, show = true, point = nil, useForeground = false, atMouse = false, enabled = true, },
+		dots = { pos = { x = 350, y = 300, }, show = true, point = nil, useForeground = false, atMouse = false, enabled = true, },
+		healme = { pos = { x = 300, y = 400, }, show = true, point = nil, useForeground = false, atMouse = false, enabled = true, },
+	},
 }
+
+
+Module.DmgFloat.Defaults = {
+	-- Options: Can pass as overrides when calling TakeDamage or GenerateText, or modify these defaults directly.
+	life_time      = 2.0,                  -- how long the text lives (seconds)
+	pop_up         = 0.2,                  -- how long the pop up animation lasts (seconds)
+	pop_down       = 0.3,                  -- how long the pop down animation lasts (seconds)
+	fade_delay     = 0.8,                  -- how long before fading starts (seconds)
+	fade_time      = 0.7,                  -- how long fading lasts (seconds)
+	float_px       = 100.0,                -- how many pixels to float over the lifetime (higher = more float)
+	y_offset_px    = 0.0,                  -- Y offset in pixels from the anchor point (start of the animation)
+	scale_mult     = 1.5,                  -- Text Scale multiplier (1.0 = default font size, 2.0 = double size, etc)
+	color          = { 255, 100, 100, 255, }, -- RGBA
+	wobble_px      = 0.0,                  -- horizontal randomization to reduce overlap (set to 0 to disable)
+	base_font_size = nil,                  -- if nil -> uses imgui.GetFontSize(), if set -> treated as "base" font size before pop/scale_mult
+}
+
+local function GetAnchorPoint(a)
+	if a.point then return a.point end
+	return ImVec2(a.pos.x, a.pos.y)
+end
+
+local function AnchorWidget(name, a)
+	if not a.show then return end
+
+	ImGui.SetNextWindowPos(ImVec2(a.pos.x, a.pos.y), ImGuiCond.FirstUseEver)
+	ImGui.SetNextWindowBgAlpha(0.2)
+
+	local flags = bit32.bor(
+		ImGuiWindowFlags.NoTitleBar,
+		ImGuiWindowFlags.NoResize,
+		ImGuiWindowFlags.AlwaysAutoResize,
+		ImGuiWindowFlags.NoSavedSettings
+	)
+
+	local ok
+	ok, a.show = ImGui.Begin("##anchor_" .. name, a.show, flags)
+	if ok then
+		ImGui.Text(name)
+		ImGui.SameLine()
+		if ImGui.SmallButton("X##" .. name) then
+			a.show = false
+		end
+
+		local winPos = ImGui.GetWindowPosVec()
+		local winSize = ImGui.GetWindowSizeVec()
+		if a.pos.x ~= winPos.x or a.pos.y ~= winPos.y then
+			a.pos = { x = winPos.x, y = winPos.y, }
+			a.point = ImVec2(winPos.x + winSize.x * 0.5, winPos.y + winSize.y * 0.5)
+			settings.Anchors[name].pos = { x = a.pos.x, y = a.pos.y, }
+			mq.pickle(configFile, settings)
+		end
+	end
+	ImGui.End()
+end
+
+local function DrawAnchor(name, a)
+	if a.atMouse then
+		Module.DmgFloat.DrawAtMouse(ImVec2(0, 0), "Anchor::" .. name, name)
+		return
+	end
+
+	local dl = a.useForeground and ImGui.GetForegroundDrawList() or ImGui.GetBackgroundDrawList()
+	local p = GetAnchorPoint(a)
+	Module.DmgFloat.DrawAt(p, dl, "Anchor::" .. name, name)
+end
+
+local function DrawAllAnchors()
+	for name, a in pairs(settings.Anchors or {}) do
+		if a and a.enabled then
+			DrawAnchor(name, a)
+		end
+	end
+end
+
+local function deepCopy(orig)
+	if type(orig) ~= 'table' then return orig end
+	local copy = {}
+	for k, v in pairs(orig) do
+		copy[k] = deepCopy(v)
+	end
+	return copy
+end
 
 local function loadThemeTable()
 	if Module.Utils.File.Exists(Module.ThemeFile) then
@@ -146,6 +237,17 @@ local function loadSettings()
 	for k, v in pairs(defaults.MeleeColors) do
 		if settings.MeleeColors[k] == nil then
 			settings.MeleeColors[k] = v
+		end
+	end
+
+	if settings.Anchors == nil then
+		settings.Anchors = {}
+		settings.Anchors = deepCopy(defaults.Anchors)
+	end
+
+	for k, v in pairs(defaults.Anchors) do
+		if settings.Anchors[k] == nil then
+			settings.Anchors[k] = v
 		end
 	end
 
@@ -319,6 +421,21 @@ local function npcMeleeCallBack(line, dType, target, dmg)
 	parseCurrentBattle(os.time() - battleStartTime)
 	if not settings.Options.showMissMe and typeValue == 'missed-me' then return end
 	if not settings.Options.showHitMe and typeValue == 'hit-by' then return end
+	local opts = {
+
+		float_px = 190, -- how many pixels to float over the lifetime (higher = more float)
+		life_time = 3, -- how long the text lives (seconds)
+		fade_delay = 1.0, -- how long before fading starts (seconds)
+		fade_time = 2.0, -- how long fading lasts (seconds)
+		wobble_px = 50,
+		base_font_size = 28,
+		drop_shadow = { 0, 0, 0, 180, },
+		drop_offset = 1,
+		color = { 166, 56, 56, 255, },
+	}
+	if settings.Options.showFloatingDmg and typeValue == 'hit-by' then
+		Module.DmgFloat.GenerateText("hitme", string.format("-%s", dmg), opts)
+	end
 	if damTable == nil then damTable = {} end
 	sequenceCounter = sequenceCounter + 1
 	table.insert(damTable, {
@@ -471,7 +588,21 @@ local function dotCallBack(line, target, dmg, spell_name)
 		dotTotalBattle = dotTotalBattle + (tonumber(dmg) or 0)
 		dmgBattCounter = dmgBattCounter + 1
 	end
+	local opts = {
+		float_px = 190, -- how many pixels to float over the lifetime (higher = more float)
+		life_time = 3.0, -- how long the text lives (seconds)
+		fade_delay = 1.0, -- how long before fading starts (seconds)
+		fade_time = 2.0, -- how long fading lasts (seconds)
+		wobble_px = 60,
+		base_font_size = 28,
+		drop_offset = 1,
+		color = { 7, 128, 5, 255, },
+		drop_shadow = { 0, 0, 0, 180, },
 
+	}
+	if settings.Options.showFloatingDmg then
+		Module.DmgFloat.GenerateText('dots', string.format("%s * %s *", dmgType:upper(), dmg), opts)
+	end
 	if damTable == nil then damTable = {} end
 	sequenceCounter = sequenceCounter + 1
 	table.insert(damTable, {
@@ -531,7 +662,23 @@ local function petCallBack(line, dType, target, dmg)
 end
 
 local function meleeCallBack(line, dType, target, dmg)
-	if string.find(line, "have been healed") then return end
+	if string.find(line, "have been healed") then
+		local opts = {
+			float_px = 190, -- how many pixels to float over the lifetime (higher = more float)
+			life_time = 3, -- how long the text lives (seconds)
+			fade_delay = 1.0, -- how long before fading starts (seconds)
+			fade_time = 2.0, -- how long fading lasts (seconds)
+			wobble_px = 50,
+			base_font_size = 28,
+			drop_shadow = { 0, 0, 0, 180, },
+			drop_offset = 1,
+			color = { 8, 162, 161, 255, },
+		}
+		if settings.Options.showFloatingDmg then
+			Module.DmgFloat.GenerateText("healme", string.format("( %s )", dmg), opts)
+		end
+		return
+	end
 	local dmgType = dType or nil
 	if dmgType == nil then return end
 	if not enteredCombat then
@@ -564,6 +711,22 @@ local function meleeCallBack(line, dType, target, dmg)
 	if dmgType == 'miss' then target = 'YOU' end
 	if damTable == nil then damTable = {} end
 
+	-- if dmgType ~= 'miss' then
+	-- 	local opts = {
+	-- 		float_px = 190, -- how many pixels to float over the lifetime (higher = more float)
+	-- 		life_time = 2.5, -- how long the text lives (seconds)
+	-- 		fade_delay = 1.0, -- how long before fading starts (seconds)
+	-- 		fade_time = 1.0, -- how long fading lasts (seconds)
+	-- 		wobble_px = 50,
+	-- 		base_font_size = 28,
+	-- 		drop_shadow = { 255, 255, 255, 180, },
+	-- 		drop_offset = 1,
+	-- 		color = settings.MeleeColors[dmgType] or { 255, 255, 255, 255, },
+	-- 	}
+	-- 	if settings.Options.showFloatingDmg then
+	-- 		Module.DmgFloat.GenerateText("hitme", string.format(" %s %s",dmgType, dmg), opts)
+	-- 	end
+	-- end
 	sequenceCounter = sequenceCounter + 1
 	table.insert(damTable, {
 		type      = dmgType,
@@ -593,6 +756,20 @@ local function critCallBack(line, dmg)
 		critTotalBattle = critTotalBattle + (tonumber(dmg) or 0)
 	end
 
+	if settings.Options.showFloatingDmg then
+		Module.DmgFloat.GenerateText("crits", string.format("CRIT < %s >", dmg),
+			{
+				color = { 255, 220, 80, 255, },
+				float_px = 200,
+				life_time = 3.5,
+				fade_delay = 1.5,
+				fade_time = 1.5,
+				wobble_px = 30,
+				base_font_size = 28,
+				drop_shadow = { 0, 0, 0, 180, },
+				drop_offset = 1,
+			})
+	end
 	if damTable == nil then damTable = {} end
 	sequenceCounter = sequenceCounter + 1
 	table.insert(damTable, {
@@ -617,7 +794,20 @@ local function critHealCallBack(line, dmg)
 	if enteredCombat then
 		critHealsTotal = critHealsTotal + (tonumber(dmg) or 0)
 	end
-
+	if settings.Options.showFloatingDmg then
+		Module.DmgFloat.GenerateText("healme", string.format("++ %s ++", dmg),
+			{
+				float_px = 200,
+				life_time = 3.5,
+				fade_delay = 1.5,
+				fade_time = 1.5,
+				wobble_px = 40,
+				base_font_size = 28,
+				drop_shadow = { 0, 0, 0, 180, },
+				drop_offset = 1,
+				color = { 8, 162, 161, 255, },
+			})
+	end
 	if damTable == nil then damTable = {} end
 	sequenceCounter = sequenceCounter + 1
 	table.insert(damTable, {
@@ -800,7 +990,6 @@ local function DrawHistory(tbl, isHistory)
 		settings.Options.showHistory = tempSettings.showHistory
 		mq.pickle(configFile, settings)
 	end
-	ImGui.SetWindowFontScale(tempSettings.fontScale)
 	if #tbl > 0 then
 		if ImGui.BeginTable("Battles", 9, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.Resizable,
 				ImGuiTableFlags.Reorderable, ImGuiTableFlags.Hideable, ImGuiTableFlags.ScrollY)) then
@@ -1036,6 +1225,32 @@ local function DrawOptions()
 			tempSettings.announceActors = Module.Utils.DrawToggle("Announce to Actors", tempSettings.announceActors, ToggleFlags, ImVec2(46, 20))
 			ImGui.SameLine()
 			ImGui.HelpMarker("Announce DPS Battle Reports to Actors.")
+
+			ImGui.TableNextColumn()
+			tempSettings.showAnchors = tempSettings.showAnchors ~= nil and tempSettings.showAnchors or settings.Options.showAnchors
+			tempSettings.showAnchors = Module.Utils.DrawToggle("Show Anchors", tempSettings.showAnchors, ToggleFlags, ImVec2(46, 20))
+			if tempSettings.showAnchors ~= settings.Options.showAnchors then
+				settings.Options.showAnchors = tempSettings.showAnchors
+				if settings.Options.showAnchors then
+					for k, v in pairs(settings.Anchors or {}) do
+						v.show = true
+					end
+				end
+				mq.pickle(configFile, settings)
+			end
+			ImGui.SameLine()
+			ImGui.HelpMarker("Show Anchors to allow you to move them.")
+
+			ImGui.TableNextColumn()
+			tempSettings.showFloatingDmg = tempSettings.showFloatingDmg ~= nil and tempSettings.showFloatingDmg or settings.Options.showFloatingDmg
+			tempSettings.showFloatingDmg = Module.Utils.DrawToggle("Show Floating Damage", tempSettings.showFloatingDmg, ToggleFlags, ImVec2(46, 20))
+			if tempSettings.showFloatingDmg ~= settings.Options.showFloatingDmg then
+				settings.Options.showFloatingDmg = tempSettings.showFloatingDmg
+				mq.pickle(configFile, settings)
+			end
+			ImGui.SameLine()
+			ImGui.HelpMarker("Show Floating Damage.")
+
 			ImGui.EndTable()
 		end
 	end
@@ -1097,8 +1312,9 @@ function Module.RenderGUI()
 			Module.IsRunning = false
 		end
 		if showWin then
-			ImGui.SetWindowFontScale(tempSettings.spamFontScale)
-			if not started then
+            ImGui.PushFont(nil, ImGui.GetFontSize() * tempSettings.spamFontScale)
+
+            if not started then
 				ImGui.PushTextWrapPos((ImGui.GetWindowContentRegionWidth() - 20) or 20)
 				ImGui.Text("This will show the last %d seconds of YOUR melee attacks.", tempSettings.displayTime)
 				ImGui.TextColored(color.orange, "WARNING The window is click through after you start.")
@@ -1134,10 +1350,13 @@ function Module.RenderGUI()
 				ImGui.PopTextWrapPos()
 			end
 			ImGui.PopStyleColor()
-			ImGui.SetWindowFontScale(1)
+            ImGui.PopFont()
 		end
 		ImGui.End()
 	end
+
+    ImGui.PushFont(nil, ImGui.GetFontSize() * tempSettings.fontScale)
+
 
 	-- Battle History Window
 	if tempSettings.showHistory then
@@ -1183,6 +1402,21 @@ function Module.RenderGUI()
 		for k, v in pairs(dataWindows) do
 			ShowData(k, v.data, v.seq)
 		end
+	end
+
+	for name, a in pairs(settings.Anchors or {}) do
+		if a.show and settings.Options.showAnchors then
+			AnchorWidget(name, a)
+		elseif not settings.Options.showAnchors and a.show then
+			a.show = false
+			mq.pickle(configFile, settings)
+		end
+	end
+    
+    ImGui.PopFont()
+
+	if settings.Options.showFloatingDmg then
+		DrawAllAnchors()
 	end
 end
 

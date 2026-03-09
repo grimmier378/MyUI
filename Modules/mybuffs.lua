@@ -62,7 +62,6 @@ end
 local Utils                            = Module.Utils
 local ToggleFlags                      = bit32.bor(
     Utils.ImGuiToggleFlags.PulseOnHover,
-    --Utils.ImGuiToggleFlags.SmilyKnob,
     Utils.ImGuiToggleFlags.StarKnob,
     Utils.ImGuiToggleFlags.AnimateOnHover,
     Utils.ImGuiToggleFlags.RightLabel)
@@ -111,10 +110,10 @@ local winSizes                         = {
 }
 local sortedKeysFavorites              = {}
 -- Timing Variables
-local clockTimer                       = mq.gettime()
+local clockTimer                       = 0
 local begTimer                         = os.time()
-local lastTime                         = mq.gettime()
-local checkIn                          = os.time()
+local lastTime                         = 0
+local checkIn                          = mq.gettime()
 local frameTime                        = 33
 local currZone, lastZone
 
@@ -226,24 +225,37 @@ local function GenerateContent(subject, songsTable, buffsTable, doWho, doWhat)
         SortedSongsA = SortBuffs(Module.songTable, 'alpha'),
         SortedSongsD = SortBuffs(Module.songTable, 'dur'),
     }
-    checkIn = os.time()
+    checkIn = mq.gettime()
     return content
 end
 
 local function GetBuff(slot)
     local buffTooltip, buffName, buffDurDisplay, buffIcon, buffID, buffBeneficial, buffHr, buffMin, buffSec, totalMin, totalSec, buffDurHMS
     local buff = mq.TLO.Me.Buff(slot)
-    local hasBuff = buff() ~= nil
-    -- if not hasBuff then
-    --     Module.TempSettings.MyBuffsNames[buffName] = nil
-    --     Module.buffTable[slot] = nil
-    --     return false
-    -- end
+    if buff() == nil then
+        Module.buffTable[slot] = {
+            Name = '',
+            Beneficial = true,
+            Duration = '',
+            DurationDisplay = '',
+            Icon = 0,
+            ID = 0,
+            Slot = slot,
+            Hours = 0,
+            Minutes = 0,
+            Seconds = 0,
+            TotalMinutes = 0,
+            TotalSeconds = 0,
+            Tooltip = "",
+        }
+        return false
+    end
+
     local duration = buff.Duration
 
     buffName = buff.Name() or ''
     buffIcon = buff.SpellIcon() or 0
-    buffID = buff.ID() or 0
+    buffID = buff.Spell.ID() or 0
     buffBeneficial = buff.Beneficial() or false
 
     -- Extract hours, minutes, and seconds from buffDuration
@@ -265,13 +277,9 @@ local function GetBuff(slot)
     buffDurDisplay = string.format("%s:%s:%s", dispBuffHr, displayBuffMin, displayBuffSec)
     buffTooltip = string.format("%s) %s (%s)", slot, buffName, buffDurHMS)
 
-
-
     if Module.buffTable[slot] ~= nil then
-        if Module.buffTable[slot].ID ~= buffID or (totalSec < 20) then
+        if Module.buffTable[slot].ID ~= buffID or mq.gettime() - checkIn >= 3000 then
             changed = true
-        else
-            if totalSec - Module.buffTable[slot].TotalSeconds > 1 then changed = true end
         end
     end
 
@@ -335,28 +343,41 @@ local function GetBuff(slot)
     }
     Module.TempSettings.MyBuffsNames[buffName] = true
 
-    return hasBuff
+    return true
 end
 
+
+---comment
+---@param slot string|integer Buff slot to check for song, if nil it will check all slots and update them
 local function GetSong(slot)
+    if not slot then return end
     local songTooltip, songName, songDurationDisplay, songIcon, songID, songBeneficial, songHr, songMin, songSec, totalMin, totalSec, songDurHMS
-    local hasSong = mq.TLO.Me.Song(slot)() ~= nil
-    -- if not hasSong then
-    --     Module.songTable[slot] = nil
-    -- end
-    songName = mq.TLO.Me.Song(slot).Name() or ''
-    songIcon = mq.TLO.Me.Song(slot).SpellIcon() or 0
-    songID = songName ~= '' and (mq.TLO.Me.Song(slot).ID() or 0) or 0
-    songBeneficial = mq.TLO.Me.Song(slot).Beneficial() or false
-    totalMin = mq.TLO.Me.Song(slot).Duration.TotalMinutes() or 0
-    totalSec = mq.TLO.Me.Song(slot).Duration.TotalSeconds() or 0
-
     local song = mq.TLO.Me.Song(slot)
-    local duration = song.Duration
 
+    if song() == nil then
+        Module.songTable[slot] = {
+            Name = '',
+            Beneficial = true,
+            Duration = '',
+            DurationDisplay = '',
+            Icon = 0,
+            ID = 0,
+            Slot = slot,
+            Hours = 0,
+            Minutes = 0,
+            Seconds = 0,
+            TotalMinutes = 0,
+            TotalSeconds = 0,
+            Tooltip = '',
+        }
+        return
+    end
+
+
+    local duration = song.Duration
     songName = song.Name() or ''
     songIcon = song.SpellIcon() or 0
-    songID = song.ID() or 0
+    songID = song.Spell.ID() or 0
     songBeneficial = song.Beneficial() or false
 
     songDurHMS = duration.TimeHMS() or ''
@@ -372,7 +393,7 @@ local function GetSong(slot)
     songTooltip = string.format("%s) %s (%s)", slot, songName, songDurHMS)
 
     if Module.songTable[slot] ~= nil then
-        if Module.songTable[slot].ID ~= songID and os.time() - checkIn >= 6 then changed = true end
+        if Module.songTable[slot].ID ~= songID or mq.gettime() - checkIn >= 3000 then changed = true end
     end
     Module.songTable[slot] = {
         Name = songName,
@@ -417,8 +438,8 @@ local function pulseIcon(speed)
 end
 
 local function CheckIn()
-    local now = os.time()
-    if now - checkIn >= 240 or firstRun then
+    local now = mq.gettime()
+    if now - checkIn >= 500 or firstRun then
         checkIn = now
         return true
     end
@@ -452,19 +473,46 @@ local function GetBuffs()
     numBuffs = 0
     numSlots = mq.TLO.Me.MaxBuffSlots() or 0
     if numSlots == 0 then return end -- most likely not loaded all the way try again next cycle
-    for i = 1, numSlots do
-        local hasBuff = false
-        hasBuff = GetBuff(i)
-        if hasBuff then
-            numBuffs = numBuffs + 1
+
+    if not loadedExeternally then
+        for i = 1, numSlots do
+            local hasBuff = false
+            hasBuff = GetBuff(i)
+            if hasBuff then
+                numBuffs = numBuffs + 1
+            end
         end
-    end
-    if mq.TLO.Me.CountSongs() > 0 then
-        for i = 1, maxSongs do
-            GetSong(i)
+        if mq.TLO.Me.CountSongs() > 0 then
+            for i = 1, maxSongs do
+                GetSong(i)
+            end
         end
+    else
+        Module.buffTable = MyUI_MyData.Buffs
+        debuffOnMe       = MyUI_MyData.DebuffsOnMe
+        Module.songTable = MyUI_MyData.Songs
+        for _, v in pairs(Module.buffTable) do
+            if v.Name ~= '' then
+                Module.TempSettings.MyBuffsNames[v.Name] = true
+            end
+        end
+        numBuffs = mq.TLO.Me.BuffCount() or 0
+        numSlots = mq.TLO.Me.MaxBuffSlots() or 0
     end
 
+    if Module.CharLoaded ~= mq.TLO.Me.DisplayName() then
+        Module.CharLoaded = mq.TLO.Me.DisplayName()
+        firstRun = true
+        solo = true
+        Module.boxes = {}
+        Module.TempSettings.MyBuffsNames = {}
+        Module.MyBuffsNames = {}
+        subject = 'Hello'
+    end
+    if Module.MyGroupLeader ~= mq.TLO.Group.Leader() then
+        Module.MyGroupLeader = mq.TLO.Group.Leader() or 'NoGroup'
+        changed = true
+    end
     if CheckIn() then
         changed = true
         subject = 'CheckIn'
@@ -783,9 +831,9 @@ local function BoxBuffs(id, sorted, view)
     -------------------------------------------- Buffs Section ---------------------------------
     if not Module.SplitWin then sizeY = math.floor(sizeY * 0.7) else sizeY = 0.0 end
     if not Module.ShowScroll and view ~= 'table' then
-        ImGui.BeginChild("Buffs##" .. boxChar .. view, ImVec2(sizeX, sizeY), ImGuiChildFlags.Border, ImGuiWindowFlags.NoScrollbar)
+        ImGui.BeginChild("Buffs##" .. boxChar .. view, ImVec2(sizeX, sizeY), ImGuiChildFlags.Borders, ImGuiWindowFlags.NoScrollbar)
     elseif view ~= 'table' and Module.ShowScroll then
-        ImGui.BeginChild("Buffs##" .. boxChar .. view, ImVec2(sizeX, sizeY), ImGuiChildFlags.Border)
+        ImGui.BeginChild("Buffs##" .. boxChar .. view, ImVec2(sizeX, sizeY), ImGuiChildFlags.Borders)
     elseif view == 'table' then
         ImGui.BeginChild("Buffs##" .. boxChar, ImVec2(ImGui.GetColumnWidth(-1), 0.0),
             bit32.bor(ImGuiChildFlags.AutoResizeY, ImGuiChildFlags.AlwaysAutoResize),
@@ -803,9 +851,7 @@ local function BoxBuffs(id, sorted, view)
         if view ~= 'table' then
             ImGui.BeginGroup()
             if boxBuffs[i] == nil or boxBuffs[i].ID == 0 then
-                ImGui.SetWindowFontScale(Scale)
                 ImGui.TextDisabled(tostring(slot))
-                ImGui.SetWindowFontScale(1)
             else
                 bName = boxBuffs[i].Name:sub(1, -1)
                 sDurT = boxBuffs[i].DurationDisplay ~= nil and boxBuffs[i].DurationDisplay or ' '
@@ -907,20 +953,16 @@ local function BoxBuffs(id, sorted, view)
             ImGui.BeginTooltip()
             if boxBuffs[i] ~= nil then
                 if boxBuffs[i].Icon > 0 then
-                    if boxChar == Module.CharLoaded then
-                        ImGui.Text(boxBuffs[i].Tooltip)
-                    else
-                        ImGui.Text(boxBuffs[i].Name)
-                    end
+                    -- if boxChar == Module.CharLoaded then
+                    --     ImGui.Text(boxBuffs[i].Tooltip)
+                    -- else
+                    ImGui.Text(boxBuffs[i].Tooltip)
+                    -- end
                 else
-                    ImGui.SetWindowFontScale(Scale)
                     ImGui.Text('none')
-                    ImGui.SetWindowFontScale(1)
                 end
             else
-                ImGui.SetWindowFontScale(Scale)
                 ImGui.Text('none')
-                ImGui.SetWindowFontScale(1)
             end
             ImGui.EndTooltip()
         end
@@ -960,9 +1002,9 @@ local function BoxSongs(id, sorted, view)
 
     --------- Songs Section -----------------------
     if Module.ShowScroll and view ~= 'table' then
-        ImGui.BeginChild("Songs##" .. boxChar, ImVec2(sizeX, sizeY), ImGuiChildFlags.Border)
+        ImGui.BeginChild("Songs##" .. boxChar, ImVec2(sizeX, sizeY), ImGuiChildFlags.Borders)
     elseif view ~= 'table' and not Module.ShowScroll then
-        ImGui.BeginChild("Songs##" .. boxChar, ImVec2(sizeX, sizeY), ImGuiChildFlags.Border, ImGuiWindowFlags.NoScrollbar)
+        ImGui.BeginChild("Songs##" .. boxChar, ImVec2(sizeX, sizeY), ImGuiChildFlags.Borders, ImGuiWindowFlags.NoScrollbar)
     elseif view == 'table' then
         ImGui.BeginChild("Songs##" .. boxChar, ImVec2(ImGui.GetColumnWidth(-1), 0.0),
             bit32.bor(ImGuiChildFlags.AutoResizeY, ImGuiChildFlags.AlwaysAutoResize),
@@ -977,9 +1019,7 @@ local function BoxSongs(id, sorted, view)
         if view ~= 'table' then
             ImGui.BeginGroup()
             if boxSongs[i] == nil or boxSongs[i].Icon == 0 then
-                ImGui.SetWindowFontScale(Scale)
                 ImGui.TextDisabled("")
-                ImGui.SetWindowFontScale(1)
             else
                 if Module.ShowIcons then
                     DrawInspectableSpellIcon(boxSongs[i].Icon, boxSongs[i], i)
@@ -1067,14 +1107,10 @@ local function BoxSongs(id, sorted, view)
                         ImGui.Text(boxSongs[i].Name)
                     end
                 else
-                    ImGui.SetWindowFontScale(Scale)
                     ImGui.Text('none')
-                    ImGui.SetWindowFontScale(1)
                 end
             else
-                ImGui.SetWindowFontScale(Scale)
                 ImGui.Text('none')
-                ImGui.SetWindowFontScale(1)
             end
             ImGui.EndTooltip()
         end
@@ -1152,12 +1188,16 @@ end
 
 -- When drawing:
 local settingsToggleFlags = bit32.bor(
---Utils.ImGuiToggleFlags.SmilyKnob,
+    Utils.ImGuiToggleFlags.StarKnob,
+    Utils.ImGuiToggleFlags.AnimateOnHover,
     Utils.ImGuiToggleFlags.PulseOnHover,
     Utils.ImGuiToggleFlags.RightLabel
+-- Utils.ImGuiToggleFlags.KnobBorder
 )
 function Module.RenderGUI()
     if currZone ~= lastZone then return end
+
+    ImGui.PushFont(nil, ImGui.GetFontSize() * Scale)
 
     if Module.ShowGUI then
         ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
@@ -1289,7 +1329,7 @@ function Module.RenderGUI()
 
             if not showTableView then
                 ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, 4, 3)
-                ImGui.SetWindowFontScale(Scale)
+
                 if not solo then
                     if #Module.boxes > 0 then
                         -- Sort boxes by the 'Name' attribute
@@ -1325,7 +1365,7 @@ function Module.RenderGUI()
                 ImGui.PopStyleVar()
             else
                 -- ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, 4, 3)
-                ImGui.SetWindowFontScale(Scale)
+
                 local tFlags = bit32.bor(
                     ImGuiTableFlags.Resizable,
                     -- ImGuiTableFlags.Sortable,
@@ -1343,27 +1383,25 @@ function Module.RenderGUI()
                     ImGui.TableSetupColumn("Songs")
                     ImGui.TableHeadersRow()
                     if #Module.boxes > 0 then
-                        ImGui.SetWindowFontScale(Scale)
                         for i = 1, #Module.boxes do
                             if Module.TempSettings.ShowOnlyGroup and Module.boxes[i].GroupLeader ~= Module.MyGroupLeader then
                                 goto next
                             end
                             ImGui.TableNextColumn()
-                            ImGui.SetWindowFontScale(Scale)
+
                             if Module.boxes[i].Name == Module.CharLoaded then
                                 ImGui.TextColored(ImVec4(0, 1, 1, 1), DrawName(i))
                             else
                                 ImGui.Text(DrawName(i))
                             end
                             ImGui.TableNextColumn()
-                            ImGui.SetWindowFontScale(Scale)
+
                             BoxBuffs(i, sortType, 'table')
                             ImGui.TableNextColumn()
-                            ImGui.SetWindowFontScale(Scale)
+
                             BoxSongs(i, sortType, 'table')
                             ::next::
                         end
-                        ImGui.SetWindowFontScale(1)
                     end
                     ImGui.EndTable()
                 end
@@ -1427,7 +1465,7 @@ function Module.RenderGUI()
             ImGui.EndPopup()
         end
         Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
-        ImGui.SetWindowFontScale(1)
+
         ImGui.End()
     end
 
@@ -1454,7 +1492,7 @@ function Module.RenderGUI()
         ImGui.SetNextWindowSize(216, 239, ImGuiCond.FirstUseEver)
         local ColorCountSongs, StyleCountSongs = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
         local songWin, show = ImGui.Begin("MyBuffs Songs##Songs" .. Module.CharLoaded, true, flags)
-        ImGui.SetWindowFontScale(Scale)
+
         if not songWin then
             Module.SplitWin = false
         end
@@ -1466,7 +1504,7 @@ function Module.RenderGUI()
                     end
                 end
             end
-            ImGui.SetWindowFontScale(1)
+
             ImGui.Spacing()
         end
 
@@ -1484,7 +1522,7 @@ function Module.RenderGUI()
         end
 
         Module.ThemeLoader.EndTheme(ColorCountSongs, StyleCountSongs)
-        ImGui.SetWindowFontScale(1)
+
         ImGui.End()
     end
 
@@ -1498,7 +1536,7 @@ function Module.RenderGUI()
         end
         ImGui.SetNextWindowSize(200, 300, ImGuiCond.FirstUseEver)
         local openConfig, showConfigGui = ImGui.Begin("MyBuffs Conf", nil, bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoFocusOnAppearing, ImGuiWindowFlags.NoCollapse))
-        ImGui.SetWindowFontScale(Scale)
+
         if not openConfig then
             Module.ShowConfig = false
         end
@@ -1510,7 +1548,6 @@ function Module.RenderGUI()
                 -- Combo Box Load Theme
 
                 if ImGui.BeginCombo("Load Theme##MyBuffs", themeName) then
-                    ImGui.SetWindowFontScale(Scale)
                     for k, data in pairs(Module.Theme.Theme) do
                         local isSelected = data.Name == themeName
                         if ImGui.Selectable(data.Name, isSelected) then
@@ -1596,7 +1633,7 @@ function Module.RenderGUI()
                     local clicked = false
                     Module.settings[Module.Name].BuffBeg, clicked = Module.Utils.DrawToggle('Buff Begging##config', Module.settings[Module.Name].BuffBeg, settingsToggleFlags,
                         ImVec2(46, 20),
-                        nil, nil, ImVec4(1, 1, 0.2, 0.8))
+                        { KnobColor = ImVec4(1, 1, 0.2, 0.8), })
                     if clicked then
                         local changed = false
                         ImGui.SetNextItemWidth(150)
@@ -1615,13 +1652,15 @@ function Module.RenderGUI()
             ImGui.SeparatorText('Toggles')
             if ImGui.CollapsingHeader('Toggles##Coll' .. Module.Name) then
                 local tmpShowIcons = Module.ShowIcons
-                tmpShowIcons = Module.Utils.DrawToggle('Show Icons', tmpShowIcons, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
+                tmpShowIcons = Module.Utils.DrawToggle('Show Icons', tmpShowIcons, settingsToggleFlags,
+                    ImVec2(46, 20), { KnobColor = ImVec4(1, 1, 0.2, 0.8), })
                 if tmpShowIcons ~= Module.ShowIcons then
                     Module.ShowIcons = tmpShowIcons
                 end
                 ImGui.SameLine()
                 local tmpPulseIcons = Module.DoPulse
-                tmpPulseIcons = Module.Utils.DrawToggle('Pulse Icons', tmpPulseIcons, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
+                tmpPulseIcons = Module.Utils.DrawToggle('Pulse Icons', tmpPulseIcons, settingsToggleFlags,
+                    ImVec2(46, 20), { KnobColor = ImVec4(1, 1, 0.2, 0.8), })
                 if tmpPulseIcons ~= Module.DoPulse then
                     Module.DoPulse = tmpPulseIcons
                 end
@@ -1638,43 +1677,44 @@ function Module.RenderGUI()
                 if ImGui.BeginTable("Toggles##", 2) then
                     ImGui.TableNextColumn()
                     local tmpShowText = Module.ShowText
-                    tmpShowText = Module.Utils.DrawToggle('Show Text', tmpShowText, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
+                    tmpShowText = Module.Utils.DrawToggle('Show Text', tmpShowText, settingsToggleFlags,
+                        ImVec2(46, 20), { KnobColor = ImVec4(1, 1, 0.2, 0.8), })
                     if tmpShowText ~= Module.ShowText then
                         Module.ShowText = tmpShowText
                     end
                     ImGui.TableNextColumn()
                     local tmpShowTimer = Module.ShowTimer
-                    tmpShowTimer = Module.Utils.DrawToggle('Show Timer', tmpShowTimer, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
+                    tmpShowTimer = Module.Utils.DrawToggle('Show Timer', tmpShowTimer, settingsToggleFlags, ImVec2(46, 20), { KnobColor = ImVec4(1, 1, 0.2, 0.8), })
                     if tmpShowTimer ~= Module.ShowTimer then
                         Module.ShowTimer = tmpShowTimer
                     end
                     ImGui.TableNextColumn()
                     local tmpScroll = Module.ShowScroll
-                    tmpScroll = Module.Utils.DrawToggle('Show Scrollbar', tmpScroll, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
+                    tmpScroll = Module.Utils.DrawToggle('Show Scrollbar', tmpScroll, settingsToggleFlags, ImVec2(46, 20), { KnobColor = ImVec4(1, 1, 0.2, 0.8), })
                     if tmpScroll ~= Module.ShowScroll then
                         Module.ShowScroll = tmpScroll
                     end
                     ImGui.TableNextColumn()
                     local tmpSplit = Module.SplitWin
-                    tmpSplit = Module.Utils.DrawToggle('Split Win', tmpSplit, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
+                    tmpSplit = Module.Utils.DrawToggle('Split Win', tmpSplit, settingsToggleFlags, ImVec2(46, 20), { KnobColor = ImVec4(1, 1, 0.2, 0.8), })
                     if tmpSplit ~= Module.SplitWin then
                         Module.SplitWin = tmpSplit
                     end
                     ImGui.TableNextColumn()
-                    Module.MailBoxShow = Module.Utils.DrawToggle('Show MailBox', Module.MailBoxShow, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
+                    Module.MailBoxShow = Module.Utils.DrawToggle('Show MailBox', Module.MailBoxShow, settingsToggleFlags, ImVec2(46, 20), { KnobColor = ImVec4(1, 1, 0.2, 0.8), })
                     ImGui.TableNextColumn()
-                    Module.ShowDebuffs = Module.Utils.DrawToggle('Show Debuffs', Module.ShowDebuffs, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
+                    Module.ShowDebuffs = Module.Utils.DrawToggle('Show Debuffs', Module.ShowDebuffs, settingsToggleFlags, ImVec2(46, 20), { KnobColor = ImVec4(1, 1, 0.2, 0.8), })
                     ImGui.TableNextColumn()
-                    Module.showTitleBar = Module.Utils.DrawToggle('Show Title Bar', Module.showTitleBar, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
+                    Module.showTitleBar = Module.Utils.DrawToggle('Show Title Bar', Module.showTitleBar, settingsToggleFlags, ImVec2(46, 20), { KnobColor = ImVec4(1, 1, 0.2, 0.8), })
                     ImGui.TableNextColumn()
-                    useWinPos = Module.Utils.DrawToggle('Use Window Positions', useWinPos, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
+                    useWinPos = Module.Utils.DrawToggle('Use Window Positions', useWinPos, settingsToggleFlags, ImVec2(46, 20), { KnobColor = ImVec4(1, 1, 0.2, 0.8), })
                     ImGui.TableNextColumn()
-                    ShowMenu = Module.Utils.DrawToggle('Show Menu', ShowMenu, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
+                    ShowMenu = Module.Utils.DrawToggle('Show Menu', ShowMenu, settingsToggleFlags, ImVec2(46, 20), { KnobColor = ImVec4(1, 1, 0.2, 0.8), })
                     ImGui.TableNextColumn()
-                    showTableView = Module.Utils.DrawToggle('Show Table', showTableView, settingsToggleFlags, ImVec2(46, 20), nil, nil, ImVec4(1, 1, 0.2, 0.8))
+                    showTableView = Module.Utils.DrawToggle('Show Table', showTableView, settingsToggleFlags, ImVec2(46, 20), { KnobColor = ImVec4(1, 1, 0.2, 0.8), })
                     ImGui.TableNextColumn()
-                    Module.TempSettings.ShowOnlyGroup = Module.Utils.DrawToggle('Show My Group Only', Module.TempSettings.ShowOnlyGroup, settingsToggleFlags, ImVec2(46, 20), nil,
-                        nil, ImVec4(1, 1, 0.2, 0.8))
+                    Module.TempSettings.ShowOnlyGroup = Module.Utils.DrawToggle('Show My Group Only', Module.TempSettings.ShowOnlyGroup, settingsToggleFlags, ImVec2(46, 20),
+                        { KnobColor = ImVec4(1, 1, 0.2, 0.8), })
                     ImGui.EndTable()
                 end
             end
@@ -1723,7 +1763,7 @@ function Module.RenderGUI()
             Module.TempSettings.NeedSavePositions = true
         end
         Module.ThemeLoader.EndTheme(ColorCountConf, StyleCountConf)
-        ImGui.SetWindowFontScale(1)
+
         ImGui.End()
     end
 
@@ -1746,7 +1786,7 @@ function Module.RenderGUI()
             ColorCountDebuffs, StyleCountDebuffs = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
             local openDebuffs, showDebuffs = ImGui.Begin("MyBuffs Debuffs##" .. Module.CharLoaded, true,
                 bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoFocusOnAppearing))
-            ImGui.SetWindowFontScale(Scale)
+
 
             if not openDebuffs then
                 Module.ShowDebuffs = false
@@ -1755,7 +1795,7 @@ function Module.RenderGUI()
                 for i = 1, #Module.boxes do
                     if #Module.boxes[i].Debuffs > 1 then
                         local sizeX, sizeY = ImGui.GetContentRegionAvail()
-                        if ImGui.BeginChild(Module.boxes[i].Name .. "##Debuffs_" .. Module.boxes[i].Name, ImVec2(sizeX, 60), bit32.bor(ImGuiChildFlags.Border), bit32.bor(ImGuiWindowFlags.NoScrollbar)) then
+                        if ImGui.BeginChild(Module.boxes[i].Name .. "##Debuffs_" .. Module.boxes[i].Name, ImVec2(sizeX, 60), bit32.bor(ImGuiChildFlags.Borders), bit32.bor(ImGuiWindowFlags.NoScrollbar)) then
                             ImGui.Text(Module.boxes[i].Name)
                             for k, v in pairs(Module.boxes[i].Debuffs) do
                                 if v.ID > 0 then
@@ -1784,7 +1824,7 @@ function Module.RenderGUI()
                 Module.TempSettings.NeedSavePositions = true
             end
             Module.ThemeLoader.EndTheme(ColorCountDebuffs, StyleCountDebuffs)
-            ImGui.SetWindowFontScale(1)
+
             ImGui.End()
         end
     end
@@ -1800,7 +1840,7 @@ function Module.RenderGUI()
         ImGui.SetNextWindowSize(400, 300, ImGuiCond.FirstUseEver)
         local openFavs, showFavs = ImGui.Begin("MyBuffs Favorites##__" .. Module.CharLoaded, true,
             bit32.bor(ImGuiWindowFlags.NoFocusOnAppearing))
-        ImGui.SetWindowFontScale(Scale)
+
 
         if not openFavs then
             Module.ShowFavorites = false
@@ -1814,9 +1854,11 @@ function Module.RenderGUI()
                 Module.settings[Module.Name].BuffBeg, clicked = Module.Utils.DrawToggle('Buff Begging', Module.settings[Module.Name].BuffBeg,
                     bit32.bor(ToggleFlags, Utils.ImGuiToggleFlags.PulseOnHover),
                     ImVec2(46, 20),
-                    ImVec4(0.026, 0.519, 0.791, 1.000),
-                    ImVec4(1, 0.2, 0.2, 0.8),
-                    ImVec4(1.000, 0.785, 0.000, 1.000))
+                    {
+                        OnColor = ImVec4(0.026, 0.519, 0.791, 1.000),
+                        OffColor = ImVec4(1, 0.2, 0.2, 0.8),
+                        KnobColor = ImVec4(1.000, 0.785, 0.000, 1.000),
+                    })
                 if clicked then
                     Module.NeedSave = true
                 end
@@ -1864,9 +1906,11 @@ function Module.RenderGUI()
                             Module.settings[Module.Name].Favorites[key], clicked = Module.Utils.DrawToggle("##Beg_" .. key, Module.settings[Module.Name].Favorites[key],
                                 bit32.bor(ToggleFlags, Utils.ImGuiToggleFlags.PulseOnHover),
                                 ImVec2(46, 20),
-                                ImVec4(0.026, 0.519, 0.791, 1.000),
-                                ImVec4(1, 0.2, 0.2, 0.8),
-                                ImVec4(1.000, 0.785, 0.000, 1.000))
+                                {
+                                    OnColor = ImVec4(0.026, 0.519, 0.791, 1.000),
+                                    OffColor = ImVec4(1, 0.2, 0.2, 0.8),
+                                    KnobColor = ImVec4(1.000, 0.785, 0.000, 1.000),
+                                })
 
                             if clicked then Module.NeedSave = true end
 
@@ -1901,7 +1945,7 @@ function Module.RenderGUI()
             Module.TempSettings.NeedSavePositions = true
         end
         Module.ThemeLoader.EndTheme(ColorCountFav, StyleCountFav)
-        ImGui.SetWindowFontScale(1)
+
         ImGui.End()
     end
 
@@ -1971,6 +2015,7 @@ function Module.RenderGUI()
     else
         mailBox = {}
     end
+    ImGui.PopFont()
 end
 
 function Module.CheckMode()
@@ -2119,6 +2164,7 @@ function Module.MainLoop()
         end
         if not solo then CheckStale() end
         GetBuffs()
+
         clockTimer = mq.gettime()
         Module.NumBuffs = mq.TLO.Me.BuffCount() or 0
     end

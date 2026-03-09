@@ -1769,7 +1769,7 @@ local function DrawRuleRow(entry)
 		local cursorScreenPos = ImGui.GetCursorScreenPosVec()
 		DrawArrow(ImVec2(cursorScreenPos.x + 10, cursorScreenPos.y), 5, 15, ColorDistance(distance))
 	end
-	ImGui.SetWindowFontScale(1)
+	
 	ImGui.TableNextColumn()
 end
 
@@ -1888,13 +1888,13 @@ local function DrawSearchWindow()
 		end
 		if show then
 			ImGui.BeginMenuBar()
-			ImGui.SetWindowFontScale(ZoomLvl)
+			
 			DrawToggles()
 			ImGui.EndMenuBar()
 			-- if ZoomLvl > 1.25 then ImGui.PopStyleVar(1) end
 			-- ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, 4,3)
 			--ImGui.SameLine()
-			ImGui.SetWindowFontScale(ZoomLvl)
+			
 			ImGui.Separator()
 			-- next row
 			if ImGui.Button(Zone.Name(), 160, 0.0) then
@@ -1941,7 +1941,7 @@ local function DrawSearchWindow()
 						end
 						ImGui.Separator()
 						local sizeX = ImGui.GetContentRegionAvail() - 4
-						ImGui.SetWindowFontScale(ZoomLvl)
+						
 						if ImGui.BeginTable('##RulesTable', 8, Module.GUI_Main.Table.Flags) then
 							ImGui.TableSetupScrollFreeze(0, 1)
 							ImGui.TableSetupColumn(Module.Icons.FA_USER_PLUS, bit32.bor(ImGuiTableColumnFlags.WidthFixed, ImGuiTableColumnFlags.NoSort), 15,
@@ -2075,7 +2075,7 @@ local function DrawSearchWindow()
 					end
 				end)
 				-- Now build the table with the sorted list
-				ImGui.SetWindowFontScale(ZoomLvl)
+				
 				if next(sortedNpcs) ~= nil then
 					local sizeX = ImGui.GetContentRegionAvail() - 4
 					if ImGui.BeginTable("NPCListTable", 3, spawnListFlags) then
@@ -2138,7 +2138,7 @@ local function DrawSearchWindow()
 			end
 		end
 		Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
-		ImGui.SetWindowFontScale(1)
+		
 		ImGui.End()
 	end
 end
@@ -2149,7 +2149,7 @@ local function Config_GUI()
 	local ColorCountConf, StyleCountConf = Module.ThemeLoader.StartTheme(useThemeName, Module.Theme)
 
 	local open, drawConfigGUI = ImGui.Begin("Alert master Config", true, bit32.bor(ImGuiWindowFlags.None, ImGuiWindowFlags.NoCollapse))
-	ImGui.SetWindowFontScale(ZoomLvl)
+	
 	if not open then
 		drawConfigGUI = false
 		openConfigGUI = false
@@ -2159,7 +2159,7 @@ local function Config_GUI()
 			ImGui.Text("Cur Theme: %s", useThemeName)
 			-- Combo Box Load Theme
 			if ImGui.BeginCombo("Load Theme", useThemeName) then
-				ImGui.SetWindowFontScale(ZoomLvl)
+				
 				for k, data in pairs(Module.Theme.Theme) do
 					local isSelected = data.Name == useThemeName
 					if ImGui.Selectable(data.Name, isSelected) then
@@ -2439,7 +2439,7 @@ local function Config_GUI()
 		end
 	end
 	Module.ThemeLoader.EndTheme(ColorCountConf, StyleCountConf)
-	ImGui.SetWindowFontScale(1)
+	
 	ImGui.End()
 end
 
@@ -2495,19 +2495,21 @@ function DrawAlertGUI() -- Draw GUI Window
 			AlertWindowOpen = false
 		end
 		if show then
-			ImGui.SetWindowFontScale(ZoomLvl)
+			
 			BuildAlertRows()
 		end
 		Module.ThemeLoader.EndTheme(ColorCountAlert, StyleCountAlert)
-		ImGui.SetWindowFontScale(1)
+		
 		ImGui.End()
 	end
 end
 
 function Module.RenderGUI()
+    ImGui.PushFont(nil, ImGui.GetFontSize() * ZoomLvl)
 	DrawSearchWindow()
 	DrawAlertGUI()
 	Config_GUI()
+    ImGui.PopFont()
 end
 
 local function load_binds()

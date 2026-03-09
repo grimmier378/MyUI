@@ -264,7 +264,7 @@ local function renderMain()
 		-- Begin Split Pane
 		-- local contentWidth, sizeY = ImGui.GetContentRegionAvail()
 		local leftWidth = 150
-		ImGui.BeginChild("ItemList", ImVec2(leftWidth, 0), bit32.bor(ImGuiChildFlags.ResizeX, ImGuiChildFlags.Border))
+		ImGui.BeginChild("ItemList", ImVec2(leftWidth, 0), bit32.bor(ImGuiChildFlags.ResizeX, ImGuiChildFlags.Borders))
 		for _, item in ipairs(trackedItems) do
 			if itemData[item] ~= nil and itemData[item].HasItem then
 				ImGui.PushStyleColor(ImGuiCol.Text, colGreen)
@@ -294,7 +294,7 @@ local function renderMain()
 
 		-- Right Side: Item Data Table
 		ImGui.SameLine()
-		ImGui.BeginChild("ItemDataView", ImVec2(0, 0), ImGuiChildFlags.Border)
+		ImGui.BeginChild("ItemDataView", ImVec2(0, 0), ImGuiChildFlags.Borders)
 		if selectedItem and itemData[selectedItem] then
 			-- ImGui.Text("Item: ")
 			-- ImGui.SameLine()

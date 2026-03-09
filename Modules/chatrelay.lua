@@ -42,8 +42,6 @@ Module.ImgPath                          = Module.Path .. "images/phone.png"
 local Utils                             = Module.Utils
 local ToggleFlags                       = bit32.bor(
     Utils.ImGuiToggleFlags.PulseOnHover,
-    --Utils.ImGuiToggleFlags.SmilyKnob,
-    --Utils.ImGuiToggleFlags.AnimateOnHover,
     Utils.ImGuiToggleFlags.RightLabel)
 local winFlags                          = bit32.bor(ImGuiWindowFlags.None)
 local currZone, lastZone, configFile, mode
@@ -333,7 +331,7 @@ function Module.RenderGUI()
         NewMessage = false
         local ColCount, StylCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
         --ImGui.PushStyleColor(ImGuiCol.Tab, ImVec4(0.000, 0.000, 0.000, 0.000))
-        ImGui.PushStyleColor(ImGuiCol.TabActive, ImVec4(0.848, 0.449, 0.115, 1.000))
+        ImGui.PushStyleColor(ImGuiCol.TabSelected, ImVec4(0.848, 0.449, 0.115, 1.000))
         ImGui.SetNextWindowSize(185, 480, ImGuiCond.FirstUseEver)
         if aSize then
             winFlags = bit32.bor(ImGuiWindowFlags.AlwaysAutoResize)

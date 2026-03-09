@@ -1298,7 +1298,7 @@ local sFlag = false
 local function DrawStatus()
     ImGui.BeginGroup()
     -- Set Window Font Scale
-    ImGui.SetWindowFontScale(scale)
+    
 
     if showHUD and ImGui.IsWindowHovered() then
         mousedOverFlag = true
@@ -1431,7 +1431,7 @@ local function DrawStatus()
 end
 
 local function RenderDebugMessages(scale)
-    ImGui.SetWindowFontScale(scale)
+    
     if ImGui.BeginChild("Tabs##DebugTab", -1, -1, ImGuiChildFlags.AutoResizeX) then
         if ImGui.Button(Module.Icons.MD_OPEN_IN_NEW) then
             Module.TempSettings.PopDebug = true
@@ -1447,7 +1447,7 @@ local function RenderDebugMessages(scale)
         ImGui.SameLine()
         ImGui.TextColored(ImVec4(0, 1, 1, 1), "%0.2f s", Module.TempSettings.Cycle or 0)
         ImGui.Separator()
-        ImGui.SetWindowFontScale(scale)
+        
         if ImGui.BeginTable('DebugTable', 5, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.Resizable, ImGuiTableFlags.Reorderable, ImGuiTableFlags.Hideable), ImVec2(0.0, 0.0)) then
             ImGui.TableSetupColumn('Time##', ImGuiTableColumnFlags.WidthFixed, 100)
             ImGui.TableSetupColumn('Zone##', ImGuiTableColumnFlags.WidthFixed, 100)
@@ -1478,7 +1478,7 @@ local function RenderDebugMessages(scale)
         end
     end
     ImGui.EndChild()
-    ImGui.SetWindowFontScale(1)
+    
 end
 
 function Module.RenderControls(scale, working_table)
@@ -1490,7 +1490,7 @@ function Module.RenderControls(scale, working_table)
     if not NavSet.doNav then
         ImGui.SetNextItemWidth(120)
         -- if ImGui.BeginCombo("##SelectPath", NavSet.SelectedPath) then
-        --     ImGui.SetWindowFontScale(scale)
+        --     
         --     if not Paths[currZone] then Paths[currZone] = {} end
         --     for name, data in pairs(Paths[currZone]) do
         --         local isSelected = name == NavSet.SelectedPath
@@ -1502,7 +1502,7 @@ function Module.RenderControls(scale, working_table)
         -- end
         local tmpP = {}
         if ImGui.BeginCombo("Path##SelectPath", NavSet.SelectedPath) then
-            ImGui.SetWindowFontScale(scale)
+            
             if not Paths[currZone] then Paths[currZone] = {} end
             for k, data in pairs(Paths[currZone]) do
                 table.insert(tmpP, k)
@@ -1528,7 +1528,7 @@ function Module.RenderControls(scale, working_table)
         end
         ImGui.PopStyleColor()
         if ImGui.IsItemHovered() then
-            ImGui.SetWindowFontScale(scale)
+            
             ImGui.SetTooltip("Delete Path")
         end
     else
@@ -1563,7 +1563,7 @@ function Module.RenderControls(scale, working_table)
             end
             ImGui.PopStyleColor()
             if ImGui.IsItemHovered() then
-                ImGui.SetWindowFontScale(scale)
+                
                 ImGui.SetTooltip("Copy Path")
             end
         else
@@ -1588,7 +1588,7 @@ function Module.RenderControls(scale, working_table)
             ImGui.PopStyleColor()
         end
         if ImGui.IsItemHovered() then
-            ImGui.SetWindowFontScale(scale)
+            
             ImGui.SetTooltip("Export: " .. currZone .. " : " .. NavSet.SelectedPath)
         end
         if ImGui.SmallButton("Write lua File") then
@@ -1687,7 +1687,7 @@ function Module.RenderControls(scale, working_table)
             ImGui.PopStyleColor()
         end
         if ImGui.IsItemHovered() then
-            ImGui.SetWindowFontScale(scale)
+            
             ImGui.SetTooltip("Add " .. currZone .. ": " .. NavSet.SelectedPath .. " to Chain")
         end
 
@@ -1709,7 +1709,7 @@ function Module.RenderControls(scale, working_table)
         end
         if SavedChains ~= nil then
             if ImGui.BeginCombo("##SelectChain", NavSet.SelectedChain) then
-                ImGui.SetWindowFontScale(scale)
+                
                 for name, data in pairs(SavedChains) do
                     local isSelected = name == NavSet.SelectedChain
                     if ImGui.Selectable(name, isSelected) then
@@ -1734,7 +1734,7 @@ function Module.RenderControls(scale, working_table)
         ImGui.SetNextItemWidth(120)
 
         if ImGui.BeginCombo("Zone##SelectChainZone", NavSet.ChainZone) then
-            ImGui.SetWindowFontScale(scale)
+            
             if not Paths[NavSet.ChainZone] then Paths[NavSet.ChainZone] = {} end
             for k, name in pairs(tmpCZ) do
                 local isSelected = name == NavSet.ChainZone
@@ -1748,7 +1748,7 @@ function Module.RenderControls(scale, working_table)
             ImGui.SetNextItemWidth(120)
 
             if ImGui.BeginCombo("Path##SelectChainPath", NavSet.ChainPath) then
-                ImGui.SetWindowFontScale(scale)
+                
                 if not Paths[NavSet.ChainZone] then Paths[NavSet.ChainZone] = {} end
                 for k, data in pairs(Paths[NavSet.ChainZone]) do
                     table.insert(tmpCP, k)
@@ -1988,7 +1988,7 @@ function Module.RenderPathData(scale, working_table)
         if NavSet.SelectedPath ~= 'None' then
             local closestWaypointIndex = FindIndexClosestWaypoint(working_table)
 
-            ImGui.SetWindowFontScale(scale)
+            
             if ImGui.BeginTable('PathTable##WpList', 6, bit32.bor(ImGuiTableFlags.Borders, ImGuiTableFlags.RowBg, ImGuiTableFlags.ScrollY, ImGuiTableFlags.ScrollX, ImGuiTableFlags.Resizable, ImGuiTableFlags.Reorderable, ImGuiTableFlags.Hideable), -1, -1) then
                 ImGui.TableSetupColumn('WP#', ImGuiTableColumnFlags.WidthFixed, 40)
                 ImGui.TableSetupColumn('Loc', ImGuiTableColumnFlags.WidthFixed, 120)
@@ -2191,6 +2191,7 @@ end
 
 function Module.RenderGUI()
     -- Main Window
+    ImGui.PushFont(nil, ImGui.GetFontSize() * scale)
     if showMainGUI then
         if currZone ~= lastZone then return end
         -- local currZone = mq.TLO.Zone.ShortName()
@@ -2264,7 +2265,7 @@ function Module.RenderGUI()
                 ImGui.EndMenuBar()
             end
             -- Set Window Font Scale
-            ImGui.SetWindowFontScale(scale)
+            
             if NavSet.PausedActiveGN then
                 if mq.TLO.SpawnCount('gm')() > 0 then
                     ImGui.TextColored(1, 0, 0, 1, "!!%s GM in Zone %s!!", Module.Icons.FA_BELL, Module.Icons.FA_BELL)
@@ -2391,7 +2392,7 @@ function Module.RenderGUI()
             -- Tabs
             -- ImGui.BeginChild("Tabs##MainTabs", -1, -1,ImGuiChildFlags.AutoResizeX)
             if ImGui.BeginTabBar('MainTabBar') then
-                ImGui.SetWindowFontScale(scale)
+                
                 if not Module.TempSettings.ControlsPopped then
                     if ImGui.BeginTabItem('Controls') then
                         if ImGui.BeginChild("Tabs##Controls", -1, -1, ImGuiChildFlags.AutoResizeX) then
@@ -2431,7 +2432,7 @@ function Module.RenderGUI()
             -- ImGui.EndChild()
         end
         -- Reset Font Scale
-        ImGui.SetWindowFontScale(1)
+        
         -- Unload Theme
         Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
         ImGui.End()
@@ -2494,7 +2495,7 @@ function Module.RenderGUI()
         end
         if showConfig then
             -- Set Window Font Scale
-            ImGui.SetWindowFontScale(scale)
+            
             if ImGui.CollapsingHeader('Theme##Settings' .. Module.Name) then
                 -- Configure ThemeZ --
                 ImGui.SeparatorText("Theme##" .. Module.Name)
@@ -2743,7 +2744,7 @@ function Module.RenderGUI()
             end
         end
         -- Reset Window Font Scale
-        ImGui.SetWindowFontScale(1)
+        
         Module.ThemeLoader.EndTheme(ColCntConf, StyCntConf)
         ImGui.End()
     end
@@ -2782,9 +2783,11 @@ function Module.RenderGUI()
         end
         ImGui.PopStyleColor()
         -- Set Window Font Scale
-        ImGui.SetWindowFontScale(1)
+        
         ImGui.End()
     end
+
+    ImGui.PopFont()
 end
 
 --[[-------- Main Functions --------]]

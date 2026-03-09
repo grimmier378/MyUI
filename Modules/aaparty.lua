@@ -365,16 +365,16 @@ end
 
 function Module:GetMyAA()
     local changed      = false
-    local tmpExpAA     = myself.PctAAExp() or 0
+    local tmpExpAA     = MyUI_MyData ~= nil and MyUI_MyData.PctAAExp or (myself.PctAAExp() or 0)
     local tmpSettingAA = mq.TLO.Window("AAWindow/AAW_PercentCount").Text() or '0'
-    local tmpPts       = myself.AAPoints() or 0
-    local tmpPtsTotal  = myself.AAPointsTotal() or 0
-    local tmpPtsSpent  = myself.AAPointsSpent() or 0
-    local tmpPctXP     = myself.PctExp() or 0
-    local tmpLvl       = myself.Level() or 0
-    local cState       = myself.CombatState() or ""
-    local tmpAirSupply = myself.PctAirSupply()
-    MyGroupLeader      = mq.TLO.Group.Leader() or "NoGroup"
+    local tmpPts       = MyUI_MyData ~= nil and MyUI_MyData.AAPoints or (myself.AAPoints() or 0)
+    local tmpPtsTotal  = MyUI_MyData ~= nil and MyUI_MyData.AAPointsTotal or (myself.AAPointsTotal() or 0)
+    local tmpPtsSpent  = MyUI_MyData ~= nil and MyUI_MyData.AAPointsSpent or (myself.AAPointsSpent() or 0)
+    local tmpPctXP     = MyUI_MyData ~= nil and MyUI_MyData.PctExp or (myself.PctExp() or 0)
+    local tmpLvl       = MyUI_MyData ~= nil and MyUI_MyData.Level or (myself.Level() or 0)
+    local cState       = MyUI_MyData ~= nil and MyUI_MyData.CombatState or (myself.CombatState() or "")
+    local tmpAirSupply = MyUI_MyData ~= nil and MyUI_MyData.PctAirSupply or (myself.PctAirSupply() or 0)
+    MyGroupLeader      = MyUI_MyData ~= nil and MyUI_MyData.GroupLeader or (mq.TLO.Group.Leader() or "NoGroup")
     if firstRun or (PctAA ~= tmpExpAA or SettingAA ~= tmpSettingAA or PtsAA ~= tmpPts or
             PtsSpent ~= tmpPtsSpent or PtsTotal ~= tmpPtsTotal or tmpLvl ~= MeLevel or tmpPctXP ~= PctExp or
             cState ~= LastState or tmpAirSupply ~= lastAirValue) then
@@ -485,7 +485,7 @@ function Module.RenderGUI()
                             if compact[groupData[i].Name] then childY = 25 end
                             if compact[groupData[i].Name] and expand[groupData[i].Name] then childY = 53 + modY end
                             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, 2, 2)
-                            imgui.BeginChild(groupData[i].Name, 165, childY, bit32.bor(ImGuiChildFlags.Border, ImGuiChildFlags.AutoResizeY), ImGuiWindowFlags.NoScrollbar)
+                            imgui.BeginChild(groupData[i].Name, 165, childY, bit32.bor(ImGuiChildFlags.Borders, ImGuiChildFlags.AutoResizeY), ImGuiWindowFlags.NoScrollbar)
                             -- Start of grouped Whole Elements
                             ImGui.BeginGroup()
                             -- Start of subgrouped Elements for tooltip

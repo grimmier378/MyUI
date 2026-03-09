@@ -29,7 +29,7 @@ end
 local Utils                                               = Module.Utils
 local ToggleFlags                                         = bit32.bor(
 	Utils.ImGuiToggleFlags.PulseOnHover,
-	Utils.ImGuiToggleFlags.SmilyKnob,
+	Utils.ImGuiToggleFlags.StarKnob,
 	Utils.ImGuiToggleFlags.RightLabel)
 -- Constants
 local ICON_WIDTH                                          = 40
@@ -763,7 +763,6 @@ end
 
 -- Display the collapasable menu area above the items
 function Module:RenderSettings()
-	ImGui.SetWindowFontScale(1.0)
 	if ImGui.BeginChild("OptionsChild") then
 		if ImGui.CollapsingHeader("Bag Options") then
 			local changed = false
@@ -1917,7 +1916,7 @@ function Module:Draw_Item_Icon(item, iconWidth, iconHeight, drawID, clickable, i
 
 	if not iconOnly then
 		-- Overlay the stack size text in the lower right corner
-		ImGui.SetWindowFontScale(0.68)
+        ImGui.PushFont(nil, ImGui.GetFontSize() * 0.68)
 		local TextSize = ImGui.CalcTextSize(tostring(item.Stack()))
 		if item.Stack() > 1 then
 			ImGui.SetCursorPos((cursor_x + offsetX) - TextSize, cursor_y + offsetY)
@@ -1932,7 +1931,7 @@ function Module:Draw_Item_Icon(item, iconWidth, iconHeight, drawID, clickable, i
 			ImGui.SetCursorPos((cursor_x + offsetXCharges), cursor_y + offsetYCharges)
 			ImGui.TextColored(ImVec4(1, 1, 0, 1), "%s", item.Charges())
 		end
-		ImGui.SetWindowFontScale(1.0)
+		ImGui.PopFont()
 
 		-- Reset the cursor to start position, then draw a transparent button (for drag & drop)
 		ImGui.SetCursorPos(cursor_x, cursor_y)
@@ -2047,7 +2046,6 @@ function Module:RenderBagContents(contentType)
 		contentType = 'items'
 	end
 	-- create_inventory()
-	ImGui.SetWindowFontScale(1.0)
 	if ImGui.BeginChild("BagContent##" .. contentType, 0.0, 0.0) then
 		ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
 		local bag_window_width = ImGui.GetWindowWidth()
@@ -2121,7 +2119,6 @@ end
 -- end
 
 function Module:RenderWeapons()
-	ImGui.SetWindowFontScale(1.0)
 	if ImGui.BeginChild("BagWeapons", 0.0, 0.0) then
 		ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
 		local function drawItemsTables(tableName)
@@ -2154,7 +2151,6 @@ function Module:RenderWeapons()
 end
 
 function Module:RenderDetails()
-	ImGui.SetWindowFontScale(1.0)
 	if ImGui.Button("Trade Selected Items") then
 		doTrade = true
 	end
@@ -2413,7 +2409,7 @@ function Module:RenderTabs()
 	end
 	if show then
 		self:RenderHeader()
-		ImGui.SetWindowFontScale(1.25)
+		ImGui.PushFont(nil, ImGui.GetFontSize() * 1.25)
 		ImGui.Text(string.format("Used/Free Slots "))
 		ImGui.SameLine()
 		ImGui.TextColored(FreeSlots > MIN_SLOTS_WARN and ImVec4(0.354, 1.000, 0.000, 0.500) or ImVec4(1.000, 0.354, 0.0, 0.5), "(%s/%s)", UsedSlots, FreeSlots)
@@ -2426,7 +2422,7 @@ function Module:RenderTabs()
 		ImGui.SeparatorText('Inventory / Destroy Area')
 		local sizeX = ImGui.GetWindowWidth()
 
-		if ImGui.BeginChild('AutoInvArea', ImVec2((sizeX / 2) - 10, 40), ImGuiChildFlags.Border) then
+		if ImGui.BeginChild('AutoInvArea', ImVec2((sizeX / 2) - 10, 40), ImGuiChildFlags.Borders) then
 			ImGui.TextDisabled("Inventory Coin/Item")
 		end
 		ImGui.EndChild()
@@ -2437,7 +2433,7 @@ function Module:RenderTabs()
 		ImGui.SameLine()
 
 		ImGui.PushStyleColor(ImGuiCol.ChildBg, ImVec4(0.2, 0, 0, 1))
-		if ImGui.BeginChild('DestroyArea', ImVec2((sizeX / 2) - 15, 40), ImGuiChildFlags.Border) then
+		if ImGui.BeginChild('DestroyArea', ImVec2((sizeX / 2) - 15, 40), ImGuiChildFlags.Borders) then
 			ImGui.TextDisabled("Destroy Item")
 		end
 		ImGui.EndChild()
@@ -2457,6 +2453,7 @@ function Module:RenderTabs()
 		self:DrawHelpMarker("Highlight items that are useable by your class.")
 
 		ImGui.Separator()
+        ImGui.PopFont()
 		if ImGui.BeginChild("BagTabs") then
 			if ImGui.BeginTabBar("##BagTabs", bit32.bor(ImGuiTabBarFlags.Reorderable)) then
 				if ImGui.BeginTabItem("Items") then
@@ -2507,7 +2504,6 @@ function Module:RenderTabs()
 
 		-- display_item_on_cursor()
 	end
-	ImGui.SetWindowFontScale(1)
 	self.ThemeLoader.EndTheme(colorCount, styleCount)
 	ImGui.End()
 end

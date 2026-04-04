@@ -13,8 +13,8 @@ Module.ShowGui = true
 
 -- check if the script is being loaded as a Module (externally) or as a Standalone script.
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI ~= nil and true or false
-if not loadedExeternally then
+local loadedExternally = MyUI ~= nil and true or false
+if not loadedExternally then
     Module.Utils       = require('lib.common')       -- common functions for use in other scripts
     Module.Icons       = require('mq.ICONS')         -- FAWESOME ICONS
     Module.Colors      = require('lib.colors')       -- color table for GUI returns ImVec4
@@ -48,7 +48,7 @@ local function Init()
     Module.IsRunning = true
     Module.Utils.PrintOutput('MyUI', false, "\a-w[\at%s\a-w] \agLoaded\aw!", Module.Name)
     myStats, myAltCur = Module.GetStats()
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init(Module.Name, Module.RenderGUI)
         Module.LocalLoop()
     end

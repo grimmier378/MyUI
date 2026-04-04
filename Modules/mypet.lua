@@ -13,9 +13,9 @@ Module.IsRunning = true
 Module.TempSettings = {}
 Module.Name = 'MyPet'
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI ~= nil and true or false
+local loadedExternally = MyUI ~= nil and true or false
 
-if not loadedExeternally then
+if not loadedExternally then
     Module.Utils       = require('lib.common')
     Module.Colors      = require('lib.colors')
     Module.Icons       = require('mq.ICONS')
@@ -263,7 +263,7 @@ local function loadSettings()
     newSetting = Module.Utils.CheckDefaultSettings(defaults, settings[Module.Name])
     newSetting = Module.Utils.CheckDefaultSettings(defaults.Buttons, settings[Module.Name].Buttons) or newSetting
     newSetting = Module.Utils.CheckDefaultSettings(defaults.ConColors, settings[Module.Name].ConColors) or newSetting
-    if loadedExeternally then
+    if loadedExternally then
         -- Load the Module.Theme
         loadTheme()
     end
@@ -551,10 +551,12 @@ function Module.RenderGUI()
                 -- Combo Box Load Theme
                 if ImGui.BeginCombo("Load Theme##" .. Module.Name, themeName) then
                     for k, data in pairs(Module.Theme.Theme) do
-                        local isSelected = data.Name == themeName
-                        if ImGui.Selectable(data.Name, isSelected) then
-                            Module.Theme.LoadTheme = data.Name
-                            themeName = Module.Theme.LoadTheme
+                        if data ~= nil then
+                            local isSelected = data.Name == themeName
+                            if ImGui.Selectable(data.Name, isSelected) then
+                                Module.Theme.LoadTheme = data.Name
+                                themeName = Module.Theme.LoadTheme
+                            end
                         end
                     end
                     ImGui.EndCombo()
@@ -567,9 +569,9 @@ function Module.RenderGUI()
                     if scale > 2 then scale = 2 end
                 end
 
-                if hasThemeZ or loadedExeternally then
+                if hasThemeZ or loadedExternally then
                     if ImGui.Button('Edit ThemeZ') then
-                        if not loadedExeternally then
+                        if not loadedExternally then
                             mq.cmd("/lua run themez")
                         else
                             if MyUI.Modules.ThemeZ ~= nil then
@@ -714,7 +716,7 @@ local function Init()
     lastCheck = mq.gettime()
 
     Module.IsRunning = true
-    if not loadedExeternally then
+    if not loadedExternally then
         petBuffs, petBuffCount = getPetData()
         GetButtonStates()
         mq.imgui.init(Module.Name, Module.RenderGUI)
@@ -727,7 +729,7 @@ local function Init()
 end
 
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         ---@diagnostic disable-next-line: undefined-global
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
         petBuffs = MyUI.MyPetData.Buffs or {}
@@ -743,7 +745,7 @@ function Module.MainLoop()
         winFlags = locked and bit32.bor(ImGuiWindowFlags.NoMove, ImGuiWindowFlags.NoResize, winFlags) or winFlags
         -- winFlags = aSize and bit32.bor(winFlags, ImGuiWindowFlags.AlwaysAutoResize) or winFlags
         winFlags = not showTitleBar and bit32.bor(winFlags, ImGuiWindowFlags.NoTitleBar) or winFlags
-        if not loadedExeternally then
+        if not loadedExternally then
             petName = myPet.DisplayName() or 'NO PET'
             petBuffs, petBuffCount = getPetData()
         end

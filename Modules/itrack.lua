@@ -19,7 +19,7 @@ local myName                 = mq.TLO.Me.CleanName()
 local tmpTxt                 = ""
 local needSave               = false
 local Module                 = {}
-local loadedExeternally      = MyUI ~= nil
+local loadedExternally      = MyUI ~= nil
 Module.Name                  = "iTrack"
 Module.IsRunning             = false
 Module.Settings              = {}
@@ -28,8 +28,8 @@ Module.TempSettings          = {}
 Module.TempSettings.Counters = {}
 
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally      = MyUI ~= nil and true or false
-if not loadedExeternally then
+local loadedExternally      = MyUI ~= nil and true or false
+if not loadedExternally then
     Module.Utils       = require('lib.common')       -- common functions for use in other scripts
     Module.Icons       = require('mq.ICONS')         -- FAWESOME ICONS
     Module.Colors      = require('lib.colors')       -- color table for GUI returns ImVec4
@@ -211,16 +211,45 @@ local colGreen = ImVec4(0.409, 1.000, 0.409, 1.000)
 local colWhite = ImVec4(1, 1, 1, 1)
 local colYellow = ImVec4(1, 1, 0, 1)
 
-local function renderBtn()
-    -- apply_style()
-    local winBtnFlags = Module.Settings.lockWindow and bit32.bor(ImGuiWindowFlags.NoMove, buttonWinFlags) or buttonWinFlags
+function Module:RenderMiniButton(grouped)
+    if not grouped then
+        local winBtnFlags = Module.Settings.lockWindow and bit32.bor(ImGuiWindowFlags.NoMove, buttonWinFlags) or buttonWinFlags
 
-    local openBtn, showBtn = ImGui.Begin(string.format("Item Tracker##Mini"), true, winBtnFlags)
-    if not openBtn then
-        showBtn = false
-    end
+        local openBtn, showBtn = ImGui.Begin(string.format("Item Tracker##Mini"), true, winBtnFlags)
+        if not openBtn then
+            showBtn = false
+        end
 
-    if showBtn then
+        if showBtn then
+            local cursorPosX, cursorPosY = ImGui.GetCursorScreenPos()
+            animMini:SetTextureCell(1147 - EQ_ICON_OFFSET)
+            ImGui.DrawTextureAnimation(animMini, 34, 34, true)
+            ImGui.SetCursorScreenPos(cursorPosX, cursorPosY)
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0.5, 0.5, 0, 0.5))
+            ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
+            if ImGui.Button("##ItemTrackerBtn", ImVec2(34, 34)) then
+                Module.Settings.showUI = not Module.Settings.showUI
+                mq.pickle(configFile, Module.Settings)
+            end
+            ImGui.PopStyleColor(3)
+        end
+        if ImGui.IsItemHovered() then
+            ImGui.BeginTooltip()
+            ImGui.Text("Item Tracker")
+            ImGui.Text("Left-click to toggle UI")
+            ImGui.Text("Right-click for options")
+            ImGui.EndTooltip()
+        end
+        if ImGui.BeginPopupContextItem("ItemTrackerContext") then
+            if ImGui.MenuItem(Module.Settings.lockWindow and "Unlock Window" or "Lock Window") then
+                Module.Settings.lockWindow = not Module.Settings.lockWindow
+                mq.pickle(configFile, Module.Settings)
+            end
+            ImGui.EndPopup()
+        end
+        ImGui.End()
+    else
         local cursorPosX, cursorPosY = ImGui.GetCursorScreenPos()
         animMini:SetTextureCell(1147 - EQ_ICON_OFFSET)
         ImGui.DrawTextureAnimation(animMini, 34, 34, true)
@@ -233,28 +262,21 @@ local function renderBtn()
             mq.pickle(configFile, Module.Settings)
         end
         ImGui.PopStyleColor(3)
-        -- if ImGui.IsItemHovered() then
-        -- 	if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
-        -- 		Module.Settings.showUI = not Module.Settings.showUI
-        -- 		mq.pickle(configFile, Module.Settings)
-        -- 	end
-        -- end
-    end
-    if ImGui.IsWindowHovered() then
-        ImGui.BeginTooltip()
-        ImGui.Text("Item Tracker")
-        ImGui.Text("Left-click to toggle UI")
-        ImGui.Text("Right-click for options")
-        ImGui.EndTooltip()
-    end
-    if ImGui.BeginPopupContextWindow("ItemTrackerContext") then
-        if ImGui.MenuItem(Module.Settings.lockWindow and "Unlock Window" or "Lock Window") then
-            Module.Settings.lockWindow = not Module.Settings.lockWindow
-            mq.pickle(configFile, Module.Settings)
+        if ImGui.IsItemHovered() then
+            ImGui.BeginTooltip()
+            ImGui.Text("Item Tracker")
+            ImGui.Text("Left-click to toggle UI")
+            ImGui.Text("Right-click for options")
+            ImGui.EndTooltip()
         end
-        ImGui.EndPopup()
+        if ImGui.BeginPopupContextItem("ItemTrackerContext") then
+            if ImGui.MenuItem(Module.Settings.lockWindow and "Unlock Window" or "Lock Window") then
+                Module.Settings.lockWindow = not Module.Settings.lockWindow
+                mq.pickle(configFile, Module.Settings)
+            end
+            ImGui.EndPopup()
+        end
     end
-    ImGui.End()
 end
 
 local function renderMain()
@@ -361,7 +383,7 @@ end
 
 function Module.RenderGUI()
     local styleCount, colorCount = Module.ThemeLoader.StartTheme(MyUI.ThemeName or Module.ThemeName, Module.Theme)
-    renderBtn()
+    if not MyUI.Settings.GroupButtons then Module:RenderMiniButton() end
 
     if Module.Settings.showUI then
         renderMain()
@@ -384,7 +406,7 @@ local function init()
     loadConfig()
     loadTrackedItems()
     RegisterActors()
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init("itemTracker", Module.RenderGUI)
     end
     mq.bind("/itrack", Module.CommandHandler)
@@ -446,7 +468,7 @@ function Module.Unload()
 end
 
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         ---@diagnostic disable-next-line: undefined-global
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
@@ -491,7 +513,7 @@ function Module.LocalLoop()
     end
 end
 
-if not loadedExeternally then
+if not loadedExternally then
     Module.LocalLoop()
 end
 return Module

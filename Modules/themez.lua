@@ -1,12 +1,12 @@
 local mq = require('mq')
 local ImGui = require 'ImGui'
 local Module = {}
-local loadedExeternally = MyUI ~= nil and true or false
+local loadedExternally = MyUI ~= nil and true or false
 Module.Name = "ThemeZ"   -- Name of the module used when loading and unloaing the modules.
 Module.IsRunning = false -- Keep track of running state. if not running we can unload it.
 Module.ShowGui = true
 
-if not loadedExeternally then
+if not loadedExternally then
     Module.Utils = require('lib.common')
     Module.ThemeLoader = require('lib.theme_loader')
 else
@@ -90,18 +90,20 @@ local function loadSettings()
     tempSettings = theme
     local styleFlag = false
     for tID, tData in pairs(tempSettings.Theme) do
-        if tData['Style'] == nil or next(tData['Style']) == nil then
-            tempSettings.Theme[tID].Style = {}
-            tempSettings.Theme[tID].Style = defaults['Theme'][1]['Style']
-            styleFlag = true
-        end
-        if tData['Color'] == nil or next(tData['Color']) == nil then
-            tempSettings.Theme[tID].Color = {}
-            tempSettings.Theme[tID].Color = defaults['Theme'][1]['Color']
-            styleFlag = true
-        end
-        if tData.Name == themeName then
-            themeID = tID
+        if tData ~= nil then
+            if tData['Style'] == nil or next(tData['Style']) == nil then
+                tempSettings.Theme[tID].Style = {}
+                tempSettings.Theme[tID].Style = defaults['Theme'][1]['Style']
+                styleFlag = true
+            end
+            if tData['Color'] == nil or next(tData['Color']) == nil then
+                tempSettings.Theme[tID].Color = {}
+                tempSettings.Theme[tID].Color = defaults['Theme'][1]['Color']
+                styleFlag = true
+            end
+            if tData.Name == themeName then
+                themeID = tID
+            end
         end
     end
 
@@ -163,9 +165,9 @@ end
 
 local function DrawStyles()
     local style = {}
-    tempSettings.Theme[themeID] = theme.Theme[themeID] or nil
+    tempSettings.Theme[themeID] = theme.Theme[themeID] or defaults.Theme[1]
     if tempSettings.Theme[themeID]['Style'] == nil then
-        tempSettings.Theme[themeID]['Style'] = defaults['Theme'][2]['Style'] or {}
+        tempSettings.Theme[themeID]['Style'] = defaults['Theme'][1]['Style'] or {}
     end
     style = tempSettings.Theme[themeID]['Style'] or {}
 
@@ -432,11 +434,13 @@ function Module.RenderGUI()
             -- Combo Box Load Theme
             if ImGui.BeginCombo("Load Theme", themeName) then
                 for k, data in pairs(tempSettings.Theme) do
-                    local isSelected = (data['Name'] == themeName)
-                    if ImGui.Selectable(data['Name'], isSelected) then
-                        tempSettings['LoadTheme'] = data['Name']
-                        themeName = tempSettings['LoadTheme']
-                        tmpName = themeName
+                    if data ~= nil then
+                        local isSelected = (data['Name'] == themeName)
+                        if ImGui.Selectable(data['Name'], isSelected) then
+                            tempSettings['LoadTheme'] = data['Name']
+                            themeName = tempSettings['LoadTheme']
+                            tmpName = themeName
+                        end
                     end
                 end
                 ImGui.EndCombo()
@@ -457,6 +461,7 @@ function Module.RenderGUI()
                 local seen = {} -- make sure we arean't duplicating entries
 
                 for i = 1, #sorteedKeys do
+                    if sorteedKeys[i] == nil then goto continue end
                     local pID = sorteedKeys[i].id
                     local pData = tempSettings.Theme[loadedID]['Color'][pID] or defaults.Theme[1].Color[pID]
                     if pData ~= nil and pID == ImGuiCol[sorteedKeys[i].name] then
@@ -526,7 +531,7 @@ local function startup()
     loadSettings()
     mq.bind("/themez", commandHandler)
     sorteedKeys = SortColors()
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init("ThemeZ Builder##", Module.RenderGUI)
         Module.LocalLoop()
     end
@@ -537,7 +542,7 @@ local function startup()
 end
 --
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
 end

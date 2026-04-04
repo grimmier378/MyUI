@@ -4,17 +4,17 @@
     Description: Stupid Simple Group Window
 ]]
 
-local mq                = require('mq')
-local ImGui             = require('ImGui')
-local Module            = {}
-Module.Name             = 'MyGroup'
-Module.ActorMailBox     = 'MyGroup'
+local mq               = require('mq')
+local ImGui            = require('ImGui')
+local Module           = {}
+Module.Name            = 'MyGroup'
+Module.ActorMailBox    = 'MyGroup'
 
-Module.IsRunning        = false
+Module.IsRunning       = false
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI ~= nil and true or false
+local loadedExternally = MyUI ~= nil and true or false
 
-if not loadedExeternally then
+if not loadedExternally then
     Module.Utils       = require('lib.common')
     Module.Colors      = require('lib.colors')
     Module.Icons       = require('mq.ICONS')
@@ -147,6 +147,7 @@ defaults        = {
             Borders = { 0.5, 0.5, 0.5, 1.0, },
             PetMax = { 0.063, 0.389, 0.117, 1.000, },
             PetMin = { 0.825, 0.727, 0.004, 1.000, },
+            NotInZone = { 0.800, 0.000, 1.000, 1.000, },
         },
     },
 }
@@ -226,16 +227,17 @@ local function loadSettings()
         -- Load settings from the Lua config file
         settings = dofile(configFile)
     end
-    if not loadedExeternally then
+    if not loadedExternally then
         loadTheme()
     end
     newSetting = Module.Utils.CheckDefaultSettings(defaults[Module.Name], settings[Module.Name])
     newSetting = Module.Utils.CheckRemovedSettings(defaults[Module.Name], settings[Module.Name]) or newSetting
-
-    if settings[Module.Name].Colors == nil or next(settings[Module.Name].Colors) == nil then
+    if settings[Module.Name].Colors == nil then
         settings[Module.Name].Colors = defaults[Module.Name].Colors
         writeSettings(configFile, settings)
     end
+    newSetting = Module.Utils.CheckDefaultSettings(defaults[Module.Name].Colors, settings[Module.Name].Colors) or newSetting
+
     showRaidWindow = settings[Module.Name].ShowRaidWindow
     showSelf = settings[Module.Name].ShowSelf
     hideTitle = settings[Module.Name].HideTitleBar
@@ -505,14 +507,14 @@ local function DrawGroupMember(id)
     local maxHP = settings[Module.Name].DynamicHP and retCol("HPMax") or Module.Colors.color('red')
     if settings[Module.Name].DynamicHP then
         if Module.MyZone ~= zne then
-            minHP = Module.Colors.color('purple')
-            maxHP = Module.Colors.color('purple')
+            minHP = retCol("NotInZone")
+            maxHP = retCol("NotInZone")
         end
     else
         if (groupData[memberName] ~= nil) then
             if hpPct == nil or hpPct <= 0 or not (Module.MyZone == groupData[memberName].Zone) then
-                minHP = Module.Colors.color('purple')
-                maxHP = Module.Colors.color('purple')
+                minHP = retCol("NotInZone")
+                maxHP = retCol("NotInZone")
             elseif hpPct < 15 then
                 minHP = Module.Colors.color('pink')
                 maxHP = Module.Colors.color('pink')
@@ -904,7 +906,7 @@ local function DrawRaidMember(id)
         if mq.TLO.SpawnCount(string.format("PC =\"%s\"", memberName))() > 0 then
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, ImVec4(r, g, b, a))
         else
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, retCol("NotInZone"))
         end
     else
         if tmpCheck == 'Unknown' then
@@ -913,7 +915,7 @@ local function DrawRaidMember(id)
             end
         end
         if hpPct <= 0 or hpPct == nil or not (Module.MyZone == tmpCheck) then
-            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('purple')))
+            ImGui.PushStyleColor(ImGuiCol.PlotHistogram, retCol("NotInZone"))
         elseif hpPct < 15 then
             ImGui.PushStyleColor(ImGuiCol.PlotHistogram, (Module.Colors.color('pink')))
         else
@@ -1087,7 +1089,7 @@ local function DrawSelf()
     -- Health Bar
     if not settings[Module.Name].DynamicHP then
         if mySelf.PctHPs() <= 0 or mySelf.PctHPs() == nil then
-            hpMin, hpMax = Module.Colors.color('purple'), Module.Colors.color('purple')
+            hpMin, hpMax = retCol("NotInZone"), retCol("NotInZone")
         elseif mySelf.PctHPs() < 15 then
             hpMin, hpMax = Module.Colors.color('pink'), Module.Colors.color('pink')
         else
@@ -1572,11 +1574,13 @@ function Module.RenderGUI()
                 -- Combo Box Load Theme
                 if ImGui.BeginCombo("Load Theme##MyGroup", themeName) then
                     for k, data in pairs(Module.Theme.Theme) do
-                        local isSelected = data.Name == themeName
-                        if ImGui.Selectable(data.Name, isSelected) then
-                            Module.Theme.LoadTheme = data.Name
-                            themeName = Module.Theme.LoadTheme
-                            settings[Module.Name].LoadTheme = themeName
+                        if data ~= nil then
+                            local isSelected = data.Name == themeName
+                            if ImGui.Selectable(data.Name, isSelected) then
+                                Module.Theme.LoadTheme = data.Name
+                                themeName = Module.Theme.LoadTheme
+                                settings[Module.Name].LoadTheme = themeName
+                            end
                         end
                     end
                     ImGui.EndCombo()
@@ -1587,7 +1591,7 @@ function Module.RenderGUI()
                 end
 
                 ImGui.SameLine()
-                if loadedExeternally then
+                if loadedExternally then
                     if ImGui.Button('Edit ThemeZ') then
                         if MyUI.Modules.ThemeZ ~= nil then
                             if MyUI.Modules.ThemeZ.IsRunning then
@@ -1829,14 +1833,18 @@ end
 local function CheckStale()
     local now = os.clock()
     local found = false
+    local stale = {}
     for k, v in pairs(groupData or {}) do
         if v.Check == nil then
             groupData[k].Check = now
         else
             if now - v.Check > 60 then
-                groupData[k] = nil
+                stale[#stale + 1] = k
             end
         end
+    end
+    for _, k in ipairs(stale) do
+        groupData[k] = nil
     end
 end
 
@@ -1846,6 +1854,7 @@ local function GenerateContent(sub)
         Subject = 'Hello'
         firstRun = false
     end
+    if groupData[Module.CharLoaded] == nil then return end
     return {
         --[[groupData[Module.CharLoaded]]
         Subject  = Subject,
@@ -2008,7 +2017,7 @@ local function init()
     CheckStale()
     Module.MyZone = mq.TLO.Zone.Name()
     showGroupWindow = Module.Mode == 'driver' and true or false
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init(Module.Name, Module.RenderGUI)
         Module.LocalLoop()
     end
@@ -2021,7 +2030,7 @@ end
 local clockTimer = mq.gettime()
 
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         ---@diagnostic disable-next-line: undefined-global
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end

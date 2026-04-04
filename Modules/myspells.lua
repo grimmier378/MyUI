@@ -21,9 +21,9 @@ Module.Name = "MySpells"
 Module.TempSettings = {}
 
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI ~= nil and true or false
+local loadedExternally = MyUI ~= nil and true or false
 
-if not loadedExeternally then
+if not loadedExternally then
     Module.Utils         = require('lib.common')
     Module.Icons         = require('mq.ICONS')
     Module.CharLoaded    = mq.TLO.Me.DisplayName()
@@ -187,7 +187,7 @@ local function loadSettings()
         newSetting = true
     end
 
-    if not loadedExeternally then
+    if not loadedExternally then
         loadTheme()
     end
     -- Set the settings to the variables
@@ -468,12 +468,14 @@ local function DrawConfigWin()
     -- Combo Box Load Theme
     if ImGui.BeginCombo("Load Theme##MySpells", themeName) then
         for k, data in pairs(Module.Theme.Theme) do
-            local isSelected = data.Name == themeName
-            if ImGui.Selectable(data.Name, isSelected) then
-                if data.Name ~= settings[Module.Name].LoadTheme then
-                    themeName = data.Name
-                    settings[Module.Name].LoadTheme = themeName
-                    mq.pickle(configFile, settings)
+            if data ~= nil then
+                local isSelected = data.Name == themeName
+                if ImGui.Selectable(data.Name, isSelected) then
+                    if data.Name ~= settings[Module.Name].LoadTheme then
+                        themeName = data.Name
+                        settings[Module.Name].LoadTheme = themeName
+                        mq.pickle(configFile, settings)
+                    end
                 end
             end
         end
@@ -487,9 +489,9 @@ local function DrawConfigWin()
         settings[Module.Name].Scale = scale
     end
 
-    if hasThemeZ or loadedExeternally then
+    if hasThemeZ or loadedExternally then
         if ImGui.Button('Edit ThemeZ') then
-            if not loadedExeternally then
+            if not loadedExternally then
                 mq.cmd("/lua run themez")
             else
                 if MyUI.Modules.ThemeZ ~= nil then
@@ -1020,7 +1022,7 @@ local function Init()
     mq.event('cast_start', "You begin casting #1#.#*#", CastDetect)
     GetSpells()
     Module.IsRunning = true
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init('GUI_MySpells', Module.RenderGUI)
         Module.LocalLoop()
     end
@@ -1028,7 +1030,7 @@ local function Init()
 end
 
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         ---@diagnostic disable-next-line: undefined-global
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end

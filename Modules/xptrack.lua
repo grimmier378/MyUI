@@ -10,10 +10,10 @@ local ImPlot              = require('ImPlot')
 local ScrollingPlotBuffer = require('lib.scrolling_plot_buffer')
 local OnEmu               = (mq.TLO.MacroQuest.BuildName():lower() or "") == "emu"
 local Module              = {}
-local loadedExeternally   = MyUI ~= nil
+local loadedExternally   = MyUI ~= nil
 Module.Name               = "XPTrack"
 Module.IsRunning          = false
-if not loadedExeternally then
+if not loadedExternally then
     Module.Icons       = require('mq.ICONS')
     Module.Utils       = require('lib.common')
     Module.ThemeLoader = require('lib.theme_loader')
@@ -339,8 +339,10 @@ function Module.RenderGUI()
 
                     local new_multiplier = tonumber(Module.Settings.GraphMultiplier)
 
-                    for idx, pt in ipairs(XPEvents.Exp.expEvents.DataY) do
-                        XPEvents.Exp.expEvents.DataY[idx] = (pt / multiplier) * new_multiplier
+                    if XPEvents.Exp and XPEvents.Exp.expEvents and XPEvents.Exp.expEvents.DataY then
+                        for idx, pt in ipairs(XPEvents.Exp.expEvents.DataY) do
+                            XPEvents.Exp.expEvents.DataY[idx] = (pt / multiplier) * new_multiplier
+                        end
                     end
 
                     multiplier = new_multiplier
@@ -376,13 +378,15 @@ function Module.RenderGUI()
             -- Combo Box Load Theme
             if ImGui.BeginCombo("Load Theme##XPTrack", Module.themeName) then
                 for k, data in pairs(Module.Theme.Theme) do
-                    local isSelected = data.Name == Module.themeName
-                    if ImGui.Selectable(data.Name, isSelected) then
-                        Module.Settings.LoadTheme = data.Name
-                        if Module.themeName ~= Module.Settings.LoadTheme then
-                            mq.pickle(ConfigFile, Module.Settings)
+                    if data ~= nil then
+                        local isSelected = data.Name == Module.themeName
+                        if ImGui.Selectable(data.Name, isSelected) then
+                            Module.Settings.LoadTheme = data.Name
+                            if Module.themeName ~= Module.Settings.LoadTheme then
+                                mq.pickle(ConfigFile, Module.Settings)
+                            end
+                            Module.themeName = Module.Settings.LoadTheme
                         end
-                        Module.themeName = Module.Settings.LoadTheme
                     end
                 end
                 ImGui.EndCombo()
@@ -521,7 +525,7 @@ mq.bind("/xpt", CommandHandler)
 Module.Utils.PrintOutput('XPTraclk', false, "\aw[\atXP Track\ax] \aoCommand: \ay/xpt \aoArgumentss: \aw[\ayreset\aw|\ayexit\aw]")
 
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         ---@diagnostic disable-next-line: undefined-global
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
@@ -735,7 +739,7 @@ Module.LoadSettings()
 
 
 -- TODO: check for persona / other char switch and reset stats?
-if not loadedExeternally then
+if not loadedExternally then
     mq.imgui.init('xptracker', Module.RenderGUI)
     while Module.IsRunning do
         Module.MainLoop()

@@ -7,9 +7,9 @@ Module.ActorMailBox = 'my_dps'
 Module.Name = 'MyDPS'
 Module.IsRunning = false
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI ~= nil and true or false
+local loadedExternally = MyUI ~= nil and true or false
 
-if not loadedExeternally then
+if not loadedExternally then
     Module.Utils       = require('lib.common')
     Module.ThemeLoader = require('lib.theme_loader')
     Module.Actor       = require('actors')
@@ -64,6 +64,10 @@ local themeName                                                                 
 local tempSettings                                                                                                                 = {}
 local dataWindows                                                                                                                  = {}
 local MyLeader                                                                                                                     = 'None'
+local battleSnapshots                                                                                                              = {}
+local snapshotViewIndex                                                                                                            = 0
+local snapshotSelectedMetric                                                                                                       = 1
+local actorBattleTracking                                                                                                          = {}
 -- Graph state
 local graphBuffers                                                                                                                 = {} -- [name][metric] -> ScrollingPlotBuffer
 local graphLastSampleTime                                                                                                          = 0
@@ -143,6 +147,17 @@ local defaults = {
         ['critHeals'] = { 0, 1, 1, 1, },
         ['dot'] = { 1, 1, 0, 1, },
     },
+    GraphOptions = {
+        breakBetweenBattles = {
+            dps       = false,
+            avg       = false,
+            crit      = true,
+            dot       = true,
+            critHeals = true,
+            dmg       = true,
+        },
+        showPieChart = false,
+    },
     Anchors = {
         hitme = { pos = { x = 300, y = 200, }, show = true, point = nil, useForeground = false, atMouse = false, enabled = true, },
         crits = { pos = { x = 400, y = 200, }, show = true, point = nil, useForeground = false, atMouse = false, enabled = true, },
@@ -167,11 +182,19 @@ Module.DmgFloat.Defaults = {
     base_font_size = nil,                     -- if nil -> uses imgui.GetFontSize(), if set -> treated as "base" font size before pop/scale_mult
 }
 
+---this checks if the anchor has a point saved as an imvec
+---if not then we will create one from the pos.x pos.y positions.
+---@param a table the anchor data table
+---@return ImVec2
 local function GetAnchorPoint(a)
     if a.point then return a.point end
     return ImVec2(a.pos.x, a.pos.y)
 end
 
+---Creates the anchor windows
+---moving the anchor window around saves the location
+---@param name string name of the anchor
+---@param a table the anchors data table
 local function AnchorWidget(name, a)
     if not a.show then return end
 
@@ -185,9 +208,10 @@ local function AnchorWidget(name, a)
         ImGuiWindowFlags.NoSavedSettings
     )
 
-    local ok
-    ok, a.show = ImGui.Begin("##anchor_" .. name, a.show, flags)
-    if ok then
+    local openAnchor
+    openAnchor, a.show = ImGui.Begin("##anchor_" .. name, a.show, flags)
+    if not openAnchor then a.show = false end
+    if a.show then
         ImGui.Text(name)
         ImGui.SameLine()
         if ImGui.SmallButton("X##" .. name) then
@@ -206,6 +230,9 @@ local function AnchorWidget(name, a)
     ImGui.End()
 end
 
+--- draws the anchor window when ebabled
+---@param name string the anchor name
+---@param a table the anchors table of settings
 local function DrawAnchor(name, a)
     if a.atMouse then
         Module.DmgFloat.DrawAtMouse(ImVec2(0, 0), "Anchor::" .. name, name)
@@ -255,7 +282,7 @@ local function loadSettings()
         end
     end
 
-    if not loadedExeternally then
+    if not loadedExternally then
         loadThemeTable()
     end
 
@@ -282,6 +309,21 @@ local function loadSettings()
         end
     end
 
+    if settings.GraphOptions == nil then
+        settings.GraphOptions = deepCopy(defaults.GraphOptions)
+    end
+    if settings.GraphOptions.breakBetweenBattles == nil then
+        settings.GraphOptions.breakBetweenBattles = deepCopy(defaults.GraphOptions.breakBetweenBattles)
+    end
+    for k, v in pairs(defaults.GraphOptions.breakBetweenBattles) do
+        if settings.GraphOptions.breakBetweenBattles[k] == nil then
+            settings.GraphOptions.breakBetweenBattles[k] = v
+        end
+    end
+    if settings.GraphOptions.showPieChart == nil then
+        settings.GraphOptions.showPieChart = defaults.GraphOptions.showPieChart
+    end
+
     local newSetting = false
 
     -- check for new settings
@@ -291,6 +333,7 @@ local function loadSettings()
     -- check for removed settings
     newSetting = Module.Utils.CheckRemovedSettings(defaults.Options, settings.Options) or newSetting
     newSetting = Module.Utils.CheckRemovedSettings(defaults.MeleeColors, settings.MeleeColors) or newSetting
+    newSetting = Module.Utils.CheckRemovedSettings(defaults.GraphOptions.breakBetweenBattles, settings.GraphOptions.breakBetweenBattles) or newSetting
 
     -- set local settings
     for k, v in pairs(settings.Options or {}) do
@@ -298,6 +341,12 @@ local function loadSettings()
     end
     tempSettings.doActors = settings.Options.announceActors
     themeName = settings.Options.useTheme or 'Default'
+
+    for k, v in pairs(settings.GraphOptions.breakBetweenBattles) do
+        tempSettings["graphBreak_" .. k] = v
+    end
+    tempSettings.graphShowPieChart = settings.GraphOptions.showPieChart
+
     if newSetting then mq.pickle(configFile, settings) end
 end
 
@@ -853,21 +902,25 @@ local function critHealCallBack(line, dmg)
 end
 
 local function cleanTable()
-    if tableSize > 0 then
-        local currentTime = os.time()
-        local i = 1
-        while i <= tableSize do
+    local currentTime = os.time()
+    local i = 1
+    while i <= #damTable do
+        if damTable[i] ~= nil then
             if currentTime - damTable[i].timestamp > settings.Options.displayTime then
                 table.remove(damTable, i)
-                tableSize = tableSize - 1
+                tableSize = math.max(0, tableSize - 1)
             else
                 i = i + 1
             end
+        else
+            table.remove(damTable, i)
         end
     end
+    tableSize = #damTable
 end
 
----comment
+---converts large numbers into smaller ones with a suffix.
+---ie 100000 = 100k, 1000000 = 1m
 ---@param num number @ Number to clean
 ---@param percision number|nil @ default 0 - Number of decimal places
 ---@param percAlways boolean|nil @ default false - Always show decimal places
@@ -1039,15 +1092,16 @@ local function getGraphColor(name)
     return graphPartyColors[graphColorAssignments[name]]
 end
 
--- add breaks between battles so the line doesn't dip back to 0
-local shouldBreakBetweenBattles = { crit = true, dot = true, critHeals = true, dmg = true, }
-
+--- adds a break in the line for the graph if that metric is set to have them
+--- this keeps the line from dropping dropping and back up
+--- instead the line just starts the new battle at 0 without connecting the battles
 local function graphInsertBattleBreak()
     local now = graphGetTime()
     local nan = 0 / 0
+    local breaks = settings.GraphOptions and settings.GraphOptions.breakBetweenBattles or {}
     for _, metrics in pairs(graphBuffers) do
-        for key, _ in pairs(shouldBreakBetweenBattles) do
-            if metrics[key] then
+        for key, shouldBreak in pairs(breaks) do
+            if shouldBreak and metrics[key] then
                 metrics[key]:AddPoint(now, nan, 0)
             end
         end
@@ -1091,11 +1145,21 @@ local function DrawGraph()
     if ImGui.CollapsingHeader("Options##Graph") then
         ImGui.Text("Metric:")
         ImGui.SameLine()
+        local style = ImGui.GetStyle()
+        local radioSize = ImGui.GetFrameHeight() + style.ItemInnerSpacing.x
+        local cursorX = ImGui.GetCursorPosX()
         for i, label in ipairs(graphMetricLabels) do
+            local textW = ImGui.CalcTextSize(label)
+            local itemW = radioSize + textW + style.ItemSpacing.x
+            if i > 1 and (cursorX + itemW - style.ItemSpacing.x) > (ImGui.GetContentRegionMax()) then
+                cursorX = style.WindowPadding.x
+            else
+                if i > 1 then ImGui.SameLine() end
+            end
             if ImGui.RadioButton(label .. "##GraphMetric", graphSelectedMetric == i) then
                 graphSelectedMetric = i
             end
-            if i < #graphMetricLabels then ImGui.SameLine() end
+            cursorX = cursorX + itemW
         end
 
         if ImGui.SmallButton("Clear##Graph") then
@@ -1103,28 +1167,188 @@ local function DrawGraph()
             graphColorAssignments = {}
             graphNextColorIdx = 1
         end
+
+        ImGui.Separator()
+
+        ImGui.Text("Break Between Battles:")
+        local toggleSize = ImVec2(46, 20)
+        local maxX = ImGui.GetContentRegionMax()
+        cursorX = ImGui.GetCursorPosX()
+        for i, key in ipairs(graphMetricKeys) do
+            local label = graphMetricLabels[i]
+            local tKey = "graphBreak_" .. key
+            local textW = ImGui.CalcTextSize(label)
+            local itemW = toggleSize.x + style.ItemInnerSpacing.x + textW + style.ItemSpacing.x
+            if i > 1 and (cursorX + itemW - style.ItemSpacing.x) > maxX then
+                cursorX = style.WindowPadding.x
+            else
+                if i > 1 then ImGui.SameLine() end
+            end
+            tempSettings[tKey] = Module.Utils.DrawToggle(label .. "##GraphBreak", tempSettings[tKey], ToggleFlags, toggleSize)
+            cursorX = cursorX + itemW
+        end
     end
-
+    ImGui.Spacing()
+    if tempSettings.graphShowPieChart then
+        if ImGui.SmallButton("Switch to Line View##GraphView") then
+            tempSettings.graphShowPieChart = false
+        end
+    else
+        if ImGui.SmallButton("Switch to Pie View##GraphView") then
+            tempSettings.graphShowPieChart = true
+        end
+    end
+    ImGui.Separator()
     local now = graphGetTime()
-    if ImPlot.BeginPlot("DPS Over Time##MyDPS") then
-        ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time)
-        ImPlot.SetupAxes("Time", metricLabel)
-        ImPlot.SetupAxisLimits(ImAxis.X1, now - 300, now, ImGuiCond.Always)
-
+    if tempSettings.graphShowPieChart then
+        local labels = {}
+        local values = {}
         for name, metrics in pairs(graphBuffers) do
             if metrics[metricKey] then
                 local buf = metrics[metricKey]
                 local count = #buf.DataY
                 if count > 0 then
-                    local col = getGraphColor(name)
-                    ImPlot.PushStyleColor(ImPlotCol.Line, ImVec4(col[1], col[2], col[3], col[4]))
-                    ImPlot.PlotLine(name, buf.DataX, buf.DataY, count, ImPlotLineFlags.None, buf.Offset - 1)
-                    ImPlot.PopStyleColor()
+                    local lastIdx = buf.Offset > 1 and (buf.Offset - 1) or count
+                    local lastVal = buf.DataY[lastIdx]
+                    if lastVal and lastVal > 0 and lastVal == lastVal then
+                        table.insert(labels, name)
+                        table.insert(values, lastVal)
+                    end
                 end
             end
         end
 
-        ImPlot.EndPlot()
+        local pieCount = #labels
+        if pieCount > 0 then
+            ImPlot.PushColormap(ImPlotColormap.Deep)
+            if ImPlot.BeginPlot(metricLabel .. " Breakdown##MyDPSPie", ImVec2(-1, -1), bit32.bor(ImPlotFlags.Equal, ImPlotFlags.NoMouseText)) then
+                ImPlot.SetupAxes(nil, nil, ImPlotAxisFlags.NoDecorations, ImPlotAxisFlags.NoDecorations)
+                ImPlot.SetupAxesLimits(0, 1, 0, 1)
+                ImPlot.PlotPieChart(labels, values, pieCount, 0.5, 0.5, 0.4, "%.1f", 90, ImPlotPieChartFlags.Normalize)
+                ImPlot.EndPlot()
+            end
+            ImPlot.PopColormap()
+        else
+            ImGui.Text("No data for pie chart yet.")
+        end
+    else
+        if ImPlot.BeginPlot("DPS Over Time##MyDPS") then
+            ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time)
+            ImPlot.SetupAxes("Time", metricLabel)
+            ImPlot.SetupAxisLimits(ImAxis.X1, now - 300, now, ImGuiCond.Always)
+
+            for name, metrics in pairs(graphBuffers) do
+                if metrics[metricKey] then
+                    local buf = metrics[metricKey]
+                    local count = #buf.DataY
+                    if count > 0 then
+                        local col = getGraphColor(name)
+                        ImPlot.PushStyleColor(ImPlotCol.Line, ImVec4(col[1], col[2], col[3], col[4]))
+                        ImPlot.PlotLine(name, buf.DataX, buf.DataY, count, ImPlotLineFlags.None, buf.Offset - 1)
+                        ImPlot.PopStyleColor()
+                    end
+                end
+            end
+
+            ImPlot.EndPlot()
+        end
+    end
+end
+
+local function DrawBattleSnapshots()
+    local snapCount = #battleSnapshots
+
+    if ImGui.CollapsingHeader("Options##BattleCharts") then
+        ImGui.Text("Metric:")
+        ImGui.SameLine()
+        local style = ImGui.GetStyle()
+        local radioSize = ImGui.GetFrameHeight() + style.ItemInnerSpacing.x
+        local cursorX = ImGui.GetCursorPosX()
+        local maxX = ImGui.GetContentRegionMax()
+        for i, label in ipairs(graphMetricLabels) do
+            local textW = ImGui.CalcTextSize(label)
+            local itemW = radioSize + textW + style.ItemSpacing.x
+            if i > 1 and (cursorX + itemW - style.ItemSpacing.x) > maxX then
+                cursorX = style.WindowPadding.x
+            else
+                if i > 1 then ImGui.SameLine() end
+            end
+            if ImGui.RadioButton(label .. "##SnapMetric", snapshotSelectedMetric == i) then
+                snapshotSelectedMetric = i
+            end
+            cursorX = cursorX + itemW
+        end
+    end
+
+    if snapCount == 0 then
+        ImGui.Text("No battle data yet.")
+        return
+    end
+
+    if snapshotViewIndex < 1 or snapshotViewIndex > snapCount then
+        snapshotViewIndex = snapCount
+    end
+
+    if ImGui.SmallButton("|<<##Snap") then
+        snapshotViewIndex = 1
+    end
+    if ImGui.IsItemHovered() then
+        ImGui.SetTooltip("First Battle")
+    end
+    ImGui.SameLine()
+    if ImGui.SmallButton("<##Snap") then
+        if snapshotViewIndex > 1 then
+            snapshotViewIndex = snapshotViewIndex - 1
+        end
+    end
+    if ImGui.IsItemHovered() then
+        ImGui.SetTooltip("Previous Battle")
+    end
+    ImGui.SameLine()
+    if ImGui.SmallButton(">##Snap") then
+        if snapshotViewIndex < snapCount then
+            snapshotViewIndex = snapshotViewIndex + 1
+        end
+    end
+    if ImGui.IsItemHovered() then
+        ImGui.SetTooltip("Next Battle")
+    end
+    ImGui.SameLine()
+    if ImGui.SmallButton(">>|##Snap") then
+        snapshotViewIndex = snapCount
+    end
+    if ImGui.IsItemHovered() then
+        ImGui.SetTooltip("Last Battle")
+    end
+    ImGui.SameLine()
+    local snap = battleSnapshots[snapshotViewIndex]
+    ImGui.Text(string.format("Battle #%d (%d of %d)", snap.sequence, snapshotViewIndex, snapCount))
+
+    local metricKey = graphMetricKeys[snapshotSelectedMetric]
+    local metricLabel = graphMetricLabels[snapshotSelectedMetric]
+
+    local labels = {}
+    local values = {}
+    for name, data in pairs(snap.participants) do
+        local val = data[metricKey] or 0
+        if val > 0 then
+            table.insert(labels, name)
+            table.insert(values, val)
+        end
+    end
+
+    local pieCount = #labels
+    if pieCount > 0 then
+        ImPlot.PushColormap(ImPlotColormap.Deep)
+        if ImPlot.BeginPlot(metricLabel .. " by Participant##SnapPie", ImVec2(-1, -1), bit32.bor(ImPlotFlags.Equal, ImPlotFlags.NoMouseText)) then
+            ImPlot.SetupAxes(nil, nil, ImPlotAxisFlags.NoDecorations, ImPlotAxisFlags.NoDecorations)
+            ImPlot.SetupAxesLimits(0, 1, 0, 1)
+            ImPlot.PlotPieChart(labels, values, pieCount, 0.5, 0.5, 0.4, "%.1f", 90, ImPlotPieChartFlags.Normalize)
+            ImPlot.EndPlot()
+        end
+        ImPlot.PopColormap()
+    else
+        ImGui.Text("No data for selected metric in this battle.")
     end
 end
 
@@ -1234,6 +1458,21 @@ local function DrawButtons()
             changedSettings = true
         end
     end
+
+    if settings.GraphOptions then
+        for key, val in pairs(settings.GraphOptions.breakBetweenBattles) do
+            local tKey = "graphBreak_" .. key
+            if tempSettings[tKey] ~= nil and tempSettings[tKey] ~= val then
+                settings.GraphOptions.breakBetweenBattles[key] = tempSettings[tKey]
+                changedSettings = true
+            end
+        end
+        if tempSettings.graphShowPieChart ~= nil and tempSettings.graphShowPieChart ~= settings.GraphOptions.showPieChart then
+            settings.GraphOptions.showPieChart = tempSettings.graphShowPieChart
+            changedSettings = true
+        end
+    end
+
     if changedSettings then
         mq.pickle(configFile, settings)
         changedSettings = false
@@ -1403,10 +1642,12 @@ local function DrawOptions()
         -- Combo Box Load Theme
         if ImGui.BeginCombo("Load Theme##DialogDB", themeName) then
             for k, data in pairs(Module.Theme.Theme) do
-                local isSelected = data.Name == themeName
-                if ImGui.Selectable(data.Name, isSelected) then
-                    tempSettings.useTheme = data.Name
-                    themeName = tempSettings.useTheme
+                if data ~= nil then
+                    local isSelected = data.Name == themeName
+                    if ImGui.Selectable(data.Name, isSelected) then
+                        tempSettings.useTheme = data.Name
+                        themeName = tempSettings.useTheme
+                    end
                 end
             end
             ImGui.EndCombo()
@@ -1417,7 +1658,7 @@ local function DrawOptions()
         end
 
         ImGui.SameLine()
-        if loadedExeternally then
+        if loadedExternally then
             if ImGui.Button('Edit ThemeZ') then
                 if MyUI.Modules.ThemeZ ~= nil then
                     if MyUI.Modules.ThemeZ.IsRunning then
@@ -1440,7 +1681,7 @@ end
 
 function Module.RenderGUI()
     if not Module.IsRunning then return end
-
+    mq.doevents()
     -- Combat Spam
     if tempSettings.showCombatWindow then
         ImGui.SetNextWindowSize(400, 200, ImGuiCond.FirstUseEver)
@@ -1524,6 +1765,10 @@ function Module.RenderGUI()
                 end
                 if ImGui.BeginTabItem("Graph") then
                     DrawGraph()
+                    ImGui.EndTabItem()
+                end
+                if ImGui.BeginTabItem("Battle Charts") then
+                    DrawBattleSnapshots()
                     ImGui.EndTabItem()
                 end
                 if ImGui.BeginTabItem("Config") then
@@ -1648,7 +1893,7 @@ local function announceDanNet(msg)
     end
 end
 
----comment
+---printDPS output
 ---@param dur integer @ duration in seconds
 ---@param rType string @ type of report (ALL, COMBAT)
 local function pDPS(dur, rType)
@@ -1702,6 +1947,39 @@ local function pDPS(dur, rType)
             critHeals = critHealsTotal,
             dot = dotTotalBattle,
         })
+        local snapshot = { sequence = battleCounter, participants = {}, }
+        snapshot.participants[Module.CharLoaded] = {
+            dps = dps,
+            avg = avgDmg,
+            dmg = dmgTotalBattle,
+            crit = critTotalBattle,
+            dot = dotTotalBattle,
+            critHeals = critHealsTotal,
+            dur = dur,
+        }
+        for _, actor in ipairs(actorsTable) do
+            if actor.name and actor.name ~= Module.CharLoaded then
+                local tracking = actorBattleTracking[actor.name]
+                local accumDmg = tracking and tracking.accum.dmg or 0
+                local accumCrit = tracking and tracking.accum.crit or 0
+                local accumDot = tracking and tracking.accum.dot or 0
+                local accumCritHeals = tracking and tracking.accum.critHeals or 0
+                snapshot.participants[actor.name] = {
+                    dps = actor.dps or 0,
+                    avg = actor.avg or 0,
+                    dmg = (actor.dmg or 0) + accumDmg,
+                    crit = (actor.crit or 0) + accumCrit,
+                    dot = (actor.dot or 0) + accumDot,
+                    critHeals = (actor.critHeals or 0) + accumCritHeals,
+                    dur = actor.dur or 0,
+                }
+            end
+        end
+        table.insert(battleSnapshots, snapshot)
+        while #battleSnapshots > 50 do
+            table.remove(battleSnapshots, 1)
+        end
+        actorBattleTracking = {}
         if settings.Options.dpsBattleReport then
             local msg = string.format(
                 "\aw[\at%s\ax] \ayChar:\ax\ao %s\ax, \ayDPS \ax(\aoBATTLE\ax): \at%s\ax, \ayTimeSpan:\ax\ao %.0f sec\ax, \ayTotal Damage: \ax\ao%s\ax, \ayAvg. Damage: \ax\ao%s\ax",
@@ -1749,6 +2027,7 @@ local function pDPS(dur, rType)
     end
 end
 
+--- print battle history output to chat \ dannet
 local function pBattleHistory()
     if battleCounter == 0 then
         Module.Utils.PrintOutput(tempSettings.OutputTab, nil, "\aw[\at%s\ax] \ayNo Battle History\ax", Module.Name)
@@ -1793,6 +2072,9 @@ local function processCommand(...)
         battleStartTime, dpsStartTime        = 0, 0
         dmgTotal, dmgCounter, dsCounter      = 0, 0, 0
         dmgTotalDS, battleCounter, tableSize = 0, 0, 0
+        battleSnapshots                      = {}
+        snapshotViewIndex                    = 0
+        actorBattleTracking                  = {}
         Module.Utils.PrintOutput(tempSettings.OutputTab, nil, "\aw[\at%s\ax] \ayTable Cleared\ax", Module.Name)
     elseif cmd == 'start' then
         started = true
@@ -1985,6 +2267,27 @@ local function RegisterActor()
         if who == Module.CharLoaded then return end
         if MyLeader ~= 'None' and leader ~= MyLeader then return end
 
+        if enteredCombat then
+            local tracking = actorBattleTracking[who]
+            if not tracking then
+                actorBattleTracking[who] = {
+                    lastBattleNum = battleNum,
+                    accum = { dmg = 0, crit = 0, dot = 0, critHeals = 0, },
+                }
+            elseif tracking.lastBattleNum ~= battleNum and battleNum ~= 0 then
+                for i = 1, #actorsTable do
+                    if actorsTable[i].name == who then
+                        tracking.accum.dmg       = tracking.accum.dmg + (actorsTable[i].dmg or 0)
+                        tracking.accum.crit      = tracking.accum.crit + (actorsTable[i].crit or 0)
+                        tracking.accum.dot       = tracking.accum.dot + (actorsTable[i].dot or 0)
+                        tracking.accum.critHeals = tracking.accum.critHeals + (actorsTable[i].critHeals or 0)
+                        break
+                    end
+                end
+                tracking.lastBattleNum = battleNum
+            end
+        end
+
         if #actorsTable == 0 then
             table.insert(actorsTable, {
                 name = who,
@@ -2041,6 +2344,7 @@ local function RegisterActor()
     end)
 end
 
+--- unbind all event binds. before unloading
 function Module.Unload()
     mq.unevent("melee_crit")
     mq.unevent("melee_crit2")
@@ -2120,7 +2424,7 @@ local function Init()
     pHelp()
 
     -- Check for arguments
-    if not loadedExeternally then
+    if not loadedExternally then
         CheckArgs(Arguments)
     else
         started = settings.Options.autoStart
@@ -2128,17 +2432,15 @@ local function Init()
     end
 
     Module.IsRunning = true
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init(Module.Name, Module.RenderGUI)
         Module.LocalLoop()
     end
 end
 
-local clockTimer = mq.gettime()
-
 function Module.MainLoop()
     -- Main Loop
-    if loadedExeternally then
+    if loadedExternally then
         ---@diagnostic disable-next-line: undefined-global
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
@@ -2175,8 +2477,9 @@ function Module.MainLoop()
         if endOfCombat > settings.Options.battleDuration then
             enteredCombat = false
             local battleDuration = os.time() - battleStartTime - endOfCombat
-            for k, v in pairs(battlesHistory) do
-                if v.sequence == -1 or v.sequence == 999999 then
+            for k = #battlesHistory, 1, -1 do
+                local v = battlesHistory[k]
+                if v == nil or v.sequence == -1 or v.sequence == 999999 then
                     table.remove(battlesHistory, k)
                 end
             end
@@ -2200,11 +2503,9 @@ function Module.MainLoop()
         actorsWorking = sortTable(actorsTable, 'party')
         firstRun = false
     end
-    -- if tempSettings.sortParty then
+
     actorsWorking = sortTable(actorsTable, 'party')
-    -- else
-    -- 	actorsWorking = actorsTable
-    -- end
+
     Module.PetName = mq.TLO.Pet.DisplayName() or 'NoPet'
     if not Module.TempSettings.petLoaded and Module.PetName ~= 'NoPet' then
         petEvent()
@@ -2225,14 +2526,6 @@ function Module.MainLoop()
     end
 
     mq.doevents()
-    -- mq.delay(5)
-    -- if tempSettings.sortParty then
-    -- 	uiTime = uiTime + 5
-    -- 	if uiTime >= 34 then
-    -- 		if tempSettings.doActors then actorsWorking = sortTable(actorsTable, 'party') end
-    -- 		uiTime = 0
-    -- 	end
-    -- end
 end
 
 function Module.LocalLoop()

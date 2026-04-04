@@ -9,9 +9,9 @@ Module.TempSettings     = {
     Popped = {},
 }
 
-local loadedExeternally = MyUI ~= nil or false
+local loadedExternally = MyUI ~= nil or false
 
-if not loadedExeternally then
+if not loadedExternally then
     Module.Path          = string.format("%s/%s/", mq.luaDir, Module.Name)
     Module.ThemeFile     = string.format('%s/MyUI/ThemeZ.lua', mq.configDir)
     Module.Theme         = require('defaults.themes')
@@ -121,6 +121,111 @@ local modKeys                            = {
     "Shift",
 }
 
+local compareSkipKeys = {
+    Name = true, Type = true, ID = true, Icon = true, Stack = true, MaxStack = true,
+    Clicky = true, Charges = true, ClassList = true, RaceList = true, BonusDmgType = true,
+    CanUse = true, isNoDrop = true, isNoRent = true, isNoTrade = true, isAttuneable = true,
+    isLore = true, isMagic = true, isEvolving = true,
+    Spelleffect = true, Worn = true, Focus1 = true, Focus2 = true,
+    SpellDesc = true, WornDesc = true, Focus1Desc = true, Focus2Desc = true, ClickyDesc = true,
+    SpellID = true, WornID = true, Focus1ID = true, Focus2ID = true, ClickyID = true,
+    AugSlot1 = true, AugSlot2 = true, AugSlot3 = true, AugSlot4 = true, AugSlot5 = true, AugSlot6 = true,
+    AugType1 = true, AugType2 = true, AugType3 = true, AugType4 = true, AugType5 = true, AugType6 = true,
+    AugSlots = true, WornSlots = true, NumSlots = true, Size = true, SizeCapacity = true,
+    Value = true, Weight = true, ReqLvl = true, RecLvl = true, TributeValue = true,
+    EvolvingLevel = true, EvolvingExpPct = true, EvolvingMaxLevel = true,
+}
+
+local compareLabels = {
+    AC = 'AC', HP = 'HP', Mana = 'Mana', Endurance = 'Endurance',
+    HPRegen = 'HP Regen', ManaRegen = 'Mana Regen', EnduranceRegen = 'End Regen',
+    BaseDMG = 'Damage', Delay = 'Delay', Haste = 'Haste',
+    STR = 'STR', STA = 'STA', AGI = 'AGI', DEX = 'DEX', WIS = 'WIS', INT = 'INT', CHA = 'CHA',
+    hStr = 'H-STR', hSta = 'H-STA', hAgi = 'H-AGI', hDex = 'H-DEX', hWis = 'H-WIS', hInt = 'H-INT', hCha = 'H-CHA',
+    MR = 'Magic Res', FR = 'Fire Res', DR = 'Disease Res', PR = 'Poison Res', CR = 'Cold Res', svCor = 'Corrupt Res',
+    hMr = 'H-MR', hFr = 'H-FR', hDr = 'H-DR', hPr = 'H-PR', hCr = 'H-CR', hCor = 'H-COR',
+    DmgShield = 'Dmg Shield', DmgShieldMit = 'DS Mitigation', Avoidance = 'Avoidance',
+    DotShield = 'DoT Shielding', Accuracy = 'Accuracy', SpellShield = 'Spell Shield',
+    HealAmount = 'Heal Amount', SpellDamage = 'Spell Damage', StunResist = 'Stun Resist',
+    Clairvoyance = 'Clairvoyance', InstrumentMod = 'Instrument Mod',
+}
+
+local colorGain = ImVec4(0.4, 0.9, 0.4, 1.0)
+local colorLoss = ImVec4(0.9, 0.4, 0.4, 1.0)
+
+local function RenderCompareTooltip(equippedItem, bagItem)
+    local bagData = InventoryData.FetchItemData(bagItem)
+    if not bagData then return end
+
+    local eqData = nil
+    if equippedItem and equippedItem() then
+        eqData = InventoryData.FetchItemData(equippedItem)
+    end
+
+    local diffs = {}
+    local seen = {}
+
+    if eqData then
+        for key, eqVal in pairs(eqData) do
+            if not compareSkipKeys[key] and type(eqVal) == 'number' then
+                local bagVal = bagData[key] or 0
+                if eqVal ~= 0 or bagVal ~= 0 then
+                    diffs[#diffs + 1] = { key = key, diff = bagVal - eqVal, bagVal = bagVal, eqVal = eqVal }
+                end
+                seen[key] = true
+            end
+        end
+    end
+
+    if bagData then
+        for key, bagVal in pairs(bagData) do
+            if not compareSkipKeys[key] and not seen[key] and type(bagVal) == 'number' then
+                local eqVal = (eqData and eqData[key]) or 0
+                if eqVal ~= 0 or bagVal ~= 0 then
+                    diffs[#diffs + 1] = { key = key, diff = bagVal - eqVal, bagVal = bagVal, eqVal = eqVal }
+                end
+            end
+        end
+    end
+
+    if #diffs == 0 then
+        ImGui.TextDisabled("No stat differences")
+        return
+    end
+
+    if eqData then
+        ImGui.TextDisabled("vs. %s", eqData.Name)
+    else
+        ImGui.TextDisabled("vs. (empty slot)")
+    end
+    ImGui.Separator()
+
+    if ImGui.BeginTable("##compareStats", 2, ImGuiTableFlags.None) then
+        ImGui.TableSetupColumn("Stat", ImGuiTableColumnFlags.WidthFixed, 120)
+        ImGui.TableSetupColumn("Diff", ImGuiTableColumnFlags.WidthFixed, 80)
+        for _, entry in ipairs(diffs) do
+            local label = compareLabels[entry.key] or entry.key
+            local diff = entry.diff
+            local invert = (entry.key == 'Delay')
+
+            ImGui.TableNextRow()
+            ImGui.TableNextColumn()
+            ImGui.Text(label)
+            ImGui.TableNextColumn()
+            if diff > 0 then
+                local color = invert and colorLoss or colorGain
+                ImGui.TextColored(color, "+%s", diff)
+            elseif diff < 0 then
+                local color = invert and colorGain or colorLoss
+                ImGui.TextColored(color, "%s", diff)
+            else
+                ImGui.TextDisabled("0")
+            end
+        end
+        ImGui.EndTable()
+    end
+end
+
 local paperdollRows                      = {
     -- inventory slots grid for the table to draw. -1 is a blank space
     { 1,  -1, 2,  -1, 4, },
@@ -139,7 +244,7 @@ function Module:LoadSettings()
     else
         settings = defaults
     end
-    if not loadedExeternally then
+    if not loadedExternally then
         if utils.File.Exists(self.ThemeFile) then
             self.Theme = dofile(self.ThemeFile)
         end
@@ -182,7 +287,7 @@ function Module:SaveSettings()
 end
 
 function Module:RefreshInventory()
-    if loadedExeternally then
+    if loadedExternally then
         invData = MyUI.InvData or invData
     else
         local curFreeSlots = InventoryData.GetFreeSlots()
@@ -319,6 +424,12 @@ function Module:RenderSlotContextMenu(slotId)
                             autoInv = true,
                         }
                     end
+                end
+                if ImGui.IsItemHovered() then
+                    ImGui.BeginTooltip()
+                    local equippedItem = mq.TLO.Me.Inventory(slotName)
+                    RenderCompareTooltip(equippedItem, item)
+                    ImGui.EndTooltip()
                 end
             end
         end
@@ -472,16 +583,22 @@ function Module:RenderBagSlot(packNum)
     local bag = mq.TLO.Me.Inventory(slotId)
     self:DrawItemIcon(bag, ICON_WIDTH, ICON_HEIGHT, 'bag_' .. packNum)
 
+    local isContainer = bag() and (bag.Container() or 0) > 0
+    local bagType = bag() and (bag.Type() or '') or ''
+    local isBagUsable = bag() and not isContainer and (bag.Clicky() or bagType == 'Food' or bagType == 'Drink')
+
     if ImGui.IsItemHovered() then
         ImGui.BeginTooltip()
         if bag() then
             InventoryData.RenderItemToolTip(bag, { Popped = Module.TempSettings.Popped, })
             ImGui.SeparatorText("Click Actions")
-            local containerSlots = bag.Container() or 0
-            if containerSlots > 0 then
+            if isContainer then
                 ImGui.Text("Right Click: Open bag")
+            elseif isBagUsable then
+                ImGui.Text("Right Click: Use item")
             end
             ImGui.Text("Left Click: Pick up bag")
+            ImGui.Text("Ctrl + Right Click: Inspect Item")
             ImGui.Text("Shift + Right Click: Pop Out Item Info")
         else
             ImGui.Text("Pack " .. packNum .. " (empty)")
@@ -498,9 +615,17 @@ function Module:RenderBagSlot(packNum)
         forceRefresh = true
     end
 
-    if ImGui.IsItemClicked(ImGuiMouseButton.Right) then
-        if bag() and (bag.Container() or 0) > 0 then
-            self.TempSettings.openContainers[packNum] = not self.TempSettings.openContainers[packNum]
+    if bag() then
+        if ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsItemClicked(ImGuiMouseButton.Right) then
+            local link = bag.ItemLink('CLICKABLE')()
+            mq.cmdf('/executelink %s', link)
+        elseif ImGui.IsItemClicked(ImGuiMouseButton.Right) and not ImGui.IsKeyDown(ImGuiMod.Shift) then
+            if isContainer then
+                self.TempSettings.openContainers[packNum] = not self.TempSettings.openContainers[packNum]
+            elseif isBagUsable then
+                if mq.TLO.Me.Casting() ~= nil then return end
+                mq.cmdf('/useitem "%s"', bag.Name())
+            end
         end
     end
 end
@@ -525,15 +650,33 @@ function Module:DrawContainerSlotIcon(item, packNum, slotNum)
     self:DrawItemIcon(item, ICON_WIDTH, ICON_HEIGHT, string.format('cont_%d_%d', packNum, slotNum))
 
     if item and item() then
+        local iType = item.Type() or ''
+        local isUsable = item.Clicky() or iType == 'Food' or iType == 'Drink'
+        local isContainer = (item.Container() or 0) > 0
+
         if ImGui.IsItemHovered() then
             ImGui.BeginTooltip()
             InventoryData.RenderItemToolTip(item, { Popped = Module.TempSettings.Popped, })
             ImGui.SeparatorText("Click Actions")
             ImGui.Text("Left Click: Pick up")
+            if isUsable and not isContainer then
+                ImGui.Text("Right Click: Use item")
+            end
+            ImGui.Text("Ctrl + Right Click: Inspect Item")
             ImGui.Text("Shift + Right Click: Pop Out Item Info")
             ImGui.EndTooltip()
             if ImGui.IsKeyDown(ImGuiMod.Shift) and ImGui.IsItemClicked(ImGuiMouseButton.Right) then
                 Module.TempSettings.Popped[item.ID()] = item
+            end
+        end
+
+        if ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsItemClicked(ImGuiMouseButton.Right) then
+            local link = item.ItemLink('CLICKABLE')()
+            mq.cmdf('/executelink %s', link)
+        elseif ImGui.IsItemClicked(ImGuiMouseButton.Right) and not ImGui.IsKeyDown(ImGuiMod.Shift) then
+            if isUsable and not isContainer then
+                if mq.TLO.Me.Casting() ~= nil then return end
+                mq.cmdf('/useitem "%s"', item.Name())
             end
         end
 
@@ -619,11 +762,13 @@ function Module:RenderSettingsWindow()
             ImGui.Text("Current Theme: %s", themeName)
             if ImGui.BeginCombo("Load Theme##MyInv", themeName) then
                 for k, data in pairs(self.Theme.Theme) do
-                    local isSelected = data.Name == themeName
-                    if ImGui.Selectable(data.Name, isSelected) then
-                        settings.themeName = data.Name
-                        themeName = settings.themeName
-                        self:SaveSettings()
+                    if data ~= nil then
+                        local isSelected = data.Name == themeName
+                        if ImGui.Selectable(data.Name, isSelected) then
+                            settings.themeName = data.Name
+                            themeName = settings.themeName
+                            self:SaveSettings()
+                        end
                     end
                 end
                 ImGui.EndCombo()
@@ -804,42 +949,68 @@ function Module:RenderMainWindow()
     ImGui.End()
 end
 
-function Module:RenderMiniButton()
-    local colorCount, styleCount = self.ThemeLoader.StartTheme(themeName, self.Theme)
-    ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, ImVec2(9, 9))
-    local openBtn, showBtn = ImGui.Begin("My Inventory##Mini", true,
-        bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoCollapse))
-    if not openBtn then
-        showBtn = false
+function Module:RenderMiniButton(grouped)
+    if not grouped then
+        local colorCount, styleCount = self.ThemeLoader.StartTheme(themeName, self.Theme)
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, ImVec2(9, 9))
+        local openBtn, showBtn = ImGui.Begin("My Inventory##Mini", true,
+            bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoCollapse))
+        if not openBtn then
+            showBtn = false
+        end
+
+        if showBtn then
+            local cursorX, cursorY = ImGui.GetCursorScreenPos()
+            local freeSlots = invData.freeSlots or 0
+            animItems:SetTextureCell(3515 - EQ_ICON_OFFSET)
+            ImGui.DrawTextureAnimation(animItems, 34, 34, true)
+            ImGui.SetCursorPos(20, 20)
+            Utils.DropShadow(freeSlots, { Enabled = true, })
+
+            ImGui.SetCursorScreenPos(cursorX, cursorY)
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0, 0.5, 0.5, 0.5))
+            ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
+            if ImGui.Button("##MyInventoryBtn", ImVec2(34, 34)) then
+                self.ShowGUI = not self.ShowGUI
+            end
+            ImGui.PopStyleColor(3)
+
+            if ImGui.IsItemHovered() then
+                ImGui.BeginTooltip()
+                ImGui.Text("My Inventory")
+                ImGui.Text("Free Slots: %d", invData.freeSlots or 0)
+                ImGui.EndTooltip()
+            end
+        end
+        ImGui.PopStyleVar()
+        self.ThemeLoader.EndTheme(colorCount, styleCount)
+        ImGui.End()
+        return
     end
 
-    if showBtn then
-        local cursorX, cursorY = ImGui.GetCursorScreenPos()
-        local freeSlots = invData.freeSlots or 0
-        animItems:SetTextureCell(3515 - EQ_ICON_OFFSET)
-        ImGui.DrawTextureAnimation(animItems, 34, 34, true)
-        ImGui.SetCursorPos(20, 20)
-        Utils.DropShadow(freeSlots, { Enabled = true, })
+    local cursorX, cursorY = ImGui.GetCursorScreenPos()
+    local freeSlots = invData.freeSlots or 0
+    animItems:SetTextureCell(3515 - EQ_ICON_OFFSET)
+    ImGui.DrawTextureAnimation(animItems, 34, 34, true)
+    ImGui.SetCursorPos(20, 20)
+    Utils.DropShadow(freeSlots, { Enabled = true, })
 
-        ImGui.SetCursorScreenPos(cursorX, cursorY)
-        ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0, 0.5, 0.5, 0.5))
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
-        if ImGui.Button("##MyInventoryBtn", ImVec2(34, 34)) then
-            self.ShowGUI = not self.ShowGUI
-        end
-        ImGui.PopStyleColor(3)
-
-        if ImGui.IsItemHovered() then
-            ImGui.BeginTooltip()
-            ImGui.Text("My Inventory")
-            ImGui.Text("Free Slots: %d", invData.freeSlots or 0)
-            ImGui.EndTooltip()
-        end
+    ImGui.SetCursorScreenPos(cursorX, cursorY)
+    ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
+    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0, 0.5, 0.5, 0.5))
+    ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
+    if ImGui.Button("##MyInventoryBtn", ImVec2(34, 34)) then
+        self.ShowGUI = not self.ShowGUI
     end
-    ImGui.PopStyleVar()
-    self.ThemeLoader.EndTheme(colorCount, styleCount)
-    ImGui.End()
+    ImGui.PopStyleColor(3)
+
+    if ImGui.IsItemHovered() then
+        ImGui.BeginTooltip()
+        ImGui.Text("My Inventory")
+        ImGui.Text("Free Slots: %d", invData.freeSlots or 0)
+        ImGui.EndTooltip()
+    end
 end
 
 function Module:ProcessPendingActions()
@@ -905,24 +1076,28 @@ function Module.RenderGUI()
         end
     end
 
-    Module:RenderMiniButton()
+    if not MyUI.Settings.GroupButtons then Module:RenderMiniButton() end
     if Module.ShowGUI then
         Module:RenderMainWindow()
     end
     Module:RenderContainerWindows()
     Module:QtyWindow()
     Module:RenderSettingsWindow()
+    local poppedToRemove = {}
     for k, v in pairs(Module.TempSettings.Popped) do
         if v and v.ID() then
             InventoryData.RenderItemInfoWin(v, Module.TempSettings.Popped, { Sender = Module.Name, })
         else
-            Module.TempSettings.Popped[k] = nil
+            poppedToRemove[#poppedToRemove + 1] = k
         end
+    end
+    for _, k in ipairs(poppedToRemove) do
+        Module.TempSettings.Popped[k] = nil
     end
 end
 
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
     Module:RefreshInventory()
@@ -968,7 +1143,7 @@ function Module:Init()
     self:RefreshInventory()
     mq.bind("/myinventory", self.CommandHandler)
 
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init("MyInventoryGUI", self.RenderGUI)
         self:LocalLoop()
         printf("%s Loaded", self.Name)

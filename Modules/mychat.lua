@@ -4,9 +4,9 @@ local zep               = require('Zep')
 
 local MAX_HISTORY_COUNT = 100
 
-local loadedExeternally = MyUI ~= nil
+local loadedExternally  = MyUI ~= nil
 local Module            = {}
-if not loadedExeternally then
+if not loadedExternally then
     Module.Utils       = require('lib.common')
     Module.ThemeLoader = require('lib.theme_loader')
     Module.Actor       = require('actors')
@@ -14,7 +14,7 @@ if not loadedExeternally then
     Module.Icons       = require('mq.ICONS')
     Module.Guild       = mq.TLO.Me.Guild()
     Module.Server      = mq.TLO.MacroQuest.Server()
-    Module.ThemesFile  = MyUI.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or MyUI.ThemeFile
+    Module.ThemesFile  = string.format('%s/MyUI/ThemeZ.lua', mq.configDir)
     Module.Theme       = {}
     Module.Mode        = 'driver'
     Module.PackageMan  = require('mq.PackageMan')
@@ -1218,7 +1218,7 @@ local function loadSettings()
         Module.Settings.Scale = 1.0
     end
 
-    if not loadedExeternally then
+    if not loadedExternally then
         if not Module.Utils.File.Exists(Module.ThemesFile) then
             local defaultThemes = Module.Utils.Library.Include('defaults.themes')
             Module.Theme = defaultThemes
@@ -1581,7 +1581,7 @@ function Module.EventChat(channelID, eventName, line, spam)
 
                 -- ZOOM Console hack
                 if i > 1 then
-                    if txtBuffer[i - 1].text == '' then i = i - 1 end
+                    if txtBuffer[i - 1] ~= nil and txtBuffer[i - 1].text == '' then i = i - 1 end
                 end
 
                 -- Add the new line to the buffer
@@ -2242,7 +2242,7 @@ end
 
 function Module.RenderGUI()
     if not Module.IsRunning then return end
-
+    mq.doevents()
     ImGui.PushFont(nil, ImGui.GetFontSize() * Module.Settings.Scale)
 
     local windowName = 'My Chat - Main##' .. Module.CharLoaded .. '_' .. windowNum
@@ -2869,7 +2869,7 @@ function Module.Config_GUI(open)
             loadSettings()
         end
         ImGui.SameLine()
-        if loadedExeternally then
+        if loadedExternally then
             if ImGui.Button('Edit ThemeZ') then
                 if MyUI.Modules.ThemeZ ~= nil then
                     if MyUI.Modules.ThemeZ.IsRunning then
@@ -3037,12 +3037,14 @@ function Module.Config_GUI(open)
             -- Combo Box Load Theme
             if ImGui.BeginCombo("Load Theme", themeName) then
                 for k, data in pairs(Module.Theme.Theme) do
-                    local isSelected = data['Name'] == themeName
-                    if ImGui.Selectable(data['Name'], isSelected) then
-                        Module.tempSettings['LoadTheme'] = data['Name']
-                        themeName = Module.tempSettings['LoadTheme']
-                        Module.Settings = Module.tempSettings
-                        writeSettings(Module.SettingsFile, Module.Settings)
+                    if data ~= nil then
+                        local isSelected = data['Name'] == themeName
+                        if ImGui.Selectable(data['Name'], isSelected) then
+                            Module.tempSettings['LoadTheme'] = data['Name']
+                            themeName = Module.tempSettings['LoadTheme']
+                            Module.Settings = Module.tempSettings
+                            writeSettings(Module.SettingsFile, Module.Settings)
+                        end
                     end
                 end
                 ImGui.EndCombo()
@@ -3388,14 +3390,14 @@ local function init()
     Module.GetPresetList()
     Module.IsRunning = true
 
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init(Module.Name, Module.RenderGUI)
         Module.LocalLoop()
     end
 end
 
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         MyUI.TempSettings.MyChatWinName = string.format('My Chat - Main')
         MyUI.TempSettings.MyChatFocusKey = Module.Settings.keyName
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then
@@ -3436,7 +3438,7 @@ function Module.MainLoop()
 
     mq.doevents()
 
-    -- Periodic cleanup of claimed lines to prevent memory growth
+    -- Cleanup claimed lines
     local now = os.clock()
     for k, t in pairs(claimedLinesTTL) do
         if now - t > CLAIMED_TTL then

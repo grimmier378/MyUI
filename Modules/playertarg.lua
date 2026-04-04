@@ -12,9 +12,9 @@ Module.Name = 'PlayerTarg'
 Module.IsRunning = false
 
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI ~= nil and true or false
+local loadedExternally = MyUI ~= nil and true or false
 
-if not loadedExeternally then
+if not loadedExternally then
     Module.Utils = require('lib.common')
     Module.Icons = require('mq.ICONS')
     Module.Colors = require('lib.colors')
@@ -230,7 +230,7 @@ local function loadSettings()
             settings[Module.Name] = defaults
         end
     end
-    if not loadedExeternally then
+    if not loadedExternally then
         loadTheme()
     end
     local newSetting = false
@@ -807,12 +807,14 @@ local function PlayerTargConf_GUI()
             -- Combo Box Load Theme
             if ImGui.BeginCombo("Load Theme##" .. Module.Name, themeName) then
                 for k, data in pairs(Module.Theme.Theme) do
-                    local isSelected = data.Name == themeName
-                    if ImGui.Selectable(data.Name, isSelected) then
-                        if settings[Module.Name].LoadTheme ~= data.Name then
-                            themeName = data.Name
-                            settings[Module.Name].LoadTheme = themeName
-                            mq.pickle(configFile, settings)
+                    if data ~= nil then
+                        local isSelected = data.Name == themeName
+                        if ImGui.Selectable(data.Name, isSelected) then
+                            if settings[Module.Name].LoadTheme ~= data.Name then
+                                themeName = data.Name
+                                settings[Module.Name].LoadTheme = themeName
+                                mq.pickle(configFile, settings)
+                            end
                         end
                     end
                 end
@@ -824,7 +826,7 @@ local function PlayerTargConf_GUI()
             end
 
             ImGui.SameLine()
-            if loadedExeternally then
+            if loadedExternally then
                 if ImGui.Button('Edit ThemeZ') then
                     if MyUI.Modules.ThemeZ ~= nil then
                         if MyUI.Modules.ThemeZ.IsRunning then
@@ -1756,7 +1758,7 @@ local function init()
     Module.IsRunning = true
     loadSettings()
     getMyStatus()
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init('GUI_Target', Module.RenderGUI)
         Module.LocalLoop()
     end
@@ -1766,7 +1768,7 @@ end
 local clockTimer = mq.gettime()
 
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         ---@diagnostic disable-next-line: undefined-global
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end

@@ -5,9 +5,9 @@ Module.Name = 'SAST'
 Module.IsRunning = false
 
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI ~= nil and true or false
+local loadedExternally = MyUI ~= nil and true or false
 
-if not loadedExeternally then
+if not loadedExternally then
     Module.Utils = require('lib.common')
     Module.Icons = require('mq.ICONS')
     Module.CharLoaded = mq.TLO.Me.DisplayName()
@@ -358,7 +358,7 @@ function Module:Init()
     currZone = mq.TLO.Zone.ID()
     lastZone = currZone
     self.IsRunning = true
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init('Adventure Status', self.RenderGUI)
         self:LocalLoop()
     end
@@ -385,7 +385,7 @@ function Module.MainLoop()
         Module.IsRunning = false
         return
     end
-    if loadedExeternally then
+    if loadedExternally then
         ---@diagnostic disable-next-line: undefined-global
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end

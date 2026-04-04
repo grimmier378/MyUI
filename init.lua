@@ -97,6 +97,8 @@ local default_list = {
 MyUI.DefaultConfig = {
     ShowMain = true,
     ThemeName = 'Default',
+    GroupButtons = false,
+    ButtonOrder = {},
     mods_list = {
         -- load order = {name = 'mod_name', enabled = true/false}
         -- Ideally we want to Load MyChat first if Enabled.This will allow the other modules can use it.
@@ -422,6 +424,30 @@ local function RenderDebug()
     ImGui.End()
 end
 
+local function GetButtonOrder()
+    local order = MyUI.Settings.ButtonOrder or {}
+    local hasBtn = {}
+    for _, data in ipairs(MyUI.Settings.mods_list) do
+        if data.enabled and MyUI.Modules[data.name] ~= nil and MyUI.Modules[data.name].RenderMiniButton ~= nil then
+            hasBtn[data.name] = true
+        end
+    end
+    local seen = {}
+    local result = {}
+    for _, name in ipairs(order) do
+        if hasBtn[name] then
+            table.insert(result, name)
+            seen[name] = true
+        end
+    end
+    for _, data in ipairs(MyUI.Settings.mods_list) do
+        if hasBtn[data.name] and not seen[data.name] then
+            table.insert(result, data.name)
+        end
+    end
+    return result
+end
+
 local function RenderMini()
     local ColorCount, StyleCount = MyUI.ThemeLoader.StartTheme(MyUI.ThemeName, MyUI.Theme)
     local openMini, showMini = ImGui.Begin(MyUI.ScriptName .. "##Mini" .. MyUI.CharLoaded, true,
@@ -434,11 +460,54 @@ local function RenderMini()
         if ImGui.ImageButton("MyUI", MyUI.Grimmier_Img:GetTextureID(), ImVec2(30, 30)) then
             MyUI.Settings.ShowMain = not MyUI.Settings.ShowMain
         end
+        if ImGui.BeginPopupContextItem("MyUI##MiniContext") then
+            DrawContextMenu()
+            ImGui.Separator()
+            ImGui.EndPopup()
+        end
+        if MyUI.Settings.GroupButtons then
+            local btnOrder = GetButtonOrder()
+            local drawList = ImGui.GetWindowDrawList()
+            local btnRects = {}
+            local dragSrcIdx = nil
+            for i, name in ipairs(btnOrder) do
+                ImGui.SameLine()
+                MyUI.Modules[name]:RenderMiniButton(true)
+                local minX, minY = ImGui.GetItemRectMin()
+                local maxX, maxY = ImGui.GetItemRectMax()
+                btnRects[i] = { minX = minX, minY = minY, maxX = maxX, maxY = maxY }
+                if ImGui.BeginDragDropSource() then
+                    dragSrcIdx = i
+                    ImGui.SetDragDropPayload("MINI_BTN", i)
+                    ImGui.Text(name)
+                    ImGui.EndDragDropSource()
+                end
+                if ImGui.BeginDragDropTarget() then
+                    drawList:AddRectFilled(ImVec2(minX, minY), ImVec2(maxX, maxY), IM_COL32(0, 255, 255, 60), 3.0, ImDrawFlags.RoundCornersAll)
+                    drawList:AddRect(ImVec2(minX, minY), ImVec2(maxX, maxY), IM_COL32(0, 255, 255, 255), 3.0, ImDrawFlags.RoundCornersAll, 2.0)
+                    local payload = ImGui.AcceptDragDropPayload("MINI_BTN")
+                    if payload ~= nil then
+                        local srcIdx = payload.Data
+                        btnOrder[srcIdx], btnOrder[i] = btnOrder[i], btnOrder[srcIdx]
+                        MyUI.Settings.ButtonOrder = btnOrder
+                        mq.pickle(MyUI.SettingsFile, MyUI.Settings)
+                    end
+                    ImGui.EndDragDropTarget()
+                end
+            end
+            if dragSrcIdx and btnRects[dragSrcIdx] then
+                local r = btnRects[dragSrcIdx]
+                drawList:AddRectFilled(ImVec2(r.minX, r.minY), ImVec2(r.maxX, r.maxY), IM_COL32(255, 165, 0, 60), 3.0, ImDrawFlags.RoundCornersAll)
+                drawList:AddRect(ImVec2(r.minX, r.minY), ImVec2(r.maxX, r.maxY), IM_COL32(255, 165, 0, 255), 3.0, ImDrawFlags.RoundCornersAll, 2.0)
+            end
+        end
     end
-    if ImGui.BeginPopupContextWindow() then
-        DrawContextMenu()
-        ImGui.Separator()
-        ImGui.EndPopup()
+    if not MyUI.Settings.GroupButtons then
+        if ImGui.BeginPopupContextWindow() then
+            DrawContextMenu()
+            ImGui.Separator()
+            ImGui.EndPopup()
+        end
     end
     if MyUI.TempSettings.MyChatWinName ~= nil and MyUI.TempSettings.MyChatFocusKey ~= nil then
         if ImGui.IsKeyPressed(ImGuiKey[MyUI.TempSettings.MyChatFocusKey]) then
@@ -573,6 +642,11 @@ function MyUI.Render()
                 MyUI.TempSettings.AddModule = ImGui.InputText("Add Custom Module", MyUI.TempSettings.AddModule or '')
 
                 MyUI.TempSettings.Debug = MyUI.Utils.DrawToggle("Debug Mode", MyUI.TempSettings.Debug, ToggleFlags, 16)
+                local newGroupButtons = MyUI.Utils.DrawToggle("Group Buttons", MyUI.Settings.GroupButtons, ToggleFlags, 16)
+                if newGroupButtons ~= MyUI.Settings.GroupButtons then
+                    MyUI.Settings.GroupButtons = newGroupButtons
+                    mq.pickle(MyUI.SettingsFile, MyUI.Settings)
+                end
                 if MyUI.TempSettings.AddModule ~= '' then
                     if ImGui.Button("Add") then
                         MyUI.TempSettings.AddCustomModule = true

@@ -51,8 +51,8 @@ Module.CurZone = mq.TLO.Zone.Name() or "Unknown"
 Module.Ping = mq.TLO.EverQuest.Ping() or 0
 -- check if the script is being loaded as a Module (externally) or as a Standalone script.
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI ~= nil and true or false
-if not loadedExeternally then
+local loadedExternally = MyUI ~= nil and true or false
+if not loadedExternally then
     -- for local standalone use we will need to load in the global MyUI. variables and functions. and make sure to include the files as needed inside of the scripts folder.
     -- Comment/Uncomment the items below as needed
     MyUI.Utils       = require('lib.common') -- common functions for use in other scripts
@@ -109,7 +109,7 @@ local function Init()
     MyUI.Utils.PrintOutput('main', true, "\ayModule \a-w[\at%s\a-w] \agLoaded\aw!", Module.Name)
 
     -- for standalone mode we need to init the GUI and use a real loop
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init(Module.Name, Module.RenderGUI)
         Module.LocalLoop()
     end

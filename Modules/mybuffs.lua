@@ -34,15 +34,15 @@ Module.iconSize         = 24
 Module.NumBuffs         = 0
 Module.MyGroupLeader    = mq.TLO.Group.Leader() or 'NoGroup'
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI ~= nil and true or false
-if not loadedExeternally then
+local loadedExternally = MyUI ~= nil and true or false
+if not loadedExternally then
     Module.Utils       = require('lib.common')
     Module.Actor       = require('actors')
     Module.CharLoaded  = mq.TLO.Me.DisplayName()
     Module.Mode        = 'driver'
     Module.Icons       = require('mq.ICONS')
     Module.Server      = mq.TLO.EverQuest.Server()
-    Module.Path        = string.format("%s/%s/", mq.luaDir, Module.Mane)
+    Module.Path        = string.format("%s/%s/", mq.luaDir, Module.Name)
     Module.ThemeFile   = string.format('%s/MyUI/ThemeZ.lua', mq.configDir)
     Module.ThemeLoader = require('lib.theme_loader')
     Module.ProgressBar = require('lib.ProgressBar')
@@ -447,22 +447,13 @@ local function CheckIn()
 end
 
 local function CheckStale()
-    local now = os.time()
-    local found = false
-    for i = 1, #Module.boxes do
-        if Module.boxes[1].Check == nil then
-            table.remove(Module.boxes, i)
-            found = true
-            break
-        else
-            if now - Module.boxes[i].Check > 300 then
+    for i = #Module.boxes, 1, -1 do
+        if Module.boxes[i] ~= nil then
+            if Module.boxes[i].Check == nil or os.time() - Module.boxes[i].Check > 300 then
                 table.remove(Module.boxes, i)
-                found = true
-                break
             end
         end
     end
-    if found then CheckStale() end
 end
 
 local function GetBuffs()
@@ -474,7 +465,7 @@ local function GetBuffs()
     numSlots = mq.TLO.Me.MaxBuffSlots() or 0
     if numSlots == 0 then return end -- most likely not loaded all the way try again next cycle
 
-    if not loadedExeternally then
+    if not loadedExternally then
         for i = 1, numSlots do
             local hasBuff = false
             hasBuff = GetBuff(i)
@@ -733,7 +724,7 @@ local function loadSettings()
         newSetting = true
     end
     themeName = Module.settings[Module.Name].LoadTheme or 'Default'
-    if not loadedExeternally then
+    if not loadedExternally then
         loadTheme(Module.ThemeFile)
     end
     newSetting = Module.Utils.CheckDefaultSettings(Module.defaults, Module.settings[Module.Name])
@@ -1549,11 +1540,13 @@ function Module.RenderGUI()
 
                 if ImGui.BeginCombo("Load Theme##MyBuffs", themeName) then
                     for k, data in pairs(Module.Theme.Theme) do
-                        local isSelected = data.Name == themeName
-                        if ImGui.Selectable(data.Name, isSelected) then
-                            Module.Theme.LoadTheme = data.Name
-                            themeName = Module.Theme.LoadTheme
-                            Module.settings[Module.Name].LoadTheme = themeName
+                        if data ~= nil then
+                            local isSelected = data.Name == themeName
+                            if ImGui.Selectable(data.Name, isSelected) then
+                                Module.Theme.LoadTheme = data.Name
+                                themeName = Module.Theme.LoadTheme
+                                Module.settings[Module.Name].LoadTheme = themeName
+                            end
                         end
                     end
                     ImGui.EndCombo()
@@ -1565,7 +1558,7 @@ function Module.RenderGUI()
 
 
                 ImGui.SameLine()
-                if loadedExeternally then
+                if loadedExternally then
                     if ImGui.Button('Edit ThemeZ') then
                         if MyUI.Modules.ThemeZ ~= nil then
                             if MyUI.Modules.ThemeZ.IsRunning then
@@ -2112,7 +2105,7 @@ end
 local arguments = { ..., }
 local buffmecheck = os.time()
 local function init()
-    if loadedExeternally then
+    if loadedExternally then
         Module.CheckMode()
     else
         Module.CheckArgs(arguments)
@@ -2136,14 +2129,14 @@ local function init()
     buffmecheck = os.time()
 
     Module.BegBuffs()
-    if not loadedExeternally then
-        mq.imgui.init(Module.Nam, Module.RenderGUI)
+    if not loadedExternally then
+        mq.imgui.init(Module.Name, Module.RenderGUI)
         Module.LocalLoop()
     end
 end
 
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         ---@diagnostic disable-next-line: undefined-global
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end

@@ -10,8 +10,8 @@ Module.DisplayName      = 'AA Party'
 Module.TempSettings     = {}
 Module.Settings         = {}
 
-local loadedExeternally = MyUI ~= nil and true or false
-if not loadedExeternally then
+local loadedExternally = MyUI ~= nil and true or false
+if not loadedExternally then
     Module.Utils       = require('lib.common')
     Module.ThemeLoader = require('lib.theme_loader')
     Module.Actor       = require('actors')
@@ -112,7 +112,7 @@ function Module:LoadSettings()
     newSetting = self.Utils.CheckDefaultSettings(defaults, self.Settings[self.DisplayName])
     newSetting = self.Utils.CheckRemovedSettings(defaults, self.Settings[self.DisplayName]) or newSetting
 
-    if not loadedExeternally then
+    if not loadedExternally then
         self:LoadTheme()
     end
 
@@ -138,21 +138,13 @@ end
 
 function Module:CheckStale()
     local now = os.time()
-    local found = false
-    for i = 1, #groupData do
-        if groupData[1].Check == nil then
-            table.remove(groupData, i)
-            found = true
-            break
-        else
-            if now - groupData[i].Check > 900 then
+    for i = #groupData, 1, -1 do
+        if groupData[i] ~= nil then
+            if groupData[i].Check == nil or now - groupData[i].Check > 900 then
                 table.remove(groupData, i)
-                found = true
-                break
             end
         end
     end
-    if found then self:CheckStale() end
 end
 
 function Module:GenerateContent(who, sub, what)
@@ -740,11 +732,13 @@ function Module.RenderGUI()
             -- Combo Box Load Theme
             if ImGui.BeginCombo("Load Theme##", Module.TempSettings.themeName) then
                 for k, data in pairs(Module.Theme.Theme) do
-                    local isSelected = data.Name == Module.TempSettings.themeName
-                    if ImGui.Selectable(data.Name, isSelected) then
-                        Module.Settings[Module.DisplayName].LoadTheme = data.Name
-                        Module.TempSettings.themeName = Module.Settings[Module.DisplayName].LoadTheme
-                        mq.pickle(configFile, Module.Settings)
+                    if data ~= nil then
+                        local isSelected = data.Name == Module.TempSettings.themeName
+                        if ImGui.Selectable(data.Name, isSelected) then
+                            Module.Settings[Module.DisplayName].LoadTheme = data.Name
+                            Module.TempSettings.themeName = Module.Settings[Module.DisplayName].LoadTheme
+                            mq.pickle(configFile, Module.Settings)
+                        end
                     end
                 end
                 ImGui.EndCombo()
@@ -756,9 +750,9 @@ function Module.RenderGUI()
                 if Module.TempSettings.scale > 2 then Module.TempSettings.scale = 2 end
             end
 
-            if hasThemeZ or loadedExeternally then
+            if hasThemeZ or loadedExternally then
                 if ImGui.Button('Edit ThemeZ') then
-                    if not loadedExeternally then
+                    if not loadedExternally then
                         mq.cmd("/lua run themez")
                     else
                         if MyUI.Modules.ThemeZ ~= nil then
@@ -890,7 +884,7 @@ function Module.Init()
     currZone = mq.TLO.Zone.ID()
     lastZone = currZone
     firstRun = true
-    if not loadedExeternally then
+    if not loadedExternally then
         Module.CheckArgs(args)
         mq.imgui.init(Module.Name, Module.RenderGUI)
     else
@@ -910,7 +904,7 @@ function Module.Init()
         aaActor:send({ mailbox = 'aa_party', script = 'myui', }, Module:GenerateContent(nil, 'Hello'))
     end
     Module.IsRunning = true
-    if not loadedExeternally then
+    if not loadedExternally then
         Module:LocalLoop()
     end
 end
@@ -918,7 +912,7 @@ end
 local clockTimer = mq.gettime()
 
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
     local elapsedTime = mq.gettime() - clockTimer

@@ -13,10 +13,10 @@ local Module            = {}
 Module.Name             = 'MyPaths'
 Module.IsRunning        = false
 ---@diagnostic disable:undefined-global
-local loadedExeternally = MyUI ~= nil and true or false
+local loadedExternally = MyUI ~= nil and true or false
 local MySelf            = mq.TLO.Me
 
-if not loadedExeternally then
+if not loadedExternally then
     Module.Utils       = require('lib.common')
     Module.ThemeLoader = require('lib.theme_loader')
     Module.Icons       = require('mq.ICONS')
@@ -155,9 +155,10 @@ defaults                                                         = {
     LoadTheme             = 'Default',
     locked                = false,
     HudLock               = false,
+    MouseHUD              = false,
     AutoSize              = false,
     stopForGM             = true,
-    RecordDlay            = 5,
+    RecordDelay           = 5,
     WatchMana             = 60,
     WatchType             = 'None',
     InvisAction           = '',
@@ -354,7 +355,7 @@ local function loadSettings()
     newSetting = Module.Utils.CheckDefaultSettings(InterruptSet, settings[Module.Name].Interrupts) or newSetting
 
     -- Load the theme
-    if not loadedExeternally then
+    if not loadedExternally then
         loadTheme()
     end
     themeName = settings[Module.Name].LoadTheme or 'Default'
@@ -454,10 +455,10 @@ local function RemoveWaypoint(name, step)
     if not tmp then return end
 
     -- Remove the specified waypoint from the in-memory table
-    for i, data in pairs(tmp) do
-        if data.step == step then
+    for i = #tmp, 1, -1 do
+        local data = tmp[i]
+        if data and data.step == step then
             table.remove(tmp, i)
-            -- Also remove it from the database
             local db = Module.SQLite3.open(PathDB)
             local stmt = db:prepare("DELETE FROM Paths_Table WHERE zone_name = ? AND path_name = ? AND step_number = ?")
             stmt:bind_values(zone, name, step)
@@ -468,16 +469,17 @@ local function RemoveWaypoint(name, step)
         end
     end
 
-    -- Reindex the remaining waypoints
-    for i, data in pairs(tmp) do
-        data.step = i
-        -- Update the step number in the database
-        local db = Module.SQLite3.open(PathDB)
-        local stmt = db:prepare("UPDATE Paths_Table SET step_number = ? WHERE zone_name = ? AND path_name = ? AND step_loc = ?")
-        stmt:bind_values(i, zone, name, data.loc)
-        stmt:step()
-        stmt:finalize()
-        db:close()
+    for i = 1, #tmp do
+        local data = tmp[i]
+        if data then
+            data.step = i
+            local db = Module.SQLite3.open(PathDB)
+            local stmt = db:prepare("UPDATE Paths_Table SET step_number = ? WHERE zone_name = ? AND path_name = ? AND step_loc = ?")
+            stmt:bind_values(i, zone, name, data.loc)
+            stmt:step()
+            stmt:finalize()
+            db:close()
+        end
     end
 
     -- Update the in-memory Paths table
@@ -2532,10 +2534,12 @@ function Module.RenderGUI()
                 ImGui.SetNextItemWidth(100)
                 if ImGui.BeginCombo("Load Theme##" .. Module.Name, themeName) then
                     for k, data in pairs(Module.Theme.Theme) do
-                        local isSelected = data.Name == themeName
-                        if ImGui.Selectable(data.Name, isSelected) then
-                            Module.Theme.LoadTheme = data.Name
-                            themeName = Module.Theme.LoadTheme
+                        if data ~= nil then
+                            local isSelected = data.Name == themeName
+                            if ImGui.Selectable(data.Name, isSelected) then
+                                Module.Theme.LoadTheme = data.Name
+                                themeName = Module.Theme.LoadTheme
+                            end
                         end
                     end
                     ImGui.EndCombo()
@@ -2550,9 +2554,9 @@ function Module.RenderGUI()
                 end
 
                 -- Edit ThemeZ Button if ThemeZ lua exists.
-                if hasThemeZ or loadedExeternally then
+                if hasThemeZ or loadedExternally then
                     if ImGui.Button('Edit ThemeZ') then
-                        if not loadedExeternally then
+                        if not loadedExternally then
                             mq.cmd("/lua run themez")
                         else
                             if Module.ThemeZ ~= nil then
@@ -2763,6 +2767,8 @@ function Module.RenderGUI()
                 settings[Module.Name].PauseStops = NavSet.WpPause
                 settings[Module.Name].InterruptDelay = InterruptSet.interruptDelay
                 settings[Module.Name].Interrupts = InterruptSet
+                settings[Module.Name].StopForPartyCorpse = InterruptSet.stopForPartyCorpse
+                settings[Module.Name].StopForRaidCorpse = InterruptSet.stopForRaidCorpse
                 mq.pickle(configFile, settings)
                 showConfigGUI = false
             end
@@ -3090,14 +3096,14 @@ local function Init()
     handleArguments()
     Module.cycleTime = os.clock()
     Module.IsRunning = true
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init(Module.Name, Module.RenderGUI)
         Module.LocalLoop()
     end
 end
 
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         ---@diagnostic disable-next-line: undefined-global
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end

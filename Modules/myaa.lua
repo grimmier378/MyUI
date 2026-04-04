@@ -42,8 +42,8 @@ Module.IsRunning              = false  -- Keep track of running state. if not ru
 Module.ShowGui                = false
 -- check if the script is being loaded as a Module (externally) or as a Standalone script.
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally       = MyUI ~= nil and true or false
-if not loadedExeternally then
+local loadedExternally       = MyUI ~= nil and true or false
+if not loadedExternally then
     Module.Utils       = require('lib.common')                   -- common functions for use in other scripts
     Module.Icons       = require('mq.ICONS')                     -- FAWESOME ICONS
     Module.Colors      = require('lib.colors')                   -- color table for GUI returns ImVec4
@@ -160,7 +160,7 @@ local function Init()
     Module.UpdateAA("all") -- Update the AA lists
     availAA = MySelf.AAPoints() or 0
     Module.TempSettings.LastAvailAA = MySelf.AAPoints() or 0
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init(Module.Name, Module.RenderGUI)
         Module.LocalLoop()
     end
@@ -365,15 +365,38 @@ local function DrawAATable(which_Table, label)
     ImGui.EndChild()
 end
 
-local function RenderBtn()
-    -- apply_style()
-    ImGui.SetNextWindowPos(ImVec2(200, 20), ImGuiCond.FirstUseEver)
-    local openBtn, showBtn = ImGui.Begin(string.format(Module.Name .. "##MiniBtn" .. Module.CharLoaded), true, buttonWinFlags)
-    if not openBtn then
-        showBtn = false
-    end
+function Module:RenderMiniButton(grouped)
+    if not grouped then
+        ImGui.SetNextWindowPos(ImVec2(200, 20), ImGuiCond.FirstUseEver)
+        local openBtn, showBtn = ImGui.Begin(string.format(Module.Name .. "##MiniBtn" .. Module.CharLoaded), true, buttonWinFlags)
+        if not openBtn then
+            showBtn = false
+        end
 
-    if showBtn then
+        if showBtn then
+            local cursorPosX, cursorPosY = ImGui.GetCursorScreenPos()
+            animMini:SetTextureCell(2305 - EQ_ICON_OFFSET)
+            ImGui.DrawTextureAnimation(animMini, 34, 34, true)
+            ImGui.SetCursorScreenPos(cursorPosX, cursorPosY)
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0.5, 0.5, 0, 0.5))
+            ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
+            if ImGui.Button("##" .. Module.Name, ImVec2(34, 34)) then
+                Module.ShowGui = not Module.ShowGui
+                Module.Settings.showUI = Module.ShowGui
+                mq.pickle(configFile, Module.Settings)
+            end
+            ImGui.PopStyleColor(3)
+        end
+        if ImGui.IsItemHovered() then
+            ImGui.BeginTooltip()
+            ImGui.Text(Module.Name)
+            ImGui.Text("Left-click to toggle UI")
+            ImGui.Text("Available AA: %s", availAA)
+            ImGui.EndTooltip()
+        end
+        ImGui.End()
+    else
         local cursorPosX, cursorPosY = ImGui.GetCursorScreenPos()
         animMini:SetTextureCell(2305 - EQ_ICON_OFFSET)
         ImGui.DrawTextureAnimation(animMini, 34, 34, true)
@@ -387,29 +410,10 @@ local function RenderBtn()
             mq.pickle(configFile, Module.Settings)
         end
         ImGui.PopStyleColor(3)
-        -- if ImGui.IsItemHovered() then
-        -- 	if ImGui.IsMouseReleased(ImGuiMouseButton.Left) then
-        -- 		Module.Settings.showUI = not Module.Settings.showUI
-        -- 		mq.pickle(configFile, Module.Settings)
-        -- 	end
-        -- end
+        if ImGui.IsItemHovered() then
+            ImGui.SetTooltip(string.format("%s\nLeft-click to toggle UI\nAvailable AA: %s", Module.Name, availAA))
+        end
     end
-    if ImGui.IsWindowHovered() then
-        ImGui.BeginTooltip()
-        ImGui.Text(Module.Name)
-        ImGui.Text("Left-click to toggle UI")
-        -- ImGui.Text("Right-click for options")
-        ImGui.Text("Available AA: %s", availAA)
-        ImGui.EndTooltip()
-    end
-    -- if ImGui.BeginPopupContextWindow("ItemTrackerContext") then
-    -- 	if ImGui.MenuItem(Module.Settings.lockWindow and "Unlock Window" or "Lock Window") then
-    -- 		Module.Settings.lockWindow = not Module.Settings.lockWindow
-    -- 		mq.pickle(configFile, Module.Settings)
-    -- 	end
-    -- 	ImGui.EndPopup()
-    -- end
-    ImGui.End()
 end
 local tabPage = mq.TLO.Window("AAWindow/AAW_Subwindows")
 
@@ -526,8 +530,8 @@ function Module.RenderGUI()
 
         ImGui.End()
     end
-    if Module.Settings.showBtn then
-        RenderBtn()
+    if Module.Settings.showBtn and not MyUI.Settings.GroupButtons then
+        Module:RenderMiniButton()
     end
     MyUI.ThemeLoader.EndTheme(styleCount, colorCount)
     ImGui.PopFont()

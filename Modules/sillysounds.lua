@@ -8,9 +8,9 @@ Module.IsRunning = false
 Module.Path = MyUI.Path ~= nil and MyUI.Path .. '/sounds/' or string.format("%s/%s/sounds/", mq.luaDir, Module.Name)
 
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI ~= nil and true or false
+local loadedExternally = MyUI ~= nil and true or false
 
-if not loadedExeternally then
+if not loadedExternally then
     MyUI.Utils = require('lib.common')
     MyUI.Icons = require('mq.ICONS')
     MyUI.CharLoaded = mq.TLO.Me.DisplayName()
@@ -170,9 +170,11 @@ local function loadSettings()
 
     -- check for missing sound files
     for k, v in pairs(settings.Sounds[settings.theme]) do
-        if not MyUI.Utils.File.Exists(string.format("%s%s/%s", Module.Path, settings.theme, v.file)) then
-            settings[k] = false
-            MyUI.Utils.PrintOutput('MyUI', nil, "\aySound file %s missing!!\n\tTurning %s \arOFF", string.format("%s%s/%s", Module.Path, settings.theme, v.file), k)
+        if v ~= nil and v.file ~= nil then
+            if not MyUI.Utils.File.Exists(string.format("%s%s/%s", Module.Path, settings.theme, v.file)) then
+                settings[k] = false
+                MyUI.Utils.PrintOutput('MyUI', nil, "\aySound file %s missing!!\n\tTurning %s \arOFF", string.format("%s%s/%s", Module.Path, settings.theme, v.file), k)
+            end
         end
     end
 
@@ -336,13 +338,17 @@ local function DrawAlertSettings(alertName, script, path, configFile)
     settings[alert] = Module.Utils.DrawToggle(alertName .. " Alert##" .. script, settings[alert])
     ImGui.TableNextColumn()
     ImGui.SetNextItemWidth(70)
-    settings.Sounds[settings.theme][soundAlert].file = ImGui.InputText('Filename##' .. alertName .. 'SND', settings.Sounds[settings.theme][soundAlert].file)
+    if settings.Sounds[settings.theme][soundAlert] ~= nil then
+        settings.Sounds[settings.theme][soundAlert].file = ImGui.InputText('Filename##' .. alertName .. 'SND', settings.Sounds[settings.theme][soundAlert].file)
+    end
     ImGui.TableNextColumn()
     ImGui.SetNextItemWidth(100)
     settings[volAlert] = ImGui.InputFloat('Volume##' .. alertName .. 'VOL', settings[volAlert], 0.1)
     ImGui.TableNextColumn()
     ImGui.SetNextItemWidth(100)
-    settings.Sounds[settings.theme][soundAlert].duration = ImGui.InputInt('Duration##' .. alertName .. 'DUR', settings.Sounds[settings.theme][soundAlert].duration)
+    if settings.Sounds[settings.theme][soundAlert] ~= nil then
+        settings.Sounds[settings.theme][soundAlert].duration = ImGui.InputInt('Duration##' .. alertName .. 'DUR', settings.Sounds[settings.theme][soundAlert].duration)
+    end
     ImGui.TableNextColumn()
     if ImGui.Button("Test and Save##" .. alertName .. "ALERT") then
         soundDuration = settings.Sounds[settings.theme][soundAlert].duration
@@ -501,7 +507,7 @@ local function init()
     -- Slash Command Binding
     mq.bind('/sillysounds', bind)
     Module.IsRunning = true
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init(Module.Name, Module.RenderGUI)
         Module.LocalLoop()
     end
@@ -509,7 +515,7 @@ end
 
 -- Main loop
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         ---@diagnostic disable-next-line: undefined-global
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end

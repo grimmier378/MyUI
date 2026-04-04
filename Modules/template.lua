@@ -54,8 +54,8 @@ Module.TempSettings = {
 
 -- check if the script is being loaded as a Module (externally) or as a Standalone script.
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI ~= nil and true or false
-if not loadedExeternally then
+local loadedExternally = MyUI ~= nil and true or false
+if not loadedExternally then
     -- for local standalone use we will need to load in the global MyUI. variables and functions. and make sure to include the files as needed inside of the scripts folder.
     -- Comment/Uncomment the items below as needed
     Module.Utils       = require('lib.common') -- common functions for use in other scripts
@@ -123,7 +123,7 @@ local function Init()
     Module.IsRunning = true
     Module.Utils.PrintOutput('main', true, "\ayModule \a-w[\at%s\a-w] \agLoaded\aw!", Module.Name)
     -- for standalone mode we need to init the GUI and use a real loop
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init(Module.Name, Module.RenderGUI)
         Module.LocalLoop()
     end
@@ -209,7 +209,7 @@ end
 
 function Module.MainLoop()
     -- This will unload the module gracefully if IsRunning state changes.
-    if loadedExeternally and not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
+    if loadedExternally and not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
 
     -- This will only allow the MainLoop to run every 500ms (half a secon)
     if mq.gettime() - drawTimerMS < 1000 then

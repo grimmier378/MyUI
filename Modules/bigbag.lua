@@ -7,9 +7,9 @@ Module.ShowGUI             = false
 Module.TempSettings        = {}
 Module.TempSettings.Popped = {}
 
-local loadedExeternally    = MyUI ~= nil and true or false
+local loadedExternally    = MyUI ~= nil and true or false
 
-if not loadedExeternally then
+if not loadedExternally then
     Module.Path          = string.format("%s/%s/", mq.luaDir, Module.Name)
     Module.ThemeFile     = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
     Module.Theme         = require('defaults.themes')
@@ -132,7 +132,7 @@ function Module:LoadSettings()
         settings = defaults
     end
 
-    if not loadedExeternally then
+    if not loadedExternally then
         if utils.File.Exists(self.ThemeFile) then
             self.Theme = dofile(self.ThemeFile)
         end
@@ -852,11 +852,13 @@ function Module:RenderSettings()
             -- Combo Box Load Theme
             if ImGui.BeginCombo("Load Theme##BigBag", themeName) then
                 for k, data in pairs(self.Theme.Theme) do
-                    local isSelected = data.Name == themeName
-                    if ImGui.Selectable(data.Name, isSelected) then
-                        settings.themeName = data.Name
-                        themeName = settings.themeName
-                        mq.pickle(configFile, settings)
+                    if data ~= nil then
+                        local isSelected = data.Name == themeName
+                        if ImGui.Selectable(data.Name, isSelected) then
+                            settings.themeName = data.Name
+                            themeName = settings.themeName
+                            mq.pickle(configFile, settings)
+                        end
                     end
                 end
                 ImGui.EndCombo()
@@ -1319,69 +1321,73 @@ function Module:BigButtonTooltip()
     ImGui.EndTooltip()
 end
 
-function Module:RenderMiniButton()
-    -- apply_style()
-    local colorCount, styleCount = self.ThemeLoader.StartTheme(themeName, self.Theme)
-    ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, ImVec2(9, 9))
-    local openBtn, showBtn = ImGui.Begin(string.format("Big Bag##Mini"), true, bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoCollapse))
-    if not openBtn then
-        showBtn = false
+function Module:RenderMiniButton(grouped)
+    if not grouped then
+        local colorCount, styleCount = self.ThemeLoader.StartTheme(themeName, self.Theme)
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, ImVec2(9, 9))
+        local openBtn, showBtn = ImGui.Begin(string.format("Big Bag##Mini"), true, bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoCollapse))
+        if not openBtn then
+            showBtn = false
+        end
+
+        if showBtn then
+            local cursorX, cursorY = ImGui.GetCursorScreenPos()
+            if FreeSlots > MIN_SLOTS_WARN then
+                animMini:SetTextureCell(3635 - EQ_ICON_OFFSET)
+                ImGui.DrawTextureAnimation(animMini, 34, 34, true)
+                ImGui.SetCursorPos(20, 20)
+                Module.Utils.DropShadow(FreeSlots, { Enabled = true, })
+            else
+                animMini:SetTextureCell(3632 - EQ_ICON_OFFSET)
+                ImGui.DrawTextureAnimation(animMini, 34, 34, true)
+                ImGui.SetCursorPos(20, 20)
+                Module.Utils.DropShadow(FreeSlots, { Enabled = true, }, nil, Module.Utils.Colors.color('teal'))
+            end
+
+            ImGui.SetCursorScreenPos(cursorX, cursorY)
+            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0, 0.5, 0.5, 0.5))
+            ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
+            if ImGui.Button("##BigBagsBtn", ImVec2(34, 34)) then
+                self.ShowGUI = not self.ShowGUI
+            end
+            ImGui.PopStyleColor(3)
+
+            if ImGui.IsItemHovered() then
+                self:BigButtonTooltip()
+            end
+        end
+        ImGui.PopStyleVar()
+        self.ThemeLoader.EndTheme(colorCount, styleCount)
+        ImGui.End()
+        return
     end
 
-    if showBtn then
-        local cursorX, cursorY = ImGui.GetCursorScreenPos()
-        if FreeSlots > MIN_SLOTS_WARN then
-            animMini:SetTextureCell(3635 - EQ_ICON_OFFSET)
-            ImGui.DrawTextureAnimation(animMini, 34, 34, true)
-            ImGui.SetCursorPos(20, 20)
-            Module.Utils.DropShadow(FreeSlots, { Enabled = true, })
-            -- ImGui.Text("%s", FreeSlots)
-        else
-            animMini:SetTextureCell(3632 - EQ_ICON_OFFSET)
-            ImGui.DrawTextureAnimation(animMini, 34, 34, true)
-            ImGui.SetCursorPos(20, 20)
-            Module.Utils.DropShadow(FreeSlots, { Enabled = true, }, nil, Module.Utils.Colors.color('teal'))
-        end
-
-        ImGui.SetCursorScreenPos(cursorX, cursorY)
-        ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0, 0.5, 0.5, 0.5))
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
-        if ImGui.Button("##BigBagsBtn", ImVec2(34, 34)) then
-            self.ShowGUI = not self.ShowGUI
-        end
-        ImGui.PopStyleColor(3)
-
-        if ImGui.IsItemHovered() then
-            self:BigButtonTooltip()
-        end
-
-        if toggleMouse ~= 'None' then
-            if ImGui.IsMouseReleased(ImGuiMouseButton[toggleMouse]) and not ImGui.IsKeyDown(ImGuiMod.Ctrl) and not ImGui.IsKeyDown(ImGuiMod.Shift) then
-                self.ShowGUI = not self.ShowGUI
-            end
-        end
-        if toggleModKey ~= 'None' and toggleKey ~= '' and toggleModKey2 == 'None' and toggleModKey3 == 'None' then
-            if ImGui.IsKeyPressed(ImGuiKey[toggleKey]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey]) then
-                self.ShowGUI = not self.ShowGUI
-            end
-        elseif toggleModKey ~= 'None' and toggleKey ~= '' and toggleModKey2 ~= 'None' and toggleModKey3 == 'None' then
-            if ImGui.IsKeyPressed(ImGuiKey[toggleKey]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey2]) then
-                self.ShowGUI = not self.ShowGUI
-            end
-        elseif toggleModKey ~= 'None' and toggleKey ~= '' and toggleModKey2 ~= 'None' and toggleModKey3 ~= 'None' then
-            if ImGui.IsKeyPressed(ImGuiKey[toggleKey]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey2]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey3]) then
-                self.ShowGUI = not self.ShowGUI
-            end
-        elseif toggleModKey == 'None' and toggleKey ~= '' then
-            if ImGui.IsKeyPressed(ImGuiKey[toggleKey]) then
-                self.ShowGUI = not self.ShowGUI
-            end
-        end
+    local cursorX, cursorY = ImGui.GetCursorScreenPos()
+    if FreeSlots > MIN_SLOTS_WARN then
+        animMini:SetTextureCell(3635 - EQ_ICON_OFFSET)
+        ImGui.DrawTextureAnimation(animMini, 34, 34, true)
+        ImGui.SetCursorPos(20, 20)
+        Module.Utils.DropShadow(FreeSlots, { Enabled = true, })
+    else
+        animMini:SetTextureCell(3632 - EQ_ICON_OFFSET)
+        ImGui.DrawTextureAnimation(animMini, 34, 34, true)
+        ImGui.SetCursorPos(20, 20)
+        Module.Utils.DropShadow(FreeSlots, { Enabled = true, }, nil, Module.Utils.Colors.color('teal'))
     end
-    ImGui.PopStyleVar()
-    self.ThemeLoader.EndTheme(colorCount, styleCount)
-    ImGui.End()
+
+    ImGui.SetCursorScreenPos(cursorX, cursorY)
+    ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
+    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0, 0.5, 0.5, 0.5))
+    ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
+    if ImGui.Button("##BigBagsBtn", ImVec2(34, 34)) then
+        self.ShowGUI = not self.ShowGUI
+    end
+    ImGui.PopStyleColor(3)
+
+    if ImGui.IsItemHovered() then
+        self:BigButtonTooltip()
+    end
 end
 
 --- ImGui Program Loop
@@ -1497,11 +1503,33 @@ end
 
 function Module.RenderGUI()
     if not Module.IsRunning then return end
+    if toggleMouse ~= 'None' then
+        if ImGui.IsMouseReleased(ImGuiMouseButton[toggleMouse]) and not ImGui.IsKeyDown(ImGuiMod.Ctrl) and not ImGui.IsKeyDown(ImGuiMod.Shift) then
+            Module.ShowGUI = not Module.ShowGUI
+        end
+    end
+    if toggleModKey ~= 'None' and toggleKey ~= '' and toggleModKey2 == 'None' and toggleModKey3 == 'None' then
+        if ImGui.IsKeyPressed(ImGuiKey[toggleKey]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey]) then
+            Module.ShowGUI = not Module.ShowGUI
+        end
+    elseif toggleModKey ~= 'None' and toggleKey ~= '' and toggleModKey2 ~= 'None' and toggleModKey3 == 'None' then
+        if ImGui.IsKeyPressed(ImGuiKey[toggleKey]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey2]) then
+            Module.ShowGUI = not Module.ShowGUI
+        end
+    elseif toggleModKey ~= 'None' and toggleKey ~= '' and toggleModKey2 ~= 'None' and toggleModKey3 ~= 'None' then
+        if ImGui.IsKeyPressed(ImGuiKey[toggleKey]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey2]) and ImGui.IsKeyDown(ImGuiMod[toggleModKey3]) then
+            Module.ShowGUI = not Module.ShowGUI
+        end
+    elseif toggleModKey == 'None' and toggleKey ~= '' then
+        if ImGui.IsKeyPressed(ImGuiKey[toggleKey]) then
+            Module.ShowGUI = not Module.ShowGUI
+        end
+    end
     if Module.ShowGUI then
         Module:RenderTabs()
     end
 
-    Module:RenderMiniButton()
+    if not MyUI.Settings.GroupButtons then Module:RenderMiniButton() end
 
     Module:QtyWindow()
 
@@ -1522,7 +1550,7 @@ function Module:Init()
     -- get_book()
     mq.bind("/bigbag", self.CommandHandler)
 
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init("BigBagGUI", self.RenderGUI)
         self:LocalLoop()
         printf("%s Loaded", self.Name)
@@ -1550,7 +1578,7 @@ function Module.CommandHandler(...)
 end
 
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
     Module:CreateInventory()

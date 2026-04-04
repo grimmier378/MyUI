@@ -22,9 +22,9 @@ Module.ActorMailBox     = 'alertmaster'
 Module.IsRunning        = false
 
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI ~= nil and true or false
+local loadedExternally = MyUI ~= nil and true or false
 
-if not loadedExeternally then
+if not loadedExternally then
     Module.Utils       = require('lib.common')
     Module.CharLoaded  = mq.TLO.Me.DisplayName()
     Module.Colors      = require('lib.colors')
@@ -651,7 +651,7 @@ local function load_settings()
         end
     end
 
-    if not loadedExeternally then
+    if not loadedExternally then
         if Module.Utils.File.Exists(Module.ThemeFile) then
             Module.Theme = dofile(Module.ThemeFile)
         end
@@ -1084,11 +1084,15 @@ local function spawn_search_players(search)
     end
 
     if search ~= 'gm' then
+        local toRemove = {}
         for name in pairs(displayTablePlayers) do
             if tmp[name] == nil then
-                displayTablePlayers[name] = nil
-                numDisplayPlayers = numDisplayPlayers - 1
+                toRemove[#toRemove + 1] = name
             end
+        end
+        for _, name in ipairs(toRemove) do
+            displayTablePlayers[name] = nil
+            numDisplayPlayers = numDisplayPlayers - 1
         end
     end
     return tmp
@@ -1831,7 +1835,7 @@ local function Config_GUI()
             end
             if ImGui.Button('Reload Theme File') then load_settings() end
             ImGui.SameLine()
-            if loadedExeternally and ImGui.Button('Edit ThemeZ') then
+            if loadedExternally and ImGui.Button('Edit ThemeZ') then
                 ---@diagnostic disable-next-line:undefined-global
                 if MyUI.Modules.ThemeZ ~= nil then
                     if MyUI.Modules.ThemeZ.IsRunning then
@@ -2293,7 +2297,7 @@ local function setup()
     check_for_announce()
     check_for_spawns()
 
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init(Module.Name, Module.RenderGUI)
         Module.LocalLoop()
     end
@@ -2309,7 +2313,7 @@ function Module.MainLoop()
         Module:RefreshZone()
     end
 
-    if loadedExeternally then
+    if loadedExternally then
         ---@diagnostic disable-next-line:undefined-global
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then
             mq.RemoveTopLevelObject('AlertMaster')

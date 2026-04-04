@@ -9,9 +9,9 @@ Module.IsRunning                                                  = false
 Module.Name                                                       = "DialogDB"
 
 ---@diagnostic disable:undefined-global
-local loadedExeternally                                           = MyUI ~= nil and true or false
+local loadedExternally                                           = MyUI ~= nil and true or false
 
-if not loadedExeternally then
+if not loadedExternally then
     Module.Utils       = require('lib.common')
     Module.CharLoaded  = mq.TLO.Me.DisplayName()
     Module.Server      = mq.TLO.EverQuest.Server()
@@ -146,7 +146,7 @@ local function loadSettings()
         Module.themeName = Module.Config.themeName or 'Default'
     end
 
-    if not loadedExeternally then
+    if not loadedExternally then
         loadTheme()
     end
 
@@ -639,13 +639,15 @@ local function DrawThemeWin()
     -- Combo Box Load Theme
     if ImGui.BeginCombo("Load Theme##DialogDB", Module.themeName) then
         for k, data in pairs(Module.Theme.Theme) do
-            local isSelected = data.Name == Module.themeName
-            if ImGui.Selectable(data.Name, isSelected) then
-                Module.Config.themeName = data.Name
-                if Module.themeName ~= Module.Config.themeName then
-                    mq.pickle(dialogConfig, Module.Config)
+            if data ~= nil then
+                local isSelected = data.Name == Module.themeName
+                if ImGui.Selectable(data.Name, isSelected) then
+                    Module.Config.themeName = data.Name
+                    if Module.themeName ~= Module.Config.themeName then
+                        mq.pickle(dialogConfig, Module.Config)
+                    end
+                    Module.themeName = Module.Config.themeName
                 end
-                Module.themeName = Module.Config.themeName
             end
         end
         ImGui.EndCombo()
@@ -656,7 +658,7 @@ local function DrawThemeWin()
     end
 
     ImGui.SameLine()
-    if loadedExeternally then
+    if loadedExternally then
         if ImGui.Button('Edit ThemeZ') then
             if MyUI.Modules.ThemeZ ~= nil then
                 if MyUI.Modules.ThemeZ.IsRunning then
@@ -1019,7 +1021,7 @@ local function init()
     Module.IsRunning = true
 
 
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init(Module.Nam, Module.RenderGUI)
         Module.LocalLoop()
     end
@@ -1027,7 +1029,7 @@ end
 
 local clockTimer = mq.gettime()
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
     local elapsedTime = mq.gettime() - clockTimer

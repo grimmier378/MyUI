@@ -68,12 +68,12 @@ local targetDots        = {}
 local firstTargetID     = nil
 
 local Module            = {}
-local loadedExeternally = MyUI ~= nil
+local loadedExternally = MyUI ~= nil
 Module.Name             = "MyDots"
 Module.IsRunning        = false
 Module.TempSettings     = {}
 
-if loadedExeternally then
+if loadedExternally then
     Module.Utils = MyUI.Utils
 else
     Module.Utils = require('lib.common')
@@ -818,7 +818,7 @@ end
 local function Init()
     loadSettings()
     -- Combined initialization
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init("MyDots", Module.RenderGUI)
     end
     -- Main loop
@@ -828,7 +828,7 @@ local function Init()
     Module.IsRunning = true
 end
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         ---@diagnostic disable-next-line: undefined-global
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end
@@ -872,7 +872,7 @@ end
 
 Init()
 
-if not loadedExeternally then
+if not loadedExternally then
     Module.LocalLoop()
 end
 return Module

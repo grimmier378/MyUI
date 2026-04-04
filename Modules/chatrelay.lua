@@ -4,18 +4,18 @@
     Description: Guild Chat Relay over Actors.
 ]]
 
-local mq                = require('mq')
-local ImGui             = require 'ImGui'
-local Module            = {}
-Module.ActorMailBox     = 'chat_relay'
-Module.IsRunning        = false
-Module.Name             = 'ChatRelay'
-Module.DisplayName      = 'Chat Relay'
+local mq               = require('mq')
+local ImGui            = require 'ImGui'
+local Module           = {}
+Module.ActorMailBox    = 'chat_relay'
+Module.IsRunning       = false
+Module.Name            = 'ChatRelay'
+Module.DisplayName     = 'Chat Relay'
 
 ---@diagnostic disable-next-line:undefined-global
-local loadedExeternally = MyUI ~= nil and true or false
+local loadedExternally = MyUI ~= nil and true or false
 
-if not loadedExeternally then
+if not loadedExternally then
     Module.Utils       = require('lib.common')
     Module.ThemeLoader = require('lib.theme_loader')
     Module.Actor       = require('actors')
@@ -288,44 +288,68 @@ local function getTellChat(line, who)
     end
 end
 
-local function RenderMini()
-    local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
+function Module:RenderMiniButton(grouped)
+    if not grouped then
+        local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
 
-    ImGui.SetNextWindowSize(100, 100, ImGuiCond.FirstUseEver)
-    ImGui.SetNextWindowPos(500, 700, ImGuiCond.FirstUseEver)
-    local openMini, showMini = ImGui.Begin("Chat Relay Mini##" .. Module.CharLoaded, true, bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar))
-    if not openMini then
-        Module.IsRunning = false
-    end
-    if showMini then
-        if not settings[Module.DisplayName].ShowOnNewMessage and NewMessage then
-            if ImGui.ImageButton("ChatRelay", minImg:GetTextureID(), ImVec2(settings[Module.DisplayName].IconSize, settings[Module.DisplayName].IconSize), ImVec2(0.0, 0.0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), ImVec4(1, 0, 0, 1)) then
-                showMain = not showMain
+        ImGui.SetNextWindowSize(100, 100, ImGuiCond.FirstUseEver)
+        ImGui.SetNextWindowPos(500, 700, ImGuiCond.FirstUseEver)
+        local openMini, showMini = ImGui.Begin("Chat Relay Mini##" .. Module.CharLoaded, true, bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar))
+        if not openMini then
+            Module.IsRunning = false
+        end
+        if showMini then
+            if not settings[Module.DisplayName].ShowOnNewMessage and NewMessage then
+                if ImGui.ImageButton("ChatRelay", minImg:GetTextureID(), ImVec2(settings[Module.DisplayName].IconSize, settings[Module.DisplayName].IconSize), ImVec2(0.0, 0.0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), ImVec4(1, 0, 0, 1)) then
+                    showMain = not showMain
+                end
+            else
+                if ImGui.ImageButton("ChatRelay", minImg:GetTextureID(), ImVec2(settings[Module.DisplayName].IconSize, settings[Module.DisplayName].IconSize)) then
+                    showMain = not showMain
+                end
             end
-        else
-            if ImGui.ImageButton("ChatRelay", minImg:GetTextureID(), ImVec2(settings[Module.DisplayName].IconSize, settings[Module.DisplayName].IconSize)) then
-                showMain = not showMain
+
+            if ImGui.BeginPopupContextItem("ChatRelayContext") then
+                if ImGui.MenuItem("exit") then
+                    Module.IsRunning = false
+                end
+                if ImGui.MenuItem("config") then
+                    showConfig = true
+                end
+                ImGui.EndPopup()
             end
         end
+        Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
 
-        if ImGui.BeginPopupContextWindow() then
-            if ImGui.MenuItem("exit") then
-                Module.IsRunning = false
-            end
-            if ImGui.MenuItem("config") then
-                showConfig = true
-            end
-            ImGui.EndPopup()
+        ImGui.End()
+        return
+    end
+    if not settings[Module.DisplayName].ShowOnNewMessage and NewMessage then
+        if ImGui.ImageButton("ChatRelay##Grouped", minImg:GetTextureID(), ImVec2(34, 34), ImVec2(0.0, 0.0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), ImVec4(1, 0, 0, 1)) then
+            showMain = not showMain
+        end
+    else
+        if ImGui.ImageButton("ChatRelay##Grouped", minImg:GetTextureID(), ImVec2(34, 34)) then
+            showMain = not showMain
         end
     end
-    Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
-
-    ImGui.End()
+    if ImGui.IsItemHovered() then
+        ImGui.SetTooltip("Chat Relay")
+    end
+    if ImGui.BeginPopupContextItem("ChatRelayContext") then
+        if ImGui.MenuItem("exit") then
+            Module.IsRunning = false
+        end
+        if ImGui.MenuItem("config") then
+            showConfig = true
+        end
+        ImGui.EndPopup()
+    end
 end
 
 function Module.RenderGUI()
     if not Module.IsRunning then return end
-
+    mq.doevents()
     if showMain then
         Minimized = false
         NewMessage = false
@@ -357,6 +381,7 @@ function Module.RenderGUI()
                             if #sortedKeys > 0 then
                                 for key in pairs(sortedKeys) do
                                     local gName = sortedKeys[key]
+                                    if not guildChat[gName] or not guildBufferCount[gName] then goto guildContinue end
                                     local gConsole = guildChat[gName]
                                     local conTag = false
                                     local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
@@ -393,6 +418,7 @@ function Module.RenderGUI()
                                     if conTag then
                                         ImGui.PopStyleColor()
                                     end
+                                    ::guildContinue::
                                 end
                             end
                             ImGui.EndTabBar()
@@ -408,6 +434,7 @@ function Module.RenderGUI()
                             if #sortedKeys > 0 then
                                 for key in pairs(sortedKeys) do
                                     local tName = sortedKeys[key]
+                                    if not tellChat[tName] or not charBufferCount[tName] then goto tellContinue end
                                     local tConsole = tellChat[tName]
                                     local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
                                     local colFlag = false
@@ -446,6 +473,7 @@ function Module.RenderGUI()
                                     if colFlag then
                                         ImGui.PopStyleColor()
                                     end
+                                    ::tellContinue::
                                 end
                             end
                             ImGui.EndTabBar()
@@ -466,7 +494,7 @@ function Module.RenderGUI()
         ImGui.End()
     end
 
-    RenderMini()
+    if not MyUI.Settings.GroupButtons then Module:RenderMiniButton() end
 
     if showConfig then
         local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
@@ -481,11 +509,13 @@ function Module.RenderGUI()
                 -- Combo Box Load Theme
                 if ImGui.BeginCombo("Load Theme##MySpells", themeName) then
                     for k, data in pairs(Module.Theme.Theme) do
-                        local isSelected = data.Name == themeName
-                        if ImGui.Selectable(data.Name, isSelected) then
-                            settings[Module.DisplayName].ThemeName = data.Name
-                            themeName = settings[Module.DisplayName].ThemeName
-                            mq.pickle(configFile, settings)
+                        if data ~= nil then
+                            local isSelected = data.Name == themeName
+                            if ImGui.Selectable(data.Name, isSelected) then
+                                settings[Module.DisplayName].ThemeName = data.Name
+                                themeName = settings[Module.DisplayName].ThemeName
+                                mq.pickle(configFile, settings)
+                            end
                         end
                     end
                     ImGui.EndCombo()
@@ -630,7 +660,7 @@ local function init()
     lastZone = currZone
     mq.bind('/chatrelay', processCommand)
     LoadSettings()
-    if loadedExeternally then
+    if loadedExternally then
         Module.CheckMode()
     else
         Module.CheckArgs(arguments)
@@ -652,7 +682,7 @@ local function init()
     guildBufferCount[Module.Guild] = { Current = 1, Last = 1, }
     lastAnnounce = os.time()
     Module.IsRunning = true
-    if not loadedExeternally then
+    if not loadedExternally then
         mq.imgui.init(Module.Name, Module.RenderGUI)
         Module.LocalLoop()
     end
@@ -661,7 +691,7 @@ end
 local clockTimer = mq.gettime()
 
 function Module.MainLoop()
-    if loadedExeternally then
+    if loadedExternally then
         ---@diagnostic disable-next-line: undefined-global
         if not MyUI.LoadModules.CheckRunning(Module.IsRunning, Module.Name) then return end
     end

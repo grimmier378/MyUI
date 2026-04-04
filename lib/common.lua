@@ -4,7 +4,7 @@ local Utils = require('mq.Utils')
 Utils.Colors = require('lib.colors')
 Utils.Animation_Item = mq.FindTextureAnimation('A_DragItem')
 Utils.Animation_Spell = mq.FindTextureAnimation('A_SpellIcons')
-
+Utils.Icons = require('mq.ICONS')
 
 ---Calcluate the color between two colors based on a value between 0 and 100.
 ---
@@ -518,6 +518,15 @@ end
 
 function Utils.SetImage(file_path)
     return mq.CreateTexture(file_path)
+end
+
+function Utils.DrawHelpMarker(desc)
+    ImGui.TextDisabled(Utils.Icons.FA_QUESTION_CIRCLE_O)
+    if ImGui.IsItemHovered() then
+        ImGui.BeginTooltip()
+        ImGui.TextUnformatted(desc)
+        ImGui.EndTooltip()
+    end
 end
 
 --- Handles Printing output.

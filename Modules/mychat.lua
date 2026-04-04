@@ -55,6 +55,7 @@ Module.DBPath            = string.format('%s/MyUI/MyChat/MyChat.db', mq.configDi
 Module.ActivePresetID    = nil
 Module.ActivePresetName  = ''
 Module.PresetList        = {}
+Module.doResetEvents     = false
 
 Module.KeyFocus          = false
 Module.KeyName           = 'RightShift'
@@ -323,16 +324,16 @@ end
 
 --- Global settings keys and their types/defaults for DB storage
 local globalSettingsKeys = {
-    locked       = { type = 'bool',   default = false },
-    timeStamps   = { type = 'bool',   default = true },
-    Scale        = { type = 'number', default = 1.0 },
-    LoadTheme    = { type = 'string', default = 'Default' },
-    doLinks      = { type = 'bool',   default = true },
-    mainEcho     = { type = 'string', default = '/say' },
-    MainFontSize = { type = 'number', default = 16 },
-    LogCommands  = { type = 'bool',   default = false },
-    keyFocus     = { type = 'bool',   default = false },
-    keyName      = { type = 'string', default = 'RightShift' },
+    locked       = { type = 'bool', default = false, },
+    timeStamps   = { type = 'bool', default = true, },
+    Scale        = { type = 'number', default = 1.0, },
+    LoadTheme    = { type = 'string', default = 'Default', },
+    doLinks      = { type = 'bool', default = true, },
+    mainEcho     = { type = 'string', default = '/say', },
+    MainFontSize = { type = 'number', default = 16, },
+    LogCommands  = { type = 'bool', default = false, },
+    keyFocus     = { type = 'bool', default = false, },
+    keyName      = { type = 'string', default = 'RightShift', },
 }
 
 ---Checks if this character has data in the DB
@@ -341,7 +342,10 @@ function Module.HasDBData()
     local db = Module.OpenDB()
     if not db then return false end
     local stmt = db:prepare('SELECT preset_id FROM char_active_preset WHERE char_name = ? AND server = ? LIMIT 1')
-    if not stmt then db:close() return false end
+    if not stmt then
+        db:close()
+        return false
+    end
     stmt:bind_values(Module.CharLoaded, Module.Server)
     local hasData = stmt:step() == Module.SQLite3.ROW
     stmt:finalize()
@@ -438,7 +442,7 @@ function Module.MigratePickleToDB(settings, charName)
 
                     if eventData.Filters then
                         for filterIndex, filterData in pairs(eventData.Filters) do
-                            local color = filterData.color or { 1.0, 1.0, 1.0, 1.0 }
+                            local color = filterData.color or { 1.0, 1.0, 1.0, 1.0, }
                             local fStmt = db:prepare([[
                                 INSERT INTO filters (event_row_id, filter_index, filter_string, color_r, color_g, color_b, color_a, enabled, hidden)
                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -486,7 +490,10 @@ function Module.LoadSettingsFromDB()
     -- Get active preset
     local presetID = nil
     local aStmt = db:prepare('SELECT preset_id FROM char_active_preset WHERE char_name = ? AND server = ? LIMIT 1')
-    if not aStmt then db:close() return false end
+    if not aStmt then
+        db:close()
+        return false
+    end
     aStmt:bind_values(Module.CharLoaded, Module.Server)
     for row in aStmt:nrows() do
         presetID = row.preset_id
@@ -507,7 +514,7 @@ function Module.LoadSettingsFromDB()
     Module.ActivePresetID = presetID
 
     -- Load global settings
-    local settings = { Channels = {} }
+    local settings = { Channels = {}, }
     local gStmt = db:prepare('SELECT key, value FROM global_settings WHERE char_name = ? AND server = ?')
     gStmt:bind_values(Module.CharLoaded, Module.Server)
     for row in gStmt:nrows() do
@@ -563,7 +570,7 @@ function Module.LoadSettingsFromDB()
                 local fIdx = fRow.filter_index
                 settings.Channels[chanID].Events[eIdx].Filters[fIdx] = {
                     filterString = fRow.filter_string,
-                    color        = { fRow.color_r, fRow.color_g, fRow.color_b, fRow.color_a },
+                    color        = { fRow.color_r, fRow.color_g, fRow.color_b, fRow.color_a, },
                     enabled      = fRow.enabled == 1,
                     hidden       = fRow.hidden == 1,
                 }
@@ -579,7 +586,7 @@ function Module.LoadSettingsFromDB()
     oStmt:bind_values(Module.CharLoaded, Module.Server)
     local overrides = {}
     for oRow in oStmt:nrows() do
-        table.insert(overrides, { channel_id = oRow.channel_id, preset_id = oRow.preset_id })
+        table.insert(overrides, { channel_id = oRow.channel_id, preset_id = oRow.preset_id, })
     end
     oStmt:finalize()
 
@@ -623,7 +630,7 @@ function Module.LoadSettingsFromDB()
                     local fIdx = fRow.filter_index
                     settings.Channels[overrideChanID].Events[eIdx].Filters[fIdx] = {
                         filterString = fRow.filter_string,
-                        color        = { fRow.color_r, fRow.color_g, fRow.color_b, fRow.color_a },
+                        color        = { fRow.color_r, fRow.color_g, fRow.color_b, fRow.color_a, },
                         enabled      = fRow.enabled == 1,
                         hidden       = fRow.hidden == 1,
                     }
@@ -715,7 +722,7 @@ function Module.WriteSettingsToDB()
 
                     if eventData.Filters then
                         for filterIndex, filterData in pairs(eventData.Filters) do
-                            local color = filterData.color or { 1.0, 1.0, 1.0, 1.0 }
+                            local color = filterData.color or { 1.0, 1.0, 1.0, 1.0, }
                             local fStmt = db:prepare([[
                                 INSERT INTO filters (event_row_id, filter_index, filter_string, color_r, color_g, color_b, color_a, enabled, hidden)
                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -759,7 +766,10 @@ function Module.GetPresetList()
     local db = Module.OpenDB()
     if not db then return list end
     local stmt = db:prepare('SELECT id, preset_name, server, created_by, created_at FROM presets ORDER BY server, preset_name')
-    if not stmt then db:close() return list end
+    if not stmt then
+        db:close()
+        return list
+    end
     for row in stmt:nrows() do
         table.insert(list, {
             id         = row.id,
@@ -782,7 +792,10 @@ function Module.CreatePreset(name)
     local db = Module.OpenDB()
     if not db then return nil end
     local stmt = db:prepare('INSERT INTO presets (preset_name, server, created_by) VALUES (?, ?, ?)')
-    if not stmt then db:close() return nil end
+    if not stmt then
+        db:close()
+        return nil
+    end
     stmt:bind_values(name, Module.Server, Module.CharLoaded)
     local rc = stmt:step()
     stmt:finalize()
@@ -1624,7 +1637,7 @@ function Module.EventChatSpam(channelID, line)
     if not txtBuffer then return end
 
     local tStamp = mq.TLO.Time.Time24()
-    local colorVec = { 1, 1, 1, 1 }
+    local colorVec = { 1, 1, 1, 1, }
     local colorCode = ImVec4(colorVec[1], colorVec[2], colorVec[3], colorVec[4])
 
     if Module.Consoles[channelID].console then
@@ -1634,7 +1647,7 @@ function Module.EventChatSpam(channelID, line)
     local displayLine = timeStamps and string.format("%s %s", tStamp, line) or line
     local i = getNextID(txtBuffer)
     if i > 1 and txtBuffer[i - 1].text == '' then i = i - 1 end
-    txtBuffer[i] = { color = colorVec, text = displayLine }
+    txtBuffer[i] = { color = colorVec, text = displayLine, }
 
     local bufferLength = #txtBuffer
     if bufferLength > zBuffer then
@@ -2343,7 +2356,7 @@ function Module.RenderGUI()
         Module.tempFilterHidden[chanID] = nil
         Module.Settings = Module.tempSettings
         ResetEvents()
-        resetEvnts = true
+        Module.doResetEvents = true
         Module.openEditGUI = false
         Module.openConfigGUI = false
     end
@@ -2391,7 +2404,6 @@ function Module.RenderGUI()
 end
 
 -------------------------------- Configure Windows and Events GUI ---------------------------
-local resetEvnts = false
 
 ---Draws the Channel data for editing. Can be either an exisiting Channel or a New one.
 ---@param editChanID integer -- the channelID we are working with
@@ -2550,7 +2562,7 @@ function Module.AddChannel(editChanID, isNewChannel)
         Module.tempSettings.Channels[editChanID].Events = channelEvents
         Module.Settings = Module.tempSettings
         ResetEvents()
-        resetEvnts = true
+        Module.doResetEvents = true
         Module.openEditGUI = false
         Module.tempFilterStrings, Module.tempEventStrings, Module.tempChanColors, Module.tempFilterHidden,
         Module.tempFilterEnabled, Module.tempFiltColors, Module.hString, channelData = {}, {}, {}, {}, {}, {}, {}, {}
@@ -2655,7 +2667,7 @@ function Module.AddChannel(editChanID, isNewChannel)
                                 ImGui.TableSetColumnIndex(3)
                                 if ImGui.Button("Delete##" .. bufferKey) then
                                     -- Defer event delete to after draw loop
-                                    pendingDeleteEvent = { editChanID, eventID }
+                                    pendingDeleteEvent = { editChanID, eventID, }
                                 end
                                 ImGui.TableNextRow()
                                 ImGui.TableSetColumnIndex(0)
@@ -2737,7 +2749,7 @@ function Module.AddChannel(editChanID, isNewChannel)
                                         ImGui.TableSetColumnIndex(3)
                                         if ImGui.Button("Delete##_" .. filterID) then
                                             -- Defer filter delete to after draw loop
-                                            pendingDeleteFilter = { editChanID, eventID, filterID }
+                                            pendingDeleteFilter = { editChanID, eventID, filterID, }
                                         end
                                     end
                                 end
@@ -2761,7 +2773,7 @@ local function buildConfig()
     local configChannelIDs = {}
     for cID, cData in pairs(Module.tempSettings.Channels) do
         if cData then
-            table.insert(configChannelIDs, { id = cID, name = cData.Name or '' })
+            table.insert(configChannelIDs, { id = cID, name = cData.Name or '', })
         end
     end
     table.sort(configChannelIDs, function(a, b) return a.name < b.name end)
@@ -3279,7 +3291,7 @@ function Module.SortChannels()
     sortedChannels = {}
     for k, v in pairs(Module.Settings.Channels) do
         if v then
-            table.insert(sortedChannels, { k, v.Name, v.TabOrder or 999 })
+            table.insert(sortedChannels, { k, v.Name, v.TabOrder or 999, })
         end
     end
 
@@ -3400,10 +3412,10 @@ function Module.MainLoop()
         Module.SortChannels()
         resetConsoles = false
     end
-    if resetEvnts then
+    if Module.doResetEvents then
         ResetEvents()
         Module.SortChannels()
-        resetEvnts = false
+        Module.doResetEvents = false
     end
     if os.time() - lastTime > 5 then
         Module.SortChannels()

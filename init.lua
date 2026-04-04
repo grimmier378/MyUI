@@ -1,43 +1,64 @@
-local mq                         = require('mq')
-local ImGui                      = require 'ImGui'
-MyUI                             = { Version = '1.0.0', ScriptName = 'MyUI', }
+local mq                           = require('mq')
+local ImGui                        = require 'ImGui'
+MyUI                               = { Version = '1.0.0', ScriptName = 'MyUI', }
 
-MyUI.PackageMan                  = require('mq.PackageMan')
-MyUI.Actor                       = require('actors')
-MyUI.CharData                    = require('lib.char_data')
-MyUI.SQLite3                     = MyUI.PackageMan.Require('lsqlite3')
-MyUI.ProgressBar                 = require('lib.progressBars')
-MyUI.Path                        = mq.luaDir .. '/myui/'
-MyUI.Icons                       = require('mq.ICONS')
-MyUI.Base64                      = require('lib.base64') -- Ensure you have a base64 module available
-MyUI.Utils                       = require('lib.common')
-MyUI.LoadModules                 = require('lib.modules')
-MyUI.Colors                      = require('lib.colors')
-MyUI.ThemeLoader                 = require('lib.theme_loader')
-MyUI.AbilityPicker               = require('lib.AbilityPicker')
-MyUI.Grimmier_Img                = MyUI.Utils.SetImage(MyUI.Path .. "images/GrimGUI.png")
+MyUI.PackageMan                    = require('mq.PackageMan')
+MyUI.Actor                         = require('actors')
+MyUI.CharData                      = require('lib.char_data')
+MyUI.InventoryData                 = require('lib.inventory_data')
+MyUI.SQLite3                       = MyUI.PackageMan.Require('lsqlite3')
+MyUI.ProgressBar                   = require('lib.progressBars')
+MyUI.Path                          = mq.luaDir .. '/myui/'
+MyUI.Icons                         = require('mq.ICONS')
+MyUI.Base64                        = require('lib.base64') -- Ensure you have a base64 module available
+MyUI.Utils                         = require('lib.common')
+MyUI.LoadModules                   = require('lib.modules')
+MyUI.Colors                        = require('lib.colors')
+MyUI.ThemeLoader                   = require('lib.theme_loader')
+MyUI.AbilityPicker                 = require('lib.AbilityPicker')
+MyUI.Grimmier_Img                  = MyUI.Utils.SetImage(MyUI.Path .. "images/GrimGUI.png")
 
 -- build, char, server info
-MyUI.CharLoaded                  = mq.TLO.Me.DisplayName()
-MyUI.Server                      = mq.TLO.EverQuest.Server()
-MyUI.Build                       = mq.TLO.MacroQuest.BuildName()
-MyUI.Guild                       = mq.TLO.Me.Guild() or "none"
-MyUI.CharClass                   = mq.TLO.Me.Class.ShortName() or "none"
+MyUI.CharLoaded                    = mq.TLO.Me.DisplayName()
+MyUI.Server                        = mq.TLO.EverQuest.Server()
+MyUI.Build                         = mq.TLO.MacroQuest.BuildName()
+MyUI.Guild                         = mq.TLO.Me.Guild() or "none"
+MyUI.CharClass                     = mq.TLO.Me.Class.ShortName() or "none"
 
-local MyActor                    = MyUI.Actor.register('myui', function(message) end)
-local mods                       = {}
+local MyActor                      = MyUI.Actor.register('myui', function(message) end)
+local mods                         = {}
 
-MyUI.InitPctComplete             = 0
-MyUI.NumModsEnabled              = 0
-MyUI.CurLoading                  = 'Loading Modules...'
-MyUI.Modules                     = {}
-MyUI.Mode                        = 'driver'
-MyUI.ConfPath                    = mq.configDir .. '/MyUI/' .. MyUI.Server:gsub(" ", "_") .. '/'
-MyUI.SettingsFile                = MyUI.ConfPath .. MyUI.CharLoaded .. '.lua'
-MyUI.MyChatLoaded                = false
-MyUI.MyChatHandler               = nil
+MyUI.InitPctComplete               = 0
+MyUI.NumModsEnabled                = 0
+MyUI.CurLoading                    = 'Loading Modules...'
+MyUI.Modules                       = {}
+MyUI.Mode                          = 'driver'
+MyUI.ConfPath                      = mq.configDir .. '/MyUI/' .. MyUI.Server:gsub(" ", "_") .. '/'
+MyUI.SettingsFile                  = MyUI.ConfPath .. MyUI.CharLoaded .. '.lua'
+MyUI.MyChatLoaded                  = false
+MyUI.MyChatHandler                 = nil
 
-local ToggleFlags                = bit32.bor(
+MyUI.Settings                      = {}
+MyUI.TempSettings                  = {}
+MyUI.Theme                         = {}
+MyUI.ThemeFile                     = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
+MyUI.ThemeName                     = 'Default'
+MyUI.TempSettings.MyChatWinName    = nil
+MyUI.TempSettings.MyChatFocusKey   = nil
+MyUI.MyData                        = {}
+MyUI.MyPetData                     = {}
+
+MyUI.IsRunning                     = false
+
+MyUI.TempSettings.ModuleProcessing = {}
+MyUI.TempSettings.Debug            = false
+MyUI.InvData                       = {}
+local invRefreshTimer              = os.time()
+local lastFreeSlots                = -1
+local INV_REFRESH_DELAY            = 5
+
+
+local ToggleFlags  = bit32.bor(
     MyUI.Utils.ImGuiToggleFlags.RightLabel,
     MyUI.Utils.ImGuiToggleFlags.PulseOnHover,
     MyUI.Utils.ImGuiToggleFlags.StarKnob,
@@ -45,7 +66,7 @@ local ToggleFlags                = bit32.bor(
 --MyUI.Utils.ImGuiToggleFlags.KnobBorder
 )
 
-local default_list               = {
+local default_list = {
     'AAParty',
     'ChatRelay',
     'DialogDB',
@@ -70,9 +91,10 @@ local default_list               = {
     "MyAA",
     "Clock",
     "MapButton",
+    "MyInventory",
 }
 
-MyUI.DefaultConfig               = {
+MyUI.DefaultConfig = {
     ShowMain = true,
     ThemeName = 'Default',
     mods_list = {
@@ -99,19 +121,9 @@ MyUI.DefaultConfig               = {
         [19] = { name = 'iTrack', enabled = false, },
         [20] = { name = 'MyAA', enabled = false, },
         --[20] = { name = 'MyDots', enabled = false, }, -- Customized Fork of Zathus' MyDots
+        [21] = { name = 'MyInventory', enabled = false, },
     },
 }
-MyUI.Settings                    = {}
-MyUI.TempSettings                = {}
-MyUI.Theme                       = {}
-MyUI.ThemeFile                   = string.format('%s/MyUI/MyThemeZ.lua', mq.configDir)
-MyUI.ThemeName                   = 'Default'
-MyUI.TempSettings.MyChatWinName  = nil
-MyUI.TempSettings.MyChatFocusKey = nil
-MyUI.MyData                      = {}
-MyUI.MyPetData                   = {}
-
-MyUI.IsRunning                   = false
 
 local function LoadTheme()
     if MyUI.Utils.File.Exists(MyUI.ThemeFile) then
@@ -595,8 +607,6 @@ function MyUI.Render()
     RenderMini()
 end
 
-MyUI.TempSettings.ModuleProcessing = {}
-MyUI.TempSettings.Debug = false
 function MyUI.Main()
     local ModTimer
     while MyUI.IsRunning do
@@ -607,6 +617,18 @@ function MyUI.Main()
         MyUI.MyData.Buffs, MyUI.MyData.DebuffsOnMe = MyUI.CharData.GetBuffs()
         MyUI.MyData.Songs = MyUI.CharData.GetSongs()
         MyUI.MyPetData = MyUI.CharData.GetPetData()
+        local curFreeSlots = MyUI.InventoryData.GetFreeSlots()
+        if MyUI.InventoryData.NeedsRefresh(invRefreshTimer, INV_REFRESH_DELAY) or curFreeSlots ~= lastFreeSlots then
+            invRefreshTimer = os.time()
+            lastFreeSlots = curFreeSlots
+            MyUI.InvData = {
+                worn = MyUI.InventoryData.GetWornItems(),
+                bags = MyUI.InventoryData.GetBagContents(),
+                containers = MyUI.InventoryData.GetBags(),
+                clickies = MyUI.InventoryData.GetEquippedClickies(),
+                freeSlots = curFreeSlots,
+            }
+        end
         for idx, data in ipairs(MyUI.Settings.mods_list) do
             if data.enabled then
                 mq.doevents()

@@ -66,6 +66,8 @@ Module.TempSettings       = {
     NamedZone        = nil,
 }
 Module.WatchedSpawns      = {}
+Module.DB                 = nil
+Module.DirtyFilthyDB      = true
 
 local pSuccess
 pSuccess, Module.ZoneList = pcall(require, 'lib.zone-list')
@@ -161,6 +163,7 @@ local ZoomLvl                          = 1.0
 local doOnce                           = true
 local haveSM, importZone, forceImport  = false, false, false
 local currZone, lastZone
+local lastRefreshZoneTime              = 0
 
 local DistColorRanges                  = {
     orange = 600,  -- green  -> orange boundary
@@ -323,13 +326,23 @@ end
 -- ---------------------------------------------------------------------------
 
 function Module:OpenDB()
+    if self.DB then return self.DB end
     local db = Module.SQLite3.open(Module.DBPath)
     if not db then
         Module.Utils.PrintOutput('MyUI', nil, 'Failed to open the AlertMaster Database')
         return nil
     end
+    db:exec('PRAGMA journal_mode=WAL;')
     db:busy_timeout(2000)
+    self.DB = db
     return db
+end
+
+function Module:CloseDB()
+    if self.DB then
+        self.DB:close()
+        self.DB = nil
+    end
 end
 
 function Module.LoadSpawnsDB()
@@ -394,11 +407,12 @@ function Module:GetSpawns(zoneShort, db)
         return {}
     end
     local result = {}
-    local stmt, err = db:prepare(string.format("SELECT spawn_name FROM npc_spawns WHERE zone_short = '%s'", zoneShort))
+    local stmt, err = db:prepare('SELECT spawn_name FROM npc_spawns WHERE zone_short = ?')
     if not stmt then
         Module.Utils.PrintOutput('MyUI', nil, 'Failed to prepare SQL statement: ' .. err)
         return {}
     end
+    stmt:bind_values(zoneShort)
     for row in stmt:nrows() do
         if row.spawn_name and row.spawn_name ~= '' then table.insert(result, row.spawn_name) end
     end
@@ -448,21 +462,20 @@ function Module:AddSafeZone(zoneShort)
     local check, errCheck = db:prepare('SELECT zone_short FROM safe_zones WHERE zone_short = ?')
     if not check then
         Module.Utils.PrintOutput('MyUI', nil, 'Failed to prepare SQL statement: ' .. errCheck)
-        db:close(); return false
+        return false
     end
     check:bind_values(zoneShort)
     local exists = check:step() == Module.SQLite3.ROW
     check:finalize()
-    if exists then
-        db:close(); return false
-    end
+    if exists then return false end
     local stmt, err = db:prepare('INSERT OR IGNORE INTO safe_zones (zone_short) VALUES (?)')
     if not stmt then
         Module.Utils.PrintOutput('MyUI', nil, 'Failed to prepare SQL statement: ' .. err)
-        db:close(); return false
+        return false
     end
     stmt:bind_values(zoneShort)
-    local rc = stmt:step(); stmt:finalize(); db:close()
+    local rc = stmt:step(); stmt:finalize()
+    self.DirtyFilthyDB = true
     return rc == Module.SQLite3.DONE
 end
 
@@ -471,7 +484,8 @@ function Module:RemoveSafeZone(zoneShort)
     if not db then return false end
     local stmt = db:prepare('DELETE FROM safe_zones WHERE zone_short = ?')
     stmt:bind_values(zoneShort)
-    local rc = stmt:step(); stmt:finalize(); db:close()
+    local rc = stmt:step(); stmt:finalize()
+    self.DirtyFilthyDB = true
     return rc == Module.SQLite3.DONE
 end
 
@@ -482,12 +496,11 @@ function Module:AddIgnorePCtoDB(pcName)
     check:bind_values(pcName)
     local exists = check:step() == Module.SQLite3.ROW
     check:finalize()
-    if exists then
-        db:close(); return false
-    end
+    if exists then return false end
     local stmt = db:prepare('INSERT OR IGNORE INTO pc_ignore (pc_name) VALUES (?)')
     stmt:bind_values(pcName)
-    local rc = stmt:step(); stmt:finalize(); db:close()
+    local rc = stmt:step(); stmt:finalize()
+    self.DirtyFilthyDB = true
     return rc == Module.SQLite3.DONE
 end
 
@@ -496,7 +509,8 @@ function Module:RemoveIgnoredPC(pcName)
     if not db then return false end
     local stmt = db:prepare('DELETE FROM pc_ignore WHERE pc_name = ?')
     stmt:bind_values(pcName)
-    local rc = stmt:step(); stmt:finalize(); db:close()
+    local rc = stmt:step(); stmt:finalize()
+    self.DirtyFilthyDB = true
     return rc == Module.SQLite3.DONE
 end
 
@@ -507,14 +521,13 @@ function Module:AddSpawnToDB(zoneShort, spawnName)
     check:bind_values(zoneShort, spawnName)
     local exists = check:step() == Module.SQLite3.ROW
     check:finalize()
-    if exists then
-        db:close(); return false
-    end
+    if exists then return false end
     db:exec('BEGIN TRANSACTION')
     local stmt = db:prepare('INSERT OR IGNORE INTO npc_spawns (zone_short, spawn_name) VALUES (?, ?)')
     stmt:bind_values(zoneShort, spawnName)
     local rc = stmt:step(); stmt:finalize()
-    db:exec('COMMIT'); db:close()
+    db:exec('COMMIT')
+    self.DirtyFilthyDB = true
     return rc == Module.SQLite3.DONE
 end
 
@@ -523,14 +536,14 @@ function Module:DeleteSpawnFromDB(zoneShort, spawnName)
     if not db then return false end
     local stmt = db:prepare('DELETE FROM npc_spawns WHERE zone_short = ? AND spawn_name = ?')
     stmt:bind_values(zoneShort, spawnName)
-    local rc = stmt:step(); stmt:finalize(); db:close()
+    local rc = stmt:step(); stmt:finalize()
+    self.DirtyFilthyDB = true
     return rc == Module.SQLite3.DONE
 end
 
 function Module:UpdateIgnoredPlayers()
     local db = self:OpenDB()
     settings.Ignore = self:GetIgnoredPlayers(db)
-    if db then db:close() end
 end
 
 -- ---------------------------------------------------------------------------
@@ -669,7 +682,6 @@ local function load_settings()
     local db           = Module:OpenDB()
     settings.SafeZones = Module:GetSafeZones(db)
     settings.Ignore    = Module:GetIgnoredPlayers(db)
-    if db then db:close() end
 
     set_settings()
     save_settings()
@@ -717,7 +729,6 @@ function Module:AddSpawnToList(name)
     end
     local db = Module:OpenDB()
     Module.TempSettings.NpcList = Module:GetSpawns(Zone.ShortName(), db)
-    if db then db:close() end
     Module.Utils.PrintOutput('AlertMaster', nil, '\ayAdded spawn alert for ' .. name .. ' in ' .. zone)
 end
 
@@ -953,16 +964,17 @@ end
 -- Refresh all the things
 -- ---------------------------------------------------------------------------
 
-local function RefreshUnhandled()
+function Module:RefreshUnhandled()
     local splitSearch = {}
     for part in string.gmatch(Module.GUI_Main.Search, '[^%s]+') do
-        table.insert(splitSearch, part)
+        table.insert(splitSearch, string.lower(part))
     end
     local newTable = {}
     for _, v in ipairs(Table_Cache.Rules) do
         local found = 0
+        local nameLower = string.lower(v.MobName)
         for _, search in ipairs(splitSearch) do
-            if string.find(string.lower(v.MobName), string.lower(search)) or string.find(v.MobDirtyName, search) then
+            if string.find(nameLower, search) or string.find(string.lower(v.MobDirtyName), search) then
                 found = found + 1
             end
         end
@@ -970,10 +982,10 @@ local function RefreshUnhandled()
     end
     Table_Cache.Unhandled                   = newTable
     Module.GUI_Main.Refresh.Sort.Rules      = true
-    Module.GUI_Main.Refresh.Table.Unhandled = true
+    Module.GUI_Main.Refresh.Table.Unhandled = false
 end
 
-local function RefreshAlerts()
+function Module:RefreshAlerts()
     local tmp = {}
     for _, v in pairs(spawnAlerts) do table.insert(tmp, v) end
     local newTable = {}
@@ -986,13 +998,31 @@ local function RefreshAlerts()
     doOnce                                = false
 end
 
-local function RefreshZone()
-    local newTable = {}
-    xTarTable = {}
+function Module:RefreshZone()
+    local existing = {}
+    for _, entry in ipairs(Table_Cache.Rules or {}) do
+        existing[entry.MobID] = entry
+    end
+
+    local liveIDs = {}
     local zoneNpcs = mq.getFilteredSpawns(function(spawn) return spawn.Type() == 'NPC' end)
     for _, spawn in ipairs(zoneNpcs) do
-        if spawn() then InsertTableSpawn(newTable, spawn, tonumber(spawn.ID())) end
+        if spawn() then
+            local id = tonumber(spawn.ID())
+            if id then liveIDs[id] = spawn end
+        end
     end
+
+    local newTable = {}
+    for id, spawn in pairs(liveIDs) do
+        if existing[id] then
+            table.insert(newTable, existing[id])
+        else
+            InsertTableSpawn(newTable, spawn, id)
+        end
+    end
+
+    xTarTable = {}
     for i = 1, mq.TLO.Me.XTargetSlots() do
         local xt = mq.TLO.Me.XTarget(i)
         if xt() and xt() ~= 0 and xt.ID() > 0 then
@@ -1008,10 +1038,11 @@ local function RefreshZone()
             end
         end
     end
-    Table_Cache.Rules                  = newTable
-    Table_Cache.Mobs                   = newTable
-    Module.GUI_Main.Refresh.Sort.Mobs  = true
-    Module.GUI_Main.Refresh.Table.Mobs = false
+    Table_Cache.Rules                       = newTable
+    Table_Cache.Mobs                        = newTable
+    Module.GUI_Main.Refresh.Sort.Mobs       = true
+    Module.GUI_Main.Refresh.Table.Mobs      = false
+    Module.GUI_Main.Refresh.Table.Unhandled = true
 end
 
 -- ---------------------------------------------------------------------------
@@ -1067,7 +1098,6 @@ local function spawn_search_npcs()
     local tmp     = {}
     local db      = Module:OpenDB()
     local tracked = Module:GetSpawns(Zone.ShortName(), db)
-    if db then db:close() end
     for _, name in pairs(tracked) do
         local search = 'npc ' .. name
         local cnt    = SpawnCount(search)()
@@ -1203,7 +1233,7 @@ local function check_for_spawns()
     end
 
     if next(spawnAlerts) ~= nil then
-        if tableUpdate or doOnce then RefreshAlerts() end
+        if tableUpdate or doOnce then Module:RefreshAlerts() end
         if spawnAlertsUpdated then
             if doAlert then AlertWindowOpen = true end
             alertTime = os.time()
@@ -1344,6 +1374,9 @@ end
 local function DrawRuleRow(entry)
     local spawn = mq.TLO.Spawn(entry.MobID)
     if not spawn() then return end
+    entry.MobDist      = math.floor(spawn.Distance() or 0)
+    entry.MobLoc       = spawn.Loc() or ' '
+    entry.MobDirection = spawn.HeadingTo() or '0'
 
     ImGui.TableNextColumn()
     if ImGui.SmallButton(Module.Icons.FA_USER_PLUS) then Module:AddSpawnToList(entry.MobName) end
@@ -1590,7 +1623,7 @@ local function DrawSearchWindow()
 
         -- Zone tab / NPC list tab switcher
         if ImGui.Button(Zone.Name(), 160, 0.0) then
-            currentTab = 'zone'; RefreshZone()
+            currentTab = 'zone'; Module:RefreshZone()
         end
         if ImGui.IsItemHovered() and showTooltips then
             ImGui.SetTooltip(string.format('Zone Short Name: %s\nSpawn Count: %s', Zone.ShortName(), tostring(#Table_Cache.Unhandled)))
@@ -1692,7 +1725,6 @@ local function DrawSearchWindow()
             if #Module.TempSettings.NpcList == 0 then
                 local db = Module:OpenDB()
                 Module.TempSettings.NpcList = Module:GetSpawns(Zone.ShortName(), db)
-                if db then db:close() end
             end
 
             ImGui.SetNextItemWidth(160)
@@ -1927,7 +1959,7 @@ local function load_binds()
                 SearchWindowOpen = false
                 Module.Utils.PrintOutput('AlertMaster', nil, '\ayClosing Search UI.')
             else
-                RefreshZone()
+                Module:RefreshZone()
                 SearchWindowOpen = true
                 Module.Utils.PrintOutput('AlertMaster', nil, '\ayShowing Search UI.')
             end
@@ -2055,12 +2087,10 @@ local function load_binds()
             Module:DeleteSpawnFromDB(zone, val_str)
             local db = Module:OpenDB()
             Module.TempSettings.NpcList = Module:GetSpawns(Zone.ShortName(), db)
-            if db then db:close() end
         elseif cmd == 'spawnlist' then
             Module.Utils.PrintOutput('AlertMaster', nil, '\aySpawn Alerts (\a-t' .. zone .. '\ax): ')
             local db = Module:OpenDB()
             local list = Module:GetSpawns(zone, db)
-            if db then db:close() end
             for _, name in ipairs(list) do
                 local up = false
                 for _, s in pairs(tSpawns) do
@@ -2256,7 +2286,7 @@ local function setup()
     Module.Utils.PrintOutput('AlertMaster', false, '\ay/alertmaster help for usage')
     print_status()
 
-    RefreshZone()
+    Module:RefreshZone()
     Module.IsRunning = true
     check_for_pcs()
     check_for_gms()
@@ -2274,9 +2304,9 @@ function Module.MainLoop()
 
     if currZone ~= lastZone then
         numAlerts = 0
-        RefreshZone()
         lastZone = mq.TLO.Zone.ID()
         check_for_zone_change()
+        Module:RefreshZone()
     end
 
     if loadedExeternally then
@@ -2293,13 +2323,14 @@ function Module.MainLoop()
     check_for_announce()
     check_for_spawns()
 
-    -- Refresh ignore / safe-zone lists from DB each tick
-    local db           = Module:OpenDB()
-    settings.Ignore    = Module:GetIgnoredPlayers(db)
-    settings.SafeZones = Module:GetSafeZones(db)
-    if db then db:close() end
-    tSafeZones = {}
-    for _, v in ipairs(settings.SafeZones or {}) do tSafeZones[v] = true end
+    if Module.DirtyFilthyDB then
+        local db           = Module:OpenDB()
+        settings.Ignore    = Module:GetIgnoredPlayers(db)
+        settings.SafeZones = Module:GetSafeZones(db)
+        tSafeZones         = {}
+        for _, v in ipairs(settings.SafeZones or {}) do tSafeZones[v] = true end
+        Module.DirtyFilthyDB = false
+    end
 
     -- NPC remind pulse: re-announce and re-open popup after remindNPC minutes
     local now = os.time()
@@ -2324,23 +2355,25 @@ function Module.MainLoop()
     -- Track external volume changes
     if not playing and playTime == 0 then originalVolume = getVolume() end
 
-    -- Actor reply: send named list to requester
     if Module.TempSettings.SendNamed then
-        local db2 = Module:OpenDB()
+        local db = Module:OpenDB()
         if amActor ~= nil then
             amActor:send({ mailbox = Module.TempSettings.ReplyTo, absolute_mailbox = true, }, {
                 Who       = Module.CharLoaded,
-                NamedList = Module:GetSpawns(Module.TempSettings.NamedZone, db2) or {},
+                NamedList = Module:GetSpawns(Module.TempSettings.NamedZone, db) or {},
             })
         end
         Module.TempSettings.SendNamed = false
         Module.TempSettings.ReplyTo   = nil
         Module.TempSettings.NamedZone = nil
-        if db2 then db2:close() end
     end
 
-    if Module.GUI_Main.Refresh.Table.Unhandled then RefreshUnhandled() end
-    if SearchWindowOpen or #Table_Cache.Mobs < 1 then RefreshZone() end
+    local now2 = os.time()
+    if (#Table_Cache.Mobs < 1 or SearchWindowOpen) and (now2 - lastRefreshZoneTime) >= 5 then
+        Module:RefreshZone()
+        lastRefreshZoneTime = now2
+    end
+    if Module.GUI_Main.Refresh.Table.Unhandled then Module:RefreshUnhandled() end
 end
 
 function Module.LocalLoop()
@@ -2352,6 +2385,7 @@ function Module.LocalLoop()
 end
 
 function Module.Unload()
+    Module:CloseDB()
     mq.unbind('/alertmaster')
     mq.RemoveTopLevelObject('AlertMaster')
 end

@@ -1,5 +1,7 @@
 local mq = require('mq')
 local ImGui = require('ImGui')
+local ImPlot = require('ImPlot')
+local ScrollingPlotBuffer = require('lib.scrolling_plot_buffer')
 local Module = {}
 Module.ActorMailBox = 'my_dps'
 Module.Name = 'MyDPS'
@@ -62,7 +64,36 @@ local themeName                                                                 
 local tempSettings                                                                                                                 = {}
 local dataWindows                                                                                                                  = {}
 local MyLeader                                                                                                                     = 'None'
-local defaults                                                                                                                     = {
+-- Graph state
+local graphBuffers                                                                                                                 = {} -- [name][metric] -> ScrollingPlotBuffer
+local graphLastSampleTime                                                                                                          = 0
+local graphSelectedMetric                                                                                                          = 1
+local graphMetricKeys                                                                                                              = { "dps", "avg", "crit", "dot", "critHeals",
+    "dmg", }
+local graphMetricLabels                                                                                                            = { "DPS", "Avg Dmg", "Crit Dmg", "Dots",
+    "Crit Heals", "Total Dmg", }
+local graphPartyColors                                                                                                             = {
+    { 0.0, 1.0, 1.0, 1.0, },                                                                                                            -- cyan (local char)
+    { 1.0, 0.4, 0.4, 1.0, },                                                                                                            -- red
+    { 0.4, 1.0, 0.4, 1.0, },                                                                                                            -- green
+    { 1.0, 1.0, 0.4, 1.0, },                                                                                                            -- yellow
+    { 1.0, 0.4, 1.0, 1.0, },                                                                                                            -- magenta
+    { 0.4, 0.4, 1.0, 1.0, },                                                                                                            -- blue
+    { 1.0, 0.7, 0.3, 1.0, },                                                                                                            -- orange
+    { 0.6, 0.4, 0.8, 1.0, },                                                                                                            -- purple
+}
+local graphColorAssignments                                                                                                        = {} -- [name] -> color index
+local graphNextColorIdx                                                                                                            = 1
+-- UTC offset for ImPlot time axis
+local graphUtcOffset
+do
+    local utcNow = os.time(os.date("!*t", os.time()))
+    local localNow = os.time(os.date("*t", os.time()))
+    graphUtcOffset = localNow - utcNow
+    if os.date("*t", os.time()).isdst then graphUtcOffset = graphUtcOffset + 3600 end
+end
+local function graphGetTime() return os.time() + graphUtcOffset end
+local defaults = {
     Options = {
         sortNewest             = true,
         showType               = true,
@@ -985,6 +1016,118 @@ local function ShowData(labelName, data, seq)
     ImGui.End()
 end
 
+-- Graph helper functions
+local function CheckBuffers(name)
+    if not graphBuffers[name] then
+        graphBuffers[name] = {}
+        for _, key in ipairs(graphMetricKeys) do
+            graphBuffers[name][key] = ScrollingPlotBuffer:new(600)
+        end
+    end
+end
+
+local function getGraphColor(name)
+    if not graphColorAssignments[name] then
+        if name == Module.CharLoaded then
+            graphColorAssignments[name] = 1
+        else
+            graphNextColorIdx = graphNextColorIdx + 1
+            if graphNextColorIdx > #graphPartyColors then graphNextColorIdx = 2 end
+            graphColorAssignments[name] = graphNextColorIdx
+        end
+    end
+    return graphPartyColors[graphColorAssignments[name]]
+end
+
+-- add breaks between battles so the line doesn't dip back to 0
+local shouldBreakBetweenBattles = { crit = true, dot = true, critHeals = true, dmg = true, }
+
+local function graphInsertBattleBreak()
+    local now = graphGetTime()
+    local nan = 0 / 0
+    for _, metrics in pairs(graphBuffers) do
+        for key, _ in pairs(shouldBreakBetweenBattles) do
+            if metrics[key] then
+                metrics[key]:AddPoint(now, nan, 0)
+            end
+        end
+    end
+end
+
+local function updateGraphData(currentTime)
+    local now = graphGetTime()
+    local dur = currentTime - battleStartTime
+    if dur <= 0 then return end
+
+    local dps = dmgTotalBattle / dur
+    local avg = dmgBattCounter > 0 and (dmgTotalBattle / dmgBattCounter) or 0
+    local name = Module.CharLoaded
+
+    CheckBuffers(name)
+    graphBuffers[name]["dps"]:AddPoint(now, dps, 0)
+    graphBuffers[name]["avg"]:AddPoint(now, avg, 0)
+    graphBuffers[name]["crit"]:AddPoint(now, critTotalBattle, 0)
+    graphBuffers[name]["dot"]:AddPoint(now, dotTotalBattle, 0)
+    graphBuffers[name]["critHeals"]:AddPoint(now, critHealsTotal, 0)
+    graphBuffers[name]["dmg"]:AddPoint(now, dmgTotalBattle, 0)
+
+    for _, actor in ipairs(actorsTable) do
+        if actor.name and actor.name ~= Module.CharLoaded then
+            CheckBuffers(actor.name)
+            graphBuffers[actor.name]["dps"]:AddPoint(now, actor.dps or 0, 0)
+            graphBuffers[actor.name]["avg"]:AddPoint(now, actor.avg or 0, 0)
+            graphBuffers[actor.name]["crit"]:AddPoint(now, actor.crit or 0, 0)
+            graphBuffers[actor.name]["dot"]:AddPoint(now, actor.dot or 0, 0)
+            graphBuffers[actor.name]["critHeals"]:AddPoint(now, actor.critHeals or 0, 0)
+            graphBuffers[actor.name]["dmg"]:AddPoint(now, actor.dmg or 0, 0)
+        end
+    end
+end
+
+local function DrawGraph()
+    local metricKey = graphMetricKeys[graphSelectedMetric]
+    local metricLabel = graphMetricLabels[graphSelectedMetric]
+
+    if ImGui.CollapsingHeader("Options##Graph") then
+        ImGui.Text("Metric:")
+        ImGui.SameLine()
+        for i, label in ipairs(graphMetricLabels) do
+            if ImGui.RadioButton(label .. "##GraphMetric", graphSelectedMetric == i) then
+                graphSelectedMetric = i
+            end
+            if i < #graphMetricLabels then ImGui.SameLine() end
+        end
+
+        if ImGui.SmallButton("Clear##Graph") then
+            graphBuffers = {}
+            graphColorAssignments = {}
+            graphNextColorIdx = 1
+        end
+    end
+
+    local now = graphGetTime()
+    if ImPlot.BeginPlot("DPS Over Time##MyDPS") then
+        ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time)
+        ImPlot.SetupAxes("Time", metricLabel)
+        ImPlot.SetupAxisLimits(ImAxis.X1, now - 300, now, ImGuiCond.Always)
+
+        for name, metrics in pairs(graphBuffers) do
+            if metrics[metricKey] then
+                local buf = metrics[metricKey]
+                local count = #buf.DataY
+                if count > 0 then
+                    local col = getGraphColor(name)
+                    ImPlot.PushStyleColor(ImPlotCol.Line, ImVec4(col[1], col[2], col[3], col[4]))
+                    ImPlot.PlotLine(name, buf.DataX, buf.DataY, count, ImPlotLineFlags.None, buf.Offset - 1)
+                    ImPlot.PopStyleColor()
+                end
+            end
+        end
+
+        ImPlot.EndPlot()
+    end
+end
+
 local function DrawHistory(tbl, isHistory)
     if settings.Options.showHistory ~= tempSettings.showHistory then
         settings.Options.showHistory = tempSettings.showHistory
@@ -1377,6 +1520,10 @@ function Module.RenderGUI()
                 end
                 if settings.Options.announceActors and ImGui.BeginTabItem("Party") then
                     DrawHistory(actorsWorking)
+                    ImGui.EndTabItem()
+                end
+                if ImGui.BeginTabItem("Graph") then
+                    DrawGraph()
                     ImGui.EndTabItem()
                 end
                 if ImGui.BeginTabItem("Config") then
@@ -2034,6 +2181,7 @@ function Module.MainLoop()
                 end
             end
             pDPS(battleDuration, "COMBAT")
+            graphInsertBattleBreak()
             battleStartTime = 0
             leftCombatTime = 0
         end
@@ -2042,6 +2190,10 @@ function Module.MainLoop()
     if battleStartTime > 0 then
         mq.doevents()
         parseCurrentBattle(currentTime - battleStartTime)
+        if (currentTime - graphLastSampleTime) >= 1 then
+            updateGraphData(currentTime)
+            graphLastSampleTime = currentTime
+        end
     end
     cleanTable()
     if firstRun then

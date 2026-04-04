@@ -10,13 +10,15 @@ Module.TempSettings.Popped = {}
 local loadedExeternally    = MyUI ~= nil and true or false
 
 if not loadedExeternally then
-    Module.Path        = string.format("%s/%s/", mq.luaDir, Module.Name)
-    Module.ThemeFile   = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
-    Module.Theme       = require('defaults.themes')
-    Module.ThemeLoader = require('lib.theme_loader')
-    Module.Colors      = require('lib.colors')
-    Module.Utils       = require('lib.common')
-    Module.CharLoaded  = mq.TLO.Me.DisplayName()
+    Module.Path          = string.format("%s/%s/", mq.luaDir, Module.Name)
+    Module.ThemeFile     = Module.ThemeFile == nil and string.format('%s/MyUI/ThemeZ.lua', mq.configDir) or Module.ThemeFile
+    Module.Theme         = require('defaults.themes')
+    Module.ThemeLoader   = require('lib.theme_loader')
+    Module.Colors        = require('lib.colors')
+    Module.Utils         = require('lib.common')
+    Module.CharLoaded    = mq.TLO.Me.DisplayName()
+    Module.InventoryData = require('lib.inventory_data')
+    Module.Icons         = require('mq.ICONS')
 else
     Module.Path = MyUI.Path
     Module.Colors = MyUI.Colors
@@ -25,7 +27,10 @@ else
     Module.ThemeLoader = MyUI.ThemeLoader
     Module.Utils = MyUI.Utils
     Module.CharLoaded = MyUI.CharLoaded
+    Module.InventoryData = MyUI.InventoryData
+    Module.Icons = MyUI.Icons
 end
+local InventoryData                                       = Module.InventoryData
 local Utils                                               = Module.Utils
 local ToggleFlags                                         = bit32.bor(
     Utils.ImGuiToggleFlags.PulseOnHover,
@@ -34,8 +39,6 @@ local ToggleFlags                                         = bit32.bor(
 -- Constants
 local ICON_WIDTH                                          = 40
 local ICON_HEIGHT                                         = 40
-local COUNT_X_OFFSET                                      = 39
-local COUNT_Y_OFFSET                                      = 23
 local EQ_ICON_OFFSET                                      = 500
 local BAG_ITEM_SIZE                                       = 40
 local INVENTORY_DELAY_SECONDS                             = 30
@@ -56,27 +59,25 @@ local toggleMouse                                         = 'Middle'
 
 -- Bag Contents
 local items                                               = {}
-local clickies                                            = {}
-local augments                                            = {}
-local jewlery                                             = {}
+local equipped_clickies                                   = {}
 local bank_items                                          = {}
 local bank_augments                                       = {}
 local book                                                = {}
 local trade_list                                          = {}
-local onehand                                             = {}
-local twohand                                             = {}
-local ranged                                              = {}
-local sell_list                                           = {}
 local display_tables                                      = {
     augments = {},
     items = {},
-    jewlery = {},
     clickies = {},
     bank_items = {},
     bank_augments = {},
     onehand = {},
     twohand = {},
     ranged = {},
+    j_charm = {},
+    j_ears = {},
+    j_face = {},
+    j_neck = {},
+    j_fingers = {},
 }
 local needSort                                            = true
 local checkAll                                            = false
@@ -96,10 +97,8 @@ local filter_text                                         = ""
 local utils                                               = require('mq.Utils')
 local settings                                            = {}
 local MySelf                                              = mq.TLO.Me
-local MyClass                                             = MySelf.Class()
 local myCopper, mySilver, myGold, myPlat, myWeight, myStr = 0, 0, 0, 0, 0, 0
 local bankCopper, bankSilver, bankGold, bankPlat          = 0, 0, 0, 0
-local book_timer                                          = 0
 local doTrade                                             = false
 local defaults                                            = {
     MIN_SLOTS_WARN = 3,
@@ -124,39 +123,7 @@ local mouseKeys                                           = {
     "Middle",
     "None",
 }
-local equipSlots                                          = {
-    [0] = 'Charm',
-    [1] = 'Ears',
-    [2] = 'Head',
-    [3] = 'Face',
-    [4] = 'Ears',
-    [5] = 'Neck',
-    [6] = 'Shoulder',
-    [7] = 'Arms',
-    [8] = 'Back',
-    [9] = 'Wrists',
-    [10] = 'Wrists',
-    [11] = 'Ranged',
-    [12] = 'Hands',
-    [13] = 'Primary',
-    [14] = 'Secondary',
-    [15] = 'Fingers',
-    [16] = 'Fingers',
-    [17] = 'Chest',
-    [18] = 'Legs',
-    [19] = 'Feet',
-    [20] = 'Waist',
-    [21] = 'Powersource',
-    [22] = 'Ammo',
-}
-
-local Sizes                                               = {
-    [0] = "Tiny",
-    [1] = 'Small',
-    [2] = 'Medium',
-    [3] = 'Large',
-    [4] = 'Giant',
-}
+local equipSlots                                          = InventoryData.equipSlots
 
 function Module:LoadSettings()
     if utils.File.Exists(configFile) then
@@ -211,130 +178,131 @@ function Module:LoadSettings()
     myPlat = MySelf.Platinum() or 0
 end
 
-function Module:DrawHelpMarker(desc)
-    ImGui.TextDisabled("(?)")
-    if ImGui.IsItemHovered() then
-        ImGui.BeginTooltip()
-        ImGui.PushTextWrapPos(ImGui.GetFontSize() * 35.0)
-        ImGui.TextUnformatted(desc)
-        ImGui.PopTextWrapPos()
-        ImGui.EndTooltip()
-    end
-end
-
-function Module:FetchClassList(item)
-    local classList = ""
-    local numClasses = item.Classes()
-    if numClasses == 0 then return '' end
-    if numClasses < 16 then
-        for i = 1, numClasses do
-            classList = string.format("%s %s", classList, item.Class(i).ShortName())
-        end
-    elseif numClasses == 16 then
-        classList = "All"
-    else
-        classList = ""
-    end
-    return classList
-end
-
-function Module:FetchRaceList(item)
-    local racesShort = {
-        ['Human'] = 'HUM',
-        ['Barbarian'] = 'BAR',
-        ['Erudite'] = 'ERU',
-        ['Wood Elf'] = 'ELF',
-        ['High Elf'] = 'HIE',
-        ['Dark Elf'] = 'DEF',
-        ['Half Elf'] = 'HEF',
-        ['Dwarf'] = 'DWF',
-        ['Troll'] = 'TRL',
-        ['Ogre'] = 'OGR',
-        ['Halfling'] = 'HFL',
-        ['Gnome'] = 'GNM',
-        ['Iksar'] = 'IKS',
-        ['Vah Shir'] = 'VAH',
-        ['Froglok'] = 'FRG',
-        ['Drakkin'] = 'DRK',
-    }
-    local raceList = ""
-    local numRaces = item.Races() or 0
-    if numRaces < 16 and numRaces > 0 then
-        for i = 1, numRaces do
-            local raceName = racesShort[item.Race(i).Name()] or ''
-            raceList = string.format("%s %s", raceList, raceName)
-        end
-    elseif numRaces == 16 then
-        raceList = "All"
-    end
-    return raceList
-end
-
 -- Sort routines
-function Module:SortInv()
-    -- Various Sorting
+
+---selects and returns the sort function for Main items based on the settings enabled.
+---@return function|nil
+local function BuildItemSortFunc()
     if sort_order.item_type and sort_order.name and sort_order.stack then
-        -- sort by item type, then name, then stacksize
-        table.sort(items, function(a, b)
-            if a.Type() == b.Type() then
-                if a.Name() == b.Name() then
-                    return a.Stack() > b.Stack()
-                else
-                    return a.Name() < b.Name()
+        return function(a, b)
+            if a.item.Type() == b.item.Type() then
+                if a.item.Name() == b.item.Name() then
+                    return a.item.Stack() > b.item.Stack()
                 end
-            else
-                return a.Type() < b.Type()
+                return a.item.Name() < b.item.Name()
             end
-        end)
+            return a.item.Type() < b.item.Type()
+        end
+    elseif sort_order.item_type and sort_order.name then
+        return function(a, b) return a.item.Type() < b.item.Type() or (a.item.Type() == b.item.Type() and a.item.Name() < b.item.Name()) end
+    elseif sort_order.item_type and sort_order.stack then
+        return function(a, b) return a.item.Type() < b.item.Type() or (a.item.Type() == b.item.Type() and a.item.Stack() > b.item.Stack()) end
+    elseif sort_order.name and sort_order.stack then
+        return function(a, b) return a.item.Stack() > b.item.Stack() or (a.item.Stack() == b.item.Stack() and a.item.Name() < b.item.Name()) end
+    elseif sort_order.stack then
+        return function(a, b) return a.item.Stack() > b.item.Stack() end
+    elseif sort_order.name then
+        return function(a, b) return a.item.Name() < b.item.Name() end
+    elseif sort_order.item_type then
+        return function(a, b) return a.item.Type() < b.item.Type() end
+    end
+    return nil
+end
+
+local function SortByName(a, b) return a.Name() < b.Name() end
+
+local function SortByTypeName(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Name() < b.Name()) end
+
+function Module:SortInv()
+    local sortFunc = BuildItemSortFunc()
+    if sortFunc then
+        table.sort(items, sortFunc)
+    end
+
+    -- bank sorting
+    if sort_order.item_type and sort_order.name and sort_order.stack then
         table.sort(bank_items, function(a, b)
             if a.Type() == b.Type() then
-                if a.Name() == b.Name() then
-                    return a.Stack() > b.Stack()
-                else
-                    return a.Name() < b.Name()
-                end
-            else
-                return a.Type() < b.Type()
+                if a.Name() == b.Name() then return a.Stack() > b.Stack() end
+                return a.Name() < b.Name()
             end
+            return a.Type() < b.Type()
         end)
-    elseif sort_order.item_type and sort_order.name and not sort_order.stack then
-        table.sort(items, function(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Name() < b.Name()) end)
+    elseif sort_order.item_type and sort_order.name then
         table.sort(bank_items, function(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Name() < b.Name()) end)
-    elseif sort_order.item_type and sort_order.stack and not sort_order.name then
-        table.sort(items, function(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Stack() > b.Stack()) end)
+    elseif sort_order.item_type and sort_order.stack then
         table.sort(bank_items, function(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Stack() > b.Stack()) end)
-    elseif sort_order.name and sort_order.stack and not sort_order.item_type then
-        table.sort(items, function(a, b) return a.Stack() > b.Stack() or (a.Stack() == b.Stack() and a.Name() < b.Name()) end)
+    elseif sort_order.name and sort_order.stack then
         table.sort(bank_items, function(a, b) return a.Stack() > b.Stack() or (a.Stack() == b.Stack() and a.Name() < b.Name()) end)
     elseif sort_order.stack then
-        table.sort(items, function(a, b) return a.Stack() > b.Stack() end)
         table.sort(bank_items, function(a, b) return a.Stack() > b.Stack() end)
     elseif sort_order.name then
-        table.sort(items, function(a, b) return a.Name() < b.Name() end)
-        table.sort(bank_items, function(a, b) return a.Name() < b.Name() end)
+        table.sort(bank_items, SortByName)
     elseif sort_order.item_type then
-        table.sort(items, function(a, b) return a.Type() < b.Type() end)
         table.sort(bank_items, function(a, b) return a.Type() < b.Type() end)
-        -- else
-        -- table.sort(items)
     end
-    table.sort(augments, function(a, b) return a.Name() < b.Name() end)      -- Sort augments by name
-    table.sort(bank_augments, function(a, b) return a.Name() < b.Name() end) -- Sort banked augments by name TODO:: Impliment this display
-    table.sort(clickies, function(a, b) return a.Name() < b.Name() end)      -- Sort clickies by name
-    table.sort(jewlery, function(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Name() < b.Name()) end)
-    table.sort(onehand, function(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Name() < b.Name()) end)
-    table.sort(twohand, function(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Name() < b.Name()) end)
-    table.sort(ranged, function(a, b) return a.Type() < b.Type() or (a.Type() == b.Type() and a.Name() < b.Name()) end)
+    table.sort(bank_augments, SortByName)
+
+    -- display tables for the UI tabs
+    local dt_items, dt_clickies, dt_augments = {}, {}, {}
+    local dt_onehand, dt_twohand, dt_ranged = {}, {}, {}
+    local dt_j_charm, dt_j_ears, dt_j_face, dt_j_neck, dt_j_fingers = {}, {}, {}, {}, {}
+
+    local jewleryBuckets = {
+        Charm = dt_j_charm,
+        Ears = dt_j_ears,
+        Face = dt_j_face,
+        Neck = dt_j_neck,
+        Fingers = dt_j_fingers,
+    }
+
+    for _, iData in ipairs(items) do
+        local itemData = iData.item
+        table.insert(dt_items, itemData)
+        if iData.isClickie then table.insert(dt_clickies, itemData) end
+        if iData.isAug then table.insert(dt_augments, itemData) end
+        if iData.jewleryType and jewleryBuckets[iData.jewleryType] then
+            table.insert(jewleryBuckets[iData.jewleryType], itemData)
+        end
+        if iData.weaponType == "onehand" then
+            table.insert(dt_onehand, itemData)
+        elseif iData.weaponType == "twohand" then
+            table.insert(dt_twohand, itemData)
+        elseif iData.weaponType == "ranged" then
+            table.insert(dt_ranged, itemData)
+        end
+    end
+
+    for _, ref in ipairs(equipped_clickies) do
+        table.insert(dt_clickies, ref)
+    end
+
+    -- sort displays
+    table.sort(dt_augments, SortByName)
+    table.sort(dt_clickies, SortByName)
+    table.sort(dt_onehand, SortByTypeName)
+    table.sort(dt_twohand, SortByTypeName)
+    table.sort(dt_ranged, SortByTypeName)
+    table.sort(dt_j_charm, SortByName)
+    table.sort(dt_j_ears, SortByName)
+    table.sort(dt_j_face, SortByName)
+    table.sort(dt_j_neck, SortByName)
+    table.sort(dt_j_fingers, SortByName)
+
     display_tables = {
-        augments = augments,
-        items = items,
-        clickies = clickies,
+        items = dt_items,
+        clickies = dt_clickies,
+        augments = dt_augments,
+        onehand = dt_onehand,
+        twohand = dt_twohand,
+        ranged = dt_ranged,
+        j_charm = dt_j_charm,
+        j_ears = dt_j_ears,
+        j_face = dt_j_face,
+        j_neck = dt_j_neck,
+        j_fingers = dt_j_fingers,
         bank_items = bank_items,
         bank_augments = bank_augments,
-        jewlery = jewlery,
-        onehand = onehand,
-        twohand = twohand,
-        ranged = ranged,
     }
 end
 
@@ -413,26 +381,14 @@ function Module:QtyWindow()
     end
 end
 
-function Module:CommaSepValue(amount)
-    local formatted = amount
-    local k = 0
-    while true do
-        formatted, k = string.gsub(formatted, "^(-?%d+)(%d%d%d)", '%1,%2')
-        if (k == 0) then
-            break
-        end
-    end
-    return formatted
-end
-
 function Module:DrawCurrency()
     animItems:SetTextureCell(644 - EQ_ICON_OFFSET)
     ImGui.DrawTextureAnimation(animItems, 20, 20)
     ImGui.SameLine()
-    ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", self:CommaSepValue(myPlat))
+    ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", InventoryData.CommaSepValue(myPlat))
     if ImGui.IsItemHovered() then
         ImGui.BeginTooltip()
-        ImGui.Text("%s Platinum", self:CommaSepValue(myPlat))
+        ImGui.Text("%s Platinum", InventoryData.CommaSepValue(myPlat))
         ImGui.EndTooltip()
         if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
             show_qty_win = true
@@ -445,10 +401,10 @@ function Module:DrawCurrency()
     animItems:SetTextureCell(645 - EQ_ICON_OFFSET)
     ImGui.DrawTextureAnimation(animItems, 20, 20)
     ImGui.SameLine()
-    ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", self:CommaSepValue(myGold))
+    ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", InventoryData.CommaSepValue(myGold))
     if ImGui.IsItemHovered() then
         ImGui.BeginTooltip()
-        ImGui.Text("%s Gold", self:CommaSepValue(myGold))
+        ImGui.Text("%s Gold", InventoryData.CommaSepValue(myGold))
         ImGui.EndTooltip()
         if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
             show_qty_win = true
@@ -461,10 +417,10 @@ function Module:DrawCurrency()
     animItems:SetTextureCell(646 - EQ_ICON_OFFSET)
     ImGui.DrawTextureAnimation(animItems, 20, 20)
     ImGui.SameLine()
-    ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", self:CommaSepValue(mySilver))
+    ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", InventoryData.CommaSepValue(mySilver))
     if ImGui.IsItemHovered() then
         ImGui.BeginTooltip()
-        ImGui.Text("%s Silver", self:CommaSepValue(mySilver))
+        ImGui.Text("%s Silver", InventoryData.CommaSepValue(mySilver))
         ImGui.EndTooltip()
         if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
             show_qty_win = true
@@ -477,10 +433,10 @@ function Module:DrawCurrency()
     animItems:SetTextureCell(647 - EQ_ICON_OFFSET)
     ImGui.DrawTextureAnimation(animItems, 20, 20)
     ImGui.SameLine()
-    ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", self:CommaSepValue(myCopper))
+    ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", InventoryData.CommaSepValue(myCopper))
     if ImGui.IsItemHovered() then
         ImGui.BeginTooltip()
-        ImGui.Text("%s Copper", self:CommaSepValue(myCopper))
+        ImGui.Text("%s Copper", InventoryData.CommaSepValue(myCopper))
         ImGui.EndTooltip()
         if ImGui.IsItemClicked(ImGuiMouseButton.Left) then
             show_qty_win = true
@@ -489,46 +445,15 @@ function Module:DrawCurrency()
     end
 end
 
-function Module:DrawItemValue(value)
-    local val_plat = math.floor(value / 1000)
-    local val_gold = math.floor((value - (val_plat * 1000)) / 100)
-    local val_silver = math.floor((value - (val_plat * 1000) - (val_gold * 100)) / 10)
-    local val_copper = value - (val_plat * 1000) - (val_gold * 100) - (val_silver * 10)
-
-    animItems:SetTextureCell(644 - EQ_ICON_OFFSET)
-    ImGui.DrawTextureAnimation(animItems, 10, 10)
-    ImGui.SameLine()
-    ImGui.TextColored(ImVec4(0, 1, 1, 1), " %s ", self:CommaSepValue(val_plat))
-    ImGui.SameLine()
-
-    animItems:SetTextureCell(645 - EQ_ICON_OFFSET)
-    ImGui.DrawTextureAnimation(animItems, 10, 10)
-    ImGui.SameLine()
-    ImGui.TextColored(ImVec4(0, 1, 1, 1), " %s ", self:CommaSepValue(val_gold))
-    ImGui.SameLine()
-
-    animItems:SetTextureCell(646 - EQ_ICON_OFFSET)
-    ImGui.DrawTextureAnimation(animItems, 10, 10)
-    ImGui.SameLine()
-    ImGui.TextColored(ImVec4(0, 1, 1, 1), " %s ", self:CommaSepValue(val_silver))
-    ImGui.SameLine()
-
-    animItems:SetTextureCell(647 - EQ_ICON_OFFSET)
-    ImGui.DrawTextureAnimation(animItems, 10, 10)
-    ImGui.SameLine()
-
-    ImGui.TextColored(ImVec4(0, 1, 1, 1), " %s ", self:CommaSepValue(val_copper))
-end
-
 function Module:DrawBankCurrency()
     ImGui.SeparatorText("Money in Bank:")
     animItems:SetTextureCell(644 - EQ_ICON_OFFSET)
     ImGui.DrawTextureAnimation(animItems, 20, 20)
     ImGui.SameLine()
-    ImGui.TextColored(ImVec4(0, 1, 1, 1), " %s", self:CommaSepValue(bankPlat))
+    ImGui.TextColored(ImVec4(0, 1, 1, 1), " %s", InventoryData.CommaSepValue(bankPlat))
     if ImGui.IsItemHovered() then
         ImGui.BeginTooltip()
-        ImGui.Text("%s Platinum", self:CommaSepValue(bankPlat))
+        ImGui.Text("%s Platinum", InventoryData.CommaSepValue(bankPlat))
         ImGui.EndTooltip()
     end
 
@@ -537,10 +462,10 @@ function Module:DrawBankCurrency()
     animItems:SetTextureCell(645 - EQ_ICON_OFFSET)
     ImGui.DrawTextureAnimation(animItems, 20, 20)
     ImGui.SameLine()
-    ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", self:CommaSepValue(bankGold))
+    ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", InventoryData.CommaSepValue(bankGold))
     if ImGui.IsItemHovered() then
         ImGui.BeginTooltip()
-        ImGui.Text("%s Gold", self:CommaSepValue(bankGold))
+        ImGui.Text("%s Gold", InventoryData.CommaSepValue(bankGold))
         ImGui.EndTooltip()
     end
 
@@ -549,10 +474,10 @@ function Module:DrawBankCurrency()
     animItems:SetTextureCell(646 - EQ_ICON_OFFSET)
     ImGui.DrawTextureAnimation(animItems, 20, 20)
     ImGui.SameLine()
-    ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", self:CommaSepValue(bankSilver))
+    ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", InventoryData.CommaSepValue(bankSilver))
     if ImGui.IsItemHovered() then
         ImGui.BeginTooltip()
-        ImGui.Text("%s Silver", self:CommaSepValue(bankSilver))
+        ImGui.Text("%s Silver", InventoryData.CommaSepValue(bankSilver))
         ImGui.EndTooltip()
     end
 
@@ -561,10 +486,10 @@ function Module:DrawBankCurrency()
     animItems:SetTextureCell(647 - EQ_ICON_OFFSET)
     ImGui.DrawTextureAnimation(animItems, 20, 20)
     ImGui.SameLine()
-    ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", self:CommaSepValue(bankCopper))
+    ImGui.TextColored(ImVec4(0, 1, 1, 1), "%s", InventoryData.CommaSepValue(bankCopper))
     if ImGui.IsItemHovered() then
         ImGui.BeginTooltip()
-        ImGui.Text("%s Copper", self:CommaSepValue(bankCopper))
+        ImGui.Text("%s Copper", InventoryData.CommaSepValue(bankCopper))
         ImGui.EndTooltip()
     end
     ImGui.SeparatorText('Items in Bank:')
@@ -609,124 +534,105 @@ function Module:CreateBank()
 end
 
 function Module:CreateInventory()
+    local jSlots = { ['Charm'] = true, ['Ears'] = true, ['Neck'] = true, ['Fingers'] = true, ['Face'] = true, }
+    local weaponSlots = { ['Primary'] = true, ['Secondary'] = true, ['Ranged'] = true, }
+    local weaponTypes = {
+        ["1H Slashing"] = true,
+        ["1H Blunt"] = true,
+        ["Piercing"] = true,
+        ["2H Slashing"] = true,
+        ["2H Blunt"] = true,
+        ["2H Piercing"] = true,
+        ["Archery"] = true,
+        ["Ammo"] = true,
+        ["Martial"] = true,
+    }
+
     ---@param item MQItem
-    ---@return boolean
-    local function CheckJewlery(item)
-        if not item() then return false end
+    ---@return string|nil jewleryType  ("charm", "ears", "neck", "fingers", "face")
+    local function checkJewleryType(item)
+        if not item() then return nil end
         for i = 1, item.WornSlots() or 0 do
             local slotID = item.WornSlot(i)()
-            local jSlots = { ['Charm'] = true, ['Ears'] = true, ['Neck'] = true, ['Fingers'] = true, ['Face'] = true, }
-            if jSlots[equipSlots[tonumber(slotID)]] and (item.AugType() or 0) == 0 then
-                return true
+            local slotName = equipSlots[tonumber(slotID)]
+            if jSlots[slotName] and (item.AugType() or 0) == 0 then
+                return slotName
             end
         end
-        return false
+        return nil
     end
 
-    local function CheckWeapons(item)
-        local weaponSlots = { ['Primary'] = true, ['Secondary'] = true, ['Ranged'] = true, }
-        local weaponTypes = {
-            ["1H Slashing"] = true,
-            ["1H Blunt"] = true,
-            ["Piercing"] = true,
-            ["2H Slashing"] = true,
-            ["2H Blunt"] = true,
-            ["2H Piercing"] = true,
-            ["Archery"] = true,
-            ["Ammo"] = true,
-            ["Martial"] = true,
-        }
-        if not item() then return end
+    ---@param item MQItem
+    ---@return string|nil weaponType ("Ranged", 'onehand', 'twohand')
+    local function checkWeaponType(item)
+        if not item() then return nil end
         for i = 1, item.WornSlots() or 0 do
             local slotID = item.WornSlot(i)()
             if weaponSlots[equipSlots[tonumber(slotID)]] and weaponTypes[item.Type()] then
                 if item.Type() == "Ammo" or item.Type() == "Archery" then
-                    table.insert(ranged, item)
-                    break
+                    return "ranged"
                 elseif item.Type():find("2H") then
-                    table.insert(twohand, item)
-                    break
+                    return "twohand"
                 else
-                    table.insert(onehand, item)
-                    break
+                    return "onehand"
                 end
             end
         end
+        return nil
     end
+
+    ---@param item MQItem
+    ---@return table DataTable {item, isClickie, isAug, jewleryType, weaponType}
+    local function getItemData(item)
+        return {
+            item = item,
+            isClickie = item.Clicky() and true or false,
+            isAug = (item.AugType() or 0) > 0,
+            jewleryType = checkJewleryType(item),
+            weaponType = checkWeaponType(item),
+        }
+    end
+
     if ((os.difftime(os.time(), start_time)) > INVENTORY_DELAY_SECONDS) or mq.TLO.Me.FreeInventory() ~= FreeSlots or clicked then
         start_time = os.time()
         items = {}
-        clickies = {}
-        jewlery = {}
-        augments = {}
-        onehand = {}
-        twohand = {}
-        ranged = {}
+        equipped_clickies = {}
         local tmpUsedSlots = 0
+
         for i = 1, 22, 1 do
             local slot = mq.TLO.Me.Inventory(i)
-            if slot.ID() ~= nil then
-                if slot.Clicky() then
-                    table.insert(clickies, slot)
-                end
+            if slot.ID() ~= nil and slot.Clicky() then
+                table.insert(equipped_clickies, slot)
             end
         end
+
         for i = 23, 34, 1 do
             local slot = mq.TLO.Me.Inventory(i)
             if slot.Container() and (slot.Container() or 0) > 0 then
                 for j = 1, (slot.Container()), 1 do
                     if (slot.Item(j)()) then
                         local itemName = slot.Item(j).Name() or 'unknown'
-                        table.insert(items, slot.Item(j))
-                        if CheckJewlery(slot.Item(j)) then
-                            table.insert(jewlery, slot.Item(j))
-                        end
-                        CheckWeapons(slot.Item(j))
+                        table.insert(items, getItemData(slot.Item(j)))
+
                         if trade_list[itemName] == nil and not slot.Item(j).NoDrop() and not slot.Item(j).NoTrade() then
-                            trade_list[itemName] = false -- Initialize trade_list with item names
+                            trade_list[itemName] = false
                         end
                         tmpUsedSlots = tmpUsedSlots + 1
-                        if slot.Item(j).Clicky() then
-                            table.insert(clickies, slot.Item(j))
-                        end
-                        if (slot.Item(j).AugType() or 0) > 0 then
-                            table.insert(augments, slot.Item(j))
-                        end
 
                         -- check spells and songs against our spellbook
                         local isSpell = itemName:find("Spell:")
                         local isSong = itemName:find("Song:")
-                        local spellName = nil
                         if isSpell or isSong then
-                            spellName = slot.Item(j).Spell.Name() --:gsub("Spell: ", "")
-                            -- elseif isSong then
-                            -- 	spellName = slot.Item(j).Spell.Name() --:gsub("Song: ", "")
-                        end
-                        if spellName ~= nil then
-                            if not book[spellName] then
-                                if mq.TLO.Me.Book(spellName)() then
-                                    book[spellName] = true
-                                else
-                                    book[spellName] = false
-                                end
+                            local spellName = slot.Item(j).Spell.Name()
+                            if spellName and not book[spellName] then
+                                book[spellName] = mq.TLO.Me.Book(spellName)() and true or false
                             end
                         end
                     end
                 end
             elseif slot.ID() ~= nil then
-                table.insert(items, slot) -- We have an item in a bag slot
+                table.insert(items, getItemData(slot))
                 tmpUsedSlots = tmpUsedSlots + 1
-                if slot.Clicky() then
-                    table.insert(clickies, slot)
-                end
-                if slot.AugType() > 0 then
-                    table.insert(augments, slot)
-                end
-
-                CheckWeapons(slot)
-                if CheckJewlery(slot) then
-                    table.insert(jewlery, slot)
-                end
             end
         end
 
@@ -742,12 +648,11 @@ end
 
 -- Converts between ItemSlot and /itemnotify pack numbers
 function Module:SlotToPack(slot_number)
-    return "pack" .. tostring(slot_number - 22)
+    return InventoryData.SlotToPack(slot_number)
 end
 
--- Converts between ItemSlot2 and /itemnotify numbers
 function Module:SlotToBagSlot(slot_number)
-    return slot_number + 1
+    return InventoryData.SlotToBagSlot(slot_number)
 end
 
 -- Displays static utilities that always show at the top of the UI
@@ -774,7 +679,7 @@ function Module:RenderSettings()
                 clicked = true
             end
             ImGui.SameLine()
-            self:DrawHelpMarker("Order items from your inventory sorted by the name of the item.")
+            self.Utils.DrawHelpMarker("Order items from your inventory sorted by the name of the item.")
 
             local pressed = false
             sort_order.stack, pressed = self.Utils.DrawToggle("Stack", sort_order.stack, ToggleFlags)
@@ -785,7 +690,7 @@ function Module:RenderSettings()
                 clicked = true
             end
             ImGui.SameLine()
-            self:DrawHelpMarker("Order items with the largest stacks appearing first.")
+            self.Utils.DrawHelpMarker("Order items with the largest stacks appearing first.")
 
             local pressed3 = false
             sort_order.item_type, pressed3 = self.Utils.DrawToggle("Item Type", sort_order.item_type, ToggleFlags)
@@ -796,7 +701,7 @@ function Module:RenderSettings()
                 clicked = true
             end
             ImGui.SameLine()
-            self:DrawHelpMarker("Order items by their type (e.g. Armor, 1H Slash, etc.)")
+            self.Utils.DrawHelpMarker("Order items by their type (e.g. Armor, 1H Slash, etc.)")
 
             local pressed2 = false
             show_item_background, pressed2 = self.Utils.DrawToggle("Show Slot Background", show_item_background, ToggleFlags)
@@ -805,7 +710,7 @@ function Module:RenderSettings()
                 mq.pickle(configFile, settings)
             end
             ImGui.SameLine()
-            self:DrawHelpMarker("Removes the background texture to give your bag a cool modern look.")
+            self.Utils.DrawHelpMarker("Removes the background texture to give your bag a cool modern look.")
 
             ImGui.SetNextItemWidth(100)
             MIN_SLOTS_WARN = ImGui.InputInt("Min Slots Warning", MIN_SLOTS_WARN, 1, 10)
@@ -814,7 +719,7 @@ function Module:RenderSettings()
                 mq.pickle(configFile, settings)
             end
             ImGui.SameLine()
-            self:DrawHelpMarker("Minimum number of slots before the warning color is displayed.")
+            self.Utils.DrawHelpMarker("Minimum number of slots before the warning color is displayed.")
 
             ImGui.SetNextItemWidth(100)
             INVENTORY_DELAY_SECONDS = ImGui.InputInt("Inventory Refresh Time (s)", INVENTORY_DELAY_SECONDS, 1, 10)
@@ -823,7 +728,7 @@ function Module:RenderSettings()
                 mq.pickle(configFile, settings)
             end
             ImGui.SameLine()
-            self:DrawHelpMarker("Time in seconds between inventory refreshes, if # of free slots hasn't changed.")
+            self.Utils.DrawHelpMarker("Time in seconds between inventory refreshes, if # of free slots hasn't changed.")
         end
 
         if ImGui.CollapsingHeader('Toggle Settings') then
@@ -836,7 +741,7 @@ function Module:RenderSettings()
                 mq.pickle(configFile, settings)
             end
             ImGui.SameLine()
-            self:DrawHelpMarker("Key to toggle the GUI (A-Z | 0-9 | F1-F12)")
+            self.Utils.DrawHelpMarker("Key to toggle the GUI (A-Z | 0-9 | F1-F12)")
             if toggleKey ~= '' then
                 ImGui.Text("Toggle Mod Key")
                 ImGui.SameLine()
@@ -865,7 +770,7 @@ function Module:RenderSettings()
                     end
                 end
                 ImGui.SameLine()
-                self:DrawHelpMarker("Modifier Key to toggle the GUI (Ctrl | Alt | Shift)")
+                self.Utils.DrawHelpMarker("Modifier Key to toggle the GUI (Ctrl | Alt | Shift)")
                 if settings.toggleModKey ~= 'None' then
                     ImGui.Text("Toggle Mod Key2")
                     ImGui.SameLine()
@@ -892,7 +797,7 @@ function Module:RenderSettings()
                         end
                     end
                     ImGui.SameLine()
-                    self:DrawHelpMarker("Modifier Key2 to toggle the GUI (Ctrl | Alt | Shift)")
+                    self.Utils.DrawHelpMarker("Modifier Key2 to toggle the GUI (Ctrl | Alt | Shift)")
 
                     if settings.toggleModKey2 ~= 'None' then
                         ImGui.Text("Toggle Mod Key3")
@@ -915,7 +820,7 @@ function Module:RenderSettings()
                             end
                         end
                         ImGui.SameLine()
-                        self:DrawHelpMarker("Modifier Key3 to toggle the GUI (Ctrl | Alt | Shift)")
+                        self.Utils.DrawHelpMarker("Modifier Key3 to toggle the GUI (Ctrl | Alt | Shift)")
                     end
                 end
             end
@@ -939,7 +844,7 @@ function Module:RenderSettings()
                 end
             end
             ImGui.SameLine()
-            self:DrawHelpMarker("Mouse Button to toggle the GUI (Left | Right | Middle)")
+            self.Utils.DrawHelpMarker("Mouse Button to toggle the GUI (Left | Right | Middle)")
         end
 
         if ImGui.CollapsingHeader("Theme Settings##BigBag") then
@@ -961,19 +866,6 @@ function Module:RenderSettings()
     ImGui.EndChild()
 end
 
-function Module:FetchWornSlots(item)
-    local SlotsString = ""
-    local tmp = {}
-    for i = 1, item.WornSlots() do
-        local slotID = item.WornSlot(i)() or '-1'
-        tmp[equipSlots[tonumber(slotID)]] = true
-    end
-    for slotID, _ in pairs(tmp) do
-        SlotsString = SlotsString .. slotID .. " "
-    end
-    return SlotsString
-end
-
 -- Helper to create a unique hidden label for each button.  The uniqueness is
 -- necessary for drag and drop to work correctly.
 function Module:RenderBtnLbl(item)
@@ -982,874 +874,6 @@ function Module:RenderBtnLbl(item)
     else
         return string.format("##bag_%s_slot_%s", item.ItemSlot(), item.ItemSlot2())
     end
-end
-
-function Module:FetchItemData(item)
-    if not item() then return nil end
-
-    local tmpItemData = {
-        Name = item.Name(),
-        Type = item.Type(),
-        ID = item.ID(),
-        ReqLvl = item.RequiredLevel() or 0,
-        RecLvl = item.RecommendedLevel() or 0,
-        AC = item.AC() or 0,
-        BaseDMG = item.Damage() or 0,
-        Delay = item.ItemDelay() or 0,
-        Value = item.Value() or 0,
-        Weight = item.Weight() or 0,
-        Stack = item.Stack() or 0,
-        MaxStack = item.StackSize() or 0,
-        Clicky = item.Clicky(),
-        Charges = (item.Charges() or 0) ~= -1 and (item.Charges() or 0) or 'Infinite',
-        ClassList = self:FetchClassList(item),
-        RaceList = self:FetchRaceList(item),
-        TributeValue = item.Tribute() or 0,
-
-        --base stats
-        HP = item.HP() or 0,
-        Mana = item.Mana() or 0,
-        Endurance = item.Endurance() or 0,
-
-        -- stats
-        STR = item.STR() or 0,
-        AGI = item.AGI() or 0,
-        STA = item.STA() or 0,
-        INT = item.INT() or 0,
-        WIS = item.WIS() or 0,
-        DEX = item.DEX() or 0,
-        CHA = item.CHA() or 0,
-        -- resists
-        MR = item.svMagic() or 0,
-        FR = item.svFire() or 0,
-        DR = item.svDisease() or 0,
-        PR = item.svPoison() or 0,
-        CR = item.svCold() or 0,
-        svCor = item.svCorruption() or 0,
-
-        --heroic stats
-        hStr = item.HeroicSTR() or 0,
-        hAgi = item.HeroicAGI() or 0,
-        hSta = item.HeroicSTA() or 0,
-        hInt = item.HeroicINT() or 0,
-        hDex = item.HeroicDEX() or 0,
-        hCha = item.HeroicCHA() or 0,
-        hWis = item.HeroicWIS() or 0,
-
-        --heroic resists
-        hMr = item.HeroicSvMagic() or 0,
-        hFr = item.HeroicSvFire() or 0,
-        hDr = item.HeroicSvDisease() or 0,
-        hPr = item.HeroicSvPoison() or 0,
-        hCr = item.HeroicSvCold() or 0,
-        hCor = item.HeroicSvCorruption() or 0,
-
-        --augments
-        AugSlots = item.Augs() or 0,
-        AugSlot1 = item.AugSlot(1).Name() or 'none',
-        AugSlot2 = item.AugSlot(2).Name() or 'none',
-        AugSlot3 = item.AugSlot(3).Name() or 'none',
-        AugSlot4 = item.AugSlot(4).Name() or 'none',
-        AugSlot5 = item.AugSlot(5).Name() or 'none',
-        AugSlot6 = item.AugSlot(6).Name() or 'none',
-
-        AugType1 = item.AugSlot1() or 'none',
-        AugType2 = item.AugSlot2() or 'none',
-        AugType3 = item.AugSlot3() or 'none',
-        AugType4 = item.AugSlot4() or 'none',
-        AugType5 = item.AugSlot5() or 'none',
-        AugType6 = item.AugSlot6() or 'none',
-
-        -- bonus efx
-        Spelleffect = item.Spell.Name() or "",
-        Worn = item.Worn.Spell() and (item.Worn.Spell.Name() or '') or 'none',
-        Focus1 = item.Focus() and (item.Focus.Spell.Name() or '') or 'none',
-        Focus2 = item.Focus2() and (item.Focus2.Spell.Name() or '') or 'none',
-        -- ElementalDamage = item.ElementalDamage() or 0,
-        Haste = item.Haste() or 0,
-        DmgShield = item.DamShield() or 0,
-        DmgShieldMit = item.DamageShieldMitigation() or 0,
-        Avoidance = item.Avoidance() or 0,
-        DotShield = item.DoTShielding() or 0,
-        InstrumentMod = item.InstrumentMod() or 0,
-        HPRegen = item.HPRegen() or 0,
-        ManaRegen = item.ManaRegen() or 0,
-        EnduranceRegen = item.EnduranceRegen() or 0,
-        Accuracy = item.Accuracy() or 0,
-        BonusDmgType = item.DMGBonusType() or 'None',
-        SpellShield = item.SpellShield() or 0,
-        Clairvoyance = item.Clairvoyance() or 0,
-        HealAmount = item.HealAmount() or 0,
-        SpellDamage = item.SpellDamage() or 0,
-        StunResist = item.StunResist() or 0,
-        CanUse = item.CanUse() or false,
-
-        --restrictions
-        isNoDrop = item.NoDrop() or false,
-        isNoRent = item.NoRent() or false,
-        isNoTrade = item.NoTrade() or false,
-        isAttuneable = item.Attuneable() or false,
-        isLore = item.Lore() or false,
-        -- isEvolving = ((item.Evolving.ExpPct() or 0) > 0 and item.Evolving.ExpOn()) or false,
-        isMagic = item.Magic() or false,
-
-        -- evolution
-        EvolvingLevel = item.Evolving.Level() or 0,
-        EvolvingExpPct = item.Evolving.ExpPct() or 0,
-        EvolvingMaxLevel = item.Evolving.MaxLevel() or 0,
-
-        --descriptions
-        SpellDesc = item.Spell and (item.Spell.Description() or '') or '',
-        WornDesc = item.Worn.Spell and (item.Worn.Spell.Description() or '') or '',
-        Focus1Desc = item.Focus and (item.Focus.Spell.Description() or '') or '',
-        Focus2Desc = item.Focus2 and (item.Focus2.Spell.Description() or '') or '',
-        ClickyDesc = item.Clicky and (item.Clicky.Spell.Description() or '') or '',
-        -- links
-        SpellID = item.Spell and (item.Spell.ID() or 0) or 0,
-        WornID = item.Worn.Spell and (item.Worn.Spell.ID() or 0) or 0,
-        Focus1ID = item.Focus and (item.Focus.Spell.ID() or 0) or 0,
-        Focus2ID = item.Focus2 and (item.Focus2.Spell.ID() or 0) or 0,
-        ClickyID = item.Clicky and (item.Clicky.Spell.ID() or 0) or 0,
-
-        -- slots
-        WornSlots = self:FetchWornSlots(item),
-        NumSlots = item.Container() or 0,
-        Size = item.Size() or 0,
-        SizeCapacity = item.SizeCapacity() or 0,
-
-    }
-    return tmpItemData
-end
-
----comment
----@param item item
-function Module:RenderItemToolTip(item)
-    if not item() then return end
-    if not items[item.ID()] then
-        items[item.ID()] = self:FetchItemData(item)
-    end
-    local itemData = items[item.ID()]
-
-    if not itemData then return end
-
-    local hasStats = false
-    local hasResists = false
-    local hasBase = false
-    local numCombatEfx = item.CombatEffects() or 0
-    local hasCombatEffects = numCombatEfx and numCombatEfx > 0
-
-    for _, stat in pairs({ 'STR', 'AGI', 'STA', 'INT', 'WIS', 'DEX', 'CHA', 'hStr', 'hSta', 'hAgi', 'hInt', 'hWis', 'hDex', 'hCha', }) do
-        if itemData[stat] and (itemData[stat] > 0 or itemData[stat] < 0) then
-            hasStats = true
-            break
-        end
-    end
-    -- local listResists = { 'MR', 'FR', 'DR', 'PR', 'CR', }
-    for _, resist in pairs({ 'MR', 'FR', 'DR', 'PR', 'CR', 'svCor', 'hMr', 'hFr', 'hCr', 'hPr', 'hDr', 'hCor', }) do
-        if itemData[resist] and (itemData[resist] > 0 or itemData[resist] < 0) then
-            hasResists = true
-            break
-        end
-    end
-    -- local listBase = { 'HP', 'Mana', 'Endurance', }
-    for _, base in pairs({ 'HP', 'Mana', 'Endurance', 'AC', 'HPRegen', 'EnduranceRegen', 'ManaRegen', }) do
-        if itemData[base] and (itemData[base] > 0 or itemData[base] < 0) then
-            hasBase = true
-            break
-        end
-    end
-    local cursorY = ImGui.GetCursorPosY()
-
-    ImGui.Text("Item: ")
-    ImGui.SameLine()
-    local changeColor, isTrash = self:ColorItemInfo(item)
-    if itemData.CanUse and (itemData.ReqLvl <= MySelf.Level()) and changeColor and not isTrash then
-        ImGui.TextColored(self.Colors.color('green'), "%s", itemData.Name)
-    elseif not isTrash then
-        ImGui.TextColored(self.Colors.color('tangarine'), "%s", itemData.Name)
-    else
-        ImGui.TextColored(self.Colors.color('grey'), "%s", itemData.Name)
-    end
-    if ImGui.IsItemHovered() then
-        ImGui.BeginTooltip()
-        ImGui.Text("Click to copy item Name to clipboard")
-        ImGui.EndTooltip()
-        if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
-            ImGui.LogToClipboard()
-            ImGui.LogText(itemData.Name)
-            ImGui.LogFinish()
-        end
-    end
-    ImGui.Text("Item ID: ")
-    ImGui.SameLine()
-    ImGui.TextColored(self.Colors.color('yellow'), "%s", itemData.ID)
-    if ImGui.IsItemHovered() then
-        ImGui.BeginTooltip()
-        ImGui.Text("Click to copy item ID to clipboard")
-        ImGui.EndTooltip()
-        if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
-            ImGui.LogToClipboard()
-            ImGui.LogText(itemData.ID)
-            ImGui.LogFinish()
-        end
-    end
-    local cursorX = ImGui.GetCursorPosX()
-    local cursorY2 = ImGui.GetCursorPosY()
-    ImGui.SetCursorPosY(cursorY)
-    ImGui.SetCursorPosX(ImGui.GetWindowWidth() - 60)
-
-    -- ImGui.SetCursorPosY(12)
-    self:Draw_Item_Icon(item, 50, 50, true, false, true)
-    if ImGui.IsItemHovered() then
-        ImGui.BeginTooltip()
-        ImGui.Text("Click to compare with items worn in allowed slots.")
-        ImGui.EndTooltip()
-        if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
-            local numSlots = item.WornSlots() or 0
-            if numSlots > 0 then
-                for i = 1, numSlots do
-                    local slotID = item.WornSlot(i)() or '-1'
-                    local wornItem = mq.TLO.Me.Inventory(slotID)
-                    if wornItem() and wornItem.ID() then
-                        self.TempSettings.Popped[wornItem.ID()] = wornItem
-                    end
-                end
-            end
-        end
-    end
-
-    ImGui.SetCursorPosX(cursorX)
-    ImGui.SetCursorPosY(cursorY2)
-
-    ImGui.Spacing()
-
-    ImGui.Text("Type: ")
-    ImGui.SameLine()
-    ImGui.TextColored(self.Colors.color('teal'), "%s", itemData.Type)
-
-    ImGui.Text("Size: ")
-    ImGui.SameLine()
-    ImGui.TextColored(self.Colors.color('yellow'), "%s", Sizes[itemData.Size] or 'Unknown')
-
-    local needSameLine = false
-    local restrictionString = ''
-    --restrictions
-    if itemData.isMagic then
-        needSameLine = true
-        restrictionString = restrictionString .. 'Magic '
-    end
-    if itemData.isNoDrop then
-        if needSameLine then restrictionString = restrictionString .. ',' end
-        restrictionString = restrictionString .. 'No Drop '
-        needSameLine = true
-    end
-    if itemData.isNoRent then
-        if needSameLine then restrictionString = restrictionString .. ',' end
-        restrictionString = restrictionString .. 'No Rent '
-        needSameLine = true
-    end
-    if itemData.isNoTrade then
-        if needSameLine then restrictionString = restrictionString .. ',' end
-        restrictionString = restrictionString .. 'No Trade '
-        needSameLine = true
-    end
-    if itemData.isLore then
-        if needSameLine then restrictionString = restrictionString .. ',' end
-        restrictionString = restrictionString .. 'Lore '
-        needSameLine = true
-    end
-    if itemData.isAttuneable then
-        if needSameLine then restrictionString = restrictionString .. ',' end
-        restrictionString = restrictionString .. 'Attuneable '
-        needSameLine = true
-    end
-    -- if itemData.isEvolving then
-    -- 	if needSameLine then restrictionString = restrictionString .. ',' end
-    -- 	restrictionString = restrictionString .. 'Evolving '
-    -- end
-
-    if restrictionString ~= '' then
-        ImGui.PushTextWrapPos(ImGui.GetWindowWidth() - 60)
-        ImGui.TextColored(self.Colors.color('grey'), "%s", restrictionString)
-        ImGui.PopTextWrapPos()
-    end
-
-    if ImGui.BeginTable('basicinfo##basicinfo', 2, ImGuiTableFlags.None) then
-        ImGui.TableSetupColumn("Info##basicinfo", ImGuiTableColumnFlags.WidthFixed, 60)
-        ImGui.TableSetupColumn("Value##basicinfo", ImGuiTableColumnFlags.WidthStretch, 240)
-        ImGui.TableNextRow()
-        if itemData.ClassList and itemData.ClassList ~= '' then
-            ImGui.TableNextColumn()
-            ImGui.Text("Classes:")
-            ImGui.TableNextColumn()
-            ImGui.PushTextWrapPos(ImGui.GetColumnWidth(-1))
-            ImGui.TextColored(self.Colors.color('grey'), "%s", itemData.ClassList)
-            ImGui.PopTextWrapPos()
-        end
-
-        if itemData.RaceList and itemData.RaceList ~= '' then
-            ImGui.TableNextColumn()
-            ImGui.Text("Races:")
-            ImGui.TableNextColumn()
-            ImGui.PushTextWrapPos(ImGui.GetColumnWidth(-1))
-            ImGui.TextColored(self.Colors.color('grey'), "%s", itemData.RaceList)
-            ImGui.PopTextWrapPos()
-        end
-
-        if itemData.WornSlots ~= '' then
-            ImGui.TableNextColumn()
-            ImGui.Text('Slots:')
-            ImGui.TableNextColumn()
-            ImGui.PushTextWrapPos(ImGui.GetColumnWidth(-1))
-            ImGui.TextColored(self.Colors.color('grey'), "%s", itemData.WornSlots)
-            ImGui.PopTextWrapPos()
-        end
-        ImGui.EndTable()
-    end
-
-    if ImGui.BeginTable('LVlInfo##lvl', 2, ImGuiTableFlags.None) then
-        ImGui.TableSetupColumn("Level Info##lvlinfo", ImGuiTableColumnFlags.WidthFixed, 150)
-        ImGui.TableSetupColumn("Value##lvlvalue", ImGuiTableColumnFlags.WidthFixed, 150)
-
-        ImGui.TableNextRow()
-        if itemData.ReqLvl > 0 then
-            ImGui.TableNextColumn()
-            ImGui.Text('Req Lvl: ')
-            ImGui.SameLine()
-            local reqColorLabel = itemData.ReqLvl <= MySelf.Level() and 'green' or 'tangarine'
-            ImGui.TextColored(self.Colors.color(reqColorLabel), "%s", itemData.ReqLvl)
-        end
-        if itemData.RecLvl and itemData.RecLvl > 0 then
-            ImGui.TableNextColumn()
-            ImGui.Text('Rec Lvl: ')
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('softblue'), "%s", itemData.RecLvl)
-        end
-
-        ImGui.TableNextColumn()
-        ImGui.Text("Weight: ")
-        ImGui.SameLine()
-        ImGui.TextColored(self.Colors.color('pink2'), "%s", itemData.Weight)
-
-        if itemData.NumSlots and itemData.NumSlots > 0 then
-            ImGui.TableNextColumn()
-            ImGui.Text("Slots: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('yellow'), "%s", itemData.NumSlots)
-
-            -- Size Capacity
-            if itemData.SizeCapacity and itemData.SizeCapacity > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("Bag Size:")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('teal'), "%s", Sizes[itemData.SizeCapacity] or 'Unknown')
-            end
-        end
-
-        if itemData.MaxStack > 1 then
-            ImGui.TableNextColumn()
-            ImGui.Text("Qty: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('yellow'), "%s", itemData.Stack)
-            ImGui.SameLine()
-            ImGui.Text(" / ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('teal'), "%s", itemData.MaxStack)
-        end
-        ImGui.EndTable()
-    end
-
-    if ImGui.BeginTable("DamageStats", 2, ImGuiTableFlags.None) then
-        ImGui.TableSetupColumn("Stat##dmg", ImGuiTableColumnFlags.WidthFixed, 150)
-        ImGui.TableSetupColumn("Value##dmg", ImGuiTableColumnFlags.WidthFixed, 150)
-        ImGui.TableNextRow()
-
-        if itemData.BaseDMG > 0 then
-            ImGui.TableNextColumn()
-            ImGui.Text("Dmg: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('pink2'), "%s", itemData.BaseDMG or 'NA')
-        end
-        if itemData.Delay > 0 then
-            ImGui.TableNextColumn()
-
-            ImGui.Text(" Dly: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('yellow'), "%s", itemData.Delay or 'NA')
-        end
-        if itemData.BonusDmgType ~= 'None' then
-            ImGui.TableNextColumn()
-            ImGui.Text("Bonus %s Dmg ", itemData.BonusDmgType)
-            -- ImGui.SameLine()
-            -- ImGui.TextColored(self.Colors.color('pink2'), "%s", itemData.ElementalDamage or 'NA')
-            ImGui.TableNextColumn()
-        end
-
-        if itemData.Haste > 0 then
-            ImGui.TableNextColumn()
-            ImGui.Text("Haste: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('green'), "%s%%", itemData.Haste)
-        end
-        if itemData.DmgShield > 0 then
-            ImGui.TableNextColumn()
-            ImGui.Text("Dmg Shield: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('yellow'), "%s", itemData.DmgShield)
-        end
-
-        if itemData.DmgShieldMit > 0 then
-            ImGui.TableNextColumn()
-            ImGui.Text("DS Mit: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('teal'), "%s", itemData.DmgShieldMit)
-        end
-        if itemData.Avoidance > 0 then
-            ImGui.TableNextColumn()
-            ImGui.Text("Avoidance: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('green'), "%s", itemData.Avoidance)
-        end
-        if itemData.DotShield > 0 then
-            ImGui.TableNextColumn()
-            ImGui.Text("DoT Shielding: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('yellow'), "%s", itemData.DotShield)
-        end
-        if itemData.Accuracy > 0 then
-            ImGui.TableNextColumn()
-            ImGui.Text("Accuracy: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('green'), "%s", itemData.Accuracy)
-        end
-        if itemData.SpellShield > 0 then
-            ImGui.TableNextColumn()
-            ImGui.Text("Spell Shield: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('teal'), "%s", itemData.SpellShield)
-        end
-
-        if itemData.HealAmount > 0 then
-            ImGui.TableNextColumn()
-            ImGui.Text("Heal Amt: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('pink2'), "%s", itemData.HealAmount)
-        end
-        if itemData.SpellDamage > 0 then
-            ImGui.TableNextColumn()
-            ImGui.Text("Spell Dmg: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('teal'), "%s", itemData.SpellDamage)
-        end
-        if itemData.StunResist > 0 then
-            ImGui.TableNextColumn()
-            ImGui.Text("Stun Res: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('green'), "%s", itemData.StunResist)
-        end
-
-        if itemData.Clairvoyance > 0 then
-            ImGui.TableNextColumn()
-            ImGui.Text("Clairvoyance: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('green'), "%s", itemData.Clairvoyance)
-        end
-        -- DPS Ratio
-        if itemData.BaseDMG > 0 and itemData.Delay > 0 then
-            ImGui.TableNextColumn()
-            ImGui.Text("Ratio: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('teal'), "%0.3f", (itemData.Delay / (itemData.BaseDMG or 1)) or 0)
-        end
-        ImGui.EndTable()
-    end
-
-    ImGui.Spacing()
-
-    -- base stats
-
-    if hasBase then
-        ImGui.SeparatorText('Stats')
-        -- base
-        if ImGui.BeginTable("BaseStats##itemBaseStats", 2, ImGuiTableFlags.None) then
-            ImGui.TableSetupColumn("Stat", ImGuiTableColumnFlags.WidthFixed, 150)
-            ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 150)
-            ImGui.TableNextRow()
-            if itemData.AC > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text(" AC: ")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('teal'), " %s", itemData.AC)
-                ImGui.TableNextRow()
-            end
-
-            if itemData.HP and itemData.HP > 0 then
-                ImGui.TableNextColumn()
-
-                ImGui.Text("HPs: ")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('pink2'), "%s", itemData.HP)
-            end
-            if itemData.Mana and itemData.Mana > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("Mana: ")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('teal'), "%s", itemData.Mana)
-            end
-            if itemData.Endurance and itemData.Endurance > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("End: ")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('yellow'), "%s", itemData['Endurance'])
-            end
-            if itemData.HPRegen > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("HP Regen: ")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('pink2'), "%s", itemData.HPRegen)
-            end
-            if itemData.ManaRegen > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("Mana Regen: ")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('teal'), "%s", itemData.ManaRegen)
-            end
-            if itemData.EnduranceRegen > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("Endurance Regen: ")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('yellow'), "%s", itemData.EnduranceRegen)
-            end
-
-            ImGui.EndTable()
-        end
-    end
-    -- stats
-    if hasStats then
-        -- ImGui.SeparatorText('Stats')
-        if ImGui.BeginTable("Stats##itemStats", 2, ImGuiTableFlags.None) then
-            ImGui.TableSetupColumn("Stat##stats", ImGuiTableColumnFlags.WidthFixed, 150)
-            ImGui.TableSetupColumn("Value##stats", ImGuiTableColumnFlags.WidthFixed, 150)
-
-            ImGui.TableNextRow()
-            if itemData['STR'] > 0 then
-                ImGui.TableNextColumn()
-
-                ImGui.Text("STR: ")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('tangarine'), "%s", itemData.STR)
-                if itemData.hStr > 0 then
-                    ImGui.SameLine()
-                    ImGui.TextColored(self.Colors.color('Yellow'), " + %s", itemData.hStr)
-                end
-            end
-            if itemData.AGI and itemData.AGI > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("AGI: ")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('tangarine'), "%s", itemData.AGI)
-                if itemData.hAgi > 0 then
-                    ImGui.SameLine()
-                    ImGui.TextColored(self.Colors.color('Yellow'), " + %s", itemData.hAgi)
-                end
-            end
-            if itemData.STA and itemData.STA > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("STA: ")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('tangarine'), "%s", itemData.STA)
-                if itemData.hSta > 0 then
-                    ImGui.SameLine()
-                    ImGui.TextColored(self.Colors.color('Yellow'), " + %s", itemData.hSta)
-                end
-            end
-            if itemData.INT and itemData.INT > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("INT: ")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('tangarine'), "%s", itemData.INT)
-                if itemData.hInt > 0 then
-                    ImGui.SameLine()
-                    ImGui.TextColored(self.Colors.color('Yellow'), " + %s", itemData.hInt)
-                end
-            end
-            if itemData.WIS and itemData.WIS > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("WIS: ")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('tangarine'), "%s", itemData.WIS)
-                if itemData.hWis > 0 then
-                    ImGui.SameLine()
-                    ImGui.TextColored(self.Colors.color('Yellow'), " + %s", itemData.hWis)
-                end
-            end
-            if itemData.DEX and itemData.DEX > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("DEX: ")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('tangarine'), "%s", itemData.DEX)
-                if itemData.hDex > 0 then
-                    ImGui.SameLine()
-                    ImGui.TextColored(self.Colors.color('Yellow'), " + %s", itemData.hDex)
-                end
-            end
-            if itemData.CHA and itemData.CHA > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("CHA: ")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('tangarine'), "%s", itemData.CHA)
-                if itemData.hCha > 0 then
-                    ImGui.SameLine()
-                    ImGui.TextColored(self.Colors.color('Yellow'), " + %s", itemData.hCha)
-                end
-            end
-            ImGui.EndTable()
-        end
-    end
-    -- resists
-    if hasResists then
-        ImGui.SeparatorText('Resists')
-        if ImGui.BeginTable("Resists##itemResists", 2, ImGuiTableFlags.None) then
-            ImGui.TableSetupColumn("Stat##res", ImGuiTableColumnFlags.WidthFixed, 150)
-            ImGui.TableSetupColumn("Value##res", ImGuiTableColumnFlags.WidthFixed, 150)
-
-            ImGui.TableNextRow()
-            if itemData['MR'] > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("MR:\t")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('green'), "%s", itemData['MR'])
-                if itemData.hMr > 0 then
-                    ImGui.SameLine()
-                    ImGui.TextColored(self.Colors.color('Yellow'), " + %s", itemData.hMr)
-                end
-            end
-            if itemData['FR'] > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("FR:\t")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('green'), "%s", itemData['FR'])
-                if itemData.hFr > 0 then
-                    ImGui.SameLine()
-                    ImGui.TextColored(self.Colors.color('Yellow'), " + %s", itemData.hFr)
-                end
-            end
-            if itemData['DR'] > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("DR:\t")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('green'), "%s", itemData['DR'])
-                if itemData.hDr > 0 then
-                    ImGui.SameLine()
-                    ImGui.TextColored(self.Colors.color('Yellow'), " + %s", itemData.hDr)
-                end
-            end
-            if itemData['PR'] > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("PR:\t")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('green'), "%s", itemData['PR'])
-                if itemData.hPr > 0 then
-                    ImGui.SameLine()
-                    ImGui.TextColored(self.Colors.color('Yellow'), " + %s", itemData.hPr)
-                end
-            end
-            if itemData['CR'] > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("CR:\t")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('green'), "%s", itemData['CR'])
-                if itemData.hCr > 0 then
-                    ImGui.SameLine()
-                    ImGui.TextColored(self.Colors.color('Yellow'), " + %s", itemData.hCr)
-                end
-            end
-            if itemData['svCor'] > 0 then
-                ImGui.TableNextColumn()
-                ImGui.Text("COR:\t")
-                ImGui.SameLine()
-                ImGui.TextColored(self.Colors.color('green'), "%s", itemData['svCor'])
-                if itemData.hCor > 0 then
-                    ImGui.SameLine()
-                    ImGui.TextColored(self.Colors.color('Yellow'), " + %s", itemData.hCor)
-                end
-            end
-            ImGui.EndTable()
-        end
-    end
-
-    -- Augments
-    if itemData.AugSlots > 0 then
-        -- ImGui.Dummy(10, 10)
-        ImGui.SeparatorText('Augments')
-        for i = 1, itemData.AugSlots do
-            local augSlotName = itemData['AugSlot' .. i] or 'none'
-            local augTypeName = itemData['AugType' .. i] or 'none'
-            if augSlotName ~= 'none' or augTypeName ~= 21 then
-                ImGui.Text("Slot %s: ", i)
-                ImGui.SameLine()
-                ImGui.PushTextWrapPos(290)
-                ImGui.TextColored(self.Colors.color('teal'), "%s Type (%s)", (augSlotName ~= 'none' and augSlotName or 'Empty'), augTypeName)
-                ImGui.PopTextWrapPos()
-            end
-        end
-    end
-
-    if hasCombatEffects or itemData.Clicky or itemData.Spelleffect ~= '' or itemData.Worn ~= 'none' or
-        itemData.Focus1 ~= 'none' or itemData.Focus2 ~= 'none' then
-        -- ImGui.Dummy(10, 10)
-
-        ImGui.SeparatorText('Efx')
-        if itemData.Clicky then
-            ImGui.Dummy(10, 10)
-            ImGui.Text("Charges: ")
-            ImGui.SameLine()
-            ImGui.TextColored(self.Colors.color('yellow'), "%s", itemData.Charges)
-            ImGui.Text("Clicky Spell: ")
-            ImGui.SameLine()
-            ImGui.PushTextWrapPos(290)
-            ImGui.TextColored(self.Colors.color('teal'), "%s", itemData.Clicky)
-            if ImGui.IsItemHovered() then
-                if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
-                    mq.TLO.Spell(itemData.ClickyID).Inspect()
-                end
-            end
-            if itemData.ClickyDesc ~= '' then
-                ImGui.Indent(5)
-                ImGui.TextColored(self.Colors.color('yellow'), itemData.ClickyDesc)
-                ImGui.Unindent(5)
-            end
-            ImGui.PopTextWrapPos()
-        end
-
-        if (itemData.Spelleffect ~= "" and
-                not ((itemData.Spelleffect == itemData.Clicky) or (itemData.Spelleffect == itemData.Worn) or
-                    (itemData.Focus1 == itemData.Spelleffect) or (itemData.Focus2 == itemData.Spelleffect))) then
-            ImGui.Dummy(10, 10)
-            local effectTypeLabel = item.EffectType() ~= 'None' and item.EffectType() or "Spell"
-            ImGui.Text("%s Effect: ", effectTypeLabel)
-            ImGui.SameLine()
-            ImGui.PushTextWrapPos(290)
-            ImGui.TextColored(self.Colors.color('teal'), "%s", itemData.Spelleffect)
-            if ImGui.IsItemHovered() then
-                if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
-                    mq.TLO.Spell(itemData.SpellID).Inspect()
-                end
-            end
-            if itemData.SpellDesc ~= '' then
-                ImGui.Indent(5)
-                ImGui.TextColored(self.Colors.color('yellow'), itemData.SpellDesc)
-                ImGui.Unindent(5)
-            end
-            ImGui.PopTextWrapPos()
-        end
-
-        if itemData.Worn ~= 'none' then
-            ImGui.Dummy(10, 10)
-            ImGui.Text("Worn Effect: ")
-            ImGui.SameLine()
-            ImGui.PushTextWrapPos(290)
-            ImGui.TextColored(self.Colors.color('teal'), "%s", itemData.Worn)
-            if ImGui.IsItemHovered() then
-                if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
-                    mq.TLO.Spell(itemData.WornID).Inspect()
-                end
-            end
-            if itemData.WornDesc ~= '' then
-                ImGui.Indent(5)
-                ImGui.TextColored(self.Colors.color('yellow'), itemData.WornDesc)
-                ImGui.Unindent(5)
-            end
-            ImGui.PopTextWrapPos()
-        end
-
-        if itemData.Focus1 ~= 'none' then
-            ImGui.Dummy(10, 10)
-            ImGui.Text("Focus Effect: ")
-            ImGui.SameLine()
-            ImGui.PushTextWrapPos(290)
-            ImGui.TextColored(self.Colors.color('teal'), "%s", itemData.Focus1)
-            if ImGui.IsItemHovered() then
-                if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
-                    mq.TLO.Spell(itemData.Focus1ID).Inspect()
-                end
-            end
-            if itemData.Focus1Desc ~= '' then
-                ImGui.Indent(5)
-                ImGui.TextColored(self.Colors.color('yellow'), itemData.Focus1Desc)
-                ImGui.Unindent(5)
-            end
-            ImGui.PopTextWrapPos()
-        end
-
-        if itemData.Focus2 ~= 'none' then
-            ImGui.Dummy(10, 10)
-            ImGui.Text("Focus2 Effect: ")
-            ImGui.SameLine()
-            ImGui.PushTextWrapPos(290)
-            ImGui.TextColored(self.Colors.color('teal'), "%s", itemData.Focus2)
-            if ImGui.IsItemHovered() then
-                if ImGui.IsMouseClicked(ImGuiMouseButton.Left) then
-                    mq.TLO.Spell(itemData.Focus2ID).Inspect()
-                end
-            end
-            if itemData.Focus2Desc ~= '' then
-                ImGui.Indent(5)
-                ImGui.TextColored(self.Colors.color('yellow'), itemData.Focus2Desc)
-                ImGui.Unindent(5)
-            end
-            ImGui.PopTextWrapPos()
-        end
-    end
-
-    if itemData.isEvolving then
-        ImGui.SeparatorText('Evolving Info')
-        ImGui.Text("Evolving Level: ")
-        ImGui.SameLine()
-        ImGui.TextColored(self.Colors.color("tangarine"), "%d", itemData.EvolvingLevel)
-
-        ImGui.Text("Evolving Max Level: ")
-        ImGui.SameLine()
-        ImGui.TextColored(self.Colors.color("teal"), "%d", itemData.EvolvingMaxLevel)
-        ImGui.Text("Evolving Exp: ")
-        ImGui.SameLine()
-        ImGui.TextColored(self.Colors.color("yellow"), "%0.2f%%", itemData.EvolvingExpPct)
-    end
-
-    ImGui.SeparatorText('Value')
-    ImGui.Dummy(10, 10)
-    ImGui.Text("Value: ")
-    ImGui.SameLine()
-    self:DrawItemValue(itemData.Value or 0)
-    if itemData.TributeValue > 0 then
-        ImGui.Text("Tribute Value: ")
-        ImGui.SameLine()
-        ImGui.TextColored(self.Colors.color('yellow'), "%s", itemData.TributeValue)
-    end
-end
-
-function Module:RenderItemInfoWin(item)
-    local itemID = item.ID()
-    local itemName = item.Name()
-
-    ImGui.SetNextWindowSize(320, 0.0, ImGuiCond.Always)
-    local mouseX, mouseY = ImGui.GetMousePos()
-    ImGui.SetNextWindowPos((mouseX - 30), (mouseY - 5), ImGuiCond.FirstUseEver)
-    local open, show = ImGui.Begin(string.format("%s##iteminfo_%s", itemName, itemID), true)
-    if not open then
-        show = false
-        self.TempSettings.Popped[itemID] = nil
-    end
-    if show then
-        if ImGui.IsWindowFocused() then
-            if ImGui.IsKeyPressed(ImGuiKey.Escape) then
-                show = false
-                self.TempSettings.Popped[itemID] = nil
-            end
-        end
-        self:RenderItemToolTip(item)
-    end
-    ImGui.End()
 end
 
 ---comment
@@ -1946,32 +970,8 @@ function Module:Draw_Item_Icon(item, iconWidth, iconHeight, drawID, clickable, i
             ImGui.PushStyleColor(ImGuiCol.ButtonActive, 0, 0.3, 0, 0.3)
         end
         local colorChange, lvlHigh, toolTipSpell = false, false, ''
-        -- local colorChange = false
-        -- local lvlHigh = false
         if canUse then
-            -- 	local isSpell = item.Name():find("Spell:")
-            -- 	local isSong = item.Name():find("Song:")
-            -- 	local iType = item.Type() or ''
             colorChange, _, lvlHigh, toolTipSpell = self:ColorItemInfo(item)
-            -- 	if isSpell or isSong then
-            -- 		local spellName = item.Spell.Name() --:gsub("Spell: ", ""):gsub("Song: ", "")
-            -- 		local spellLvl = mq.TLO.Spell(spellName).Level() or 0
-            -- 		if not book[spellName] then
-            -- 			if spellLvl > MySelf.Level() then
-            -- 				lvlHigh = true
-            -- 			end
-            -- 			colorChange = true
-            -- 			toolTipSpell = spellLvl > 0 and string.format("Lvl %s", spellLvl) or ''
-            -- 		else
-            -- 			toolTipSpell = "Already Know"
-            -- 		end
-            -- 	else
-            -- 		if iType == 'Combinable' or iType == 'Food' or iType == 'Drink' then
-            -- 			colorChange = false
-            -- 		else
-            -- 			colorChange = true
-            -- 		end
-            -- 	end
         end
 
         if colorChange then
@@ -1999,7 +999,7 @@ function Module:Draw_Item_Icon(item, iconWidth, iconHeight, drawID, clickable, i
             local clicky = item.Clicky() or 'none'
             ImGui.BeginTooltip()
 
-            self:RenderItemToolTip(item)
+            InventoryData.RenderItemToolTip(item, { Popped = Module.TempSettings.Popped, highlightUseable = settings.highlightUseable, showItemBackground = show_item_background, })
             ImGui.SeparatorText("Click Actions")
             if clickable then
                 ImGui.Text("Right Click to use item")
@@ -2068,56 +1068,6 @@ function Module:RenderBagContents(contentType)
     ImGui.EndChild()
 end
 
--- function Module:RenderBankContents()
--- 	-- create_inventory()
--- 	ImGui.SetWindowFontScale(1.0)
--- 	if ImGui.BeginChild("BankContent", 0.0, 0.0) then
--- 		ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
--- 		local bag_window_width = ImGui.GetWindowWidth()
--- 		local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
--- 		local temp_bag_cols = 1
-
--- 		for index, _ in ipairs(display_tables.bank_items or {}) do
--- 			if string.match(string.lower(display_tables.bank_items[index].Name()), string.lower(filter_text)) then
--- 				self:Draw_Item_Icon(display_tables.bank_items[index], ICON_WIDTH, ICON_HEIGHT, 'bank' .. index, false)
--- 				if bag_cols > temp_bag_cols then
--- 					temp_bag_cols = temp_bag_cols + 1
--- 					ImGui.SameLine()
--- 				else
--- 					temp_bag_cols = 1
--- 				end
--- 			end
--- 		end
--- 		ImGui.PopStyleVar()
--- 	end
--- 	ImGui.EndChild()
--- end
-
--- function Module:RenderClickies()
--- 	ImGui.SetWindowFontScale(1.0)
--- 	if ImGui.BeginChild("BagClickies", 0.0, 0.0) then
--- 		ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
--- 		local bag_window_width = ImGui.GetWindowWidth()
--- 		local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
--- 		local temp_bag_cols = 1
-
--- 		for index, _ in ipairs(display_tables.clickies or {}) do
--- 			if string.match(string.lower(display_tables.clickies[index].Name()), string.lower(filter_text)) then
--- 				self:Draw_Item_Icon(display_tables.clickies[index], ICON_WIDTH,
--- 					ICON_HEIGHT, 'clicky' .. index, true)
--- 				if bag_cols > temp_bag_cols then
--- 					temp_bag_cols = temp_bag_cols + 1
--- 					ImGui.SameLine()
--- 				else
--- 					temp_bag_cols = 1
--- 				end
--- 			end
--- 		end
--- 		ImGui.PopStyleVar()
--- 	end
--- 	ImGui.EndChild()
--- end
-
 function Module:RenderWeapons()
     if ImGui.BeginChild("BagWeapons", 0.0, 0.0) then
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
@@ -2144,6 +1094,42 @@ function Module:RenderWeapons()
         drawItemsTables('twohand')
         ImGui.SeparatorText('Ranged Weapons')
         drawItemsTables('ranged')
+
+        ImGui.PopStyleVar()
+    end
+    ImGui.EndChild()
+end
+
+function Module:RenderJewlery()
+    if ImGui.BeginChild("BagJewlery", 0.0, 0.0) then
+        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(0, 0))
+        local function drawItemsTables(tableName)
+            local bag_window_width = ImGui.GetWindowWidth()
+            local bag_cols = math.floor(bag_window_width / BAG_ITEM_SIZE)
+            local temp_bag_cols = 1
+            for index, _ in ipairs(display_tables[tableName] or {}) do
+                if string.match(string.lower(display_tables[tableName][index].Name()), string.lower(filter_text)) then
+                    self:Draw_Item_Icon(display_tables[tableName][index], ICON_WIDTH, ICON_HEIGHT, tableName .. index, true)
+                    if bag_cols > temp_bag_cols then
+                        temp_bag_cols = temp_bag_cols + 1
+                        ImGui.SameLine()
+                    else
+                        temp_bag_cols = 1
+                    end
+                end
+            end
+            ImGui.NewLine()
+        end
+        ImGui.SeparatorText('Charms')
+        drawItemsTables('j_charm')
+        ImGui.SeparatorText('Earrings')
+        drawItemsTables('j_ears')
+        ImGui.SeparatorText('Masks / Face')
+        drawItemsTables('j_face')
+        ImGui.SeparatorText('Necklaces')
+        drawItemsTables('j_neck')
+        ImGui.SeparatorText('Rings')
+        drawItemsTables('j_fingers')
 
         ImGui.PopStyleVar()
     end
@@ -2451,7 +1437,7 @@ function Module:RenderTabs()
             mq.pickle(configFile, settings)
         end
         ImGui.SameLine()
-        self:DrawHelpMarker("Highlight items that are useable by your class.")
+        self.Utils.DrawHelpMarker("Highlight items that are useable by your class.")
 
         ImGui.Separator()
         ImGui.PopFont()
@@ -2462,7 +1448,7 @@ function Module:RenderTabs()
                     ImGui.EndTabItem()
                 end
                 if ImGui.BeginTabItem("Jewlery") then
-                    self:RenderBagContents('jewlery')
+                    self:RenderJewlery()
                     ImGui.EndTabItem()
                 end
                 if ImGui.BeginTabItem('Clickies') then
@@ -2521,7 +1507,8 @@ function Module.RenderGUI()
 
     for k, v in pairs(Module.TempSettings.Popped) do
         if v and v.ID() then
-            Module:RenderItemInfoWin(v)
+            InventoryData.RenderItemInfoWin(v, Module.TempSettings.Popped,
+                { Sender = Module.Name, showItemBackground = show_item_background, highlightUseable = settings.highlightUseable, })
         else
             Module.TempSettings.Popped[k] = nil
         end

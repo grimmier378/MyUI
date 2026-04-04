@@ -68,31 +68,36 @@ local oneshot                                                    = false
 local rwStatus, gwStatus                                         = '', ''
 local interruptInProgress                                        = false
 local NavSet                                                     = {
+    State            = 'IDLE',
+    PreviousState    = nil,
+    SortedWaypoints  = nil,
+    NavCommandIssued = false,
+    NavStartedOnce   = false,
     ChainPath        = 'Select Path...',
     ChainStart       = false,
     ChainLoop        = false,
-    SelectedPath     = 'None',
     ChainZone        = 'Select Zone...',
-    LastPath         = nil,
     CurChain         = 0,
     doChainPause     = false,
-    autoRecord       = false,
+    SelectedPath     = 'None',
+    LastPath         = nil,
+    SelectedChain    = 'None',
     doNav            = false,
     doSingle         = false,
     doLoop           = false,
     doReverse        = false,
     doPingPong       = false,
     doPause          = false,
+    autoRecord       = false,
     RecordDelay      = 5,
+    RecordMinDist    = 25,
     StopDist         = 30,
     PauseStart       = 0,
     WpPause          = 1,
     CurrentStepIndex = 1,
     LoopCount        = 0,
-    RecordMinDist    = 25,
     PreviousDoNav    = false,
     PausedActiveGN   = false,
-    SelectedChain    = 'None',
 }
 
 local InterruptSet                                               = {
@@ -386,9 +391,7 @@ local function RecordWaypoint(name)
     local index = #tmp or 1
     local distToLast = 0
     if lastRecordedWP ~= loc and lastRecordedWP ~= '' then
-        local tmpLastWP = lastRecordedWP
-        local yx = tmpLastWP:match("^(.-,.-),") -- Match the y,x part of the string
-        tmpLastWP = tmpLastWP:sub(1, #yx - 1)
+        local tmpLastWP = Module:getYX(lastRecordedWP)
         distToLast = mq.TLO.Math.Distance(tmpLastWP)()
         if distToLast < NavSet.RecordMinDist and NavSet.autoRecord then
             Module.Status = "Recording: Distance to Last WP is less than " .. NavSet.RecordMinDist .. "!"
@@ -1012,9 +1015,7 @@ local function FindIndexClosestWaypoint(table)
     local closestLoc = 1
     if tmp == nil then return closestLoc end
     for i = 1, #tmp do
-        local tmpClosest = tmp[i].loc
-        local yx = tmpClosest:match("^(.-,.-),") -- Match the y,x part of the string
-        tmpClosest = tmpClosest:sub(1, #yx - 1)
+        local tmpClosest = Module:getYX(tmp[i].loc)
 
         local dist = mq.TLO.Math.Distance(tmpClosest)()
         if dist < closest then
@@ -1041,168 +1042,244 @@ local function sortPathsTable(zone, path)
     return tmp
 end
 
-local function NavigatePath(name)
-    if not NavSet.doNav then
-        return
-    end
-    local zone = mq.TLO.Zone.ShortName()
-    local startNum = 1
-    if NavSet.CurrentStepIndex ~= 1 then
-        startNum = NavSet.CurrentStepIndex
-    end
-    if NavSet.doSingle then NavSet.doNav = true end
-    if NavSet.doLoop then
-        table.insert(debugMessages, { Time = os.date("%H:%M:%S"), Zone = zone, Path = name, WP = 'Loop Started', Status = 'Loop Started!', })
-    end
-    if #ChainedPaths > 0 and not NavSet.ChainStart then
-        NavSet.ChainPath = NavSet.SelectedPath
-        NavSet.ChainStart = true
-    end
-    :: StartNav ::
-    while NavSet.doNav do
-        local tmp = sortPathsTable(zone, name)
+function Module:getYX(loc)
+    local yx = loc:match("^(.-,.-),")
+    return loc:sub(1, #yx - 1)
+end
 
-        if tmp == nil then
+function Module:issueNavCommand(wp)
+    mq.cmdf("/nav locyxz %s dist=%s log=off", wp.loc, NavSet.StopDist)
+    NavSet.NavCommandIssued = true
+    NavSet.NavStartedOnce = false
+    local dist = mq.TLO.Math.Distance(self:getYX(wp.loc))() or 0
+    self.Status = "Nav to WP #: " .. wp.step .. " Distance: " .. string.format("%.2f", dist)
+end
+
+function Module:ProcessNavState()
+    local zone = currZone
+    local state = NavSet.State
+
+    if state == 'IDLE' then
+        return
+    elseif state == 'NAV_STARTING' then
+        NavSet.SortedWaypoints = sortPathsTable(zone, NavSet.SelectedPath)
+        if NavSet.SortedWaypoints == nil or #NavSet.SortedWaypoints == 0 then
             NavSet.doNav = false
-            Module.Status = 'Idle'
+            self.Status = 'Idle'
+            NavSet.State = 'IDLE'
             return
         end
 
-        for i = startNum, #tmp do
-            if NavSet.doSingle then i = NavSet.CurrentStepIndex end
-            NavSet.CurrentStepIndex = i
+        if #ChainedPaths > 0 and not NavSet.ChainStart then
+            NavSet.ChainPath = NavSet.SelectedPath
+            NavSet.ChainStart = true
+        end
+
+        if NavSet.doLoop then
+            table.insert(debugMessages, { Time = os.date("%H:%M:%S"), Zone = zone, Path = NavSet.SelectedPath, WP = 'Loop Started', Status = 'Loop Started!', })
+        end
+
+        local idx = NavSet.CurrentStepIndex
+        if idx < 1 or idx > #NavSet.SortedWaypoints then
+            idx = 1
+            NavSet.CurrentStepIndex = 1
+        end
+
+        self:issueNavCommand(NavSet.SortedWaypoints[idx])
+        NavSet.State = 'NAV_TO_WP'
+    elseif state == 'NAV_TO_WP' then
+        if not NavSet.doNav then
+            NavSet.State = 'IDLE'
+            return
+        end
+
+        -- Check for interrupts
+        if interruptInProgress then
+            NavSet.PreviousState = 'NAV_TO_WP'
+            NavSet.State = 'INTERRUPTED'
+            return
+        end
+
+        local wp = NavSet.SortedWaypoints[NavSet.CurrentStepIndex]
+        if not wp then
+            NavSet.doNav = false
+            NavSet.State = 'IDLE'
+            self.Status = 'Idle'
+            return
+        end
+
+        local destYX = self:getYX(wp.loc)
+        local dist = mq.TLO.Math.Distance(destYX)() or 0
+        local navActive = mq.TLO.Navigation.Active()
+
+        if navActive then
+            NavSet.NavStartedOnce = true
+        end
+
+        if dist <= NavSet.StopDist and not navActive and not NavSet.NavCommandIssued then
+            NavSet.State = 'ARRIVED_AT_WP'
+            return
+        end
+
+        NavSet.NavCommandIssued = false
+
+        if MySelf.Speed() == 0 and not MySelf.Sitting() and not navActive and dist > NavSet.StopDist then
+            mq.cmdf("/nav locyxz %s dist=%s log=off", wp.loc, NavSet.StopDist)
+        end
+
+        self.Status = "Nav to WP #: " .. wp.step .. " Distance: " .. string.format("%.2f", dist)
+    elseif state == 'ARRIVED_AT_WP' then
+        if not NavSet.doNav then
+            NavSet.State = 'IDLE'
+            return
+        end
+
+        local wp = NavSet.SortedWaypoints[NavSet.CurrentStepIndex]
+        if not wp then
+            NavSet.doNav = false
+            NavSet.State = 'IDLE'
+            self.Status = 'Idle'
+            return
+        end
+
+        if NavSet.doSingle then
+            NavSet.doNav = false
+            NavSet.doSingle = false
+            self.Status = 'Idle - Arrived at Destination!'
+            NavSet.LoopCount = 0
+            NavSet.State = 'IDLE'
+            return
+        end
+
+        if wp.cmd ~= '' then
+            table.insert(debugMessages, { Time = os.date("%H:%M:%S"), Zone = currZone, Path = NavSet.SelectedPath, WP = 'Command', Status = 'Executing Command: ' .. wp.cmd, })
+            if wp.cmd:find("/mypaths stop") then NavSet.doNav = false end
+            mq.cmdf(wp.cmd)
             if not NavSet.doNav then
+                NavSet.State = 'IDLE'
                 return
             end
-            local tmpDestLoc = tmp[i].loc
-            local yx = tmpDestLoc:match("^(.-,.-),") -- Match the y,x part of the string
-            tmpDestLoc = tmpDestLoc:sub(1, #yx - 1)
-
-            local tmpDist = mq.TLO.Math.Distance(tmpDestLoc)() or 0
-            mq.cmdf("/nav locyxz %s dist=%s log=off", tmp[i].loc, NavSet.StopDist)
-            Module.Status = "Nav to WP #: " .. tmp[i].step .. " Distance: " .. string.format("%.2f", tmpDist)
-            mq.delay(3000, function() return mq.TLO.Navigation.Active() end)
-            -- mq.delay(3000, function () return MySelf.Speed() > 0 end)
-            -- coroutine.yield()  -- Yield here to allow updates
-            while mq.TLO.Math.Distance(tmpDestLoc)() > NavSet.StopDist or mq.TLO.Navigation.Active() do
-                if not NavSet.doNav then
-                    goto EndNav
-                end
-                if currZone ~= lastZone then
-                    NavSet.SelectedPath = 'None'
-                    NavSet.doNav = false
-                    Module.intPauseTime = 0
-                    InterruptSet.PauseStart = 0
-
-                    goto EndNav
-                end
-                if interruptInProgress then
-                    coroutine.yield()
-                    if not NavSet.doNav then goto EndNav end
-                elseif MySelf.Speed() == 0 then
-                    mq.delay(1)
-                    if not MySelf.Sitting() then
-                        tmpDestLoc = tmp[i].loc
-                        yx = tmpDestLoc:match("^(.-,.-),") -- Match the y,x part of the string
-                        tmpDestLoc = tmpDestLoc:sub(1, #yx - 1)
-                        mq.cmdf("/nav locyxz %s dist=%s log=off", tmp[i].loc, NavSet.StopDist)
-                        tmpDist = mq.TLO.Math.Distance(tmpDestLoc)() or 0
-                        Module.Status = "Nav to WP #: " .. tmp[i].step .. " Distance: " .. string.format("%.2f", tmpDist)
-                        coroutine.yield()
-                        if not NavSet.doNav then goto EndNav end
-                    end
-                end
-                -- mq.delay(1)
-                tmpDestLoc = tmp[i].loc
-                yx = tmpDestLoc:match("^(.-,.-),") -- Match the y,x part of the string
-                tmpDestLoc = tmpDestLoc:sub(1, #yx - 1)
-                tmpDist = mq.TLO.Math.Distance(tmpDestLoc)() or 0
-                coroutine.yield() -- Yield here to allow updates
-                if not NavSet.doNav then goto EndNav end
-            end
-            -- mq.cmdf("/nav stop log=off")
-            -- status = "Arrived at WP #: "..tmp[i].step
-
-            if NavSet.doSingle then
-                NavSet.doNav = false
-                NavSet.doSingle = false
-                Module.Status = 'Idle - Arrived at Destination!'
-                NavSet.LoopCount = 0
-                goto EndNav
-            end
-            -- Check for Commands to execute at Waypoint
-            if tmp[i].cmd ~= '' then
-                table.insert(debugMessages, { Time = os.date("%H:%M:%S"), Zone = zone, Path = name, WP = 'Command', Status = 'Executing Command: ' .. tmp[i].cmd, })
-                if tmp[i].cmd:find("/mypaths stop") then NavSet.doNav = false end
-                -- mq.delay(1)
-                mq.cmdf(tmp[i].cmd)
-                -- mq.delay(1)
-                coroutine.yield()
-                if not NavSet.doNav then goto EndNav end
-            end
-            -- Door Check
-            if tmp[i].door and not NavSet.doReverse then
-                InterruptSet.openDoor = true
-                ToggleSwitches()
-            elseif tmp[i].doorRev and NavSet.doReverse then
-                InterruptSet.openDoor = true
-                ToggleSwitches()
-            end
-            -- Check for Delay at Waypoint
-            Module.curWpPauseTime = tmp[i].delay
-            if tmp[i].delay > 0 then
-                Module.Status = string.format("Paused %s seconds at WP #: %s", tmp[i].delay, tmp[i].step)
-                Module.curWpPauseTime = tmp[i].delay
-                NavSet.PauseStart = os.clock()
-                coroutine.yield()
-                if not NavSet.doNav then goto EndNav end
-                -- coroutine.yield()  -- Yield here to allow updates
-            elseif NavSet.WpPause > 0 then
-                Module.Status = string.format("Global Paused %s seconds at WP #: %s", NavSet.WpPause, tmp[i].step)
-                Module.curWpPauseTime = NavSet.WpPause
-                NavSet.PauseStart = os.clock()
-                coroutine.yield()
-                if not NavSet.doNav then goto EndNav end
-                -- coroutine.yield()  -- Yield here to allow updates
-                -- else
-                --     if InterruptSet.interruptFound and tmp[i].delay == 0 then
-                --         curWpPauseTime = 0
-                --         NavSet.PauseStart = os.clock()
-                --         coroutine.yield()
-                --         if not NavSet.doNav then goto EndNav end
-                --     end
-            end
         end
 
-        -- Check if we need to loop
+        if wp.door and not NavSet.doReverse then
+            InterruptSet.openDoor = true
+            ToggleSwitches()
+        elseif wp.doorRev and NavSet.doReverse then
+            InterruptSet.openDoor = true
+            ToggleSwitches()
+        end
 
-        if not NavSet.doLoop then
-            goto EndNav
+        if wp.delay > 0 then
+            self.Status = string.format("Paused %s seconds at WP #: %s", wp.delay, wp.step)
+            self.curWpPauseTime = wp.delay
+            NavSet.PauseStart = os.clock()
+            NavSet.State = 'WP_PAUSE'
+        elseif NavSet.WpPause > 0 then
+            self.Status = string.format("Global Paused %s seconds at WP #: %s", NavSet.WpPause, wp.step)
+            self.curWpPauseTime = NavSet.WpPause
+            NavSet.PauseStart = os.clock()
+            NavSet.State = 'WP_PAUSE'
         else
-            NavSet.LoopCount = NavSet.LoopCount + 1
-            table.insert(debugMessages, {
-                Time = os.date("%H:%M:%S"),
-                Zone = zone,
-                Path = name,
-                WP = 'Loop #' .. NavSet.LoopCount,
-                Status = 'Loop #' ..
-                    NavSet.LoopCount .. ' Completed!',
-            })
-            NavSet.CurrentStepIndex = 1
-            startNum = 1
-            if NavSet.doPingPong then
-                NavSet.doReverse = not NavSet.doReverse
+            NavSet.State = 'NEXT_WP'
+        end
+    elseif state == 'WP_PAUSE' then
+        if not NavSet.doNav then
+            NavSet.State = 'IDLE'
+            NavSet.PauseStart = 0
+            self.curWpPauseTime = 0
+            return
+        end
+
+        if interruptInProgress then
+            NavSet.PreviousState = 'WP_PAUSE'
+            NavSet.State = 'INTERRUPTED'
+            return
+        end
+
+        local elapsed = os.clock() - NavSet.PauseStart
+        if elapsed >= self.curWpPauseTime then
+            NavSet.PauseStart = 0
+            self.curWpPauseTime = 0
+            NavSet.State = 'NEXT_WP'
+        end
+    elseif state == 'INTERRUPTED' then
+        if not NavSet.doNav then
+            NavSet.State = 'IDLE'
+            InterruptSet.PauseStart = 0
+            self.intPauseTime = 0
+            return
+        end
+
+        if not InterruptSet.interruptFound then
+            local elapsed = os.clock() - InterruptSet.PauseStart
+            if elapsed >= self.intPauseTime then
+                InterruptSet.PauseStart = 0
+                self.intPauseTime = 0
+                interruptInProgress = false
+
+                if NavSet.PreviousState == 'WP_PAUSE' then
+                    NavSet.PauseStart = os.clock()
+                    self.Status = string.format('Paused: Interrupt over, restarting WP %s delay', self.curWpPauseTime)
+                    NavSet.State = 'WP_PAUSE'
+                elseif NavSet.PreviousState == 'NAV_TO_WP' then
+                    local wp = NavSet.SortedWaypoints[NavSet.CurrentStepIndex]
+                    if wp then
+                        self:issueNavCommand(wp)
+                    end
+                    NavSet.State = 'NAV_TO_WP'
+                else
+                    NavSet.State = 'IDLE'
+                end
+                NavSet.PreviousState = nil
             end
-            goto StartNav
+        end
+    elseif state == 'NEXT_WP' then
+        if not NavSet.doNav then
+            NavSet.State = 'IDLE'
+            return
+        end
+
+        local nextIdx = NavSet.CurrentStepIndex + 1
+
+        if nextIdx > #NavSet.SortedWaypoints then
+            if NavSet.doLoop then
+                NavSet.LoopCount = NavSet.LoopCount + 1
+                table.insert(debugMessages, {
+                    Time = os.date("%H:%M:%S"),
+                    Zone = currZone,
+                    Path = NavSet.SelectedPath,
+                    WP = 'Loop #' .. NavSet.LoopCount,
+                    Status = 'Loop #' .. NavSet.LoopCount .. ' Completed!',
+                })
+
+                if NavSet.doPingPong then
+                    NavSet.doReverse = not NavSet.doReverse
+                end
+
+                NavSet.SortedWaypoints = sortPathsTable(currZone, NavSet.SelectedPath)
+                if not NavSet.SortedWaypoints or #NavSet.SortedWaypoints == 0 then
+                    NavSet.doNav = false
+                    NavSet.State = 'IDLE'
+                    self.Status = 'Idle'
+                    return
+                end
+
+                NavSet.CurrentStepIndex = 1
+                self:issueNavCommand(NavSet.SortedWaypoints[1])
+                NavSet.State = 'NAV_TO_WP'
+            else
+                NavSet.doNav = false
+                self.Status = 'Idle - Arrived at Destination!'
+                NavSet.LoopCount = 0
+                NavSet.State = 'IDLE'
+            end
+        else
+            NavSet.CurrentStepIndex = nextIdx
+            self:issueNavCommand(NavSet.SortedWaypoints[nextIdx])
+            NavSet.State = 'NAV_TO_WP'
         end
     end
-    ::EndNav::
-    NavSet.doNav = false
-    Module.Status = 'Idle - Arrived at Destination!'
-    NavSet.LoopCount = 0
 end
-
-local co = coroutine.create(NavigatePath)
 
 -------- Import and Export Functions --------
 local function serialize_table(val, name, skipnewlines, depth)
@@ -1324,28 +1401,6 @@ local function DrawStatus()
     ImGui.Text("Current Loc: ")
     ImGui.SameLine()
     ImGui.TextColored(1, 1, 0, 1, "%s", MySelf.LocYXZ())
-    --[[
-    if NavSet.doNav then
-        local tmpTable = sortPathsTable(currZone, NavSet.SelectedPath) or {}
-        if tmpTable[NavSet.CurrentStepIndex] then
-            ImGui.Text("Current WP: ")
-            ImGui.SameLine()
-            ImGui.TextColored(1,1,0,1,"%s ",tmpTable[NavSet.CurrentStepIndex].step or 0)
-            ImGui.SameLine()
-            ImGui.Text("Distance: ")
-            ImGui.SameLine()
-            ImGui.TextColored(0,1,1,1,"%.2f", mq.TLO.Math.Distance(tmpLoc)())
-            local tmpDist = mq.TLO.Math.Distance(tmpLoc)() or 0
-            local dist = string.format("%.2f",tmpDist)
-            local tmpStatus = status
-            if tmpStatus:find("Distance") then
-                tmpStatus = tmpStatus:sub(1, tmpStatus:find("Distance:") - 1)
-                tmpStatus = string.format("%s Distance: %s",tmpStatus,dist)
-                ImGui.TextColored(ImVec4(0,1,1,1), tmpStatus)
-            end
-        end
-    end
-    ]]
     ImGui.Text("Nav Type: ")
     ImGui.SameLine()
 
@@ -1430,7 +1485,7 @@ local function DrawStatus()
     ImGui.EndGroup()
 end
 
-local function RenderDebugMessages(scale)
+local function RenderDebugMessages()
     if ImGui.BeginChild("Tabs##DebugTab", -1, -1, ImGuiChildFlags.AutoResizeX) then
         if ImGui.Button(Module.Icons.MD_OPEN_IN_NEW) then
             Module.TempSettings.PopDebug = true
@@ -1479,7 +1534,7 @@ local function RenderDebugMessages(scale)
     ImGui.EndChild()
 end
 
-function Module.RenderControls(scale, working_table)
+function Module.RenderControls(working_table)
     ImGui.SeparatorText("Select a Path")
     if working_table == nil then
         working_table = sortPathsTable(currZone, NavSet.SelectedPath) or {}
@@ -1487,17 +1542,6 @@ function Module.RenderControls(scale, working_table)
 
     if not NavSet.doNav then
         ImGui.SetNextItemWidth(120)
-        -- if ImGui.BeginCombo("##SelectPath", NavSet.SelectedPath) then
-        --
-        --     if not Paths[currZone] then Paths[currZone] = {} end
-        --     for name, data in pairs(Paths[currZone]) do
-        --         local isSelected = name == NavSet.SelectedPath
-        --         if ImGui.Selectable(name, isSelected) then
-        --             NavSet.SelectedPath = name
-        --         end
-        --     end
-        --     ImGui.EndCombo()
-        -- end
         local tmpP = {}
         if ImGui.BeginCombo("Path##SelectPath", NavSet.SelectedPath) then
             if not Paths[currZone] then Paths[currZone] = {} end
@@ -1901,7 +1945,7 @@ function Module.RenderControls(scale, working_table)
     end
 end
 
-function Module.RenderPathData(scale, working_table)
+function Module.RenderPathData(working_table)
     if working_table == nil then
         working_table = sortPathsTable(currZone, NavSet.SelectedPath) or {}
     end
@@ -2204,9 +2248,7 @@ function Module.RenderGUI()
             local xy = 0
             if tmpTable[NavSet.CurrentStepIndex] ~= nil then
                 curWPTxt = tmpTable[NavSet.CurrentStepIndex].step or 0
-                tmpLoc = tmpTable[NavSet.CurrentStepIndex].loc or ''
-                xy = tmpLoc:match("^(.-,.-),") -- Match the y,x part of the string
-                tmpLoc = tmpLoc:sub(1, #xy - 1)
+                tmpLoc = Module:getYX(tmpTable[NavSet.CurrentStepIndex].loc or '')
             end
 
             if ImGui.BeginMenuBar() then
@@ -2380,7 +2422,6 @@ function Module.RenderGUI()
             end
             ImGui.Separator()
             -- Tabs
-            -- ImGui.BeginChild("Tabs##MainTabs", -1, -1,ImGuiChildFlags.AutoResizeX)
             if ImGui.BeginTabBar('MainTabBar') then
                 if not Module.TempSettings.ControlsPopped then
                     if ImGui.BeginTabItem('Controls') then
@@ -2388,7 +2429,7 @@ function Module.RenderGUI()
                             if ImGui.SmallButton(Module.Icons.MD_OPEN_IN_NEW .. "##ControlsPopout") then
                                 Module.TempSettings.ControlsPopped = true
                             end
-                            Module.RenderControls(scale, tmpTable)
+                            Module.RenderControls(tmpTable)
                         end
                         ImGui.EndChild()
                         ImGui.EndTabItem()
@@ -2400,7 +2441,7 @@ function Module.RenderGUI()
                             if ImGui.SmallButton(Module.Icons.MD_OPEN_IN_NEW .. "##PathDataPopout") then
                                 Module.TempSettings.PathDataPopped = true
                             end
-                            Module.RenderPathData(scale, tmpTable)
+                            Module.RenderPathData(tmpTable)
                         end
 
                         ImGui.EndChild()
@@ -2410,7 +2451,7 @@ function Module.RenderGUI()
                 if showDebugTab and DEBUG then
                     if not Module.TempSettings.PopDebug then
                         if ImGui.BeginTabItem('Debug Messages') then
-                            RenderDebugMessages(scale)
+                            RenderDebugMessages()
                             ImGui.EndTabItem()
                         end
                     end
@@ -2418,11 +2459,8 @@ function Module.RenderGUI()
 
                 ImGui.EndTabBar()
             end
-            -- ImGui.EndChild()
         end
-        -- Reset Font Scale
 
-        -- Unload Theme
         Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
         ImGui.End()
 
@@ -2435,7 +2473,7 @@ function Module.RenderGUI()
                 showControls = false
             end
             if showControls then
-                Module.RenderControls(scale, tmpTable)
+                Module.RenderControls(tmpTable)
             end
             ImGui.End()
             Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
@@ -2450,7 +2488,7 @@ function Module.RenderGUI()
                 showPathData = false
             end
             if showPathData then
-                Module.RenderPathData(scale, tmpTable)
+                Module.RenderPathData(tmpTable)
             end
             ImGui.End()
             Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
@@ -2466,7 +2504,7 @@ function Module.RenderGUI()
             Module.TempSettings.PopDebug = false
         end
         if showDebug then
-            RenderDebugMessages(scale)
+            RenderDebugMessages()
         end
         ImGui.End()
         Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
@@ -2670,9 +2708,6 @@ function Module.RenderGUI()
                         settings[Module.Name].RaidWatchHealth = ImGui.InputInt("Watch Health##RaidWatch" .. Module.Name, settings[Module.Name].RaidWatchHealth, 1, 5)
                         if settings[Module.Name].RaidWatchHealth > 100 then settings[Module.Name].RaidWatchHealth = 100 end
                         if settings[Module.Name].RaidWatchHealth < 1 then settings[Module.Name].RaidWatchHealth = 1 end
-                        -- settings[Module.Name].RaidWatchMana = ImGui.InputInt("Watch Mana##RaidWatch" .. Module.Name, settings[Module.Name].RaidWatchMana, 1, 5)
-                        -- if settings[Module.Name].RaidWatchMana > 100 then settings[Module.Name].RaidWatchMana = 100 end
-                        -- if settings[Module.Name].RaidWatchMana < 1 then settings[Module.Name].RaidWatchMana = 1 end
 
                         if ImGui.BeginCombo("Watch Type##RaidWatch" .. Module.Name, settings[Module.Name].RaidWatchType) then
                             local types = { "All", "Healer", "Self", "None", }
@@ -2782,26 +2817,6 @@ end
 --[[-------- Main Functions --------]]
 
 local function displayHelp()
-    --[[
-    Commands: /mypaths [go|stop|list|chainadd|chainclear|show|quit|help] [loop|rloop|start|reverse|pingpong|closest|rclosest] [path]
-    Options: go = REQUIRES arguments and Path name see below for Arguments.
-    Options: stop = Stops the current Navigation.
-    Options: show = Toggles Main GUI.
-    Options: chainclear = Clears the Current Chain.
-    Options: chainadd [normal|reverse|loop|pingpong] [path] -- adds path to chain in current zone
-    Options: chainadd [normal|reverse|loop|pingpong] [zone] [path] -- adds zone/path to chain
-    Options: list = Lists all Paths in the current Zone.
-    Options: list zone -- list all zones that have paths
-    Options: list [zone] -- list all paths in specified zone
-    Options: quit or exit = Exits the script.
-    Options: help = Prints out this help list.
-    Arguments: loop = Loops the path, rloop = Loop in reverse.
-    Arguments: closest = start at closest wp, rclosest = start at closest wp and go in reverse.
-    Arguments: start = starts the path normally, reverse = run the path backwards.
-    Arguments: pingpong = start in ping pong mode.
-    Example: /mypaths go loop "Loop A"
-    Example: /mypaths stop
-    Commands: /mypaths [combat|xtarg] [on|off] - Toggle Combat or Xtarget.]]
     Module.Utils.PrintOutput('MyUI', nil,
         "\ay[\at%s\ax] \agCommands: \ay/mypaths [go|stop|list|chainadd|chainclear|chainloop|show|quit|save|reload|help] [loop|rloop|start|reverse|pingpong|closest|rclosest] [path]",
         Module.Name)
@@ -3052,34 +3067,6 @@ local function bind(...)
     handleArguments()
 end
 
-local function processArgs()
-    if #args == 0 then
-        displayHelp()
-        return
-    end
-    if #args == 2 then
-        if (args[1] == 'debug' and args[2] == 'hud') or (args[2] == 'debug' and args[1] == 'hud') then
-            DEBUG = not DEBUG
-            showHUD = not showHUD
-            return
-        end
-    end
-    if args[1] == 'debug' then
-        DEBUG = not DEBUG
-        return
-    end
-    if args[1] == 'hud' then
-        showHUD = not showHUD
-        return
-    end
-    for i = 1, #args do
-        if args[i] == 'go' then
-            oneshot = true
-        end
-    end
-    handleArguments()
-end
-
 function Module.Unload()
     mq.unbind('/mypaths')
 end
@@ -3100,7 +3087,7 @@ local function Init()
     currZone = mq.TLO.Zone.ShortName()
     lastZone = currZone
     displayHelp()
-    processArgs()
+    handleArguments()
     Module.cycleTime = os.clock()
     Module.IsRunning = true
     if not loadedExeternally then
@@ -3143,6 +3130,11 @@ function Module.MainLoop()
         NavSet.PreviousDoNav = false
         -- Reset navigation state for new zone
         NavSet.CurrentStepIndex = 1
+        NavSet.State = 'IDLE'
+        NavSet.SortedWaypoints = nil
+        NavSet.NavCommandIssued = false
+        NavSet.NavStartedOnce = false
+        NavSet.PreviousState = nil
         Module.Status = 'Idle'
         NavSet.CurChain = NavSet.CurChain + 1
         if NavSet.ChainStart then
@@ -3192,10 +3184,6 @@ function Module.MainLoop()
 
     if NavSet.doPause then
         goto paused
-    end
-
-    if NavSet.doNav then
-        InterruptSet.interruptFound = CheckInterrupts()
     end
 
     if NavSet.doNav and NavSet.ChainStart and not NavSet.doChainPause then
@@ -3293,74 +3281,23 @@ function Module.MainLoop()
         -- end
     end
 
-    if not InterruptSet.interruptFound and not NavSet.doPause and not NavSet.doChainPause then
-        if NavSet.doNav and NavSet.PreviousDoNav ~= NavSet.doNav then
-            -- Reset the coroutine since doNav changed from false to true
-            co = coroutine.create(NavigatePath)
-        end
-        curTime = os.clock()
+    if NavSet.doNav and NavSet.PreviousDoNav ~= NavSet.doNav then
+        NavSet.State = 'NAV_STARTING'
+    end
 
-        -- If the coroutine is not dead, resume it
-        if coroutine.status(co) ~= "dead" then
-            -- Check if we need to pause
-            if InterruptSet.PauseStart > 0 and NavSet.PauseStart == 0 then
-                curTime = os.clock()
+    if not NavSet.doNav and NavSet.State ~= 'IDLE' then
+        NavSet.State = 'IDLE'
+        NavSet.SortedWaypoints = nil
+        NavSet.NavCommandIssued = false
+        NavSet.NavStartedOnce = false
+        NavSet.PreviousState = nil
+    end
 
-                local diff = curTime - InterruptSet.PauseStart
-                if diff > Module.intPauseTime then
-                    -- Time is up, resume the coroutine and reset the timer values
+    if not NavSet.doPause and not NavSet.doChainPause then
+        Module:ProcessNavState()
+    end
 
-                    -- Module.Utils.PrintOutput('MyUI',nil,"Pause time: %s Start Time %s Current Time: %s Difference: %s", pauseTime, InterruptSet.PauseStart, curTime, diff)
-                    Module.intPauseTime = 0
-                    InterruptSet.PauseStart = 0
-                    local success, message = coroutine.resume(co, NavSet.SelectedPath)
-                    if not success then
-                        Module.Utils.PrintOutput('MyUI', nil, "Error: " .. message)
-                        -- Reset coroutine on error
-                        co = coroutine.create(NavigatePath)
-                    end
-                end
-            elseif InterruptSet.PauseStart > 0 and NavSet.PauseStart > 0 then
-                curTime = os.clock()
-                local diff = curTime - InterruptSet.PauseStart
-                if diff > Module.intPauseTime then
-                    -- Interrupt is over, reset the values
-                    Module.intPauseTime = 0
-                    InterruptSet.PauseStart = 0
-                    --reset wp pause timer
-                    NavSet.PauseStart = os.clock()
-                    Module.Status = string.format('Paused: Interrupt over Restarting WP %s delay', Module.curWpPauseTime)
-                end
-            elseif InterruptSet.PauseStart == 0 and NavSet.PauseStart > 0 then
-                curTime = os.clock()
-                local diff = curTime - NavSet.PauseStart
-                if diff > Module.curWpPauseTime then
-                    -- Time is up, resume the coroutine and reset the timer values
-                    -- Module.Utils.PrintOutput('MyUI',nil,"Pause time: %s Start Time %s Current Time: %s Difference: %s", pauseTime, InterruptSet.PauseStart, curTime, diff)
-                    Module.curWpPauseTime = 0
-                    NavSet.PauseStart = 0
-                    local success, message = coroutine.resume(co, NavSet.SelectedPath)
-                    if not success then
-                        Module.Utils.PrintOutput('MyUI', nil, "Error: " .. message)
-                        -- Reset coroutine on error
-                        co = coroutine.create(NavigatePath)
-                    end
-                end
-            else
-                -- Resume the coroutine we are do not need to pause
-                local success, message = coroutine.resume(co, NavSet.SelectedPath)
-                if not success then
-                    Module.Utils.PrintOutput('MyUI', nil, "Error: " .. message)
-                    -- Reset coroutine on error
-                    co = coroutine.create(NavigatePath)
-                end
-            end
-        else
-            -- If the coroutine is dead, create a new one
-            co = coroutine.create(NavigatePath)
-        end
-    elseif not NavSet.doNav and not NavSet.autoRecord then
-        -- Reset state when doNav is false
+    if not NavSet.doNav and not NavSet.autoRecord then
         NavSet.LoopCount = 0
         if not NavSet.ChainStart then
             NavSet.doPause = false
@@ -3371,7 +3308,6 @@ function Module.MainLoop()
         PathStartClock, PathStartTime = nil, nil
     end
 
-    -- Update previousDoNav to the current state
     NavSet.PreviousDoNav = NavSet.doNav
 
     if #ChainedPaths > 0 and not NavSet.doNav and NavSet.ChainStart then

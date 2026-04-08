@@ -365,6 +365,22 @@ local function DrawAATable(which_Table, label)
     ImGui.EndChild()
 end
 
+function Module:DrawMini()
+    local clicked, hovered = Module.Utils.DrawMiniButton("##" .. Module.Name, 2305)
+    if clicked then
+        Module.ShowGui = not Module.ShowGui
+        Module.Settings.showUI = Module.ShowGui
+        mq.pickle(configFile, Module.Settings)
+    end
+    if hovered then
+        ImGui.BeginTooltip()
+        ImGui.Text(Module.Name)
+        ImGui.Text("Left-click to toggle UI")
+        ImGui.Text("Available AA: %s", availAA)
+        ImGui.EndTooltip()
+    end
+end
+
 function Module:RenderMiniButton(grouped)
     if not grouped then
         ImGui.SetNextWindowPos(ImVec2(200, 20), ImGuiCond.FirstUseEver)
@@ -374,45 +390,11 @@ function Module:RenderMiniButton(grouped)
         end
 
         if showBtn then
-            local cursorPosX, cursorPosY = ImGui.GetCursorScreenPos()
-            animMini:SetTextureCell(2305 - EQ_ICON_OFFSET)
-            ImGui.DrawTextureAnimation(animMini, 34, 34, true)
-            ImGui.SetCursorScreenPos(cursorPosX, cursorPosY)
-            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0.5, 0.5, 0, 0.5))
-            ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
-            if ImGui.Button("##" .. Module.Name, ImVec2(34, 34)) then
-                Module.ShowGui = not Module.ShowGui
-                Module.Settings.showUI = Module.ShowGui
-                mq.pickle(configFile, Module.Settings)
-            end
-            ImGui.PopStyleColor(3)
-        end
-        if ImGui.IsItemHovered() then
-            ImGui.BeginTooltip()
-            ImGui.Text(Module.Name)
-            ImGui.Text("Left-click to toggle UI")
-            ImGui.Text("Available AA: %s", availAA)
-            ImGui.EndTooltip()
+            self:DrawMini()
         end
         ImGui.End()
     else
-        local cursorPosX, cursorPosY = ImGui.GetCursorScreenPos()
-        animMini:SetTextureCell(2305 - EQ_ICON_OFFSET)
-        ImGui.DrawTextureAnimation(animMini, 34, 34, true)
-        ImGui.SetCursorScreenPos(cursorPosX, cursorPosY)
-        ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0.5, 0.5, 0, 0.5))
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
-        if ImGui.Button("##" .. Module.Name, ImVec2(34, 34)) then
-            Module.ShowGui = not Module.ShowGui
-            Module.Settings.showUI = Module.ShowGui
-            mq.pickle(configFile, Module.Settings)
-        end
-        ImGui.PopStyleColor(3)
-        if ImGui.IsItemHovered() then
-            ImGui.SetTooltip(string.format("%s\nLeft-click to toggle UI\nAvailable AA: %s", Module.Name, availAA))
-        end
+        self:DrawMini()
     end
 end
 local tabPage = mq.TLO.Window("AAWindow/AAW_Subwindows")

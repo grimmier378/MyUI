@@ -949,6 +949,21 @@ function Module:RenderMainWindow()
     ImGui.End()
 end
 
+function Module:DrawMini()
+    local clicked, hovered = Utils.DrawMiniButton("##MyInventoryBtn", 3515, {
+        text = tostring(invData.freeSlots or 0),
+    })
+    if clicked then
+        self.ShowGUI = not self.ShowGUI
+    end
+    if hovered then
+        ImGui.BeginTooltip()
+        ImGui.Text("My Inventory")
+        ImGui.Text("Free Slots: %d", invData.freeSlots or 0)
+        ImGui.EndTooltip()
+    end
+end
+
 function Module:RenderMiniButton(grouped)
     if not grouped then
         local colorCount, styleCount = self.ThemeLoader.StartTheme(themeName, self.Theme)
@@ -960,56 +975,14 @@ function Module:RenderMiniButton(grouped)
         end
 
         if showBtn then
-            local cursorX, cursorY = ImGui.GetCursorScreenPos()
-            local freeSlots = invData.freeSlots or 0
-            animItems:SetTextureCell(3515 - EQ_ICON_OFFSET)
-            ImGui.DrawTextureAnimation(animItems, 34, 34, true)
-            ImGui.SetCursorPos(20, 20)
-            Utils.DropShadow(freeSlots, { Enabled = true, })
-
-            ImGui.SetCursorScreenPos(cursorX, cursorY)
-            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0, 0.5, 0.5, 0.5))
-            ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
-            if ImGui.Button("##MyInventoryBtn", ImVec2(34, 34)) then
-                self.ShowGUI = not self.ShowGUI
-            end
-            ImGui.PopStyleColor(3)
-
-            if ImGui.IsItemHovered() then
-                ImGui.BeginTooltip()
-                ImGui.Text("My Inventory")
-                ImGui.Text("Free Slots: %d", invData.freeSlots or 0)
-                ImGui.EndTooltip()
-            end
+            self:DrawMini()
         end
         ImGui.PopStyleVar()
         self.ThemeLoader.EndTheme(colorCount, styleCount)
         ImGui.End()
         return
-    end
-
-    local cursorX, cursorY = ImGui.GetCursorScreenPos()
-    local freeSlots = invData.freeSlots or 0
-    animItems:SetTextureCell(3515 - EQ_ICON_OFFSET)
-    ImGui.DrawTextureAnimation(animItems, 34, 34, true)
-    ImGui.SetCursorPos(20, 20)
-    Utils.DropShadow(freeSlots, { Enabled = true, })
-
-    ImGui.SetCursorScreenPos(cursorX, cursorY)
-    ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
-    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0, 0.5, 0.5, 0.5))
-    ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
-    if ImGui.Button("##MyInventoryBtn", ImVec2(34, 34)) then
-        self.ShowGUI = not self.ShowGUI
-    end
-    ImGui.PopStyleColor(3)
-
-    if ImGui.IsItemHovered() then
-        ImGui.BeginTooltip()
-        ImGui.Text("My Inventory")
-        ImGui.Text("Free Slots: %d", invData.freeSlots or 0)
-        ImGui.EndTooltip()
+    else
+        self:DrawMini()
     end
 end
 

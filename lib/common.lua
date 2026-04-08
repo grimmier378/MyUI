@@ -483,6 +483,42 @@ end
 
 --- Draw Status Icons from items, spells, or pwcs with tooltips
 ---@param type string  'item' or 'pwcs' or 'spell' type of icon to draw
+---@param id string ImGui button ID (e.g. "##BigBagsBtn")
+---@param iconId integer|nil EQ icon ID (raw, before -500 offset). nil when using a custom image.
+---@param opts table|nil Optional: { image = textureID, imageTint = ImVec4, hoverColor = ImVec4, text = string, textOffset = {x, y}, textColor = ImVec4 }
+---@return boolean clicked, boolean hovered, number cursorX, number cursorY
+function Utils.DrawMiniButton(id, iconId, opts)
+    local cursorX, cursorY = ImGui.GetCursorScreenPos()
+    if opts and opts.image then
+        Utils.Animation_Item:SetTextureCell(3996)
+        ImGui.DrawTextureAnimation(Utils.Animation_Item, 34, 34, true)
+        ImGui.SetCursorScreenPos(cursorX, cursorY)
+        if opts.imageTint then
+            ImGui.Image(opts.image, ImVec2(34, 34), ImVec2(0, 0), ImVec2(1, 1), opts.imageTint)
+        else
+            ImGui.Image(opts.image, ImVec2(34, 34))
+        end
+    else
+        Utils.Animation_Item:SetTextureCell((iconId or 4496) - 500)
+        ImGui.DrawTextureAnimation(Utils.Animation_Item, 34, 34, true)
+    end
+    if opts and opts.text then
+        local offsetX = (opts.textOffset and opts.textOffset.x) or 11
+        local offsetY = (opts.textOffset and opts.textOffset.y) or 11
+        ImGui.SetCursorScreenPos(cursorX + offsetX, cursorY + offsetY)
+        Utils.DropShadow(opts.text, { Enabled = true, }, nil, opts.textColor)
+    end
+    ImGui.SetCursorScreenPos(cursorX, cursorY)
+    local hoverColor = (opts and opts.hoverColor) or ImVec4(0, 0.5, 0.5, 0.5)
+    ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
+    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, hoverColor)
+    ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
+    local clicked = ImGui.Button(id, ImVec2(34, 34))
+    ImGui.PopStyleColor(3)
+    local hovered = ImGui.IsItemHovered()
+    return clicked, hovered, cursorX, cursorY
+end
+
 ---@param txt string  the tooltip text
 ---@param iconID integer|string  the icon id to draw
 ---@param iconSize integer|nil  the size of the icon to draw

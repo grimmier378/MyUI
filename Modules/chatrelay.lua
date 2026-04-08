@@ -288,6 +288,26 @@ local function getTellChat(line, who)
     end
 end
 
+function Module:DrawMini()
+    local tint = (not settings[Module.DisplayName].ShowOnNewMessage and NewMessage) and ImVec4(1, 0, 0, 1) or nil
+    local clicked, hovered = Module.Utils.DrawMiniButton("##ChatRelayBtn", nil, { image = minImg:GetTextureID(), imageTint = tint })
+    if clicked then
+        showMain = not showMain
+    end
+    if hovered then
+        ImGui.SetTooltip("Chat Relay")
+    end
+    if ImGui.BeginPopupContextItem("ChatRelayContext") then
+        if ImGui.MenuItem("exit") then
+            Module.IsRunning = false
+        end
+        if ImGui.MenuItem("config") then
+            showConfig = true
+        end
+        ImGui.EndPopup()
+    end
+end
+
 function Module:RenderMiniButton(grouped)
     if not grouped then
         local ColorCount, StyleCount = Module.ThemeLoader.StartTheme(themeName, Module.Theme)
@@ -299,51 +319,14 @@ function Module:RenderMiniButton(grouped)
             Module.IsRunning = false
         end
         if showMini then
-            if not settings[Module.DisplayName].ShowOnNewMessage and NewMessage then
-                if ImGui.ImageButton("ChatRelay", minImg:GetTextureID(), ImVec2(settings[Module.DisplayName].IconSize, settings[Module.DisplayName].IconSize), ImVec2(0.0, 0.0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), ImVec4(1, 0, 0, 1)) then
-                    showMain = not showMain
-                end
-            else
-                if ImGui.ImageButton("ChatRelay", minImg:GetTextureID(), ImVec2(settings[Module.DisplayName].IconSize, settings[Module.DisplayName].IconSize)) then
-                    showMain = not showMain
-                end
-            end
-
-            if ImGui.BeginPopupContextItem("ChatRelayContext") then
-                if ImGui.MenuItem("exit") then
-                    Module.IsRunning = false
-                end
-                if ImGui.MenuItem("config") then
-                    showConfig = true
-                end
-                ImGui.EndPopup()
-            end
+            self:DrawMini()
         end
         Module.ThemeLoader.EndTheme(ColorCount, StyleCount)
 
         ImGui.End()
         return
-    end
-    if not settings[Module.DisplayName].ShowOnNewMessage and NewMessage then
-        if ImGui.ImageButton("ChatRelay##Grouped", minImg:GetTextureID(), ImVec2(34, 34), ImVec2(0.0, 0.0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), ImVec4(1, 0, 0, 1)) then
-            showMain = not showMain
-        end
     else
-        if ImGui.ImageButton("ChatRelay##Grouped", minImg:GetTextureID(), ImVec2(34, 34)) then
-            showMain = not showMain
-        end
-    end
-    if ImGui.IsItemHovered() then
-        ImGui.SetTooltip("Chat Relay")
-    end
-    if ImGui.BeginPopupContextItem("ChatRelayContext") then
-        if ImGui.MenuItem("exit") then
-            Module.IsRunning = false
-        end
-        if ImGui.MenuItem("config") then
-            showConfig = true
-        end
-        ImGui.EndPopup()
+        self:DrawMini()
     end
 end
 

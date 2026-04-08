@@ -110,6 +110,10 @@ local renamePresetName                          = ''
 local pendingDeleteEvent                        = nil -- {chanID, eventID}
 local pendingDeleteFilter                       = nil -- {chanID, eventID, filterID}
 local pendingDeleteChannel                      = nil -- chanID
+local lastTabOrder                              = {}
+local tabOrderDirty                             = false
+local tabOrderLastSave                          = 0
+local TAB_ORDER_SAVE_INTERVAL                   = 3
 
 local keyboardKeys                              = {
     [1]  = 'GraveAccent',
@@ -1704,20 +1708,19 @@ local function DrawConsole(channelID)
     local footerHeight = 35
     local contentSizeX, contentSizeY = ImGui.GetContentRegionAvail()
     contentSizeY = contentSizeY - footerHeight
-
+    -- ImGui.PushFont(ImGui.ConsoleFont, Module.Settings.MainFontSize)
     -- Render console output
     console.console:Render(ImVec2(0, contentSizeY))
+    -- ImGui.PopFont()
 
     -- Separator for command input
     ImGui.Separator()
-
     -- Input text field flags
     local textFlags = bit32.bor(
         ImGuiInputTextFlags.EnterReturnsTrue,
         ImGuiInputTextFlags.CallbackCompletion,
         ImGuiInputTextFlags.CallbackHistory
     )
-
     -- Position and style adjustments
     ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 2)
     ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 2)
@@ -1849,6 +1852,7 @@ local function DrawChatWindow()
                     ImGui.EndMenu()
                 end
             end
+
             spamOn, enableSpam = ImGui.MenuItem('Enable Spam##' .. windowNum, nil, enableSpam)
             if ImGui.MenuItem('Re-Index Settings##' .. windowNum) then
                 forceIndex = true
@@ -1889,7 +1893,7 @@ local function DrawChatWindow()
         end
         if ImGui.BeginMenu('Channels##' .. windowNum) then
             for _, Data in ipairs(sortedChannels) do
-                local channelID = Data[1]
+                local channelID = Data.Id
                 if Module.Settings.Channels[channelID] then
                     local enabled = Module.Settings.Channels[channelID].enabled
                     local name = Module.Settings.Channels[channelID].Name
@@ -1906,7 +1910,7 @@ local function DrawChatWindow()
 
         if ImGui.BeginMenu('Links##' .. windowNum) then
             for _, Data in ipairs(sortedChannels) do
-                local channelID = Data[1]
+                local channelID = Data.Id
                 if Module.Settings.Channels[channelID] then
                     local enableLinks = Module.Settings.Channels[channelID].enableLinks
                     local name = Module.Settings.Channels[channelID].Name
@@ -1925,7 +1929,7 @@ local function DrawChatWindow()
         end
         if ImGui.BeginMenu('PopOut##' .. windowNum) then
             for _, Data in ipairs(sortedChannels) do
-                local channelID = Data[1]
+                local channelID = Data.Id
                 if Module.Settings.Channels[channelID] then
                     if channelID ~= 9000 or enableSpam then
                         local PopOut = Module.Settings.Channels[channelID].PopOut
@@ -2145,8 +2149,9 @@ local function DrawChatWindow()
         end
         -- End Main tab
         -- Begin other tabs
+        local tabPositions = {}
         for _, channelData in ipairs(sortedChannels) do
-            local channelID = channelData[1] or 0
+            local channelID = channelData.Id or 0
             if Module.Settings.Channels[channelID] and Module.Settings.Channels[channelID].enabled then
                 local name = Module.Settings.Channels[channelID].Name:gsub("^%d+%s*", "") .. '##' .. windowNum
                 local links = Module.Settings.Channels[channelID].enableLinks
@@ -2155,6 +2160,7 @@ local function DrawChatWindow()
                 local tNameP = PopOut and 'Disable PopOut' or 'Enable PopOut'
                 local tNameM = enableMain and 'Disable Main' or 'Enable Main'
                 local tNameL = links and 'Disable Links' or 'Enable Links'
+
 
                 local function tabToolTip()
                     ImGui.BeginTooltip()
@@ -2165,7 +2171,10 @@ local function DrawChatWindow()
                 end
 
                 if not PopOut then
-                    if ImGui.BeginTabItem(name) then
+                    local selected = ImGui.BeginTabItem(name)
+                    local tabX = ImGui.GetItemRectMin()
+                    table.insert(tabPositions, { id = channelID, x = tabX, })
+                    if selected then
                         activeTabID = channelID
 
                         if ImGui.IsItemHovered() then
@@ -2218,14 +2227,6 @@ local function DrawChatWindow()
                                 Module.Consoles[channelID].txtBuffer = {}
                             end
 
-                            ImGui.Separator()
-                            if ImGui.Selectable(Module.Icons.FA_ARROW_LEFT .. ' Move Left##' .. windowNum) then
-                                Module.MoveTab(channelID, 'left')
-                            end
-                            if ImGui.Selectable(Module.Icons.FA_ARROW_RIGHT .. ' Move Right##' .. windowNum) then
-                                Module.MoveTab(channelID, 'right')
-                            end
-
                             ImGui.EndPopup()
                         end
 
@@ -2237,6 +2238,42 @@ local function DrawChatWindow()
             end
         end
         ImGui.EndTabBar()
+
+        if #tabPositions > 0 then
+            table.sort(tabPositions, function(a, b) return a.x < b.x end)
+            local newOrder = {}
+            for i, tp in ipairs(tabPositions) do
+                newOrder[i] = tp.id
+            end
+            local orderChanged = false
+            if #newOrder ~= #lastTabOrder then
+                orderChanged = true
+            else
+                for i = 1, #newOrder do
+                    if newOrder[i] ~= lastTabOrder[i] then
+                        orderChanged = true
+                        break
+                    end
+                end
+            end
+            if orderChanged then
+                tabOrderDirty = true
+                lastTabOrder = newOrder
+            end
+        end
+    end
+
+    if tabOrderDirty and (os.clock() - tabOrderLastSave) >= TAB_ORDER_SAVE_INTERVAL then
+        for i, id in ipairs(lastTabOrder) do
+            if Module.Settings.Channels[id] then
+                Module.Settings.Channels[id].TabOrder = i
+            end
+        end
+        Module.tempSettings = Module.Settings
+        writeSettings(Module.SettingsFile, Module.Settings)
+        Module.SortChannels()
+        tabOrderDirty = false
+        tabOrderLastSave = os.clock()
     end
 end
 
@@ -3293,70 +3330,30 @@ function Module.SortChannels()
     sortedChannels = {}
     for k, v in pairs(Module.Settings.Channels) do
         if v then
-            table.insert(sortedChannels, { k, v.Name, v.TabOrder or 999, })
+            table.insert(sortedChannels, { Id = k, Name = v.Name, TabOrder = v.TabOrder or 999, })
         end
     end
 
     -- Sort by TabOrder (lower = further left), then alphabetically as tiebreaker
     table.sort(sortedChannels, function(a, b)
-        if a[3] ~= b[3] then
-            return a[3] < b[3]
+        if a.TabOrder ~= b.TabOrder then
+            return a.TabOrder < b.TabOrder
         end
-        return a[2] < b[2]
+        return a.Name < b.Name
     end)
 end
 
----Swaps two channels' TabOrder values and re-sorts
----@param channelID integer -- the channel to move
----@param direction string -- 'left' or 'right'
-function Module.MoveTab(channelID, direction)
-    -- Find current position in sortedChannels
-    local curIdx = nil
-    for i, entry in ipairs(sortedChannels) do
-        if entry[1] == channelID then
-            curIdx = i
-            break
-        end
-    end
-    if not curIdx then return end
-
-    local swapIdx = nil
-    if direction == 'left' then
-        -- Find the nearest visible, non-popped-out channel to the left
-        for i = curIdx - 1, 1, -1 do
-            local sid = sortedChannels[i][1]
-            if Module.Settings.Channels[sid] and Module.Settings.Channels[sid].enabled
-                and not Module.Settings.Channels[sid].PopOut then
-                swapIdx = i
-                break
-            end
-        end
-    elseif direction == 'right' then
-        -- Find the nearest visible, non-popped-out channel to the right
-        for i = curIdx + 1, #sortedChannels do
-            local sid = sortedChannels[i][1]
-            if Module.Settings.Channels[sid] and Module.Settings.Channels[sid].enabled
-                and not Module.Settings.Channels[sid].PopOut then
-                swapIdx = i
-                break
-            end
-        end
-    end
-
-    if not swapIdx then return end
-
-    -- Swap TabOrder values
-    local curChanID = sortedChannels[curIdx][1]
-    local swapChanID = sortedChannels[swapIdx][1]
-    local tmpOrder = Module.Settings.Channels[curChanID].TabOrder
-    Module.Settings.Channels[curChanID].TabOrder = Module.Settings.Channels[swapChanID].TabOrder
-    Module.Settings.Channels[swapChanID].TabOrder = tmpOrder
-    Module.tempSettings = Module.Settings
-    writeSettings(Module.SettingsFile, Module.Settings)
-    Module.SortChannels()
-end
-
 function Module.Unload()
+    if tabOrderDirty and #lastTabOrder > 0 then
+        for i, id in ipairs(lastTabOrder) do
+            if Module.Settings.Channels[id] then
+                Module.Settings.Channels[id].TabOrder = i
+            end
+        end
+        Module.tempSettings = Module.Settings
+        writeSettings(Module.SettingsFile, Module.Settings)
+        tabOrderDirty = false
+    end
     for eventName, _ in pairs(Module.eventNames) do
         mq.unevent(eventName)
     end

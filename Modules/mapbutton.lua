@@ -85,6 +85,33 @@ local function Init()
     end
 end
 
+function Module:DrawMini()
+    local clicked, hovered = Module.Utils.DrawMiniButton("##" .. Module.Name, 6849)
+    if clicked then
+        mq.cmd("/nearby toggle")
+    end
+    if hovered then
+        ImGui.BeginTooltip()
+        ImGui.Text(Module.Name)
+        ImGui.Text("Toggle NearBy Map")
+        ImGui.Separator()
+        ImGui.TextColored(ImVec4(1, 1, 0, 1), "(Ctrl + M) or\n(Shift + MiddleMouseBtn)\nto toggle")
+        ImGui.EndTooltip()
+    end
+    if (ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsKeyPressed(ImGuiKey.M)) or
+        (ImGui.IsMouseReleased(ImGuiMouseButton['Middle']) and ImGui.IsKeyDown(ImGuiMod.Shift)) then
+        mq.cmd("/nearby toggle")
+    end
+    if ImGui.BeginPopupContextItem("options##MapButton") then
+        local changed = false
+        changed, Module.Settings.HideOnStart = ImGui.MenuItem("HideOnStart##mapbutton", nil, Module.Settings.HideOnStart)
+        if changed then
+            mq.pickle(configFile, Module.Settings)
+        end
+        ImGui.EndPopup()
+    end
+end
+
 function Module:RenderMiniButton(grouped)
     if not grouped then
         ImGui.SetNextWindowPos(ImVec2(200, 20), ImGuiCond.FirstUseEver)
@@ -94,71 +121,11 @@ function Module:RenderMiniButton(grouped)
         end
 
         if showBtn then
-            local cursorPosX, cursorPosY = ImGui.GetCursorScreenPos()
-            animMini:SetTextureCell(6849 - EQ_ICON_OFFSET)
-            ImGui.DrawTextureAnimation(animMini, 34, 34, true)
-            ImGui.SetCursorScreenPos(cursorPosX, cursorPosY)
-            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0.5, 0.5, 0, 0.5))
-            ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
-            if ImGui.Button("##" .. Module.Name, ImVec2(34, 34)) then
-                mq.cmd("/nearby toggle")
-            end
-            ImGui.PopStyleColor(3)
-        end
-        if ImGui.IsItemHovered() then
-            ImGui.BeginTooltip()
-            ImGui.Text(Module.Name)
-            ImGui.Text("Toggle NearBy Map")
-            ImGui.Separator()
-            ImGui.TextColored(ImVec4(1, 1, 0, 1), "(Ctrl + M) or\n(Shift + MiddleMouseBtn)\nto toggle")
-            ImGui.EndTooltip()
-        end
-        if (ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsKeyPressed(ImGuiKey.M)) or
-            (ImGui.IsMouseReleased(ImGuiMouseButton['Middle']) and ImGui.IsKeyDown(ImGuiMod.Shift)) then
-            mq.cmd("/nearby toggle")
-        end
-        if ImGui.BeginPopupContextItem("options##MapButton") then
-            local changed = false
-            changed, Module.Settings.HideOnStart = ImGui.MenuItem("HideOnStart##mapbutton", nil, Module.Settings.HideOnStart)
-            if changed then
-                mq.pickle(configFile, Module.Settings)
-            end
-            ImGui.EndPopup()
+            self:DrawMini()
         end
         ImGui.End()
     else
-        local cursorPosX, cursorPosY = ImGui.GetCursorScreenPos()
-        animMini:SetTextureCell(6849 - EQ_ICON_OFFSET)
-        ImGui.DrawTextureAnimation(animMini, 34, 34, true)
-        ImGui.SetCursorScreenPos(cursorPosX, cursorPosY)
-        ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0.5, 0.5, 0, 0.5))
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
-        if ImGui.Button("##" .. Module.Name, ImVec2(34, 34)) then
-            mq.cmd("/nearby toggle")
-        end
-        ImGui.PopStyleColor(3)
-        if ImGui.IsItemHovered() then
-            ImGui.BeginTooltip()
-            ImGui.Text(Module.Name)
-            ImGui.Text("Toggle NearBy Map")
-            ImGui.Separator()
-            ImGui.TextColored(ImVec4(1, 1, 0, 1), "(Ctrl + M) or\n(Shift + MiddleMouseBtn)\nto toggle")
-            ImGui.EndTooltip()
-        end
-        if (ImGui.IsKeyDown(ImGuiMod.Ctrl) and ImGui.IsKeyPressed(ImGuiKey.M)) or
-            (ImGui.IsMouseReleased(ImGuiMouseButton['Middle']) and ImGui.IsKeyDown(ImGuiMod.Shift)) then
-            mq.cmd("/nearby toggle")
-        end
-        if ImGui.BeginPopupContextItem("options##MapButton") then
-            local changed = false
-            changed, Module.Settings.HideOnStart = ImGui.MenuItem("HideOnStart##mapbutton", nil, Module.Settings.HideOnStart)
-            if changed then
-                mq.pickle(configFile, Module.Settings)
-            end
-            ImGui.EndPopup()
-        end
+        self:DrawMini()
     end
 end
 

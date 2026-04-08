@@ -98,6 +98,7 @@ MyUI.DefaultConfig = {
     ShowMain = true,
     ThemeName = 'Default',
     GroupButtons = false,
+    ResizeMini = false,
     ButtonOrder = {},
     mods_list = {
         -- load order = {name = 'mod_name', enabled = true/false}
@@ -369,6 +370,15 @@ local function DrawContextMenu()
         ImGui.Separator()
     end
 
+    if MyUI.Settings.GroupButtons then
+        local changed = false
+        changed, MyUI.Settings.ResizeMini = ImGui.MenuItem('Resize Mini', nil, MyUI.Settings.ResizeMini)
+        if changed then
+            mq.pickle(MyUI.SettingsFile, MyUI.Settings)
+        end
+        ImGui.Spacing()
+        ImGui.Separator()
+    end
     if ImGui.MenuItem('Exit') then
         MyUI.IsRunning = false
     end
@@ -450,14 +460,26 @@ end
 
 local function RenderMini()
     local ColorCount, StyleCount = MyUI.ThemeLoader.StartTheme(MyUI.ThemeName, MyUI.Theme)
-    local openMini, showMini = ImGui.Begin(MyUI.ScriptName .. "##Mini" .. MyUI.CharLoaded, true,
-        bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar))
+    local miniFlags
+    if MyUI.Settings.GroupButtons then
+        local btnCount = #GetButtonOrder() + 1
+        local initCols = math.min(btnCount, 5)
+        local initRows = math.ceil(btnCount / initCols)
+        local initW = initCols * (34 + 2) + 16
+        local initH = initRows * (34 + 2) + 16
+        ImGui.SetNextWindowSize(ImVec2(initW, initH), ImGuiCond.FirstUseEver)
+        miniFlags = bit32.bor(ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoScrollbar)
+    else
+        miniFlags = bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar)
+    end
+    local openMini, showMini = ImGui.Begin(MyUI.ScriptName .. "##Mini" .. MyUI.CharLoaded, true, miniFlags)
 
     if not openMini then
         MyUI.IsRunning = false
     end
     if showMini then
-        if ImGui.ImageButton("MyUI", MyUI.Grimmier_Img:GetTextureID(), ImVec2(30, 30)) then
+        local clicked = MyUI.Utils.DrawMiniButton("##MyUIBtn", nil, { image = MyUI.Grimmier_Img:GetTextureID(), })
+        if clicked then
             MyUI.Settings.ShowMain = not MyUI.Settings.ShowMain
         end
         if ImGui.BeginPopupContextItem("MyUI##MiniContext") then
@@ -466,16 +488,25 @@ local function RenderMini()
             ImGui.EndPopup()
         end
         if MyUI.Settings.GroupButtons then
+            ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, ImVec2(2, 2))
+            local winWidth = ImGui.GetContentRegionAvail()
+            local cols = math.max(1, math.floor(winWidth / (34 + 2)))
+            local col = 2
             local btnOrder = GetButtonOrder()
             local drawList = ImGui.GetWindowDrawList()
             local btnRects = {}
             local dragSrcIdx = nil
             for i, name in ipairs(btnOrder) do
-                ImGui.SameLine()
+                if col <= cols then
+                    ImGui.SameLine()
+                    col = col + 1
+                else
+                    col = 2
+                end
                 MyUI.Modules[name]:RenderMiniButton(true)
                 local minX, minY = ImGui.GetItemRectMin()
                 local maxX, maxY = ImGui.GetItemRectMax()
-                btnRects[i] = { minX = minX, minY = minY, maxX = maxX, maxY = maxY }
+                btnRects[i] = { minX = minX, minY = minY, maxX = maxX, maxY = maxY, }
                 if ImGui.BeginDragDropSource() then
                     dragSrcIdx = i
                     ImGui.SetDragDropPayload("MINI_BTN", i)
@@ -494,6 +525,14 @@ local function RenderMini()
                     end
                     ImGui.EndDragDropTarget()
                 end
+            end
+            ImGui.PopStyleVar()
+            if MyUI.Settings.ResizeMini then
+                local totalBtns = #btnOrder + 1
+                local rows = math.ceil(totalBtns / cols)
+                local clampW = cols * (34 + 2) + 16
+                local clampH = rows * (34 + 2) + 16
+                ImGui.SetWindowSize(ImVec2(clampW, clampH))
             end
             if dragSrcIdx and btnRects[dragSrcIdx] then
                 local r = btnRects[dragSrcIdx]

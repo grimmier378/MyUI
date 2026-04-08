@@ -7,7 +7,7 @@ Module.ShowGUI             = false
 Module.TempSettings        = {}
 Module.TempSettings.Popped = {}
 
-local loadedExternally    = MyUI ~= nil and true or false
+local loadedExternally     = MyUI ~= nil and true or false
 
 if not loadedExternally then
     Module.Path          = string.format("%s/%s/", mq.luaDir, Module.Name)
@@ -1321,72 +1321,39 @@ function Module:BigButtonTooltip()
     ImGui.EndTooltip()
 end
 
+function Module:DrawMini()
+    local iconId = FreeSlots > MIN_SLOTS_WARN and 3635 or 3632
+    local textColor = FreeSlots > MIN_SLOTS_WARN and nil or Module.Utils.Colors.color('teal')
+    local clicked, hovered = Module.Utils.DrawMiniButton("##BigBagsBtn", iconId, {
+        text = tostring(FreeSlots), textColor = textColor,
+    })
+    if clicked then
+        self.ShowGUI = not self.ShowGUI
+    end
+    if hovered then
+        self:BigButtonTooltip()
+    end
+end
+
 function Module:RenderMiniButton(grouped)
     if not grouped then
         local colorCount, styleCount = self.ThemeLoader.StartTheme(themeName, self.Theme)
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, ImVec2(9, 9))
-        local openBtn, showBtn = ImGui.Begin(string.format("Big Bag##Mini"), true, bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoCollapse))
+        local openBtn, showBtn = ImGui.Begin(string.format("Big Bag##Mini"), true,
+            bit32.bor(ImGuiWindowFlags.AlwaysAutoResize, ImGuiWindowFlags.NoTitleBar, ImGuiWindowFlags.NoCollapse))
         if not openBtn then
             showBtn = false
         end
 
         if showBtn then
-            local cursorX, cursorY = ImGui.GetCursorScreenPos()
-            if FreeSlots > MIN_SLOTS_WARN then
-                animMini:SetTextureCell(3635 - EQ_ICON_OFFSET)
-                ImGui.DrawTextureAnimation(animMini, 34, 34, true)
-                ImGui.SetCursorPos(20, 20)
-                Module.Utils.DropShadow(FreeSlots, { Enabled = true, })
-            else
-                animMini:SetTextureCell(3632 - EQ_ICON_OFFSET)
-                ImGui.DrawTextureAnimation(animMini, 34, 34, true)
-                ImGui.SetCursorPos(20, 20)
-                Module.Utils.DropShadow(FreeSlots, { Enabled = true, }, nil, Module.Utils.Colors.color('teal'))
-            end
-
-            ImGui.SetCursorScreenPos(cursorX, cursorY)
-            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0, 0.5, 0.5, 0.5))
-            ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
-            if ImGui.Button("##BigBagsBtn", ImVec2(34, 34)) then
-                self.ShowGUI = not self.ShowGUI
-            end
-            ImGui.PopStyleColor(3)
-
-            if ImGui.IsItemHovered() then
-                self:BigButtonTooltip()
-            end
+            self:DrawMini()
         end
         ImGui.PopStyleVar()
         self.ThemeLoader.EndTheme(colorCount, styleCount)
         ImGui.End()
         return
-    end
-
-    local cursorX, cursorY = ImGui.GetCursorScreenPos()
-    if FreeSlots > MIN_SLOTS_WARN then
-        animMini:SetTextureCell(3635 - EQ_ICON_OFFSET)
-        ImGui.DrawTextureAnimation(animMini, 34, 34, true)
-        ImGui.SetCursorPos(20, 20)
-        Module.Utils.DropShadow(FreeSlots, { Enabled = true, })
     else
-        animMini:SetTextureCell(3632 - EQ_ICON_OFFSET)
-        ImGui.DrawTextureAnimation(animMini, 34, 34, true)
-        ImGui.SetCursorPos(20, 20)
-        Module.Utils.DropShadow(FreeSlots, { Enabled = true, }, nil, Module.Utils.Colors.color('teal'))
-    end
-
-    ImGui.SetCursorScreenPos(cursorX, cursorY)
-    ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
-    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0, 0.5, 0.5, 0.5))
-    ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
-    if ImGui.Button("##BigBagsBtn", ImVec2(34, 34)) then
-        self.ShowGUI = not self.ShowGUI
-    end
-    ImGui.PopStyleColor(3)
-
-    if ImGui.IsItemHovered() then
-        self:BigButtonTooltip()
+        self:DrawMini()
     end
 end
 

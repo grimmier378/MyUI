@@ -211,6 +211,28 @@ local colGreen = ImVec4(0.409, 1.000, 0.409, 1.000)
 local colWhite = ImVec4(1, 1, 1, 1)
 local colYellow = ImVec4(1, 1, 0, 1)
 
+function Module:DrawMini()
+    local clicked, hovered = Module.Utils.DrawMiniButton("##ItemTrackerBtn", 1147)
+    if clicked then
+        Module.Settings.showUI = not Module.Settings.showUI
+        mq.pickle(configFile, Module.Settings)
+    end
+    if hovered then
+        ImGui.BeginTooltip()
+        ImGui.Text("Item Tracker")
+        ImGui.Text("Left-click to toggle UI")
+        ImGui.Text("Right-click for options")
+        ImGui.EndTooltip()
+    end
+    if ImGui.BeginPopupContextItem("ItemTrackerContext") then
+        if ImGui.MenuItem(Module.Settings.lockWindow and "Unlock Window" or "Lock Window") then
+            Module.Settings.lockWindow = not Module.Settings.lockWindow
+            mq.pickle(configFile, Module.Settings)
+        end
+        ImGui.EndPopup()
+    end
+end
+
 function Module:RenderMiniButton(grouped)
     if not grouped then
         local winBtnFlags = Module.Settings.lockWindow and bit32.bor(ImGuiWindowFlags.NoMove, buttonWinFlags) or buttonWinFlags
@@ -221,61 +243,11 @@ function Module:RenderMiniButton(grouped)
         end
 
         if showBtn then
-            local cursorPosX, cursorPosY = ImGui.GetCursorScreenPos()
-            animMini:SetTextureCell(1147 - EQ_ICON_OFFSET)
-            ImGui.DrawTextureAnimation(animMini, 34, 34, true)
-            ImGui.SetCursorScreenPos(cursorPosX, cursorPosY)
-            ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0.5, 0.5, 0, 0.5))
-            ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
-            if ImGui.Button("##ItemTrackerBtn", ImVec2(34, 34)) then
-                Module.Settings.showUI = not Module.Settings.showUI
-                mq.pickle(configFile, Module.Settings)
-            end
-            ImGui.PopStyleColor(3)
-        end
-        if ImGui.IsItemHovered() then
-            ImGui.BeginTooltip()
-            ImGui.Text("Item Tracker")
-            ImGui.Text("Left-click to toggle UI")
-            ImGui.Text("Right-click for options")
-            ImGui.EndTooltip()
-        end
-        if ImGui.BeginPopupContextItem("ItemTrackerContext") then
-            if ImGui.MenuItem(Module.Settings.lockWindow and "Unlock Window" or "Lock Window") then
-                Module.Settings.lockWindow = not Module.Settings.lockWindow
-                mq.pickle(configFile, Module.Settings)
-            end
-            ImGui.EndPopup()
+            self:DrawMini()
         end
         ImGui.End()
     else
-        local cursorPosX, cursorPosY = ImGui.GetCursorScreenPos()
-        animMini:SetTextureCell(1147 - EQ_ICON_OFFSET)
-        ImGui.DrawTextureAnimation(animMini, 34, 34, true)
-        ImGui.SetCursorScreenPos(cursorPosX, cursorPosY)
-        ImGui.PushStyleColor(ImGuiCol.Button, ImVec4(0, 0, 0, 0))
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImVec4(0.5, 0.5, 0, 0.5))
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImVec4(0, 0, 0, 0))
-        if ImGui.Button("##ItemTrackerBtn", ImVec2(34, 34)) then
-            Module.Settings.showUI = not Module.Settings.showUI
-            mq.pickle(configFile, Module.Settings)
-        end
-        ImGui.PopStyleColor(3)
-        if ImGui.IsItemHovered() then
-            ImGui.BeginTooltip()
-            ImGui.Text("Item Tracker")
-            ImGui.Text("Left-click to toggle UI")
-            ImGui.Text("Right-click for options")
-            ImGui.EndTooltip()
-        end
-        if ImGui.BeginPopupContextItem("ItemTrackerContext") then
-            if ImGui.MenuItem(Module.Settings.lockWindow and "Unlock Window" or "Lock Window") then
-                Module.Settings.lockWindow = not Module.Settings.lockWindow
-                mq.pickle(configFile, Module.Settings)
-            end
-            ImGui.EndPopup()
-        end
+        self:DrawMini()
     end
 end
 
